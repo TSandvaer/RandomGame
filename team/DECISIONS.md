@@ -353,3 +353,5 @@ Format:
 ## 2026-05-02 — Save schema v3 → v4 design locked: additive-only (`character.stash` sparse 72-slot array + `character.ember_bags` Dict keyed by stratum-id-as-String capped 8 + `character.stash_ui_state.stash_room_seen` bool), all JSON-pure, `_migrate_v3_to_v4` idempotent has()-guarded backfill, 8 round-trip invariants pinned for Tess M2 test, +5–10 KB typical save-size delta well within OPFS quota. **Implementation lands in M2** after Sponsor's M1 soak gate clears. One structural deviation from Uma's `stash-ui-v1.md` §5 (ember-bags placed under `character.` for M3 multi-character symmetry, not at root) — to be confirmed with Uma in M2 implementation PR. Detail: `team/devon-dev/save-schema-v4-plan.md`.
 
 ## 2026-05-02 — Stratum-2 biome locked: Cinder Vaults, palette Cinder-Rust, ember-accent preserved, daltonization-clear. Detail: `team/uma-ux/palette-stratum-2.md`.
+
+## 2026-05-02 — M2 week-1 backlog drafted (anticipatory; revisable post-Sponsor M1 sign-off). Detail: `team/priya-pl/m2-week-1-backlog.md`.
