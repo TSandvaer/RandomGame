@@ -26,6 +26,13 @@ jobs:
     # the runtime here.
     container:
       image: barichello/godot-ci:4.3
+    # The barichello/godot-ci container's default shell is `sh -e`, which
+    # does not understand `set -o pipefail` and exits 2 immediately on any
+    # `run:` step that uses it. Force bash for every step so pipefail and
+    # other bashisms work. (Tess fix, 2026-05-02 — CI red since first push.)
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,11 +47,16 @@ jobs:
       - name: Install GUT (pinned)
         run: |
           set -euo pipefail
-          # Avoid running git inside the addons/ folder if it ever already
-          # contained source — we want a clean checkout pinned to GUT_VERSION.
-          rm -rf addons/gut
-          git clone --depth 1 --branch "${GUT_VERSION}" https://github.com/bitwes/Gut.git addons/gut
-          ls addons/gut
+          # The bitwes/Gut repo is itself a Godot project — the actual addon
+          # lives at `addons/gut/` inside that repo. Clone to a temp dir, then
+          # move the inner `addons/gut/` to our `addons/gut/`. (Tess fix
+          # 2026-05-02 — previously cloned the whole repo to addons/gut/,
+          # which left gut_cmdln.gd at addons/gut/addons/gut/gut_cmdln.gd.)
+          rm -rf addons/gut /tmp/gut-src
+          git clone --depth 1 --branch "${GUT_VERSION}" https://github.com/bitwes/Gut.git /tmp/gut-src
+          mkdir -p addons
+          mv /tmp/gut-src/addons/gut addons/gut
+          ls addons/gut/gut_cmdln.gd
 
       - name: Headless import (asset import sanity)
         run: |
