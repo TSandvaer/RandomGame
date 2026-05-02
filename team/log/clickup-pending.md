@@ -141,6 +141,17 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - created_at: 2026-05-02T (uma-run-001)
 - attempts: 1 (MCP returned "ClickUp is not connected")
 
+## ENTRY 2026-05-02-011
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "feat(mobs): grunt mob archetype — pathing, melee swing, death"
+    status: ready for qa test
+- reason: Drew run-002 task #8. PR #6 opened on `drew/grunt-mob`. Lands `scripts/mobs/Grunt.gd` + `scenes/mobs/Grunt.tscn` + the TRES schema implementation paired in per Priya's run-001 split (`scripts/content/*.gd`, ContentFactory, 7 authored seed TRES). 18 paired GUT tests in `tests/test_grunt.gd` covering full state machine + 3 required edge cases (rapid hit spam, death-mid-telegraph, death-while-pathing) + 14 schema/factory smoke tests in `tests/test_content_factory.gd`. Tess merges after sign-off.
+- created_at: 2026-05-02T (drew-run-002)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
 ## ENTRY 2026-05-02-010
 
 - op: update_task
@@ -150,4 +161,133 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
     status: complete
 - reason: `team/uma-ux/death-restart-flow.md` landed in commit 9a1e772. Death = comma not full stop. Sequence: lethal hit → embers gather → dissolve + bell → "You fell." card → run summary leading with KEPT (level, XP, stash) and de-emphasizing LOST WITH THE RUN. Default focus on "Descend Again". 25-row tester checklist. Includes failure-mode test cases (death during inventory open, quit during death sequence, etc.). Pure design task. Self-flipped to `complete`.
 - created_at: 2026-05-02T (uma-run-001)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-011
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: 86c9kwhtt
+    status: complete
+- reason: Tess sign-off — Devon W1#4 (player movement + dodge-roll). 9 paired GUT tests in tests/test_player_move.gd verified via CI green (PR #5 + PR #7 runs). Edge-case probes run: EP-RAPID (rapid double-press → second rejected, dir not overwritten), EP-INTR (collision layer cleared during i-frames + restored after = mid-action interrupt safe), EP-EDGE (8-direction normalisation invariant). Run-002 retro sign-off after CI fix unblocked verification.
+- created_at: 2026-05-02T (tess-run-002)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-012
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: 86c9kwhu7
+    status: complete
+- reason: Tess sign-off — Devon W1#5 (player attacks). 17 paired GUT tests across tests/test_hitbox.gd (7) and tests/test_player_attack.gd (10), CI green. Edge-case probes: EP-DUP (single-hit-per-target collapses multi-overlaps + self-hit filtered), EP-RAPID (recovery blocks immediate re-attack), EP-INTR (attack blocked during dodge; dodge cancels recovery). Run-002 retro sign-off.
+- created_at: 2026-05-02T (tess-run-002)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-013
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: 86c9kwhuq
+    status: complete
+- reason: Tess sign-off — Devon W1#6 (JSON save/load skeleton). 14 paired GUT tests in tests/test_save.gd including the v0→v1 forward-compat test the testing bar singled out. CI green. Edge-case probes: EP-RT (round-trip default + modified payloads), EP-INTR (atomic write tmp→rename + .tmp cleanup), EP-OOO (corrupt JSON → empty dict, root-not-dict → empty dict). Phase A test_save_roundtrip.gd adds AC3-shaped death-rule pair (DECISIONS.md 2026-05-02 — equipped persists, level kept). Run-002 retro sign-off.
+- created_at: 2026-05-02T (tess-run-002)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-014
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "[Devon] W1 · #2 GitHub Actions CI workflow + GUT canary smoke test"
+    status: complete
+- reason: Tess sign-off — Devon W1#2 (CI + smoke canary). After Tess's run-002 PR #5 fixed the shell-bash and GUT-clone-path issues that were keeping CI red since first push, CI now executes the full pipeline. tests/test_smoke.gd (5 canary tests: engine version, Save autoload contract, Main scene loadability, input map, physics layer naming) green. Run-002 retro sign-off.
+- created_at: 2026-05-02T (tess-run-002)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-015
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "test(smoke): automated smoke test — game boots, title screen, no errors"
+    status: complete
+- reason: Tess sign-off — W1#17 (automated smoke). Phase A merged in PR #7 (commit 8b801f9): tests/test_boot.gd (4 tests), tests/test_autoloads.gd (4 tests, GameState placeholder marked `pending` until autoload registers), tests/test_save_roundtrip.gd (9 tests including death-rule pair), tests/test_quit_relaunch_save.gd (4 integration tests for AC6). 22 new tests, CI green. Phase A inventory in automated-smoke-plan.md updated to `landed`. Run-002.
+- created_at: 2026-05-02T (tess-run-002)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-016
+
+- op: create_task
+- list_id: 901523123922
+- payload:
+    name: "bug(mobs): Grunt._apply_layers does not handle CharacterBody2D default 1"
+    priority: high
+    tags: [bug, mobs, week-1]
+    status: to do
+    description: |
+      ## Severity: major
+
+      ## Build
+      - Source: PR #6 (drew/grunt-mob), tip 0b79003
+      - Discovered via CI run 25250844944 (red since first push of this PR).
+
+      ## Repro
+      Run GUT against the PR head: `tests/test_grunt.gd::test_collision_layer_is_enemy` fails — got 1, expected 8 (LAYER_ENEMY). Mask: got 1, expected 3 (world+player).
+
+      ## Root cause
+      `Grunt._apply_layers()` guards with `if collision_layer == 0`, but `CharacterBody2D` defaults to `collision_layer = 1` when constructed via `GruntScript.new()` (no .tscn). The default never fires, layer stays at 1.
+
+      Production .tscn-loaded grunts are unaffected (the .tscn pre-sets layer to 8). This bug only fires for code paths that construct via `GruntScript.new()` — which is exactly what `tests/test_grunt.gd::_make_grunt()` does, plus any future spawner that might do the same.
+
+      ## Fix
+      Drop the `if collision_layer == 0` guard and unconditionally assign `LAYER_ENEMY` / mask in `_apply_layers()`. Simpler invariant: "Grunt is always on the enemy layer."
+
+      ## Workaround
+      `gh pr checkout 6` and run the failing test against a Grunt spawned from `Grunt.tscn` instead of `GruntScript.new()` — the layer is correct in that path.
+
+      ## Owner
+      Drew (PR #6 author). Bounce review at https://github.com/TSandvaer/RandomGame/pull/6#issuecomment-4363696819.
+- created_at: 2026-05-02T (tess-run-002)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-017
+
+- op: create_task
+- list_id: 901523123922
+- payload:
+    name: "bug(test): four content-factory tests flagged Risky — Did not assert"
+    priority: normal
+    tags: [bug, test, week-1]
+    status: to do
+    description: |
+      ## Severity: minor
+
+      ## Build
+      - Source: PR #6 (drew/grunt-mob), tip 0b79003.
+      - Test file: `tests/test_content_factory.gd`.
+
+      ## Repro
+      Run GUT against the PR head. The following four tests are reported by GUT as Risky (`Did not assert`) despite containing `assert_eq` calls:
+        - `test_make_affix_def_defaults`
+        - `test_make_affix_def_overrides`
+        - `test_make_item_def_defaults`
+        - `test_make_loot_table_default_independent_mode`
+
+      Sibling test `test_make_affix_value_range_defaults` passes normally. Pattern: the four risky tests all begin with a typed local assignment from a `make_*` factory (e.g. `var a: AffixDef = ContentFactory.make_affix_def()`), where `make_affix_value_range` (which works) returns into a typed `AffixValueRange` — same pattern, different class.
+
+      ## Suspected cause
+      Typed-variable assignment from `_<Class>.new()` errors silently for AffixDef / ItemDef / LootTableDef but not AffixValueRange. Possibly a `class_name` registration order issue at parse time, or a typing mismatch in the factory's return signature when the schema script declares non-trivial state.
+
+      ## Debug step
+      Drop the type annotation in one risky test (`var a = ContentFactory.make_affix_def()`); if asserts then fire, the cast is the issue and the factory's return type is the load-bearing fix.
+
+      ## Why this matters
+      Per `team/TESTING_BAR.md` `## Maintenance discipline`: a no-assert test is a flaky-shaped test — same fix-or-quarantine rule. Cannot ship M1 with silent-pass tests in the inventory.
+
+      ## Owner
+      Drew (PR #6 author).
+- created_at: 2026-05-02T (tess-run-002)
 - attempts: 1 (MCP returned "ClickUp is not connected")

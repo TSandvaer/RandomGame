@@ -54,10 +54,11 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 ## Tess (Tester)
 
 - Last updated: 2026-05-02
-- Status: working (run 002)
-- Working on: Run 002 — Task A: retro-verifying Devon's tasks 2/4/5/6/17 against current `main` and queueing ClickUp `ready for qa test → complete` flips. Task B: Phase A GUT tests (`tu-boot-*`, `tu-autoload-*`, `tu-save-*`, `ti-save-*`). Task C: review any open feature PRs (none non-mine at run start). **CI is red since 2026-05-02** — workflow uses `set -o pipefail` under the container's `sh -e` shell which lacks the `pipefail` option, so every step exits 2 before any test runs. Filing as `blocker` and fixing forward in `tess/ci-shell-bash` before any other PR merges, since CI must be green for the squash-merge admin path.
-- Blocked on: ClickUp MCP disconnected this run — flips queue into `team/log/clickup-pending.md` per fallback protocol.
-- Next: Land CI fix → land Phase A tests → flip retro sign-offs (queued) → end-of-run idle.
+- Status: idle (chunk done — run 002)
+- Working on: —
+- Blocked on: ClickUp MCP disconnected this entire run — sign-off flips and bug filings queued in `team/log/clickup-pending.md` (entries 011–017). Next dispatched ClickUp-MCP-up agent should replay them.
+- Deliverables this run: (a) **CI fix** — `tess/ci-shell-bash` PR #5, two commits: `defaults.run.shell: bash` to unblock `set -o pipefail`, plus a clone-then-move fix for the GUT addon-in-addon path. CI green for the first time in this project. (b) **Retro sign-offs** for Devon W1 #2/#4/#5/#6/#17 — five tasks, all paired tests verified via CI green, ≥3 edge-case probes per `TESTING_BAR.md`. ClickUp flips queued. (c) **Phase A GUT tests** — `tess/m1-gut-phase-a` PR #7, four files (`test_boot.gd`, `test_autoloads.gd`, `test_save_roundtrip.gd`, `test_quit_relaunch_save.gd`), 22 tests including the AC3-shaped M1 death-rule pair (DECISIONS.md 2026-05-02). 67 passing + 1 deliberate pending placeholder, 0 failing. Slot allocation: Devon=999, Tess roundtrip=998, Tess integration=997. (d) **PR review** — PR #6 (Drew grunt mob) bounced with two filed bugs (`bug(mobs)` major + `bug(test)` minor); Drew has since pushed fixes (commit 0693476 visible in their work tree) — re-review on next dispatch. PR #8 (Drew stratum-1 room) blocked-comment: stacked on #6, awaiting #6 to merge before deep review. Run log at `team/log/tess-run-002.md`.
+- Next: When dispatched again — re-review Drew's PR #6 (fixes already pushed, just need CI green confirmation), then PR #8 once #6 merges. Then Phase B GUT tests as combat/grunt/loot land in `ready for qa test`. Triage queue every tick. After Drew merges, run M1 acceptance probes against the room (AC2 candidate) for the first time end-to-end.
 
 ---
 
