@@ -37,10 +37,11 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 ## Devon (Game Dev #1, lead)
 
 - Last updated: 2026-05-02
-- Status: working (run 003 — ClickUp 86c9kxnqx: 5 testability hooks for M1 acceptance plan)
-- Working on: branch `devon/testability-hooks` — build SHA in main menu (CI stamp + HUD overlay), debug-only fast-XP toggle (Ctrl+Shift+X, debug-build gated), save-dir README writer (one-liner on first save), stable mob-spawn seed in test mode (`--test-mode` CLI/env flag), HTML5 console error surfacing verification + export-preset doc. Per-hook commits paired with GUT tests (`test_build_sha.gd`, `test_fast_xp_debug.gd`, `test_save_readme.gd`, `test_test_mode_seed.gd`).
-- Blocked on: —
-- Next: Open PR, label `ready for qa test`, stop. Tess merges. After dispatch — Tess bounce-list (if any) or week-2 backlog: export_presets.cfg, level-up math + damage formula.
+- Status: idle (chunk done — run 003)
+- Working on: —
+- Blocked on: PR #19 (`feat(test-hooks)`) awaiting Tess sign-off + merge per `GIT_PROTOCOL.md`. ClickUp `86c9kxnqx` flipped to `ready for qa test`.
+- Deliverables this run: PR #19 (`devon/testability-hooks`) — 5 testability hooks paired with 4 GUT test files (33 new tests). (1) Build SHA — `BuildInfo` autoload + CI stamp step in `ci.yml` and `release-itch.yml` writing `${GITHUB_SHA:0:7}` to `build_info.txt` (gitignored); rendered as `BuildLabel` footer in `Main.tscn` with `dev-local` fallback. `tests/test_build_sha.gd` (8 tests). (2) Fast-XP toggle — `DebugFlags` autoload listens for Ctrl+Shift+X (physical keycode); `xp_multiplier()` returns 100 vs 1; triple-gated by `OS.is_debug_build()`. 100x is a placeholder per task spec — flagged in PR body for Priya curve calibration. `tests/test_fast_xp_debug.gd` (9 tests). (3) Save-dir README — `Save.save_game()` writes `user://README.txt` (location, schema_version, clear-procedure) on every save. `tests/test_save_readme.gd` (6 tests). (4) Test-mode mob seed — `--test-mode` CLI / `EMBERGRAVE_TEST_MODE` env pins `DebugFlags.mob_spawn_seed()` to `0x7E57C0DE`; loot RNG (Drew's LootRoller) untouched. `tests/test_test_mode_seed.gd` (10 tests). (5) HTML5 console errors — verified Godot 4.3's default routes `print`/`push_error`/`push_warning` + uncaught script errors to browser `console.log`/`console.error`; no code change. Verification procedure for Tess in `team/devon-dev/debug-flags.md`. Plus `chore(decisions)` PR #20 — two appendix entries (testability-hooks decision + loot-RNG scope clarification), self-merged.
+- Next: When dispatched again — Tess bounce-list (if any). Otherwise week-2 backlog per `team/priya-pl/week-2-backlog.md`: `export_presets.cfg` authoring (unblocks first real `release-itch.yml` run), level-up math + XP curve (Priya N1), damage formula (N3).
 
 ## Drew (Game Dev #2)
 
