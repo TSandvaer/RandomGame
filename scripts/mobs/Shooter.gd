@@ -305,6 +305,18 @@ func _enter_kite() -> void:
 	# Cancel any pending aim — kiting interrupts.
 	_aim_left = 0.0
 	_set_state(STATE_KITING)
+	# Apply kite velocity immediately on the transition tick. Otherwise the
+	# match block has already run the prior state's branch (e.g. AIMING) and
+	# we'd ship a zero-velocity tick before _process_kiting runs next frame —
+	# tests assert kite velocity within the same tick as the state change.
+	if _player != null:
+		var to_player: Vector2 = _player.global_position - global_position
+		if to_player.length_squared() > 0.0:
+			velocity = (-to_player.normalized()) * move_speed
+		else:
+			velocity = Vector2.ZERO
+	else:
+		velocity = Vector2.ZERO
 
 
 # ---- Projectile spawn ------------------------------------------------
