@@ -130,3 +130,14 @@
 - **M1 RC verification**: solidified. Build artifact `591bcc8` is the most-verified M1 RC. Sponsor's existing soak target (`9cd07cb`) is still functional — same code path, just smaller test count claim was misleading. Don't re-ping.
 - **Open PRs**: none.
 - **Roles idle**: all 5.
+
+## Tick 2026-05-02 19:35
+
+- **Roles working**: Tess (run-016 — integration GUT scene tests for M1 ACs #2/#3/#6).
+- **Roles idle**: Priya, Uma, Devon, Drew.
+- **Open PRs**: none.
+- **Dispatched this tick**: Tess only. Integration tests strengthen verification without changing game behavior — safe with Sponsor about to soak.
+- **Decisions made**: Continued throttled single-agent dispatch. Integration scene tests are the highest-leverage remaining QA work.
+- **Merged since last tick**: 1 PR (#70 heartbeat 19:15 + soak log).
+- **Open issues**: none.
+- **M1 RC progress**: Verified-coverage artifact `591bcc8` is the most-trusted M1 RC. Sponsor's existing soak target (`9cd07cb`) still functional (same code path; just smaller-test-count claim was misleading). Awaiting Sponsor return.
