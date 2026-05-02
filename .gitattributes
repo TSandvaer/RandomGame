@@ -1,0 +1,21 @@
+* text=auto eol=lf
+
+# Godot text resources — keep LF in repo regardless of host OS
+*.gd       text eol=lf
+*.tscn     text eol=lf
+*.tres     text eol=lf
+*.godot    text eol=lf
+*.cfg      text eol=lf
+
+# Godot binaries
+*.import   text eol=lf
+*.png      binary
+*.jpg      binary
+*.ogg      binary
+*.wav      binary
+*.ttf      binary
+*.otf      binary
+
+# Aseprite sources
+*.aseprite binary
+*.ase      binary
