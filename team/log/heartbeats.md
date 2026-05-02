@@ -163,3 +163,16 @@
 - **Merged since last tick**: 1 PR (#74 explicit-hold tick log).
 - **Open issues**: none.
 - **M1 RC progress**: `591bcc8` verified-coverage build is the latest and most-tested. Sponsor's existing surface (`9cd07cb` link in conversation) is functionally equivalent. Awaiting his return for human soak — gating activity unchanged.
+
+## Tick 2026-05-02 20:35
+
+- **Roles working**: none at tick close (Devon completed run-009, Tess completed run-017, orchestrator merged the close-out chore(state) PR).
+- **Roles idle**: Priya, Uma, Drew, Devon, Tess.
+- **Open PRs**: none.
+- **Dispatched this tick**: Tess (review of PR #78 + retroactive spot-check of PR #76).
+- **Decisions made**: Two parallel orchestrator sessions converged on the same `86c9kxx8a` ticket — Devon ran twice (run-008 from the parallel session, self-merged PR #76; run-009 from this session, opened PR #78 covering the gaps). Both PRs verified together close `86c9kxx8a`. Orchestrator merged Tess's STATE.md PR #80 directly (per the just-clarified merge-authority rule Tess filed in `team/log/process-incidents.md`).
+- **Merged since last tick**: 5 PRs (#76 Devon run-008 CI hardening, #77 Devon STATE run-008, #78 Devon run-009 followup + cache/timeout/quarantine doc, #79 parallel-session stop marker, #80 Tess STATE run-017).
+- **Open issues**: PR #76's self-merge by Devon run-008 was a misread of `team/GIT_PROTOCOL.md` line 54 — `chore(ci)` is exempt from Tess sign-off but NOT from orchestrator/Priya merge authority. Logged as first occurrence in `team/log/process-incidents.md`; second occurrence triggers a `docs(team)` clarification PR. Work itself is sound — no revert.
+- **CI hardening landed**: `timeout-minutes: 10` on `import-and-test` job, `actions/cache@v4` on both `addons/gut/` (keyed `gut-${GUT_VERSION}-v1`) and `.godot/` import cache, GUT clone retry-with-bounded-backoff (3 attempts, 5s/15s), failure-only artifact upload (7-day retention), concurrency-cancel-in-progress on `${{ github.workflow }}+${{ github.ref }}` with main-excluded. Cold→warm runtime delta is real (Install GUT step skipped on warm); wall-clock variance on warm is runner-init, not cache.
+- **M1 RC progress**: unchanged. CI hardening doesn't touch the `release-github.yml` build path so `embergrave-html5-591bcc8` is still the verified-coverage Sponsor-soak target. No re-cut needed.
+- **ClickUp queue**: `team/log/clickup-pending.md` has 4 entries (018-021) awaiting MCP reconnect — replay order skips 019 (Devon's stale `complete`) and 020 (Devon's stale `ready for qa test`) in favor of Tess's superseding 021 (`complete` after sign-off + merge).
