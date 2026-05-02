@@ -91,18 +91,33 @@ func test_xp_gained_signal_emits_with_actual_amount() -> void:
 # --- Multi-level overflow ----------------------------------------------
 
 func test_single_gain_crosses_multiple_levels() -> void:
-	# Big gain at L1 — 100 + 282 = 382 brings us right to start-of-L3.
-	# Going to 1000 lands at L3 + (1000 - 100 - 282) = 618 XP into L3.
+	# Big gain at L1 — costs are 100 / 282 / 519 / 800.
+	# 1000 XP from L1:
+	#   L1 -> L2 (cost 100, 900 carried)
+	#   L2 -> L3 (cost 282, 618 carried)
+	#   L3 -> L4 (cost 519, 99 carried)
+	# Ends at L4 with 99 XP into L4. level_up fires 3 times.
 	watch_signals(_levels())
 	_levels().gain_xp(1000)
-	assert_eq(_levels().current_level(), 3, "1000 XP from L1 ends at L3")
-	assert_eq(_levels().current_xp(), 618, "overflow XP carries into next level")
-	# level_up fires once per boundary — L1->L2 + L2->L3 = 2 emits.
-	assert_signal_emit_count(_levels(), "level_up", 2)
+	assert_eq(_levels().current_level(), 4, "1000 XP from L1 ends at L4")
+	assert_eq(_levels().current_xp(), 99, "overflow XP carries into the new level")
+	assert_signal_emit_count(_levels(), "level_up", 3)
 	var p1: Array = get_signal_parameters(_levels(), "level_up", 0)
 	var p2: Array = get_signal_parameters(_levels(), "level_up", 1)
+	var p3: Array = get_signal_parameters(_levels(), "level_up", 2)
 	assert_eq(p1[0], 2, "first level_up payload = 2")
 	assert_eq(p2[0], 3, "second level_up payload = 3")
+	assert_eq(p3[0], 4, "third level_up payload = 4")
+
+
+func test_two_level_jump_with_partial_overflow() -> void:
+	# Smaller multi-level: 400 XP at L1 crosses L1->L2 (100 cost) leaving
+	# 300, then L2->L3 (282 cost) leaving 18. Ends at L3 with 18 XP.
+	watch_signals(_levels())
+	_levels().gain_xp(400)
+	assert_eq(_levels().current_level(), 3)
+	assert_eq(_levels().current_xp(), 18)
+	assert_signal_emit_count(_levels(), "level_up", 2)
 
 
 func test_huge_gain_clamps_at_max_level() -> void:
