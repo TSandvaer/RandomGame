@@ -212,3 +212,15 @@
 - **Open issues**: M1 RC `591bcc8` still verified-coverage soak target. After PR #94 lands (charger fix), CI totals settle at 566 passing / 1 long-standing pending. Still no Sponsor message — interactive 30-min soak remains the gating activity.
 - **M1 RC progress**: Three M1-residual fixes landed in this 30-min window (CR-1, CR-2, charger flake). All are latent-bug fixes — no user-visible behavior change in M1's playable surface, no re-cut warranted. The build artifact `embergrave-html5-591bcc8` accurately represents the M1 player experience Sponsor will soak.
 - **Dispatch envelope status**: After PR #94 + Tess sign-off, only anticipatory M2 work remains (Priya backlog already in flight). Next tick may need to surface "all dispatchable closed" as a soft blocker — depends on Tess + Priya outcomes.
+
+## Tick 2026-05-02 21:53
+
+- **Roles working**: Tess (run-021, M2 acceptance plan + fixture catalog draft — anticipatory phase of T12 from M2 backlog).
+- **Roles idle**: Uma, Devon, Drew, Priya (just landed PR #97).
+- **Open PRs**: none (PR #97 just merged).
+- **Dispatched this tick**: Tess (T12 M2 acceptance plan).
+- **Decisions made**: Priya's M2 week-1 backlog draft (PR #97) merged at `6f363f9` — 12 P0/P1 tickets, owner load Devon 7 / Drew 3 / Uma 2 / Tess 1 omnibus, ~12-ticket capacity ceiling. Tess T12 (acceptance plan + fixtures) is the only T-row from the backlog that can ship anticipatory without M2 implementation existing — design-only first phase. Drafting it now positions Tess to validate M2 implementations immediately when they start. Other T-rows (T1-T11) are all gated on Sponsor M1 sign-off (per the backlog's pre-conditions).
+- **Merged since last tick**: 3 PRs (#94 charger flake fix, #96 Tess STATE run-020, #97 Priya M2 backlog draft).
+- **Open issues**: After Tess T12 lands, dispatch envelope is **genuinely Sponsor-gated**. M2 features (T1-T11) wait on Sponsor M1 sign-off. Bug-bash (`86c9kxx7h`) reserved for post-Sponsor. Remaining no-Sponsor-risk options are scarce: Uma microcopy pass on M1 docs (deferred per her standing "Next" — partially unblocked now that CR-1+CR-2 fixes landed); Drew sprite-scaffold prep (touches gameplay surface, riskier). Will surface as soft-blocker next tick if Tess T12 lands and nothing else has shifted.
+- **M1 RC progress**: Three M1-residual fixes (CR-1, CR-2, charger flake) all landed. 587 passing / 1 long-standing pending. M1 surface unchanged for Sponsor — `embergrave-html5-591bcc8` accurately represents the playable experience. **A re-cut on the post-fix tip would be more-test-verified but no player-visible behavior delta — defer unless Sponsor explicitly asks for the latest build.**
+- **ClickUp queue**: Now ~10 entries pending replay (018-021 + 022-026 from this session's Tess + Devon work). MCP still down.
