@@ -34,10 +34,15 @@ func _init() -> void:
 
 ## Reset RNG to a known seed. Two rollers seeded identically produce
 ## identical roll sequences.
+##
+## NOTE: Godot's RandomNumberGenerator uses `state` as the live counter
+## that derives randoms; assigning `seed` already re-derives `state`
+## internally. Do NOT zero `state` after assigning `seed` — that clobbers
+## the seed-derivation and makes every call return the same sequence
+## regardless of the seed (CI caught exactly this — different seeds
+## produced identical 200-roll sequences while state==0).
 func seed_rng(seed: int) -> void:
 	_rng.seed = seed
-	# Reset state so the first .randf() after seeding is deterministic.
-	_rng.state = 0
 
 
 # ---- Tier helpers ----------------------------------------------------
