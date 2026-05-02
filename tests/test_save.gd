@@ -99,9 +99,66 @@ func test_envelope_carries_schema_version_and_saved_at() -> void:
 	f.close()
 	var parsed: Variant = JSON.parse_string(raw)
 	assert_true(parsed is Dictionary)
-	assert_eq(int(parsed["schema_version"]), 1, "envelope contains schema_version=1")
+	# Schema is at v2 as of 2026-05-02 (added xp_to_next to character).
+	assert_eq(int(parsed["schema_version"]), 2, "envelope contains schema_version=2")
 	assert_true(parsed.has("saved_at"))
 	assert_true(parsed.has("data"))
+
+
+# --- Forward-compat migration: v1 -> v2 ---------------------------------
+
+func test_migrate_v1_save_to_v2_adds_xp_to_next() -> void:
+	# Hand-author a v1 save: character has level/xp but no xp_to_next.
+	var v1_envelope: Dictionary = {
+		"schema_version": 1,
+		"saved_at": "2026-05-02T10:00:00",
+		"data": {
+			"character": {
+				"name": "Ember-Knight",
+				"level": 3,
+				"xp": 200,
+				"vigor": 0, "focus": 0, "edge": 0,
+				"hp_current": 100, "hp_max": 100,
+			},
+			"stash": [],
+			"equipped": {},
+			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 0.0},
+		},
+	}
+	var f: FileAccess = FileAccess.open(_save().save_path(TEST_SLOT), FileAccess.WRITE)
+	f.store_string(JSON.stringify(v1_envelope))
+	f.close()
+
+	var loaded: Dictionary = _save().load_game(TEST_SLOT)
+	assert_true(loaded.has("character"))
+	assert_true(loaded["character"].has("xp_to_next"),
+		"v1 -> v2 migration adds xp_to_next to character")
+	# Curve mirror in Save.gd: floor(100 * L^1.5) — at L=3, 519.
+	assert_eq(loaded["character"]["xp_to_next"], 519)
+	# Untouched fields preserved.
+	assert_eq(loaded["character"]["level"], 3)
+	assert_eq(loaded["character"]["xp"], 200)
+
+
+func test_migrate_v0_save_chains_through_v2() -> void:
+	# A v0 file (no schema_version, no meta) must end up at v2 — both
+	# migrations chain. xp_to_next must be present after the chain.
+	var v0_envelope: Dictionary = {
+		"data": {
+			"character": {"level": 2, "xp": 50},
+		},
+	}
+	var f: FileAccess = FileAccess.open(_save().save_path(TEST_SLOT), FileAccess.WRITE)
+	f.store_string(JSON.stringify(v0_envelope))
+	f.close()
+	var loaded: Dictionary = _save().load_game(TEST_SLOT)
+	# v0 -> v1 added meta + equipped.
+	assert_true(loaded.has("meta"))
+	assert_true(loaded.has("equipped"))
+	# v1 -> v2 added xp_to_next.
+	assert_true(loaded["character"].has("xp_to_next"))
+	# At L=2, xp_to_next = floor(100 * 2^1.5) = 282.
+	assert_eq(loaded["character"]["xp_to_next"], 282)
 
 
 # --- Forward-compat migration: v0 -> v1 ---------------------------------

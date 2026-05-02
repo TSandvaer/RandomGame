@@ -129,9 +129,10 @@ func test_v0_to_v1_backfills_required_v1_fields_with_defaults() -> void:
 # =====================================================================
 
 func test_save_migrated_v0_then_reload_round_trips() -> void:
-	# After loading a v0, the next save call writes back as v1. Reload
-	# that and the schema_version on disk MUST be v1 — we never re-emit
-	# v0 from a runtime that's at SCHEMA_VERSION=1.
+	# After loading a v0, the next save call writes back at the current
+	# SCHEMA_VERSION (v2 as of 2026-05-02). Reload that and the
+	# schema_version on disk MUST match SCHEMA_VERSION — we never re-emit
+	# an old version from a current runtime.
 	_install_fixture_at_slot(FIXTURE_V0, TEST_SLOT)
 	var loaded_v0: Dictionary = _save().load_game(TEST_SLOT)
 	# Save it back without modification.
@@ -142,8 +143,11 @@ func test_save_migrated_v0_then_reload_round_trips() -> void:
 	var raw: String = f.get_as_text()
 	f.close()
 	var parsed: Dictionary = JSON.parse_string(raw)
-	assert_eq(int(parsed["schema_version"]), 1,
-		"on-disk envelope upgraded to v1 after migration + save")
+	# Schema bumped to 2 on 2026-05-02 (added xp_to_next to character).
+	# When SCHEMA_VERSION bumps, update this number AND add the new
+	# migration test in test_save.gd.
+	assert_eq(int(parsed["schema_version"]), 2,
+		"on-disk envelope upgraded to current schema (v2) after migration + save")
 	# And reload one more time — fields are stable.
 	var reloaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_eq(reloaded["character"]["level"], 4, "level stable across v0 → migrate → save → reload")

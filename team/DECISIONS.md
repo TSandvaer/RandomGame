@@ -253,3 +253,18 @@ Format:
 - Reversibility: reversible — workflow can be deleted once `release-itch.yml` is unblocked, or merged into it. Preset file stays either way.
 - Affects: Tess (download path documented in `team/devon-dev/m1-rc-build.md`), orchestrator (gets a stable artifact URL to surface to Sponsor when M1 RC is ready), all devs (can `gh workflow run release-github.yml` from any branch to produce a smoke-build).
 - Detail: `team/devon-dev/m1-rc-build.md`, ClickUp `86c9ky4fv`.
+
+## 2026-05-02 — Level-up curve locked: 100 * level^1.5, cap L5
+
+- Decided by: Devon (per dispatch authority — XP / level math owns the curve; flagged for Drew/Tess as combat-balance dependency)
+- Decision: M1 character XP curve is **`xp_to_next(level) = floor(100 * level^1.5)`** with cap at **L5**. Per-level XP costs:
+  - L1 -> L2: 100 XP
+  - L2 -> L3: 282 XP
+  - L3 -> L4: 519 XP
+  - L4 -> L5: 800 XP
+  - **Total: 1701 XP to cap**.
+  Implementation lands as `Levels` autoload (`scripts/progression/Levels.gd`) with `gain_xp(amount)`, `current_level()`, `xp_to_next()`, signals `xp_gained(amount)` + `level_up(new_level)`. XP gain is wired to mob death via `Levels.subscribe_to_mob(mob)` which reads `mob_def.xp_reward` from the `Grunt.mob_died` signal payload. DebugFlags fast-XP multiplier is applied exactly once, inside `Levels.gain_xp()` — single source of truth, gameplay code stays multiplier-naive. Save schema bumps **v1 -> v2** to add `character.xp_to_next` (HUD convenience field; derived from level). Migration mirrors the curve constants in `Save.gd` so a save authored under a future curve revision is identifiable from the schema_version alone.
+- Why: Quadratic-ish (`x^1.5`) gives a noticeable but not punishing climb. Pure linear feels grindy at the top; pure quadratic (`x^2`) makes L5 feel out of reach in M1's tiny content footprint (1 stratum, 1 mob — `xp_reward=10`). `BASE_XP=100` matches Drew's grunt reward so L1 -> L2 is ~10 grunts, fast enough to feel the loop in M1 playtests. With DebugFlags fast-XP `100x`, Tess can reach L5 in ~2 minutes per the `m1-test-plan.md` AC4/AC7 budget.
+- Reversibility: reversible until Drew pins boss DPS targets to per-level player stat budget (week 2 N6) and Tess writes the AC4/AC7 acceptance cases against specific XP totals. Sticky after that.
+- Affects: Drew (combat-balance — boss DPS and grunt scaling key off the level curve), Tess (acceptance tests assert XP totals at specific levels; M1-AC4 reaches L4-5), Uma (level-up panel HUD reads `current_xp / xp_to_next` for the bar), Save schema (v1 -> v2 migration adds `xp_to_next`; v0 -> v1 -> v2 chains cleanly).
+- Detail: `scripts/progression/Levels.gd`, `tests/test_levels.gd`, ClickUp `86c9kxx2t`.
