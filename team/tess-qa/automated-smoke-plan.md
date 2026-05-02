@@ -35,23 +35,25 @@ Test ID format: `tu-<area>-<NN>` (unit) or `ti-<area>-<NN>` (integration). One f
 
 ### Phase A — boot & save (writes first; ~6 unit + 2 integration)
 
-#### `tests/unit/test_boot.gd` — game boots without errors
+**Status: landed run-002 (2026-05-02).** Files live flat in `tests/` (not `tests/unit/`) per the existing repo layout. ID-to-file mapping: see headers below; file paths in this section now reference the actual locations on disk.
+
+#### `tests/test_boot.gd` — game boots without errors  *(landed)*
 
 | ID            | Test                                       | What it asserts                                                                  |
 |---------------|--------------------------------------------|----------------------------------------------------------------------------------|
 | `tu-boot-01`  | `test_main_scene_instantiates`             | `load("res://scenes/main.tscn").instantiate()` is non-null and parse-error-free.  |
 | `tu-boot-02`  | `test_no_orphan_errors_on_first_frame`     | After 1 process frame, no `push_error` was logged. `Engine.get_frames_drawn() > 0`. |
 
-#### `tests/unit/test_autoloads.gd` — singletons register
+#### `tests/test_autoloads.gd` — singletons register  *(landed; GameState is a deferred no-op until that autoload is registered)*
 
 | ID                 | Test                                   | What it asserts                                                              |
 |--------------------|----------------------------------------|------------------------------------------------------------------------------|
 | `tu-autoload-01`   | `test_gamestate_present`               | `GameState` autoload exists and is the expected class.                       |
 | `tu-autoload-02`   | `test_savesystem_present_and_api`      | `SaveSystem` exists; has `save_game()` and `load_game()` methods (signature). |
 
-#### `tests/unit/test_save_roundtrip.gd` — JSON save/load preserves persistent data
+#### `tests/test_save_roundtrip.gd` — JSON save/load preserves persistent data  *(landed run-002; complements Devon's `tests/test_save.gd`)*
 
-The most fragile shared surface in M1. Deepest coverage.
+The most fragile shared surface in M1. Deepest coverage. Devon's `test_save.gd` (run-001) already covers low-level round-trip and migration; `test_save_roundtrip.gd` (run-002) adds the AC-shaped invariants — including the M1 death-rule pair (DECISIONS.md 2026-05-02: equipped persists, inventory wipes, level kept). Slot allocation: Devon=999, Tess roundtrip=998, Tess integration=997.
 
 | ID               | Test                                            | What it asserts                                                              |
 |------------------|-------------------------------------------------|------------------------------------------------------------------------------|
@@ -63,7 +65,7 @@ The most fragile shared surface in M1. Deepest coverage.
 | `tu-save-06`     | `test_save_does_not_persist_run_state`          | Per AC3: after death, run-XP / run-room may reset, but `level` + `stash` do not. |
 | `tu-save-07`     | `test_save_format_is_valid_json`                | Saved file parses with `JSON.parse()`. Catches accidental binary writes.     |
 
-#### `tests/integration/test_quit_relaunch_save.gd` — full quit→relaunch flow (AC6)
+#### `tests/test_quit_relaunch_save.gd` — full quit→relaunch flow (AC6)  *(landed run-002)*
 
 | ID            | Test                                                  | What it asserts                                                              |
 |---------------|-------------------------------------------------------|------------------------------------------------------------------------------|
