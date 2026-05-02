@@ -114,6 +114,19 @@ var _vigor: int = 0
 var _focus: int = 0
 var _edge: int = 0
 
+# Affix-driven move_speed bonus (flat px/s ADD on top of WALK_SPEED, per
+# the swift affix). Tracked on Player (not PlayerStats) because move_speed
+# is a Player-local concept; PlayerStats owns V/F/E. Per
+# `team/drew-dev/affix-application.md`.
+var _move_speed_bonus: float = 0.0
+
+# Equipped ItemInstance map: slot StringName -> ItemInstance. Distinct from
+# `_equipped_weapon: ItemDef` (which is the legacy/Damage-formula slot
+# pointer for back-compat with existing tests). When equip_item is called
+# with a weapon, both `_equipped[&"weapon"]` and `_equipped_weapon` are set.
+# Affix application reads from `_equipped[*].rolled_affixes`.
+var _equipped_items: Dictionary = {}
+
 
 func _ready() -> void:
 	# Seed the saved layer mask from whatever the scene authored. Tests may
@@ -176,11 +189,160 @@ func get_equipped_weapon() -> ItemDef:
 
 ## Equip / unequip the weapon (pass null to unequip). Fires
 ## `equipped_weapon_changed`. M1 contract: only one weapon slot.
+##
+## **Affix-naive version.** This sets the legacy `_equipped_weapon: ItemDef`
+## reference used by the damage formula. For an affix-aware equip path
+## (apply rolled affixes on equip, reverse on unequip), use `equip_item`
+## with an `ItemInstance`.
 func set_equipped_weapon(weapon: ItemDef) -> void:
 	if weapon == _equipped_weapon:
 		return
 	_equipped_weapon = weapon
 	equipped_weapon_changed.emit(weapon)
+
+
+# ---- ItemInstance equip / unequip (affix-aware) -----------------------
+
+const SLOT_WEAPON: StringName = &"weapon"
+const SLOT_ARMOR: StringName = &"armor"
+
+## Equip an `ItemInstance` into its slot. Walks the instance's rolled
+## affixes and applies each one to PlayerStats (for V/F/E) or directly to
+## Player-local fields (move_speed). If a different instance is already
+## equipped in that slot, it's unequipped first (clean reverse).
+##
+## Idempotency: equipping the **same instance** that's already in its slot
+## is a no-op (no double-application). Two distinct instances of the same
+## ItemDef *are* distinct (each has its own rolled_affixes).
+##
+## See `team/drew-dev/affix-application.md` for the full math and decisions.
+##
+## Returns true on equip, false if the input was null.
+func equip_item(instance: ItemInstance) -> bool:
+	if instance == null or instance.def == null:
+		return false
+	var slot: StringName = _slot_for(instance.def.slot)
+	if slot == &"":
+		push_warning("Player.equip_item: unsupported slot %d" % instance.def.slot)
+		return false
+	# Idempotency: same-instance re-equip is a no-op.
+	var current: ItemInstance = _equipped_items.get(slot, null) as ItemInstance
+	if current == instance:
+		return true
+	# Unequip the existing item in this slot first (reverses its affixes).
+	if current != null:
+		_unequip_internal(slot, current)
+	_equipped_items[slot] = instance
+	_apply_item_affixes(instance)
+	# Mirror to legacy weapon ref so Damage formula keeps working.
+	if slot == SLOT_WEAPON:
+		_equipped_weapon = instance.def
+		equipped_weapon_changed.emit(instance.def)
+	return true
+
+
+## Remove the item currently in `slot` (one of SLOT_WEAPON / SLOT_ARMOR).
+## Reverses its affix contributions. No-op if the slot is empty.
+##
+## Returns the unequipped ItemInstance, or null if nothing was there.
+func unequip_item(slot: StringName) -> ItemInstance:
+	var current: ItemInstance = _equipped_items.get(slot, null) as ItemInstance
+	if current == null:
+		return null
+	_unequip_internal(slot, current)
+	return current
+
+
+## Returns the ItemInstance currently equipped in `slot`, or null if empty.
+func get_equipped_item(slot: StringName) -> ItemInstance:
+	return _equipped_items.get(slot, null) as ItemInstance
+
+
+## Returns the player's effective walk speed, including the swift-affix
+## ADD bonus. Use this instead of `WALK_SPEED` when computing velocity.
+func get_walk_speed() -> float:
+	return WALK_SPEED + _move_speed_bonus
+
+
+## Returns the current move-speed affix bonus (px/s ADD). Tests + HUD.
+func get_move_speed_bonus() -> float:
+	return _move_speed_bonus
+
+
+# ---- Internal: affix apply / reverse ----------------------------------
+
+func _slot_for(item_slot: int) -> StringName:
+	match item_slot:
+		ItemDef.Slot.WEAPON:
+			return SLOT_WEAPON
+		ItemDef.Slot.ARMOR:
+			return SLOT_ARMOR
+		_:
+			return &""
+
+
+func _apply_item_affixes(instance: ItemInstance) -> void:
+	for a: AffixRoll in instance.rolled_affixes:
+		if a == null or a.def == null:
+			continue
+		_apply_single_affix(a)
+
+
+func _reverse_item_affixes(instance: ItemInstance) -> void:
+	for a: AffixRoll in instance.rolled_affixes:
+		if a == null or a.def == null:
+			continue
+		_reverse_single_affix(a)
+
+
+func _apply_single_affix(roll: AffixRoll) -> void:
+	var stat: StringName = roll.def.stat_modified
+	var v: float = roll.rolled_value
+	var mode: int = int(roll.def.apply_mode)
+	# Stats handled by PlayerStats: vigor, focus, edge.
+	if stat == &"vigor" or stat == &"focus" or stat == &"edge":
+		var ps: Node = _player_stats_autoload()
+		if ps != null:
+			ps.apply_affix_modifier(stat, v, mode)
+		return
+	# Player-local stats.
+	if stat == &"move_speed":
+		if mode == AffixDef.ApplyMode.ADD:
+			_move_speed_bonus += v
+		else:
+			# MUL on move_speed scales WALK_SPEED indirectly via
+			# get_walk_speed (); we fold MUL into the bonus by computing
+			# the equivalent flat ADD. Keeps M1 simple.
+			_move_speed_bonus += WALK_SPEED * v
+		return
+	# Unknown stats: warn, ignore. (max_hp, crit_chance, etc. are M2 wiring.)
+	push_warning("Player.equip_item: affix stat '%s' has no M1 hookup; ignoring" % stat)
+
+
+func _reverse_single_affix(roll: AffixRoll) -> void:
+	var stat: StringName = roll.def.stat_modified
+	var v: float = roll.rolled_value
+	var mode: int = int(roll.def.apply_mode)
+	if stat == &"vigor" or stat == &"focus" or stat == &"edge":
+		var ps: Node = _player_stats_autoload()
+		if ps != null:
+			ps.clear_affix_modifier(stat, v, mode)
+		return
+	if stat == &"move_speed":
+		if mode == AffixDef.ApplyMode.ADD:
+			_move_speed_bonus -= v
+		else:
+			_move_speed_bonus -= WALK_SPEED * v
+		return
+	# Unknown stats fell through silently on apply; same on reverse.
+
+
+func _unequip_internal(slot: StringName, current: ItemInstance) -> void:
+	_reverse_item_affixes(current)
+	_equipped_items.erase(slot)
+	if slot == SLOT_WEAPON:
+		_equipped_weapon = null
+		equipped_weapon_changed.emit(null)
 
 
 ## Edge stat — read by Damage.compute_player_damage to scale weapon damage.
@@ -328,7 +490,7 @@ func _process_grounded(_delta: float) -> void:
 
 	if input_dir.length_squared() > 0.0:
 		_facing = input_dir
-		var speed: float = WALK_SPEED * (SPRINT_MULTIPLIER if sprinting else 1.0)
+		var speed: float = get_walk_speed() * (SPRINT_MULTIPLIER if sprinting else 1.0)
 		velocity = input_dir * speed
 		set_state(STATE_WALK)
 	else:
@@ -351,9 +513,9 @@ func _process_dodge(_delta: float) -> void:
 
 func _process_attack(_delta: float) -> void:
 	# Player can still drift slowly during attack recovery — feels weighted
-	# rather than rooted. Half walk speed.
+	# rather than rooted. Half walk speed (affix-modified).
 	var input_dir: Vector2 = _read_movement_input()
-	velocity = input_dir * (WALK_SPEED * 0.5)
+	velocity = input_dir * (get_walk_speed() * 0.5)
 	if _attack_recovery_left <= 0.0:
 		set_state(STATE_IDLE)
 	# Dodge can interrupt recovery.
