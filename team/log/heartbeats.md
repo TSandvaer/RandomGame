@@ -98,3 +98,14 @@
 - **Merged since last tick**: 4 PRs (#55 affix system, #57 tess state, #58 retro, #59 priya state).
 - **Open issues**: Branch contention persists (Devon flagged 1 incident, recovered via clean-branch push).
 - **M1 RC progress**: Sponsor's soak target `9cd07cb` (boss-inclusive). Latest polish `1a05d4b` (rooms 2-8). Next RC after PR #60 = inventory-inclusive (full UI loop).
+
+## Tick 2026-05-02 18:35
+
+- **Roles working**: Priya (run-005 — affix-balance pin to unblock Drew on `86c9kxx61`).
+- **Roles idle**: Tess (run-013 done), Devon, Drew, Uma.
+- **Open PRs**: none.
+- **Dispatched this tick**: Priya only. Holding aggressive parallel dispatches now that M1 is complete on main — Sponsor's soak is the gating activity, and queueing more PRs adds review burden when Sponsor returns.
+- **Decisions made**: Slowed dispatch density. M1 player loop is genuinely complete; further work is QA polish + week-3 onset. Better to have a stable target for Sponsor's soak than a moving one.
+- **Merged since last tick**: 2 PRs (#60 inventory UI, #62 tess state run-013).
+- **Open issues**: None blocking. Worktree thrash continues but no incident this tick (single-agent dispatch).
+- **M1 RC progress**: Inventory-inclusive RC artifact `embergrave-html5-ceb6430` on `ceb6430`. Documented in soak log. Sponsor's soak target hasn't been updated — `9cd07cb` ping stands. Sponsor will see all build options in-conversation when they return.
