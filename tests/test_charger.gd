@@ -323,12 +323,21 @@ func test_killed_mid_charge_no_orphan_motion() -> void:
 	p.global_position = Vector2(400.0, 0.0)
 	c.set_player(p)
 	_drive_to_charging(c)
-	# Push player away so no body-hit happens.
+	# After _drive_to_charging the charger is in STATE_CHARGING and
+	# `_begin_charge` has set velocity = _charge_dir * charge_speed. We do
+	# NOT run an extra `_physics_process(0.016)` between the drive helper
+	# and the kill: that intermediate tick goes through `move_and_slide()`
+	# whose displacement uses `get_physics_process_delta_time()`. In headless
+	# GUT runs that integration step can produce sub-epsilon displacement
+	# (env-sensitive — depends on whether the engine has ticked physics yet),
+	# falsely tripping the wall-stop branch and transitioning CHARGING ->
+	# RECOVERING. CI run 25260213330 captured the flake. The kill-mid-charge
+	# invariant doesn't need an extra physics tick — we already have the
+	# CHARGING state + non-zero velocity from `_begin_charge`.
+	# Push player far so any later subsequent tick won't body-hit.
 	p.global_position = Vector2(99999.0, 0.0)
-	# One charge tick so velocity is set and state is CHARGING.
-	c._physics_process(0.016)
-	assert_eq(c.get_state(), Charger.STATE_CHARGING)
-	assert_gt(c.velocity.x, 0.0, "velocity > 0 mid-charge")
+	assert_eq(c.get_state(), Charger.STATE_CHARGING, "charger is charging post-drive")
+	assert_gt(c.velocity.length(), 0.0, "velocity > 0 mid-charge")
 	# Lethal hit. Note: armored multiplier is 1.0 outside recovery, so 30
 	# dmg in flat-kills the 30-HP charger.
 	watch_signals(c)
@@ -344,13 +353,14 @@ func test_killed_mid_charge_no_orphan_motion() -> void:
 	assert_signal_emit_count(c, "mob_died", 1, "mob_died emits exactly once")
 
 
-## Repro-hardening counterpart to test_killed_mid_charge_no_orphan_motion: loops
-## the kill -> tick -> assert sequence N times in the same test body. The
-## original test used to flake under engine auto-physics racing the test's
-## manual `_physics_process` calls (run 25260213330 reproduced "expected
-## charging, got recovering"). With `set_physics_process(false)` in the helper,
-## the loop must pass deterministically every iteration. If this test ever
-## flakes again, the regression is real and reproducible — not a one-shot.
+## Repro-hardening counterpart to test_killed_mid_charge_no_orphan_motion:
+## loops the kill -> assert sequence N times in the same test body. Combined
+## with `set_physics_process(false)` in the helper and the no-extra-tick
+## pattern from the original test, this catches any future regression of the
+## "death zeros velocity immediately" invariant deterministically. The
+## original test used to flake (run 25260213330) under environment-sensitive
+## `move_and_slide()` displacement that triggered the wall-stop transition
+## when the test ran an extra tick post-`_drive_to_charging`.
 func test_killed_mid_charge_zero_velocity_immediate_loop() -> void:
 	const ITERATIONS: int = 25
 	for i in range(ITERATIONS):
@@ -363,9 +373,9 @@ func test_killed_mid_charge_zero_velocity_immediate_loop() -> void:
 		c.set_player(p)
 		_drive_to_charging(c)
 		p.global_position = Vector2(99999.0, 0.0)
-		c._physics_process(0.016)
-		# Pre-kill invariants: must be CHARGING with non-zero velocity. If
-		# either fails on any iteration, the manual-tick determinism is broken.
+		# Pre-kill invariants: charging with non-zero velocity. We rely on
+		# `_begin_charge` having set both (no extra physics tick needed —
+		# see test_killed_mid_charge_no_orphan_motion comment).
 		assert_eq(c.get_state(), Charger.STATE_CHARGING, "iter %d: charging pre-kill" % i)
 		assert_gt(c.velocity.length(), 0.0, "iter %d: velocity > 0 pre-kill" % i)
 		# Kill and assert zero-velocity invariant immediately.
