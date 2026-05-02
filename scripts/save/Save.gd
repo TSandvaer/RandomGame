@@ -29,14 +29,28 @@ const TMP_SUFFIX: String = ".tmp"
 const README_FILENAME: String = "README.txt"
 const README_PATH: String = SAVE_DIR + README_FILENAME
 
-const SCHEMA_VERSION: int = 1
+const SCHEMA_VERSION: int = 2
+
+# Curve mirror used only by the v1 -> v2 migration (xp_to_next backfill).
+# MUST match `scripts/progression/Levels.gd` constants of the same names.
+# When Levels' curve changes, mirror it here AND bump SCHEMA_VERSION so
+# saves from the old curve are explicitly migrated.
+const _V2_BASE_XP: int = 100
+const _V2_EXP_POWER: float = 1.5
+const _V2_MAX_LEVEL: int = 5
 
 # Default empty payload schema. Mutated by gameplay then handed back to save_game.
+#
+# v2 (2026-05-02): added `xp_to_next` to character so HUD has a one-shot
+# read for the level-up bar. Derived from level via Levels.xp_required_for(),
+# but persisting it keeps the save self-describing for tooling and future
+# Levels-curve migrations.
 const DEFAULT_PAYLOAD: Dictionary = {
 	"character": {
 		"name": "Ember-Knight",
 		"level": 1,
 		"xp": 0,
+		"xp_to_next": 100,  # Levels.xp_required_for(1) at runtime
 		"vigor": 0,
 		"focus": 0,
 		"edge": 0,
@@ -174,6 +188,8 @@ func migrate(data: Dictionary, from_version: int) -> Dictionary:
 	var out: Dictionary = data.duplicate(true)
 	if from_version < 1:
 		out = _migrate_v0_to_v1(out)
+	if from_version < 2:
+		out = _migrate_v1_to_v2(out)
 	return out
 
 
@@ -189,6 +205,42 @@ func _migrate_v0_to_v1(data: Dictionary) -> Dictionary:
 	if not data.has("character"):
 		data["character"] = DEFAULT_PAYLOAD["character"].duplicate(true)
 	return data
+
+
+## v1 -> v2: add `xp_to_next` to the character block. Derived from current
+## level so a partially-leveled v1 save loads with the right ceiling
+## visible in the HUD on first frame.
+##
+## We don't reach into the Levels autoload here (load runs before any new-
+## game flow has set Levels state) — instead we re-derive the curve inline
+## using the `_V2_*` constants at the top of this file (mirror of
+## scripts/progression/Levels.gd).
+func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
+	# Defensive: a malformed v1 might have lost the character block. v0->v1
+	# already backfills it from DEFAULT_PAYLOAD; if that didn't run for
+	# some reason (unlikely; the migrate() chain always runs in order),
+	# create it here too.
+	if not data.has("character") or not (data["character"] is Dictionary):
+		data["character"] = DEFAULT_PAYLOAD["character"].duplicate(true)
+	var character: Dictionary = data["character"]
+	if not character.has("xp_to_next"):
+		var lvl: int = int(character.get("level", 1))
+		character["xp_to_next"] = _v2_xp_required_for(lvl)
+	# Also ensure level/xp exist (a hand-edited v1 might've stripped them).
+	if not character.has("level"):
+		character["level"] = 1
+	if not character.has("xp"):
+		character["xp"] = 0
+	return data
+
+
+## Curve mirror used only by the v1 -> v2 migration. See Levels.gd for the
+## authoritative implementation.
+static func _v2_xp_required_for(level: int) -> int:
+	if level >= _V2_MAX_LEVEL:
+		return 0
+	var clean_level: int = max(1, level)
+	return int(floor(float(_V2_BASE_XP) * pow(float(clean_level), _V2_EXP_POWER)))
 
 # ---- Testability README -------------------------------------------------
 
