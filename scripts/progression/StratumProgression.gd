@@ -111,12 +111,13 @@ func snapshot_to_save_data(data: Dictionary) -> void:
 	}
 
 
-## Read progression state back from a loaded save payload. Tolerant of
-## missing keys (older saves) — defaults to empty progression.
+## Read progression state back from a loaded save payload. Tolerates
+## missing keys (older saves / empty dict) — defaults to empty
+## progression. The typed `Dictionary` param can't actually receive
+## null in GDScript 4.3, so the empty-dict path is the canonical
+## "no data" shape (locked in by `test_html5_invariants.gd::TI-5`).
 func restore_from_save_data(data: Dictionary) -> void:
 	_cleared.clear()
-	if data == null:
-		return
 	var sub: Variant = data.get("stratum_progression", {})
 	if not (sub is Dictionary):
 		return
