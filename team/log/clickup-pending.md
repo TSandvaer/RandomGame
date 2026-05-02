@@ -141,6 +141,17 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - created_at: 2026-05-02T (uma-run-001)
 - attempts: 1 (MCP returned "ClickUp is not connected")
 
+## ENTRY 2026-05-02-011
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "feat(mobs): grunt mob archetype — pathing, melee swing, death"
+    status: ready for qa test
+- reason: Drew run-002 task #8. PR #6 opened on `drew/grunt-mob`. Lands `scripts/mobs/Grunt.gd` + `scenes/mobs/Grunt.tscn` + the TRES schema implementation paired in per Priya's run-001 split (`scripts/content/*.gd`, ContentFactory, 7 authored seed TRES). 18 paired GUT tests in `tests/test_grunt.gd` covering full state machine + 3 required edge cases (rapid hit spam, death-mid-telegraph, death-while-pathing) + 14 schema/factory smoke tests in `tests/test_content_factory.gd`. Tess merges after sign-off.
+- created_at: 2026-05-02T (drew-run-002)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
 ## ENTRY 2026-05-02-010
 
 - op: update_task
