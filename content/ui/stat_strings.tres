@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="StatStrings" load_steps=2 format=3 uid="uid://b2embergrave_stat_strings"]
+
+[ext_resource type="Script" path="res://scripts/content/StatStrings.gd" id="1_statstrings"]
+
+[resource]
+script = ExtResource("1_statstrings")
+vigor_header = "VIGOR"
+vigor_sub_header = "toughness · health pool · stamina"
+vigor_body = "+5 max HP per point
++1 HP regen / 10 s per point"
+vigor_flavor = "\"Vigor is what stands between you and the next bell. Stack it when the floor bites.\""
+focus_header = "FOCUS"
+focus_sub_header = "dodge · cooldowns · steady hands"
+focus_body = "+0.02 s dodge i-frame per point
+-1% ability cooldown per point"
+focus_flavor = "\"Focus narrows the world to the next strike. The flame burns truer for it.\""
+edge_header = "EDGE"
+edge_sub_header = "damage · crit · bite"
+edge_body = "+1 damage per point
++1% crit chance per point"
+edge_flavor = "\"Edge is the cruelty in your swing. Sharper, faster, more often.\""

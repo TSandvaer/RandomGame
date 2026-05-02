@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3embergrave_stat_allocation_panel"]
+
+[ext_resource type="Script" path="res://scripts/ui/StatAllocationPanel.gd" id="1_statpanel"]
+
+[node name="StatAllocationPanel" type="CanvasLayer"]
+script = ExtResource("1_statpanel")
+layer = 80

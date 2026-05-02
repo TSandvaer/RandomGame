@@ -99,8 +99,8 @@ func test_envelope_carries_schema_version_and_saved_at() -> void:
 	f.close()
 	var parsed: Variant = JSON.parse_string(raw)
 	assert_true(parsed is Dictionary)
-	# Schema is at v2 as of 2026-05-02 (added xp_to_next to character).
-	assert_eq(int(parsed["schema_version"]), 2, "envelope contains schema_version=2")
+	# Schema is at v3 as of 2026-05-02 (added stats / unspent / first_level_up_seen).
+	assert_eq(int(parsed["schema_version"]), 3, "envelope contains schema_version=3")
 	assert_true(parsed.has("saved_at"))
 	assert_true(parsed.has("data"))
 

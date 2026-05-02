@@ -184,19 +184,46 @@ func set_equipped_weapon(weapon: ItemDef) -> void:
 
 
 ## Edge stat — read by Damage.compute_player_damage to scale weapon damage.
+## Reads from the PlayerStats autoload (canonical source) when available;
+## falls back to the legacy local `_edge` field for tests that bare-
+## instantiate a Player without the autoload (or to honor an explicit
+## set_stat call from a save-restore path that pre-dates PlayerStats).
 func get_edge() -> int:
+	var ps: Node = _player_stats_autoload()
+	if ps != null:
+		return int(ps.get_stat(&"edge"))
 	return _edge
 
 
 ## Vigor stat — read by Damage.compute_mob_damage to mitigate incoming hits.
+## See get_edge for the autoload-fallback pattern.
 func get_vigor() -> int:
+	var ps: Node = _player_stats_autoload()
+	if ps != null:
+		return int(ps.get_stat(&"vigor"))
 	return _vigor
 
 
 ## Focus stat — currently unused by the damage formula but tracked here so
 ## the level-up allocation flow has a single home for V/F/E.
 func get_focus() -> int:
+	var ps: Node = _player_stats_autoload()
+	if ps != null:
+		return int(ps.get_stat(&"focus"))
 	return _focus
+
+
+## Internal helper — fetch the PlayerStats autoload if it's registered.
+## Returns null inside bare-instantiated test contexts where the autoload
+## hasn't been wired (existing tests construct a Player via `Player.new()`
+## and configure stats via set_stat).
+func _player_stats_autoload() -> Node:
+	if not is_inside_tree():
+		return null
+	var loop: SceneTree = get_tree()
+	if loop == null:
+		return null
+	return loop.root.get_node_or_null("PlayerStats")
 
 
 ## Set Vigor / Focus / Edge to an absolute value (e.g. when restoring from
@@ -265,8 +292,9 @@ func try_attack(kind: StringName, dir: Vector2 = Vector2.ZERO) -> Node:
 
 	# Damage routed through the formula utility. Reads equipped weapon +
 	# Edge stat, returns floored int. Fist (no weapon) = 1 damage flat per
-	# Damage.FIST_DAMAGE.
-	var damage: int = DamageScript.compute_player_damage(_equipped_weapon, _edge, kind)
+	# Damage.FIST_DAMAGE. Edge comes from the PlayerStats autoload when
+	# available (falls back to the local `_edge` field for tests).
+	var damage: int = DamageScript.compute_player_damage(_equipped_weapon, get_edge(), kind)
 	var knockback_strength: float
 	var reach: float
 	var radius: float

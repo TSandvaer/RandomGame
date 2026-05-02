@@ -29,7 +29,7 @@ const TMP_SUFFIX: String = ".tmp"
 const README_FILENAME: String = "README.txt"
 const README_PATH: String = SAVE_DIR + README_FILENAME
 
-const SCHEMA_VERSION: int = 2
+const SCHEMA_VERSION: int = 3
 
 # Curve mirror used only by the v1 -> v2 migration (xp_to_next backfill).
 # MUST match `scripts/progression/Levels.gd` constants of the same names.
@@ -45,6 +45,13 @@ const _V2_MAX_LEVEL: int = 5
 # read for the level-up bar. Derived from level via Levels.xp_required_for(),
 # but persisting it keeps the save self-describing for tooling and future
 # Levels-curve migrations.
+#
+# v3 (2026-05-02): added `character.stats` block ({vigor, focus, edge}) and
+# `character.unspent_stat_points` for the level-up allocation UI. Replaces
+# the flat vigor/focus/edge fields kept in v2 — those are retained as a
+# compatibility shadow during v2 -> v3 migration so old saves load cleanly.
+# Also added `character.first_level_up_seen` (one-shot panel auto-open
+# gate per Uma `level-up-panel.md` LU-05 / LU-06).
 const DEFAULT_PAYLOAD: Dictionary = {
 	"character": {
 		"name": "Ember-Knight",
@@ -54,6 +61,13 @@ const DEFAULT_PAYLOAD: Dictionary = {
 		"vigor": 0,
 		"focus": 0,
 		"edge": 0,
+		"stats": {
+			"vigor": 0,
+			"focus": 0,
+			"edge": 0,
+		},
+		"unspent_stat_points": 0,
+		"first_level_up_seen": false,
 		"hp_current": 100,
 		"hp_max": 100,
 	},
@@ -190,6 +204,8 @@ func migrate(data: Dictionary, from_version: int) -> Dictionary:
 		out = _migrate_v0_to_v1(out)
 	if from_version < 2:
 		out = _migrate_v1_to_v2(out)
+	if from_version < 3:
+		out = _migrate_v2_to_v3(out)
 	return out
 
 
@@ -231,6 +247,49 @@ func _migrate_v1_to_v2(data: Dictionary) -> Dictionary:
 		character["level"] = 1
 	if not character.has("xp"):
 		character["xp"] = 0
+	return data
+
+
+## v2 -> v3: add the `character.stats` block ({vigor, focus, edge}) and the
+## `character.unspent_stat_points` + `character.first_level_up_seen` fields
+## introduced by the level-up allocation UI (Devon's `86c9kxx2y`).
+##
+## v2 already had flat `vigor`/`focus`/`edge` int fields directly on the
+## character block — we preserve those (compat shadow), copy them into the
+## new `stats` sub-dict so PlayerStats.restore_from_character can read the
+## v2-authored values, and add the new bookkeeping fields with defaults.
+##
+## Backward compat: the v2 flat fields are retained on the character block
+## (some test fixtures and the inventory-stat-panel code still read them).
+## Going forward, `character.stats` is the canonical surface; the flat
+## fields stay write-once-on-migration and aren't kept in sync after.
+func _migrate_v2_to_v3(data: Dictionary) -> Dictionary:
+	if not data.has("character") or not (data["character"] is Dictionary):
+		data["character"] = DEFAULT_PAYLOAD["character"].duplicate(true)
+	var character: Dictionary = data["character"]
+	# Backfill the new `stats` block. If a v2 save already has flat
+	# vigor/focus/edge, lift them in (don't lose data).
+	if not character.has("stats") or not (character["stats"] is Dictionary):
+		character["stats"] = {
+			"vigor": int(character.get("vigor", 0)),
+			"focus": int(character.get("focus", 0)),
+			"edge": int(character.get("edge", 0)),
+		}
+	# Backfill the unspent-points bank. Default 0 — fresh characters have
+	# no banked points; a v2 character that has already leveled past L1
+	# might be expected to have unspent points, but we deliberately default
+	# to 0 because (a) we don't know how many were silently consumed by
+	# v2's missing UI, (b) the player won't notice 0 banked vs N banked
+	# more than they'd notice an over-count, and (c) Tess can verify the
+	# fresh-start path in tests.
+	if not character.has("unspent_stat_points"):
+		character["unspent_stat_points"] = 0
+	# Backfill the first-level-up auto-open gate. Default false (next
+	# level-up will trigger the auto-open). For v2 characters who have
+	# already leveled, this may auto-open one extra time on their next
+	# level-up, which is acceptable — it's still a celebratory beat.
+	if not character.has("first_level_up_seen"):
+		character["first_level_up_seen"] = false
 	return data
 
 
