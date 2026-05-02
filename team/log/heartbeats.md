@@ -42,3 +42,15 @@
 - **M1 RC progress**: Build artifact `embergrave-html5-69a14c1-manual.zip` exists and was surfaced to Sponsor. After PR #40 merges, Tess re-cuts on the new SHA; Sponsor will have a boss-inclusive build to soak when they return.
 
 **Sponsor surface state**: SURFACED (M1 sign-off candidate ping sent in previous orchestrator turn). Expecting Sponsor to soak when they return.
+
+## Tick 2026-05-02 16:55
+
+- **Roles working**: Tess (run-009 — merge PR #45 + final RC re-cut), Drew (run-007 — rooms 2-8 of stratum 1).
+- **Roles idle**: Priya, Uma, Devon.
+- **Roles blocked**: none.
+- **Open PRs**: #45 stratum exit (Drew, ready-for-qa, CI green, 37 paired tests).
+- **Dispatched this tick**: Tess (PR #45 merge + final RC re-cut consolidating boss + damage formula + stratum exit), Drew (rooms 2-8).
+- **Decisions made**: Don't re-ping Sponsor with successive RC builds. Sponsor has the d803d3d candidate; the next RC (after PR #45 merges) is the consolidated final candidate. They'll see the latest in-conversation when they return. Decided NOT to dispatch Devon this tick to limit worktree thrash; can dispatch on stat-allocation UI next tick once Tess/Drew settle.
+- **Merged since last tick**: 2 PRs (#43 damage formula, #44 tess state).
+- **Open issues**: Soak still requires Sponsor (held since automated agent can't do interactive playthrough).
+- **M1 RC progress**: Current Sponsor-facing build is `d803d3d`. After PR #45 merges, Tess re-cuts on the new SHA — that becomes the **final M1 RC candidate** with full polish (boss + charger + shooter + level-up + damage formula + stratum exit).
