@@ -192,3 +192,12 @@ Format:
 - Reversibility: reversible — M2 can soften (ember-bag recovery) or harden (lose equipped on second death) the rule without breaking M1.
 - Affects: Drew (loot system must distinguish equipped vs. inventory state on death), Devon (save schema needs `equipped_items` vs. `inventory_items` separation; serialize `equipped_items` and persistent character on death; reset run state), Uma (death-restart-flow run-summary copy may need to call out "equipped gear kept" explicitly), Tess (M1-AC test cases for death must verify equipped persists, inventory wipes, level kept).
 - Detail: open thread in Uma's `STATE.md` section; consumed and resolved here.
+
+## 2026-05-02 — Switch to worktree-isolated agent dispatches
+
+- Decided by: orchestrator (Sponsor flagged the friction, asked for recommendation, accepted)
+- Decision: All future agent dispatches use **`isolation: "worktree"`** by default. Each dispatched agent gets its own temporary git worktree (separate working directory + HEAD, shared `.git` and origin). The orchestrator continues to operate on the main checkout. `team/GIT_PROTOCOL.md` "Concurrent agents" section updated. Sequential dispatches with no expected parallelism may opt out per orchestrator's call.
+- Why: Concurrent agents (Tess, Devon, Drew running in parallel) repeatedly polluted the orchestrator's main checkout — `git checkout` issued by one agent left the working directory on a non-main branch, so subsequent orchestrator commits landed on the wrong branch. We worked around it with defensive `git checkout main` + `git restore --source=` patterns, but the per-commit overhead added up. Worktree isolation gives every agent its own working directory without changing the branch model. Drew's untracked WIP files appearing in my queue-flush PR was the canonical example of cross-agent leakage; that won't recur.
+- Reversibility: reversible at any time — flag is per-dispatch. If the orchestrator finds worktree creation slow or wasteful for a tiny task, dispatch without it.
+- Affects: Orchestrator (changes the dispatch call shape going forward), all agents (their worktree path is no longer the project root — relevant only if a script hardcodes `c:\Trunk\PRIVATE\RandomGame`; none should). Disk: a few MB per concurrent agent. CI: untouched (CI runs against pushed branches, not local worktrees).
+- Detail: `team/GIT_PROTOCOL.md` "Concurrent agents" section.
