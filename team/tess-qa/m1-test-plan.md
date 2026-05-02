@@ -171,6 +171,37 @@ A "hard crash" = browser tab closed by the engine, native exe terminated, or GDS
 
 ---
 
+## Automated integration coverage (per AC)
+
+GUT scene-level integration tests exercise the **end-to-end flow** behind
+each acceptance criterion, layered on top of the unit-level coverage in
+`automated-smoke-plan.md`. Scene tests load the actual `.tscn`, compose
+real player + mob nodes, and drive the public APIs the input layer would
+call in production. They catch wiring regressions (layer/team mismatches,
+autoload snapshot conflicts, room-side assembler bugs) that unit tests in
+isolation cannot.
+
+| AC   | Unit coverage                                       | Integration coverage (GUT scene)              |
+|------|-----------------------------------------------------|------------------------------------------------|
+| AC1  | `tests/test_export_presets.gd`, `test_build_sha.gd` | n/a (build-pipeline AC; manual + CI smoke)     |
+| AC2  | `tests/test_player_attack.gd`, `test_grunt.gd`      | **`tests/integration/test_ac2_first_kill.gd`** — loads `Stratum1Room01.tscn`, walks player to grunt, confirms kill within sim budget; covers hitbox/team/layer integration. |
+| AC3* | `tests/test_player_attack.gd`, `test_grunt.gd`, `test_hitbox.gd`, `test_save_roundtrip.gd::test_death_rule_keeps_level_xp_equipped` | **`tests/integration/test_ac3_combat_loop.gd`** — combat-loop mechanical correctness in-room: attacks land, dodge i-frames clear player layer, knockback fires, single-hit-per-target, dead-grunt no-op. Death-keeps-level (the official AC3 surface) is unit-covered via `test_save_roundtrip` and `test_quit_relaunch_save`. |
+| AC4  | `tests/test_stratum1_boss.gd`, `test_stratum1_boss_room.gd` | Same scene tests cover boss-room load + boss state machine. |
+| AC5  | (broad — every test fail surfaces regressions)      | All integration tests double as crash probes (room load, save round-trip, combat sim). |
+| AC6  | `tests/test_save.gd`, `test_save_roundtrip.gd`, `test_quit_relaunch_save.gd` | **`tests/integration/test_ac6_quit_relaunch.gd`** — exercises the full autoload snapshot/restore path (Levels + PlayerStats + Inventory + StratumProgression) through Save.save_game / load_game, asserting in-RAM autoload state matches across a wipe-and-reload cycle. |
+| AC7  | `tests/test_loot_roller.gd`, `test_loot_affix_integration.gd`, `test_affix_system.gd` | Loot-pipeline tests cover spawner -> pickup -> inventory; manual visual affix-distinction stays a manual case (T03). |
+
+*AC3 in the Sponsor's mvp-scope is "death does not lose character level or
+stashed gear" — unit-covered via the death-rule tests above. The integration
+file under the AC3 column above instead covers the **combat-loop** (the
+"movement, dodge, attacks, hitboxes feel right" surface that an AC3 death-
+loss bug would also surface through). Both surfaces have unit + integration
+coverage as of run-016 (Tess).
+
+Run integration tests headless: `godot --headless -s addons/gut/gut_cmdln.gd
+-gdir=res://tests -ginclude_subdirs -gexit` — same command used by CI, the
+`-ginclude_subdirs` flag picks up `tests/integration/`.
+
 ## Regression sweep
 
 Every release-tagged build (any build that goes to Sponsor or to itch.io main page) re-runs this **shorter** suite. Goal: ≤30 minutes per pass so it actually happens.
