@@ -28,14 +28,14 @@ extends Node
 ##   - Fast-XP multiplier (`FAST_XP_MULTIPLIER = 100`) is a placeholder.
 ##     Priya owns the level curve; if 100x conflicts with the curve's
 ##     intent, swap here in one place. Flagged in the PR body.
-##   - Test-mode seed (`TEST_MODE_MOB_SEED = 0xEMBE_R7E5_T_M0DE`) is
-##     arbitrary but stable. Reproducibility is the value, not the number.
+##   - Test-mode seed (`TEST_MODE_MOB_SEED = 0x7E57C0DE`) is arbitrary
+##     but stable. Reproducibility is the value, not the number.
 
 const FAST_XP_MULTIPLIER: int = 100
 const NORMAL_XP_MULTIPLIER: int = 1
 # Arbitrary stable seed; reproducibility is the value, not the number.
 # Spelled in hex so it's obviously a fixed test fixture, not arithmetic.
-const TEST_MODE_MOB_SEED: int = 0x7E57_C0DE
+const TEST_MODE_MOB_SEED: int = 0x7E57C0DE
 const TEST_MODE_CLI_FLAG: String = "--test-mode"
 const TEST_MODE_ENV_VAR: String = "EMBERGRAVE_TEST_MODE"
 
