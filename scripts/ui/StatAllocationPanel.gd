@@ -154,6 +154,17 @@ func close(_emit: bool = true) -> void:
 		panel_closed.emit(_get_unspent())
 
 
+## Safety guard: if the panel is freed while still open (scene reload,
+## HTML5 tab-blur path), restore Engine.time_scale so the world doesn't
+## stay at 0.10 forever. Idempotent w.r.t. close() — once `_open` is false
+## (normal close path already restored), this is a no-op. Per Tess's
+## `team/tess-qa/html5-rc-audit-591bcc8.md` §4 CR-2.
+func _exit_tree() -> void:
+	if _open:
+		Engine.time_scale = _previous_time_scale
+		_open = false
+
+
 ## Spend 1 unspent point on the given stat. Updates PlayerStats, persists
 ## via Save.save_game, refreshes tile values, fires `point_allocated`.
 ## Returns true on success. Returns false (no-op) if no points are banked

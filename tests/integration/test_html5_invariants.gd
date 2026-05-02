@@ -13,12 +13,10 @@ extends GutTest
 ## round-trip purity, autoload idempotency, time_scale cleanup, save-path
 ## sanity, BuildInfo non-emptiness.
 ##
-## **Pending tests (TI-6 / TI-7):** the `_exit_tree` time-scale-restore
-## guard is recommended in the audit doc (CR-1 / CR-2) but not yet landed
-## in `InventoryPanel.gd` / `StatAllocationPanel.gd`. The two tests are
-## marked `pending()` here so this PR's CI is green; they flip to active
-## the moment the one-line guards land. Same idiom as `test_autoloads.gd:67`
-## (GameState autoload pending).
+## **TI-6 / TI-7 active as of Devon run-011:** the `_exit_tree` time-scale-
+## restore guard recommended in the audit doc (CR-1 / CR-2) has landed in
+## `InventoryPanel.gd` / `StatAllocationPanel.gd`. The two tests, which
+## previously shipped as `pending()`, now drive the guard directly.
 ##
 ## Slot 995 chosen to avoid collisions: 999 (test_save), 998 (test_save_roundtrip),
 ## 997 (test_quit_relaunch_save), 996 (test_ac6_quit_relaunch).
@@ -285,34 +283,38 @@ func test_stratum_progression_restore_from_empty_dict_is_noop() -> void:
 # TI-6 — InventoryPanel _exit_tree restores Engine.time_scale.
 # =======================================================================
 ##
-## PENDING per audit CR-1 — fix not yet landed in InventoryPanel.gd.
-## Test body documents the contract; flips active when Devon adds the
-## one-line `_exit_tree` guard. See `team/tess-qa/html5-rc-audit-591bcc8.md`.
+## Locks in the audit CR-1 fix: if InventoryPanel is freed while still
+## open (e.g. scene reload, HTML5 tab-blur during scene-change),
+## `Engine.time_scale` is restored to the snapshot value via the
+## `_exit_tree` guard in `scripts/ui/InventoryPanel.gd`. Without the
+## guard the world stays at 0.10 forever.
 func test_inventory_panel_exit_tree_restores_time_scale() -> void:
-	pending("CR-1 fix not yet landed — see html5-rc-audit-591bcc8.md §4 Code-fix-recommended. " +
-		"InventoryPanel.gd needs `func _exit_tree() -> void: if _open: Engine.time_scale = _previous_time_scale`.")
-	# The test body that *would* run once CR-1 lands is sketched here so the
-	# fix-PR can flip pending() -> the live assertions in one commit:
-	#
-	#   var packed: PackedScene = load("res://scenes/ui/InventoryPanel.tscn")
-	#   var panel: InventoryPanel = packed.instantiate()
-	#   add_child(panel)
-	#   panel.open()
-	#   assert_eq(Engine.time_scale, 0.10, "panel-open sets 0.10")
-	#   panel.queue_free()
-	#   await get_tree().process_frame
-	#   assert_eq(Engine.time_scale, 1.0,
-	#       "freed-while-open panel restores time_scale via _exit_tree")
+	var packed: PackedScene = load("res://scenes/ui/InventoryPanel.tscn")
+	var panel: InventoryPanel = packed.instantiate()
+	add_child(panel)
+	panel.open()
+	assert_eq(Engine.time_scale, 0.10, "panel-open sets 0.10")
+	panel.queue_free()
+	await get_tree().process_frame
+	assert_eq(Engine.time_scale, 1.0,
+		"freed-while-open panel restores time_scale via _exit_tree")
 
 
 # =======================================================================
 # TI-7 — StatAllocationPanel _exit_tree restores Engine.time_scale.
 # =======================================================================
 ##
-## PENDING per audit CR-2 — same shape as TI-6.
+## Mirror invariant for `StatAllocationPanel` (audit CR-2 fix).
 func test_stat_allocation_panel_exit_tree_restores_time_scale() -> void:
-	pending("CR-2 fix not yet landed — see html5-rc-audit-591bcc8.md §4 Code-fix-recommended. " +
-		"StatAllocationPanel.gd needs `func _exit_tree() -> void: if _open: Engine.time_scale = _previous_time_scale`.")
+	var packed: PackedScene = load("res://scenes/ui/StatAllocationPanel.tscn")
+	var panel: StatAllocationPanel = packed.instantiate()
+	add_child(panel)
+	panel.open()
+	assert_eq(Engine.time_scale, 0.10, "panel-open sets 0.10")
+	panel.queue_free()
+	await get_tree().process_frame
+	assert_eq(Engine.time_scale, 1.0,
+		"freed-while-open panel restores time_scale via _exit_tree")
 
 
 # =======================================================================

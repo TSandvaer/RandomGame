@@ -99,3 +99,12 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - created_at: 2026-05-02T20:50
 - attempts: 0
 - note: Tess run 018 — CR-3 follow-up from W3-A5 HTML5 RC audit. Low severity; can be deferred or land alongside ENTRY 022's fix. Devon picks up.
+
+## ENTRY 2026-05-02-024
+- op: update_task
+- task_id: <pending: resolves to ENTRY 022's ClickUp ID once created>
+- payload:
+    status: ready for qa test
+- created_at: 2026-05-02T21:30
+- attempts: 0
+- note: **Devon run-011** — CR-1 + CR-2 fix landed in PR `devon/cr-1-cr-2-time-scale-guard` (`fix(ui): _exit_tree restores Engine.time_scale on InventoryPanel + StatAllocationPanel`). Both panels now have a `_exit_tree()` guard restoring `Engine.time_scale = _previous_time_scale` if `_open` is true; idempotent vs. normal `close()` (sets `_open = false` after restore so a second `_exit_tree` after a normal `close()` is a no-op). Tess's TI-6 / TI-7 in `tests/integration/test_html5_invariants.gd` flipped from `pending(...)` to live assertions per the test-comment sketch (one commit, paired-test discipline). Test count delta: 563 → 565 passing / 3 → 1 pending (remaining pending = `tests/test_autoloads.gd:67` GameState autoload). CR-3 deferred per dispatch (out of scope this PR). PR awaits Tess sign-off; **NOT self-merging** (`fix(ui)` is not exempt from Tess sign-off per `team/GIT_PROTOCOL.md`).

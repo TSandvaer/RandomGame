@@ -146,6 +146,17 @@ func close() -> void:
 	panel_closed.emit()
 
 
+## Safety guard: if the panel is freed while still open (scene reload,
+## HTML5 tab-blur path), restore Engine.time_scale so the world doesn't
+## stay at 0.10 forever. Idempotent w.r.t. close() — once `_open` is false
+## (normal close path already restored), this is a no-op. Per Tess's
+## `team/tess-qa/html5-rc-audit-591bcc8.md` §4 CR-1.
+func _exit_tree() -> void:
+	if _open:
+		Engine.time_scale = _previous_time_scale
+		_open = false
+
+
 ## Test-only helper for click simulation. Mirrors the live click handler;
 ## tests use this to drive the click flow without raising real input
 ## events.
