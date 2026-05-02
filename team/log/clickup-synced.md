@@ -303,3 +303,23 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - created_at: 2026-05-02T (drew-run-002)
 - attempts: 1 (MCP returned "ClickUp is not connected")
 - note: PR #6 typed-array bug Tess flagged (entry 017) is fixed in commit 0693476 on drew/grunt-mob — CI now green.
+
+---
+
+## 2026-05-02 22:30 — second-batch flush (entries 018-026)
+
+ClickUp MCP reconnected; orchestrator drained the 9-entry queue accumulated since the first flush.
+
+**Resolutions:**
+
+- **ENTRY 018** (`86c9kxx8a` → `in progress`) — applied. Devon run-008 transitional status for `chore(ci): hardening pass`.
+- **ENTRY 019** — skipped. Superseded by ENTRY 021's terminal `complete` status (Devon's run-008 self-merge under wide reading of `chore(ci)` exemption was overridden by Tess sign-off via PR #78 in run-009 + run-017).
+- **ENTRY 020** — skipped. Superseded by ENTRY 021.
+- **ENTRY 021** (`86c9kxx8a` → `complete`) — applied. Tess run-017 sign-off + merge of PR #78 covering the three uncovered gaps on top of Devon run-008's PR #76. Process slip filed in `team/log/process-incidents.md`.
+- **ENTRY 022** (create `bug(html5): InventoryPanel + StatAllocationPanel _exit_tree...`) — applied; created task **`86c9kzmf7`**. Tags: `bug`, `week-3` (`html5` was not a recognized space tag).
+- **ENTRY 023** (create `chore(progression): drop dead null-check in StratumProgression.restore_from_save_data`) — applied; created task **`86c9kzmfe`**. Default status; Devon currently in flight on `devon/cr-3-stratum-progression-cleanup`. Tags: `chore`, `week-3`.
+- **ENTRY 024** — skipped. Superseded by ENTRY 025.
+- **ENTRY 025** (`86c9kzmf7` → `complete`) — applied. Tess run-019 sign-off + merge of Devon's PR #87 (`fix(ui): _exit_tree restores Engine.time_scale on InventoryPanel + StatAllocationPanel`) at squash commit `98a344e`. Tess's TI-6 + TI-7 in `tests/integration/test_html5_invariants.gd` flipped pending → live in same PR.
+- **ENTRY 026** (create `fix(mobs): charger orphan-velocity race in death-mid-charge path` with terminal `complete` status on create) — applied; created task **`86c9kzmfm`**. Tags: `bug` (`mobs`/`charger`/`ci-flake` were not recognized space tags). Drew run-007 fix at `7697ca5` via PR #94, Tess run-020 sign-off. ClickUp DID accept create-with-terminal-status `complete` on this list — the fallback note's contingency was unnecessary.
+
+**Operational note for future flushes:** the recognized space-level tags are limited to `bug`, `chore`, `week-3` (others observed: `feat`, `qa`, `design`, but not the per-system tags). Tag-creation requires Sponsor or workspace-level permission; for now, tag with what's recognized and rely on the ticket name's `<scope>:` prefix for system-level filtering.
