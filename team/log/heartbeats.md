@@ -236,3 +236,23 @@
 - **Open issues**: ClickUp queue at ~10 entries pending replay (MCP still down). Charger-flake follow-up trail captured in process-incidents.md and clickup-pending.md ENTRY 026 — closed.
 - **M1 RC progress**: `591bcc8` is verified-coverage and remains the active soak target. 587 passing / 1 long-standing pending on the post-fix tip. **Awaiting Sponsor's interactive 30-min soak — single gating activity for M1 sign-off; no agent substitute.**
 - **Next-tick decision rule**: If Sponsor returns with input, handle normally per session-resume guidance (sign-off → dispatch M2 week-1 per Priya's backlog; bug bounce → Tess + Devon/Drew fix-forward; question → answer). If still no Sponsor message AND no shift in dispatchable envelope, the next tick will likely be another soft-blocker entry. Cron continues running every 10 min on minutes 3/13/23/33/43/53.
+
+## Tick 2026-05-02 22:33 — envelope genuinely exhausted (W3-A5 audit closed)
+
+- **Roles working**: none.
+- **Roles idle**: all 5.
+- **Open PRs**: none (PR #104 just merged at `a88b660`).
+- **Dispatched this tick**: NONE — all dispatchable envelope items are closed.
+- **Decisions made**: User explicitly overrode the prior soft-blocker with "continue" at ~22:25; orchestrator dispatched Uma (palette S3-S8 indicative refinement) + Devon (CR-3 StratumProgression cleanup). Both landed cleanly. ClickUp MCP reconnected mid-tick — 9-entry queue (ENTRY 018-026) drained: 3 new task IDs created (`86c9kzmf7` CR-1+CR-2 bug `complete`, `86c9kzmfe` CR-3 chore `complete` post-Tess-signoff, `86c9kzmfm` charger flake `complete`). Devon notified mid-run via SendMessage to use live MCP instead of queue. **W3-A5 HTML5 audit is now fully closed** — all three code-fix-recommended findings (CR-1 + CR-2 + CR-3) resolved on `main`.
+- **Merged since last tick (5 PRs in ~30 minutes)**: #101 Devon CR-3 (`chore(progression): remove dead null-check`) at `b704345`, #102 ClickUp queue flush at `b13b020`, #103 Uma palette S3-S8 indicative refinement at `c03cef4`, #104 Tess STATE run-022 at `a88b660`. Plus PR #100 (22:03 soft-blocker) from prior tick.
+- **Open issues**: none. All M1-residual fix queues drained. ClickUp pending queue is empty.
+- **M1 RC progress**: `embergrave-html5-591bcc8` remains the verified-coverage Sponsor-soak target. Post-fix tip is `a88b660` with all M1-residual fixes baked (CR-1 + CR-2 + CR-3 + charger flake) — 586 passing / 1 long-standing pending. **Awaiting Sponsor's interactive 30-min soak** — single gating activity, no agent substitute.
+- **Dispatch envelope status — genuinely exhausted**:
+  - Half-A: all done (CI hardening, integration GUT, HTML5 audit, worktree-isolation v3).
+  - Half-B-design: all done (stash UI v1, stratum-2 palette, save-schema v4 plan, audio v1.1, S3-S8 indicative refinement).
+  - Half-B-code (W3-B2 stratum-2 chunk scaffold): done.
+  - M1-residual fixes (CR-1, CR-2, CR-3, charger flake): all closed.
+  - Anticipatory M2 work (Priya backlog, Tess T12 acceptance plan): both landed.
+  - Bug-bash (`86c9kxx7h`): RESERVED for post-Sponsor.
+  - M2 implementation (T1-T11 from Priya's backlog): SPONSOR-GATED.
+- **Next-tick decision rule**: If Sponsor returns, handle normally. Otherwise the cron's accepted blocker condition ("all Half-A and Half-B-design items in flight or done; only riskier Half-B-code or Sponsor-gated work remains") applies and ticks are no-op until shift.
