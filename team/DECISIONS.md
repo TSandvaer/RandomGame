@@ -174,3 +174,21 @@ Format:
 - Reversibility: reversible until ClickUp promotion at end of week 1.
 - Affects: all roles week 2.
 - Detail: `team/priya-pl/week-2-backlog.md`
+
+## 2026-05-02 — Visual direction locked: pixel art 96 px/tile, 480x270 canvas
+
+- Decided by: Uma (authored) → orchestrator (formalization)
+- Decision: Embergrave's visual direction is **pixel art at 96 px/tile, 480×270 internal canvas, integer scaling only, nearest-neighbor filtering**, eight-stratum hue progression per `team/uma-ux/palette.md`. Stratum 1 palette is authoritative; S2–S8 are indicative until those strata enter scope. This is a binding lock — switching art styles after content authoring begins is multi-week rework.
+- Why: Uma's call as the design authority; orchestrator formalizes so Drew (mob sprite resolution and color usage) and Devon (project viewport/render settings, UI scene scaling) can implement against a fixed contract starting now. Pixel art at this resolution ships cleanly to itch.io HTML5 with no upscale artifacts and is a known shippable scope for a 2-developer team.
+- Reversibility: one-way once Drew authors the first stratum-1 mob sprite and Devon configures viewport.
+- Affects: Drew (all sprite/tile resolution and palette usage), Devon (project viewport, stretch mode, UI render settings, font choice), Tess (visual regression test cases keyed to palette hexes), future content authoring.
+- Detail: `team/uma-ux/visual-direction.md`, `team/uma-ux/palette.md`.
+
+## 2026-05-02 — M1 death rule: keep level + equipped, lose unequipped inventory
+
+- Decided by: orchestrator (Uma flagged; Priya's mvp-scope said "death loses run progress, keeps level/stash" but M1 has no stash UI)
+- Decision: On M1 death, the player **keeps** character level, XP earned, and currently-equipped items (weapon + armor). The player **loses** all unequipped inventory items and the run-progress (depth, position, in-progress combat resources). The run-summary screen leads with what was kept (per Uma's death-restart-flow). M2 introduces a stash UI + an "ember-bag" gear-recovery pattern at the death point.
+- Why: Preserves Sponsor's two-ladder treadmill (character level + gear) with meaningful death stakes, without requiring stash UI in M1. Equipped-only persistence is the simplest rule that still carries the gear ladder forward through the sting of a wipe. Inventory loss creates a real choice ("equip the rare drop now or risk losing it") which is genuinely the loop fantasy.
+- Reversibility: reversible — M2 can soften (ember-bag recovery) or harden (lose equipped on second death) the rule without breaking M1.
+- Affects: Drew (loot system must distinguish equipped vs. inventory state on death), Devon (save schema needs `equipped_items` vs. `inventory_items` separation; serialize `equipped_items` and persistent character on death; reset run state), Uma (death-restart-flow run-summary copy may need to call out "equipped gear kept" explicitly), Tess (M1-AC test cases for death must verify equipped persists, inventory wipes, level kept).
+- Detail: open thread in Uma's `STATE.md` section; consumed and resolved here.

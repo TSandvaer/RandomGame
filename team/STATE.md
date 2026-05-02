@@ -64,7 +64,7 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ## Open decisions awaiting orchestrator
 
-(none — Priya made all Phase 0 calls and logged them in `DECISIONS.md`.)
+(none — Uma's two pending cross-role calls resolved by orchestrator on resume 2026-05-02; see `DECISIONS.md` entries on visual-direction lock and M1 death rule.)
 
 ## Sponsor sign-off queue
 
