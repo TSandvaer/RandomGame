@@ -249,3 +249,6 @@ intent of the test (e.g. `--test-mode` flag is debug-only by design).
   fix-vs-quarantine criteria, 7-day default lifetime, current
   quarantine list of zero, distinction between conditional skips and
   real quarantines, workflow for filing new quarantines).
+
+  Verified cold + warm cache demo runs on this PR; numbers in the PR
+  body table.
