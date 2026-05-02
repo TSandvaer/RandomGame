@@ -41,19 +41,19 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ## Drew (Game Dev #2)
 
-- Last updated: 2026-05-01 (by Priya, dispatching)
-- Status: ready to start in parallel
-- Working on: —
-- Blocked on: Devon's scaffold (#1) for tasks that touch the project. Can start authoring tooling design (TRES schema) on paper while waiting.
-- Next: (1) TRES schema for MobDef + ItemDef (start now, no scaffold needed), (2) Grunt mob archetype, (3) Stratum-1 first room chunk-based assembly POC, (4) Gear drop on mob death (T1 weapon + T1 armor stub).
+- Last updated: 2026-05-01
+- Status: working
+- Working on: Task 1 — TRES schema for MobDef + ItemDef + AffixDef + LootTableDef (`team/drew-dev/tres-schemas.md`).
+- Blocked on: Devon's scaffold (#1) for tasks 2–4 (Grunt mob, level POC, loot drop) — those touch the Godot project tree.
+- Next: After scaffold lands: (2) Grunt mob archetype, (3) Stratum-1 first room chunk-based assembly POC, (4) Gear drop on mob death (T1 weapon + T1 armor stub).
 
 ## Tess (Tester)
 
-- Last updated: 2026-05-01 (by Priya, dispatching)
-- Status: ready to start
-- Working on: —
-- Blocked on: nothing — MVP scope is locked at `team/priya-pl/mvp-scope.md`.
-- Next: (1) M1 acceptance test plan covering all 7 acceptance criteria — deliverable `team/tess-qa/m1-test-plan.md`, (2) Automated smoke test (game boots, title screen, no errors) once Devon's scaffold lands.
+- Last updated: 2026-05-01
+- Status: working
+- Working on: (1) M1 acceptance test plan → (2) Bug report template → (3) Automated smoke test plan (paper) → (4) Test environment matrix.
+- Blocked on: nothing — MVP scope is locked at `team/priya-pl/mvp-scope.md`. GUT scaffold not yet committed (paper deliverables only this run).
+- Next: Land 4 QA spec docs this run; write actual GUT smoke tests once Devon's scaffold commit lands.
 
 ---
 
