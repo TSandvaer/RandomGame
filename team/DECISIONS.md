@@ -244,3 +244,12 @@ Format:
 - Reversibility: rolling document — risks added, retired, re-scored as M1 progresses.
 - Affects: orchestrator (heartbeat scan target), Priya (rolling owner), all roles (each risk has a named owner).
 - Detail: `team/priya-pl/risk-register.md`.
+
+## 2026-05-02 — Secret-free M1 RC build path lands
+
+- Decided by: Devon (per dispatch authority — CI / release tooling)
+- Decision: New workflow `.github/workflows/release-github.yml` produces an HTML5 build, zips it, and either uploads it as a workflow artifact (manual dispatch) or attaches it to a GitHub Release (tag pushes matching `v*-rc*` / `v*-m1-*` / `m1-rc*`). Uses the same `barichello/godot-ci:4.3` container as `ci.yml`. Requires no secrets — works without `BUTLER_API_KEY` / `ITCH_USER` / `ITCH_GAME`. Ships alongside `release-itch.yml` (which still requires those secrets); whichever has its prerequisites met can run. `export_presets.cfg` was authored and committed (HTML5, Windows Desktop, Linux/X11, macOS — preset names matched to both workflows' matrix entries) and removed from `.gitignore` so the file actually tracks. Paired sanity test `tests/test_export_presets.gd` asserts the preset file and required preset names are present (catches workflow-vs-preset name drift at unit-test time, not in a 3-minute-failed CI run).
+- Why: Sponsor hasn't set up itch.io secrets and isn't here to. M1 sign-off needs a build path that produces a Tess-downloadable artifact today. HTML5-only on purpose — Windows/macOS/Linux exports remain in `release-itch.yml` for when secrets exist; M1 sign-off only needs HTML5.
+- Reversibility: reversible — workflow can be deleted once `release-itch.yml` is unblocked, or merged into it. Preset file stays either way.
+- Affects: Tess (download path documented in `team/devon-dev/m1-rc-build.md`), orchestrator (gets a stable artifact URL to surface to Sponsor when M1 RC is ready), all devs (can `gh workflow run release-github.yml` from any branch to produce a smoke-build).
+- Detail: `team/devon-dev/m1-rc-build.md`, ClickUp `86c9ky4fv`.
