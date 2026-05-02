@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MobDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/content/MobDef.gd" id="1_mob"]
+[ext_resource type="Resource" path="res://resources/loot_tables/boss_drops.tres" id="2_loot"]
+
+[resource]
+script = ExtResource("1_mob")
+id = &"stratum1_boss"
+display_name = "Warden of the Outer Cloister"
+sprite_path = ""
+hp_base = 600
+damage_base = 15
+move_speed = 80.0
+ai_behavior_tag = &"stratum1_boss"
+loot_table = ExtResource("2_loot")
+xp_reward = 250

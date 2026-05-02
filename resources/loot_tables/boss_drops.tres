@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="LootTableDef" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/content/LootTableDef.gd" id="1_table"]
+[ext_resource type="Script" path="res://scripts/content/LootEntry.gd" id="2_entry"]
+[ext_resource type="Resource" path="res://resources/items/weapons/iron_sword.tres" id="3_sword"]
+[ext_resource type="Resource" path="res://resources/items/armors/leather_vest.tres" id="4_vest"]
+
+[sub_resource type="Resource" id="Resource_boss_entry_sword_t3"]
+script = ExtResource("2_entry")
+item_def = ExtResource("3_sword")
+weight = 1.0
+tier_modifier = 2
+
+[sub_resource type="Resource" id="Resource_boss_entry_vest_t2"]
+script = ExtResource("2_entry")
+item_def = ExtResource("4_vest")
+weight = 1.0
+tier_modifier = 1
+
+[resource]
+script = ExtResource("1_table")
+id = &"boss_drops"
+entries = [SubResource("Resource_boss_entry_sword_t3"), SubResource("Resource_boss_entry_vest_t2")]
+roll_count = -1
