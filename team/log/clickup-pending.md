@@ -117,3 +117,32 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - created_at: 2026-05-02T22:00
 - attempts: 0
 - note: **Tess run-019** — signed off and merged Devon's PR #87 (`fix(ui): _exit_tree restores Engine.time_scale on InventoryPanel + StatAllocationPanel`) at squash commit `98a344ef1b9b3088b79d68e552c2ad50c6278137`. CI verified green on head SHA `55f0325` (run 25259904834 attempt 3: 565p / 1p / 0f / 5850 asserts) — test count math holds main `563p / 3p` → branch `565p / 1p` (TI-6 + TI-7 flipped pending → passing per audit CR-1 + CR-2). Both panels' `_exit_tree` guards match the audit-doc prescription exactly (`if _open: Engine.time_scale = _previous_time_scale; _open = false` — idempotent vs. normal close, no-op on double invocation). **Charger flake trail (NOT introduced by this PR):** attempts 1 AND 2 of run 25259904834 both failed on `tests/test_charger.gd::test_killed_mid_charge_no_orphan_motion` (Devon's PR comment captured only attempt 1 — attempt 2 had same shape plus charge-velocity 180→0 and sideways-knock 500→0 assertions). Bumps flake rate to ≥2/3 on this repro window — real state-machine race in `scripts/mobs/Charger.gd`, not a one-shot blip. Drew dispatched in parallel to investigate. Supersedes ENTRY 024 (Devon's `ready for qa test`). Re-cut skipped (panels not yet HUD-wired in Main.tscn — fix is latent-bug coverage, doesn't change the M1 RC playable surface).
+
+## ENTRY 2026-05-02-026
+- op: create_task
+- list_id: 901523123922
+- payload:
+    name: "fix(mobs): charger orphan-velocity race in death-mid-charge path"
+    description: |
+      **Discovered by:** Tess run-019 / Devon run-011 — `tests/test_charger.gd::test_killed_mid_charge_no_orphan_motion` failed on attempts 1+2 of CI run 25259904834 (≥2/3 flake rate on the same repro window). Real state-machine race, not a one-shot blip.
+
+      **Root cause (Drew run-007):** `Charger.gd::_physics_process` wall-stop check fired false-positive on the FIRST CHARGING tick when `get_physics_process_delta_time()` returned ~0 (headless engine had not yet stepped physics). Sub-epsilon post-slide displacement transitioned CHARGER → RECOVERING (zeroing velocity) BEFORE the test's `take_damage` call, breaking the test's CHARGING + velocity-positive pre-conditions. Tests with overridden `move_speed = 180` masked the bug because `180 * 0.003 > 0.5`; default `charge_speed = 60` from MobDef tripped the epsilon. Doc-comment on `WALL_STOP_DISPLACEMENT_EPSILON` already said "this many frames in a row" — bug-as-coded, not as-documented.
+
+      **Fix (production, surgical):** added `WALL_STOP_FRAMES_REQUIRED = 2` constant + `_wall_stop_frames` counter to `Charger.gd`. Wall-stop fires only after two consecutive sub-epsilon-displacement ticks. Counter resets on `_begin_charge()` AND on any tick that clears the epsilon (else-branch). Production-correct improvement: dropped frames on slow devices no longer abort charges.
+
+      **Fix (test, defensive):** `c.set_physics_process(false)` in `_make_charger` / `_make_charger_with_def` helpers — removes engine-driven race so manual `_physics_process(delta)` calls are deterministic. New paired test `test_killed_mid_charge_zero_velocity_immediate_loop` repeats kill→tick→assert pattern x25 for deterministic regression.
+
+      **Verification:** 5 green CI runs on same SHA `dbdf843` (25260759815 / 25260786183 / 25260816869 / 25260843664 / 25260870293), all `success` on `CI` workflow. Test count delta: main `586p / 1p` → PR `587p / 1p` (+1 = new looped regression test).
+
+      **Files:**
+      - `scripts/mobs/Charger.gd` (WALL_STOP_FRAMES_REQUIRED constant + `_wall_stop_frames` counter)
+      - `tests/test_charger.gd` (helper `set_physics_process(false)` + new looped test)
+
+      **PR:** #94 (`drew/charger-flake-fix`) — squash-merged `7697ca5` 2026-05-02T20:20Z.
+
+      **Severity:** medium (CI flake on critical mob test).
+    status: complete
+    tags: ["bug", "mobs", "charger", "ci-flake"]
+- created_at: 2026-05-02T20:25
+- attempts: 0
+- note: **Tess run-020** — sign-off + merge of Drew's run-007 charger flake fix (PR #94). No pre-existing ClickUp task ID for this fix-trail; creating-as-complete since fix has already landed on `main`. If MCP rejects a `create_task` with terminal status `complete`, replay as `create_task` with default status then a follow-up `update_task` to `complete`.
