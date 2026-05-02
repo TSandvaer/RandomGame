@@ -28,11 +28,18 @@ static func make_affix_def(overrides: Dictionary = {}) -> AffixDef:
 	a.name = overrides.get("name", "Swift")
 	a.stat_modified = overrides.get("stat_modified", &"move_speed_pct")
 	a.apply_mode = overrides.get("apply_mode", AffixDef.ApplyMode.MUL)
-	a.value_ranges = overrides.get("value_ranges", [
-		make_affix_value_range(0.02, 0.04),  # T1
-		make_affix_value_range(0.04, 0.08),  # T2
-		make_affix_value_range(0.08, 0.12),  # T3
-	])
+	# value_ranges must be Array[AffixValueRange] — untyped Array literals
+	# from Dictionary.get() can't be assigned directly to a typed-array
+	# property in Godot 4. Build a fresh typed array and copy.
+	var ranges: Array[AffixValueRange] = []
+	if overrides.has("value_ranges"):
+		for r in overrides["value_ranges"]:
+			ranges.append(r)
+	else:
+		ranges.append(make_affix_value_range(0.02, 0.04))  # T1
+		ranges.append(make_affix_value_range(0.04, 0.08))  # T2
+		ranges.append(make_affix_value_range(0.08, 0.12))  # T3
+	a.value_ranges = ranges
 	return a
 
 
@@ -53,7 +60,12 @@ static func make_item_def(overrides: Dictionary = {}) -> ItemDef:
 	i.tier = overrides.get("tier", ItemDef.Tier.T1)
 	i.icon_path = overrides.get("icon_path", "")
 	i.base_stats = overrides.get("base_stats", make_item_base_stats({"damage": 5}))
-	i.affix_pool = overrides.get("affix_pool", [])
+	# Typed-array copy (Array[AffixDef]).
+	var pool: Array[AffixDef] = []
+	if overrides.has("affix_pool"):
+		for p in overrides["affix_pool"]:
+			pool.append(p)
+	i.affix_pool = pool
 	return i
 
 
@@ -68,9 +80,14 @@ static func make_loot_entry(item: ItemDef, weight: float = 1.0, tier_mod: int = 
 static func make_loot_table(overrides: Dictionary = {}) -> LootTableDef:
 	var t: LootTableDef = _LootTableDef.new()
 	t.id = overrides.get("id", &"test_loot_table")
-	t.entries = overrides.get("entries", [
-		make_loot_entry(make_item_def(), 1.0, 0),
-	])
+	# Typed-array copy (Array[LootEntry]).
+	var entries: Array[LootEntry] = []
+	if overrides.has("entries"):
+		for e in overrides["entries"]:
+			entries.append(e)
+	else:
+		entries.append(make_loot_entry(make_item_def(), 1.0, 0))
+	t.entries = entries
 	t.roll_count = overrides.get("roll_count", -1)
 	return t
 
