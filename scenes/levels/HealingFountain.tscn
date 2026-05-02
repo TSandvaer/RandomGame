@@ -1,0 +1,22 @@
+[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_healing_fountain"]
+
+[ext_resource type="Script" path="res://scripts/levels/HealingFountain.gd" id="1_fountain"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_fountain"]
+radius = 12.0
+
+[node name="HealingFountain" type="Area2D"]
+collision_layer = 32
+collision_mask = 2
+script = ExtResource("1_fountain")
+heal_amount = 40
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_fountain")
+
+[node name="Sprite" type="ColorRect" parent="."]
+offset_left = -10.0
+offset_top = -10.0
+offset_right = 10.0
+offset_bottom = 10.0
+color = Color(0.18, 0.62, 0.78, 1)
