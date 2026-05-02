@@ -46,10 +46,15 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 ## Drew (Game Dev #2)
 
 - Last updated: 2026-05-02
-- Status: working
-- Working on: Run 002 — week-1 carry-overs from Priya's revised timeline. Implementing in order: (8) Grunt mob archetype + AI state machine, (9) Stratum-1 first room + chunk-based assembly POC, (10) LootRoller + 10-edge-case GUT tests. Schema implementation (`scripts/content/*.gd` + ContentFactory + seed TRES) bundled with task #8 per Priya's run-001 split decision.
-- Blocked on: nothing. Devon's scaffold + physics layers + Hitbox + Player landed in run-001. ClickUp MCP disconnected — status updates queued to `team/log/clickup-pending.md`.
-- Next: Per-task: feature branch → paired GUT tests in same commit → push → PR → label ready-for-qa → stop. Tess merges after sign-off.
+- Status: idle (chunk done — week-1 carry-overs all in `ready for qa test`)
+- Working on: —
+- Blocked on: nothing. Three PRs awaiting Tess sign-off; once #6 merges, #8 and #11 are unblocked. ClickUp MCP was reconnected mid-run by orchestrator (entries flushed); my new entries (drew/loot-roller commit) are still pending and will land alongside that PR's merge.
+- Deliverables run-002:
+  - **Task #8 — feat(mobs): grunt mob** (PR #6, `drew/grunt-mob`, CI green): `scripts/mobs/Grunt.gd` + `scenes/mobs/Grunt.tscn` + TRES schema implementation paired in per Priya's run-001 split (`scripts/content/{MobDef,ItemDef,ItemBaseStats,AffixDef,AffixValueRange,LootEntry,LootTableDef}.gd` + `tests/factories/content_factory.gd` + 7 authored seed TRES files: grunt, swift/vital/keen, iron sword, leather vest, grunt drops). 32 paired GUT tests across `test_grunt.gd` (18) and `test_content_factory.gd` (14) covering full state machine, all 3 required edge cases (rapid hit spam, death-mid-telegraph, death-while-pathing), heavy-telegraph one-shot, layer wiring, MobDef hot-swap, every factory + every authored TRES round-trip. CI failure (typed-array assignment + bare collision_layer) caught and fixed in same PR.
+  - **Task #9 — feat(levels): stratum-1 first room + chunk POC** (PR #8, `drew/stratum1-first-room` stacked on grunt-mob, CI green): `scripts/levels/{LevelChunkDef,MobSpawnPoint,ChunkPort,LevelAssembler,Stratum1Room01}.gd` + `scenes/levels/Stratum1Room01.tscn` + `scenes/levels/chunks/s1_room01_chunk.tscn` + `resources/level_chunks/s1_room01.tres`. Architecture supports many chunks; M1 ships one. Mobs referenced by `mob_id: StringName` (decoupled from MobDef tree). 22 paired GUT tests across `test_level_chunk.gd` (16 unit) and `test_stratum1_room.gd` (6 integration). New design doc `team/drew-dev/level-chunks.md`.
+  - **Task #10 — feat(loot): LootRoller + flagship coverage** (PR #11, `drew/loot-roller` stacked on grunt-mob): `scripts/loot/{LootRoller,AffixRoll,ItemInstance,Pickup,MobLootSpawner}.gd` + `scenes/loot/Pickup.tscn`. Both roll modes (independent + weighted-pick), determinism via `seed_rng(int)`, tier modifier clamping, Fisher-Yates affix pick without duplicates, ADD/MUL apply_mode. 28 paired GUT tests covering ALL 10 edge cases from the schema doc + 4000-roll weight-distribution band + tier-respect catch + T1/T2/T3 affix counts + duplicate-free + authored grunt drops integration + full Grunt.mob_died → spawner signal wiring.
+- Decisions logged: none new in `DECISIONS.md` this run (all decisions Drew made are AI/level/loot internals per dispatch authority — captured in code comments + design doc `team/drew-dev/level-chunks.md`).
+- Next: Tess sign-off + merge of PRs #6/#8/#11 in order. Once `drew/grunt-mob` merges, the stacked PRs (#8 #11) will need to retarget if they don't auto-clean — Drew will rebase on next dispatch if needed. Then week-2 backlog per `team/priya-pl/week-2-backlog.md`: 2 more mob archetypes (shooter, charger), stratum-1 boss, balance pass on affix value ranges (placeholders awaiting Priya pin).
 
 ## Tess (Tester)
 
