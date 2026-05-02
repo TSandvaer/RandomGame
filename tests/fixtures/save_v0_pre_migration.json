@@ -1,0 +1,31 @@
+{
+  "saved_at": "2026-04-15T12:34:56",
+  "data": {
+    "character": {
+      "name": "Old-Knight",
+      "level": 4,
+      "xp": 1850,
+      "vigor": 2,
+      "focus": 1,
+      "edge": 0,
+      "hp_current": 95,
+      "hp_max": 110
+    },
+    "stash": [
+      {
+        "id": "weapon_iron_sword",
+        "tier": 2,
+        "rolled_affixes": [
+          {"affix_id": "swift", "value": 0.075}
+        ],
+        "stack_count": 1
+      },
+      {
+        "id": "armor_leather",
+        "tier": 1,
+        "rolled_affixes": [],
+        "stack_count": 1
+      }
+    ]
+  }
+}
