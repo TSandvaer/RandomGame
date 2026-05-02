@@ -41,6 +41,16 @@ class FakePlayer:
 func _make_charger() -> Charger:
 	var c: Charger = ChargerScript.new()
 	add_child_autofree(c)
+	# Tests drive `_physics_process` manually with state-bounded deltas
+	# (see `_drive_to_charging`). If the engine ALSO auto-ticks the body via
+	# its physics scheduler, the two callers race: a slow CI runner can sneak
+	# enough engine ticks between manual calls to expire `_charge_time_left`,
+	# transitioning CHARGING -> RECOVERING before the test asserts on it. Real
+	# observed flake: run 25260213330 fails with "expected charging, got
+	# recovering" + "velocity > 0 mid-charge: 0.0". Disabling auto-physics
+	# makes the test fully deterministic — manual `_physics_process(delta)`
+	# calls still work, they just no longer race with the engine.
+	c.set_physics_process(false)
 	return c
 
 
@@ -48,6 +58,8 @@ func _make_charger_with_def(def: MobDef) -> Charger:
 	var c: Charger = ChargerScript.new()
 	c.mob_def = def
 	add_child_autofree(c)
+	# See _make_charger() for why auto-physics is disabled.
+	c.set_physics_process(false)
 	return c
 
 
@@ -330,6 +342,36 @@ func test_killed_mid_charge_no_orphan_motion() -> void:
 	assert_eq(c.get_state(), Charger.STATE_DEAD)
 	assert_signal_not_emitted(c, "charge_hit_spawned", "no charge hit fires from a corpse")
 	assert_signal_emit_count(c, "mob_died", 1, "mob_died emits exactly once")
+
+
+## Repro-hardening counterpart to test_killed_mid_charge_no_orphan_motion: loops
+## the kill -> tick -> assert sequence N times in the same test body. The
+## original test used to flake under engine auto-physics racing the test's
+## manual `_physics_process` calls (run 25260213330 reproduced "expected
+## charging, got recovering"). With `set_physics_process(false)` in the helper,
+## the loop must pass deterministically every iteration. If this test ever
+## flakes again, the regression is real and reproducible — not a one-shot.
+func test_killed_mid_charge_zero_velocity_immediate_loop() -> void:
+	const ITERATIONS: int = 25
+	for i in range(ITERATIONS):
+		var def: MobDef = ContentFactory.make_mob_def({"hp_base": 30})
+		var c: Charger = _make_charger_with_def(def)
+		var p: FakePlayer = FakePlayer.new()
+		add_child_autofree(p)
+		c.global_position = Vector2.ZERO
+		p.global_position = Vector2(400.0, 0.0)
+		c.set_player(p)
+		_drive_to_charging(c)
+		p.global_position = Vector2(99999.0, 0.0)
+		c._physics_process(0.016)
+		# Pre-kill invariants: must be CHARGING with non-zero velocity. If
+		# either fails on any iteration, the manual-tick determinism is broken.
+		assert_eq(c.get_state(), Charger.STATE_CHARGING, "iter %d: charging pre-kill" % i)
+		assert_gt(c.velocity.length(), 0.0, "iter %d: velocity > 0 pre-kill" % i)
+		# Kill and assert zero-velocity invariant immediately.
+		c.take_damage(30, Vector2.ZERO, null)
+		assert_eq(c.get_state(), Charger.STATE_DEAD, "iter %d: dead post-kill" % i)
+		assert_eq(c.velocity, Vector2.ZERO, "iter %d: velocity zeroed on death" % i)
 
 
 # ---- 11: layers per DECISIONS.md ----------------------------------
