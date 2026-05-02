@@ -1,0 +1,190 @@
+name: Release to itch.io
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "m1-*"
+      - "m2-*"
+      - "m3-*"
+  workflow_dispatch:
+    inputs:
+      itch_channel_suffix:
+        description: "Optional itch.io channel suffix (e.g. 'preview'). Leave blank for default per-platform channels."
+        required: false
+        default: ""
+
+env:
+  GODOT_VERSION: "4.3"
+  # Match the CI workflow's Docker tag.
+  GODOT_DOCKER_TAG: "4.3"
+  EXPORT_NAME: "embergrave"
+
+# Secrets required (set in GitHub repo Settings -> Secrets and variables -> Actions):
+#   BUTLER_API_KEY  — from https://itch.io/user/settings/api-keys
+#   ITCH_USER       — itch.io username (e.g. tsandvaer)
+#   ITCH_GAME       — game slug (e.g. embergrave)
+# See team/devon-dev/itch-deploy.md for the full setup checklist.
+
+permissions:
+  contents: write   # needed by softprops/action-gh-release to attach builds to the GitHub Release
+
+jobs:
+  export:
+    name: Export ${{ matrix.preset }}
+    runs-on: ubuntu-22.04
+    container:
+      image: barichello/godot-ci:4.3
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: "HTML5"
+            channel: "html5"
+            artifact: "embergrave-html5"
+            export_path: "build/web/index.html"
+            output_dir: "build/web"
+          - preset: "Windows Desktop"
+            channel: "windows"
+            artifact: "embergrave-windows"
+            export_path: "build/windows/embergrave.exe"
+            output_dir: "build/windows"
+          - preset: "Linux/X11"
+            channel: "linux"
+            artifact: "embergrave-linux"
+            export_path: "build/linux/embergrave.x86_64"
+            output_dir: "build/linux"
+          - preset: "macOS"
+            channel: "mac"
+            artifact: "embergrave-macos"
+            export_path: "build/macos/embergrave.zip"
+            output_dir: "build/macos"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Provide export templates
+        run: |
+          set -euo pipefail
+          # barichello/godot-ci pre-installs templates at /root/.local/share/godot/export_templates/${VERSION}.stable
+          # Confirm they're present; if not, download them.
+          TEMPLATE_DIR="/root/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$TEMPLATE_DIR"
+          if [ -z "$(ls -A "$TEMPLATE_DIR" 2>/dev/null)" ]; then
+            curl -L -o /tmp/templates.tpz "https://downloads.tuxfamily.org/godotengine/${GODOT_VERSION}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+            unzip -o /tmp/templates.tpz -d /tmp/
+            mv /tmp/templates/* "$TEMPLATE_DIR/"
+          fi
+
+      - name: Headless import
+        run: godot --headless --import --quit-after 200
+
+      - name: Create output dir
+        run: mkdir -p ${{ matrix.output_dir }}
+
+      - name: Export ${{ matrix.preset }}
+        run: |
+          set -euo pipefail
+          # `--export-release` needs export_presets.cfg to define this preset name.
+          # Presets are committed to the repo so the matrix entries above match
+          # the names in export_presets.cfg.
+          godot --headless --export-release "${{ matrix.preset }}" "${{ matrix.export_path }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.output_dir }}/
+          retention-days: 14
+
+  publish-itch:
+    name: Push to itch.io via butler
+    needs: export
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Install butler
+        run: |
+          set -euo pipefail
+          curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip butler.zip -d butler-bin
+          chmod +x butler-bin/butler
+          ./butler-bin/butler -V
+
+      - name: Compute channel suffix
+        id: suffix
+        run: |
+          if [ -n "${{ github.event.inputs.itch_channel_suffix }}" ]; then
+            echo "suffix=-${{ github.event.inputs.itch_channel_suffix }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push HTML5 to itch
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          ./butler-bin/butler push \
+            "artifacts/embergrave-html5" \
+            "${{ secrets.ITCH_USER }}/${{ secrets.ITCH_GAME }}:html5${{ steps.suffix.outputs.suffix }}" \
+            --userversion "${GITHUB_REF_NAME}"
+
+      - name: Push Windows to itch
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          ./butler-bin/butler push \
+            "artifacts/embergrave-windows" \
+            "${{ secrets.ITCH_USER }}/${{ secrets.ITCH_GAME }}:windows${{ steps.suffix.outputs.suffix }}" \
+            --userversion "${GITHUB_REF_NAME}"
+
+      - name: Push Linux to itch
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          ./butler-bin/butler push \
+            "artifacts/embergrave-linux" \
+            "${{ secrets.ITCH_USER }}/${{ secrets.ITCH_GAME }}:linux${{ steps.suffix.outputs.suffix }}" \
+            --userversion "${GITHUB_REF_NAME}"
+
+      - name: Push macOS to itch
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          ./butler-bin/butler push \
+            "artifacts/embergrave-macos" \
+            "${{ secrets.ITCH_USER }}/${{ secrets.ITCH_GAME }}:mac${{ steps.suffix.outputs.suffix }}" \
+            --userversion "${GITHUB_REF_NAME}"
+
+  github-release:
+    name: Attach builds to GitHub Release
+    needs: export
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Zip per-platform builds
+        run: |
+          set -euo pipefail
+          mkdir -p release/
+          for d in artifacts/*/; do
+            name="$(basename "$d")"
+            (cd "$d" && zip -r "../../release/${name}.zip" .)
+          done
+          ls -la release/
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.zip
+          generate_release_notes: true
