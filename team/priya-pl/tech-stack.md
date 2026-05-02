@@ -1,5 +1,16 @@
 # Tech Stack — Embergrave
 
+## v1 — frozen 2026-05-02
+
+This document is **v1-frozen** as of end-of-week-1. Stack choices below are the canonical M1 contract. Any change after this date must:
+
+1. Land in a `## Changes` section appended to the bottom of this doc, with date + rationale + `Decided by`.
+2. Not silently edit the v1 content above.
+
+Rationale per `team/DECISIONS.md` (2026-05-01 tech-stack entry): tech-stack drift mid-build forces Devon and Drew to relearn tooling and breaks CI; freezing locks the contract until M1 ships.
+
+---
+
 Two-developer team, ~4 weeks part-time to first playable. Bias: ship fast, runnable in browser, low ceremony.
 
 ## Stack
