@@ -74,3 +74,58 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - reason: Tracking artifact for the role expansion mid-run-001 per TESTING_BAR.md. Five docs landed (m1-test-plan, bug-template, automated-smoke-plan, test-environments, soak-template). Acknowledging the new bar so it's visible in ClickUp; the work is already done in commit 0f41828.
 - created_at: 2026-05-01T (mid-run)
 - attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-006
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "[Uma] W1 · Player journey map — title to first kill to first death"
+    status: complete
+- reason: `team/uma-ux/player-journey.md` landed in commit 366744a. 12 beats from cold-launch to first death with 32-row tester checklist. Pure design task — exempt from #2/#4/#5 of testing bar's DoD per `TESTING_BAR.md`. Self-flipped to `complete`.
+- created_at: 2026-05-02T (uma-run-001)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-007
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "design(ui): inventory & stats panel mockup (M1 surfaces)"
+    status: complete
+- reason: `team/uma-ux/inventory-stats-panel.md` landed in commit 366744a. M1 weapon+armor active; off-hand/trinket/relic stubbed visible-but-disabled; 8x3 grid; full keymap; tooltip spec; time-slow-on-open; 24-row tester checklist. Pure design task. Self-flipped to `complete`.
+- created_at: 2026-05-02T (uma-run-001)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-008
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "design(ui): HUD mockup — HP, XP bar, level, gold, equipped relic"
+    status: complete
+- reason: `team/uma-ux/hud.md` landed in commit 366744a. Four-corner layout (vitals top-left, context top-right, cooldowns bottom-center, badges bottom-right), exact hex codes per element, mob/boss nameplate spec, 22-row tester checklist. Note: ClickUp title says "equipped relic" but M1 has no relic slot — the HUD doc explicitly stubs that for M2. Pure design task. Self-flipped to `complete`.
+- created_at: 2026-05-02T (uma-run-001)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-009
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "design(art): visual direction one-pager + palette + reference board"
+    status: complete
+- reason: `team/uma-ux/visual-direction.md` + `team/uma-ux/palette.md` landed in commit 9a1e772. Visual call: pixel-art at 96 px/tile, 480x270 internal canvas, integer scaling only, nearest-neighbour filter project-wide. Palette is stratum-1 authoritative + strata 2-8 indicative + color-blind notes. 15-row + 12-row tester checklists. Reference board is text-only (game/film/illustrator names) per GIT_PROTOCOL "no large binaries". Pure design task. Self-flipped to `complete`.
+- created_at: 2026-05-02T (uma-run-001)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
+## ENTRY 2026-05-02-010
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "design(ux): death & restart-run flow — what feels fair"
+    status: complete
+- reason: `team/uma-ux/death-restart-flow.md` landed in commit 9a1e772. Death = comma not full stop. Sequence: lethal hit → embers gather → dissolve + bell → "You fell." card → run summary leading with KEPT (level, XP, stash) and de-emphasizing LOST WITH THE RUN. Default focus on "Descend Again". 25-row tester checklist. Includes failure-mode test cases (death during inventory open, quit during death sequence, etc.). Pure design task. Self-flipped to `complete`.
+- created_at: 2026-05-02T (uma-run-001)
+- attempts: 1 (MCP returned "ClickUp is not connected")

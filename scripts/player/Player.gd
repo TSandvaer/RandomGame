@@ -1,17 +1,21 @@
 class_name Player
 extends CharacterBody2D
-## The Ember-Knight. Top-down 8-directional movement, sprint, and an
-## invulnerable dodge-roll. State-machine driven so attack states can
-## later inherit the same exclusivity guarantees.
+## The Ember-Knight. Top-down 8-directional movement, sprint, an
+## invulnerable dodge-roll, and light/heavy melee attacks.
+## State-machine driven so attack and dodge states can't interleave.
 ##
 ## Decisions encoded here:
-##   - Walk speed 120 px/s; sprint multiplier 1.6×; dodge speed 360 px/s.
+##   - Walk speed 120 px/s; sprint multiplier 1.6x; dodge speed 360 px/s.
 ##   - Dodge duration 0.30s; i-frame window covers the whole dodge.
 ##   - Dodge cooldown 0.45s, measured from dodge start (so total lockout
 ##     after dodge end = 0.15s — matches Hades-feel tuning).
 ##   - During dodge i-frames the player's collision_layer is cleared so
 ##     enemy hitboxes (mask: layer 2) miss. World collision (layer 1) still
 ##     blocks via collision_mask, so you can't dodge through walls.
+##   - Light attack: 8 damage, 0.18s recovery, 0.10s hitbox lifetime.
+##   - Heavy attack: 18 damage, 0.40s recovery, 0.14s hitbox lifetime.
+##   - Attacks cannot be initiated mid-dodge; dodge can interrupt attack
+##     recovery (gives the player an out — Hades convention).
 ##   - Sprint costs no resource in M1; a stamina meter is parked for M2.
 
 # ---- Signals ------------------------------------------------------------
@@ -25,17 +29,43 @@ signal state_changed(from_state: StringName, to_state: StringName)
 signal iframes_started()
 signal iframes_ended()
 
+## Emitted whenever the player spawns an attack hitbox. Useful for VFX
+## hooks and tests that want to verify an attack actually fired.
+signal attack_spawned(kind: StringName, hitbox: Node)
+
 # ---- Tuning constants ---------------------------------------------------
 
 const STATE_IDLE: StringName = &"idle"
 const STATE_WALK: StringName = &"walk"
 const STATE_DODGE: StringName = &"dodge"
+const STATE_ATTACK: StringName = &"attack"
+
+const ATTACK_LIGHT: StringName = &"light"
+const ATTACK_HEAVY: StringName = &"heavy"
 
 const WALK_SPEED: float = 120.0
 const SPRINT_MULTIPLIER: float = 1.6
 const DODGE_SPEED: float = 360.0
 const DODGE_DURATION: float = 0.30
 const DODGE_COOLDOWN: float = 0.45  # measured from dodge START
+
+# Light: short reach, fast recovery, low damage.
+# Heavy: longer reach, slower recovery, higher damage.
+const LIGHT_DAMAGE: int = 8
+const LIGHT_KNOCKBACK: float = 80.0
+const LIGHT_REACH: float = 28.0
+const LIGHT_HITBOX_RADIUS: float = 18.0
+const LIGHT_HITBOX_LIFETIME: float = 0.10
+const LIGHT_RECOVERY: float = 0.18
+
+const HEAVY_DAMAGE: int = 18
+const HEAVY_KNOCKBACK: float = 180.0
+const HEAVY_REACH: float = 36.0
+const HEAVY_HITBOX_RADIUS: float = 22.0
+const HEAVY_HITBOX_LIFETIME: float = 0.14
+const HEAVY_RECOVERY: float = 0.40
+
+const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 
 # ---- Runtime state ------------------------------------------------------
 
@@ -47,6 +77,9 @@ var _dodge_time_left: float = 0.0
 var _dodge_cooldown_left: float = 0.0
 var _dodge_dir: Vector2 = Vector2.ZERO
 var _is_invulnerable: bool = false
+
+# Attack bookkeeping
+var _attack_recovery_left: float = 0.0
 
 # Collision layer to restore after dodge i-frames clear it.
 const PLAYER_LAYER_BIT: int = 2  # see project.godot 2d_physics/layer_2 = "player"
@@ -70,6 +103,8 @@ func _physics_process(delta: float) -> void:
 			_process_grounded(delta)
 		STATE_DODGE:
 			_process_dodge(delta)
+		STATE_ATTACK:
+			_process_attack(delta)
 
 	move_and_slide()
 
@@ -94,6 +129,12 @@ func can_dodge() -> bool:
 	return _state != STATE_DODGE and _dodge_cooldown_left <= 0.0
 
 
+## True if a new attack can fire right now: not dodging, not in attack
+## recovery. Idle/walk both allow attack starts.
+func can_attack() -> bool:
+	return _state != STATE_DODGE and _attack_recovery_left <= 0.0
+
+
 ## Get the unit vector the player is facing. Used by attack spawners.
 func get_facing() -> Vector2:
 	return _facing
@@ -111,9 +152,12 @@ func set_state(new_state: StringName) -> void:
 
 ## Force-start a dodge in a given direction. Returns true if accepted.
 ## `dir` is normalised internally; if it's zero, dodge fires forward.
+## Dodge interrupts attack recovery (intentional — gives player an out).
 func try_dodge(dir: Vector2) -> bool:
 	if not can_dodge():
 		return false
+	# Cancel any in-flight attack recovery so the dodge feels responsive.
+	_attack_recovery_left = 0.0
 	var d: Vector2 = dir.normalized() if dir.length_squared() > 0.0 else _facing
 	_dodge_dir = d
 	_facing = d
@@ -122,6 +166,46 @@ func try_dodge(dir: Vector2) -> bool:
 	_enter_iframes()
 	set_state(STATE_DODGE)
 	return true
+
+
+## Fire a light or heavy attack. Returns the spawned Hitbox node, or null
+## if the attack was rejected (mid-dodge or in recovery). Direction is the
+## intended hit direction; if zero, uses current facing.
+func try_attack(kind: StringName, dir: Vector2 = Vector2.ZERO) -> Node:
+	if not can_attack():
+		return null
+	if kind != ATTACK_LIGHT and kind != ATTACK_HEAVY:
+		push_warning("Player.try_attack: unknown kind '%s'" % kind)
+		return null
+	var d: Vector2 = dir.normalized() if dir.length_squared() > 0.0 else _facing
+	_facing = d
+
+	var damage: int
+	var knockback_strength: float
+	var reach: float
+	var radius: float
+	var lifetime: float
+	var recovery: float
+	if kind == ATTACK_LIGHT:
+		damage = LIGHT_DAMAGE
+		knockback_strength = LIGHT_KNOCKBACK
+		reach = LIGHT_REACH
+		radius = LIGHT_HITBOX_RADIUS
+		lifetime = LIGHT_HITBOX_LIFETIME
+		recovery = LIGHT_RECOVERY
+	else:
+		damage = HEAVY_DAMAGE
+		knockback_strength = HEAVY_KNOCKBACK
+		reach = HEAVY_REACH
+		radius = HEAVY_HITBOX_RADIUS
+		lifetime = HEAVY_HITBOX_LIFETIME
+		recovery = HEAVY_RECOVERY
+
+	var hitbox: Hitbox = _spawn_hitbox(d, damage, d * knockback_strength, reach, radius, lifetime)
+	_attack_recovery_left = recovery
+	set_state(STATE_ATTACK)
+	attack_spawned.emit(kind, hitbox)
+	return hitbox
 
 
 # ---- State handlers -----------------------------------------------------
@@ -141,6 +225,10 @@ func _process_grounded(_delta: float) -> void:
 
 	if Input.is_action_just_pressed("dodge"):
 		try_dodge(input_dir)
+	elif Input.is_action_just_pressed("attack_light"):
+		try_attack(ATTACK_LIGHT, input_dir)
+	elif Input.is_action_just_pressed("attack_heavy"):
+		try_attack(ATTACK_HEAVY, input_dir)
 
 
 func _process_dodge(_delta: float) -> void:
@@ -149,11 +237,25 @@ func _process_dodge(_delta: float) -> void:
 		_exit_dodge()
 
 
+func _process_attack(_delta: float) -> void:
+	# Player can still drift slowly during attack recovery — feels weighted
+	# rather than rooted. Half walk speed.
+	var input_dir: Vector2 = _read_movement_input()
+	velocity = input_dir * (WALK_SPEED * 0.5)
+	if _attack_recovery_left <= 0.0:
+		set_state(STATE_IDLE)
+	# Dodge can interrupt recovery.
+	if Input.is_action_just_pressed("dodge"):
+		try_dodge(input_dir)
+
+
 func _tick_timers(delta: float) -> void:
 	if _dodge_time_left > 0.0:
 		_dodge_time_left = max(0.0, _dodge_time_left - delta)
 	if _dodge_cooldown_left > 0.0:
 		_dodge_cooldown_left = max(0.0, _dodge_cooldown_left - delta)
+	if _attack_recovery_left > 0.0:
+		_attack_recovery_left = max(0.0, _attack_recovery_left - delta)
 
 
 func _exit_dodge() -> void:
@@ -176,13 +278,30 @@ func _exit_iframes() -> void:
 	iframes_ended.emit()
 
 
+# ---- Hitbox spawn -------------------------------------------------------
+
+func _spawn_hitbox(dir: Vector2, damage: int, knockback: Vector2, reach: float, radius: float, lifetime: float) -> Hitbox:
+	var hitbox: Hitbox = HitboxScript.new()
+	# Configure BEFORE adding to tree so _ready() reads correct values.
+	hitbox.configure(damage, knockback, lifetime, Hitbox.TEAM_PLAYER, self)
+	hitbox.position = dir * reach
+	# Attach a CircleShape2D collider via CollisionShape2D child.
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	var circle: CircleShape2D = CircleShape2D.new()
+	circle.radius = radius
+	shape.shape = circle
+	hitbox.add_child(shape)
+	add_child(hitbox)
+	return hitbox
+
+
 # ---- Input --------------------------------------------------------------
 
 func _read_movement_input() -> Vector2:
 	# Input.get_vector handles 8-direction normalisation cleanly.
 	var v: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	# get_vector already normalises diagonals to length 1.0, so the player
-	# doesn't move √2× faster diagonally. Belt-and-suspenders:
+	# doesn't move sqrt(2)x faster diagonally. Belt-and-suspenders:
 	if v.length_squared() > 1.0:
 		v = v.normalized()
 	return v
