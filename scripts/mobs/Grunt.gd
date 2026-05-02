@@ -378,12 +378,16 @@ func _apply_mob_def() -> void:
 
 
 func _apply_layers() -> void:
-	# We sit on the enemy layer so player_hitbox masks 4 finds us.
-	if collision_layer == 0:
+	# Bare-instantiated CharacterBody2D defaults to collision_layer = 1
+	# (world) and collision_mask = 1 (world). Authored .tscn nodes carry
+	# the right values already (layer 8 = enemy bit 4, mask 3 = world+player).
+	# We detect the bare-default state and fix it up so tests that construct
+	# a Grunt via `Grunt.new()` end up on the enemy layer just like a
+	# scene-loaded grunt.
+	const BARE_DEFAULT_LAYER: int = 1
+	if collision_layer == 0 or collision_layer == BARE_DEFAULT_LAYER:
 		collision_layer = LAYER_ENEMY
-	# We collide with world + player (so the player can't walk through us
-	# and we can't walk through the world).
-	if collision_mask == 0:
+	if collision_mask == 0 or collision_mask == BARE_DEFAULT_LAYER:
 		collision_mask = LAYER_WORLD | LAYER_PLAYER
 
 
