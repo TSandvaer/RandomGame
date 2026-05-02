@@ -355,3 +355,5 @@ Format:
 ## 2026-05-02 — Stratum-2 biome locked: Cinder Vaults, palette Cinder-Rust, ember-accent preserved, daltonization-clear. Detail: `team/uma-ux/palette-stratum-2.md`.
 
 ## 2026-05-02 — M2 week-1 backlog drafted (anticipatory; revisable post-Sponsor M1 sign-off). Detail: `team/priya-pl/m2-week-1-backlog.md`.
+
+## 2026-05-02 — Stratum S3-S8 indicative palette refined: descent-narrative arc + ember-accent + accessibility forecast across all 6 deeper strata.
