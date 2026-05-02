@@ -131,3 +131,12 @@ Format:
 - Reversibility: one-way for Phase 1+.
 - Affects: all roles. Major impact on Tess (workload up), Devon/Drew (tests-with-features mandatory), Priya (week-2 backlog needs ≥20% test buffer), orchestrator (heartbeat now polices `ready for qa test` queue depth and blocks Sponsor pings on open bugs).
 - Detail: `team/TESTING_BAR.md`
+
+## 2026-05-01 — Testability hooks Devon must expose for M1 test plan
+
+- Decided by: Tess
+- Decision: Five hooks the M1 build must expose so Tess's acceptance test plan is actually executable: (1) **Build SHA visible in main menu** — small "build: abcdef1" footer, sourced from CI stamp; (2) **Debug-only "fast-XP" toggle** — gated behind a hidden key combo, never shipped to Sponsor — so Tess can reach level 4–5 in <2 min for AC4/AC7 testing; (3) **Save file location documented** in a one-liner README inside the user data dir — discoverable for AC3-T03 and AC6 inspection; (4) **Stable mob spawn seed in test mode** — debug flag that fixes the seed so AC4 setup isn't 30 min of grinding to retry; (5) **HTML5 console error surfacing** — verify Godot's default GDScript-error-to-browser-console pipeline is not stripped from release builds. Tess will file these as `chore(test-hooks)` ClickUp tasks.
+- Why: Without these, the M1 test plan blows out of its time budget on every run — especially AC4 (boss DPS check) and AC7 (loot affix coverage), which need a level-4+ character with specific gear. Cheap to expose, expensive to live without.
+- Reversibility: reversible — hooks can be removed post-M1 if they're a footgun. Build-SHA footer stays forever.
+- Affects: Devon (implements hooks 1, 2, 4, 5; documents 3), Tess (uses all five), Sponsor (must not see hook 2 — gate it).
+- Detail: `team/tess-qa/m1-test-plan.md` § "Notes for Devon & Drew (testability hooks needed)"

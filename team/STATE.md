@@ -50,10 +50,11 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 ## Tess (Tester)
 
 - Last updated: 2026-05-01
-- Status: working
-- Working on: (1) M1 acceptance test plan → (2) Bug report template → (3) Automated smoke test plan (paper) → (4) Test environment matrix.
-- Blocked on: nothing — MVP scope is locked at `team/priya-pl/mvp-scope.md`. GUT scaffold not yet committed (paper deliverables only this run).
-- Next: Land 4 QA spec docs this run; write actual GUT smoke tests once Devon's scaffold commit lands.
+- Status: idle (chunk done — 5 QA spec docs landed)
+- Working on: —
+- Blocked on: nothing. Role expanded mid-run per `team/TESTING_BAR.md` (Sponsor's "no debugging" directive): Tess is now active hammer + sole `ready for qa test → complete` gate + mandatory ≥3 edge-case probes per feature + scheduled bug bashes + soak sessions per release candidate.
+- Deliverables this run: `team/tess-qa/m1-test-plan.md` (35 manual cases across 7 ACs + regression sweep + 8-probe edge-case matrix + Tess-only sign-off flow), `bug-template.md` (severity matched to TESTING_BAR.md), `automated-smoke-plan.md` (30 unit + 10 integration GUT tests inventoried), `test-environments.md` (primary = Chrome/Win11 HTML5 + Firefox + Windows native), `soak-template.md` (30-min soak per release candidate). Devon's scaffold + GUT CI + initial player scene landed during this run → Phase A GUT test code writable next tick.
+- Next: Phase A GUT tests (`tu-boot-*`, `tu-autoload-*`, `tu-save-*`, `ti-save-*` — 9 unit + 2 integration). Then Phase B as combat/grunt/loot land in `ready for qa test`. Triage `ready for qa test` queue every tick.
 
 ---
 
