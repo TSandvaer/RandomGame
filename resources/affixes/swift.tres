@@ -5,23 +5,23 @@
 
 [sub_resource type="Resource" id="Resource_swift_t1"]
 script = ExtResource("2_range")
-min_value = 0.02
-max_value = 0.04
+min_value = 2.0
+max_value = 5.0
 
 [sub_resource type="Resource" id="Resource_swift_t2"]
 script = ExtResource("2_range")
-min_value = 0.04
-max_value = 0.08
+min_value = 5.0
+max_value = 9.0
 
 [sub_resource type="Resource" id="Resource_swift_t3"]
 script = ExtResource("2_range")
-min_value = 0.08
-max_value = 0.12
+min_value = 9.0
+max_value = 14.0
 
 [resource]
 script = ExtResource("1_affix")
 id = &"swift"
 name = "Swift"
-stat_modified = &"move_speed_pct"
+stat_modified = &"move_speed"
 value_ranges = [SubResource("Resource_swift_t1"), SubResource("Resource_swift_t2"), SubResource("Resource_swift_t3")]
-apply_mode = 1
+apply_mode = 0

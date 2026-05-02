@@ -5,23 +5,23 @@
 
 [sub_resource type="Resource" id="Resource_vital_t1"]
 script = ExtResource("2_range")
-min_value = 4.0
-max_value = 8.0
+min_value = 5.0
+max_value = 15.0
 
 [sub_resource type="Resource" id="Resource_vital_t2"]
 script = ExtResource("2_range")
-min_value = 8.0
-max_value = 14.0
+min_value = 15.0
+max_value = 25.0
 
 [sub_resource type="Resource" id="Resource_vital_t3"]
 script = ExtResource("2_range")
-min_value = 14.0
-max_value = 22.0
+min_value = 25.0
+max_value = 40.0
 
 [resource]
 script = ExtResource("1_affix")
 id = &"vital"
 name = "of Vitality"
-stat_modified = &"max_hp"
+stat_modified = &"vigor"
 value_ranges = [SubResource("Resource_vital_t1"), SubResource("Resource_vital_t2"), SubResource("Resource_vital_t3")]
 apply_mode = 0
