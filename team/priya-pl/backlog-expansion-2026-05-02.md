@@ -6,11 +6,11 @@ This doc is generated to **fill the dispatch envelope**. The user's standing ins
 
 ## TL;DR (5 lines)
 
-1. **Tickets proposed:** 8 new ticket-shapes (4 P0, 3 P1, 1 P2). All genuinely dispatchable without Sponsor input — pure design / planning / doc / ops / fixtures-for-locked-designs / postmortem.
-2. **Expected throughput value:** if all 4 P0s dispatch this session, ~4–6 hours of orchestrated work absorbed; team stays productive instead of idling.
+1. **Tickets proposed:** 8 new ticket-shapes (3 P0, 4 P1, 1 P2). All genuinely dispatchable without Sponsor input — pure design / planning / doc / ops / fixtures-for-locked-designs / postmortem.
+2. **Expected throughput value:** if all 3 P0s dispatch this session, ~4–6 hours of orchestrated work absorbed; team stays productive instead of idling.
 3. **Sponsor-gating verdict:** zero blocking pre-conditions on any of the 8 tickets. Two carry "Sponsor may revise post-soak" caveats (T-EXP-1 M2 week-2 backlog, T-EXP-7 sponsor-soak prep) — both are anticipatory drafts, revisable in-place.
 4. **Top 3 highest-leverage:** T-EXP-3 (risk register refresh — 1 tick, unblocks PL situational awareness), T-EXP-1 (M2 week-2 backlog — extends planning runway by another week), T-EXP-2 (performance budget spec — gates M2 regressions before they happen).
-5. **ClickUp side-effect:** create the 4 P0 tasks in list `901523123922` via live MCP. Don't pre-create P1/P2 — those wait for orchestrator's "yes, dispatch."
+5. **ClickUp side-effect:** create the 3 P0 tasks in list `901523123922` via live MCP. Don't pre-create P1/P2 — those wait for orchestrator's "yes, dispatch."
 
 ---
 
