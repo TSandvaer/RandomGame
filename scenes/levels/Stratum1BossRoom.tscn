@@ -1,0 +1,18 @@
+[gd_scene load_steps=2 format=3 uid="uid://b0embergrave_stratum1_boss_room"]
+
+[ext_resource type="Script" path="res://scripts/levels/Stratum1BossRoom.gd" id="1_room"]
+
+[node name="Stratum1BossRoom" type="Node2D"]
+script = ExtResource("1_room")
+boss_scene_path = "res://scenes/mobs/Stratum1Boss.tscn"
+boss_mob_def_path = "res://resources/mobs/stratum1_boss.tres"
+boss_spawn_position = Vector2(240, 135)
+door_trigger_position = Vector2(240, 250)
+door_trigger_size = Vector2(80, 16)
+
+[node name="ArenaFloor" type="ColorRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 270.0
+color = Color(0.07, 0.06, 0.09, 1)
