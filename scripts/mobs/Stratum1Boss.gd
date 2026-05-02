@@ -156,6 +156,7 @@ const LAYER_PLAYER: int = 1 << 1         # bit 2
 const LAYER_ENEMY: int = 1 << 3          # bit 4
 
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
+const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
 # ---- Inspector --------------------------------------------------------
 
@@ -409,7 +410,12 @@ func _fire_melee_swing() -> void:
 		var to_player: Vector2 = _player.global_position - global_position
 		if to_player.length_squared() > 0.0:
 			dir = to_player.normalized()
-	var dmg: int = int(round(damage_base * MELEE_DAMAGE_MULTIPLIER))
+	# Damage routed through the formula utility. Reads MobDef.damage_base +
+	# the player's Vigor mitigation at swing-fire time. The melee-multiplier
+	# is a *boss-specific* attack-shape decision, applied on top of the
+	# formula output — same pattern as Grunt's heavy swing.
+	var formula_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
+	var dmg: int = int(round(float(formula_dmg) * MELEE_DAMAGE_MULTIPLIER))
 	var hb: Hitbox = _spawn_hitbox(
 		dir,
 		dmg,
@@ -446,7 +452,11 @@ func _begin_slam_telegraph() -> void:
 
 
 func _fire_slam_hit() -> void:
-	var dmg: int = int(round(damage_base * SLAM_DAMAGE_MULTIPLIER))
+	# Damage routed through the formula utility, then scaled by the slam-
+	# specific multiplier (boss attack-shape, separate from Damage.gd's
+	# player-attack-type-mult).
+	var formula_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
+	var dmg: int = int(round(float(formula_dmg) * SLAM_DAMAGE_MULTIPLIER))
 	# Slam is omnidirectional — knockback from boss center outward.
 	var kb_dir: Vector2 = Vector2.RIGHT
 	if _player != null:
@@ -608,6 +618,17 @@ func _apply_layers() -> void:
 		collision_layer = LAYER_ENEMY
 	if collision_mask == 0 or collision_mask == BARE_DEFAULT_LAYER:
 		collision_mask = LAYER_WORLD | LAYER_PLAYER
+
+
+## Read the player's Vigor stat for the damage formula. Returns 0 if the
+## player ref is unset (test-bare boss) or doesn't expose get_vigor
+## (defensive: no crash if a non-Player target sneaks in).
+func _player_vigor() -> int:
+	if _player == null:
+		return 0
+	if not _player.has_method("get_vigor"):
+		return 0
+	return int(_player.get_vigor())
 
 
 func _resolve_player() -> void:

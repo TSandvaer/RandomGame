@@ -87,6 +87,7 @@ const LAYER_PLAYER: int = 1 << 1
 const LAYER_ENEMY: int = 1 << 3
 
 const ProjectileScene: PackedScene = preload("res://scenes/projectiles/Projectile.tscn")
+const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
 # ---- Inspector --------------------------------------------------------
 
@@ -327,8 +328,13 @@ func _spawn_projectile(dir: Vector2) -> void:
 		d = Vector2.RIGHT
 	d = d.normalized()
 	var p: Projectile = ProjectileScene.instantiate()
+	# Damage routed through the formula utility. Reads MobDef.damage_base +
+	# the player's Vigor mitigation at projectile-spawn time. Projectile is
+	# in-flight after this point — mid-flight stat changes don't retro-edit
+	# the damage payload (matches Grunt's swing-time policy).
+	var hit_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
 	# Configure BEFORE add_child so _ready picks up team/lifetime/layers.
-	p.configure(damage_base, d * PROJECTILE_SPEED, PROJECTILE_LIFETIME, Projectile.TEAM_ENEMY, self, PROJECTILE_KNOCKBACK)
+	p.configure(hit_dmg, d * PROJECTILE_SPEED, PROJECTILE_LIFETIME, Projectile.TEAM_ENEMY, self, PROJECTILE_KNOCKBACK)
 	# Spawn at the shooter's position. Parent under the shooter's parent so
 	# the projectile outlives the shooter (player should still take the hit
 	# of an in-flight projectile from a corpse — the projectile is its own
@@ -405,6 +411,16 @@ func _apply_layers() -> void:
 		collision_layer = LAYER_ENEMY
 	if collision_mask == 0 or collision_mask == BARE_DEFAULT_LAYER:
 		collision_mask = LAYER_WORLD | LAYER_PLAYER
+
+
+## Read the player's Vigor stat for the damage formula. Returns 0 if the
+## player ref is unset or doesn't expose get_vigor (defensive).
+func _player_vigor() -> int:
+	if _player == null:
+		return 0
+	if not _player.has_method("get_vigor"):
+		return 0
+	return int(_player.get_vigor())
 
 
 func _resolve_player() -> void:

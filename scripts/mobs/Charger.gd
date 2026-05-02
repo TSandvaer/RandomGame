@@ -117,6 +117,7 @@ const LAYER_PLAYER: int = 1 << 1         # bit 2
 const LAYER_ENEMY: int = 1 << 3          # bit 4
 
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
+const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
 # ---- Inspector --------------------------------------------------------
 
@@ -381,8 +382,11 @@ func _maybe_charge_hit_player() -> void:
 
 
 func _spawn_charge_hitbox() -> Hitbox:
+	# Damage routed through the formula utility. Reads MobDef.damage_base +
+	# the player's Vigor mitigation at hit-spawn time.
+	var hit_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
 	var hb: Hitbox = HitboxScript.new()
-	hb.configure(damage_base, _charge_dir * CHARGE_KNOCKBACK, CHARGE_HITBOX_LIFETIME, Hitbox.TEAM_ENEMY, self)
+	hb.configure(hit_dmg, _charge_dir * CHARGE_KNOCKBACK, CHARGE_HITBOX_LIFETIME, Hitbox.TEAM_ENEMY, self)
 	hb.position = _charge_dir * CHARGE_HITBOX_REACH
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	var circle: CircleShape2D = CircleShape2D.new()
@@ -457,6 +461,16 @@ func _apply_layers() -> void:
 		collision_layer = LAYER_ENEMY
 	if collision_mask == 0 or collision_mask == BARE_DEFAULT_LAYER:
 		collision_mask = LAYER_WORLD | LAYER_PLAYER
+
+
+## Read the player's Vigor stat for the damage formula. Returns 0 if the
+## player ref is unset or doesn't expose get_vigor (defensive).
+func _player_vigor() -> int:
+	if _player == null:
+		return 0
+	if not _player.has_method("get_vigor"):
+		return 0
+	return int(_player.get_vigor())
 
 
 func _resolve_player() -> void:

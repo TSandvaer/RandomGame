@@ -7,6 +7,7 @@ extends GutTest
 
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
+const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
 
 func _make_player_in_tree() -> Player:
@@ -22,7 +23,10 @@ func test_light_attack_spawns_hitbox_with_correct_payload() -> void:
 	var p: Player = _make_player_in_tree()
 	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT)
 	assert_not_null(hb, "light attack must spawn a hitbox")
-	assert_eq(hb.damage, Player.LIGHT_DAMAGE, "light damage 8")
+	# Bare-instantiated player (no equipped weapon) -> fist damage = 1.
+	# Validated separately in test_damage.gd; this assertion ties the wiring
+	# (hitbox.damage = formula output) without re-asserting formula constants.
+	assert_eq(hb.damage, DamageScript.FIST_DAMAGE, "no weapon -> fist damage 1")
 	assert_eq(hb.lifetime, Player.LIGHT_HITBOX_LIFETIME, "light lifetime 0.10")
 	assert_eq(hb.team, Hitbox.TEAM_PLAYER, "player attacks belong to player team")
 	# Hitbox parented to player so it follows our position.
@@ -34,7 +38,9 @@ func test_light_attack_spawns_hitbox_with_correct_payload() -> void:
 func test_heavy_attack_uses_heavy_tuning() -> void:
 	var p: Player = _make_player_in_tree()
 	var hb: Hitbox = p.try_attack(Player.ATTACK_HEAVY, Vector2.UP)
-	assert_eq(hb.damage, Player.HEAVY_DAMAGE, "heavy damage 18")
+	# Bare player + no weapon -> fist (heavy multiplier doesn't apply to
+	# fist per Damage.compute_player_damage spec — fist is flat 1).
+	assert_eq(hb.damage, DamageScript.FIST_DAMAGE, "no weapon -> fist damage 1 (heavy still flat)")
 	assert_eq(hb.lifetime, Player.HEAVY_HITBOX_LIFETIME, "heavy lifetime 0.14")
 
 
