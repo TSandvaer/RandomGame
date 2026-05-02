@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://b0embergrave_stratum1_room07"]
 
-[ext_resource type="Script" path="res://scripts/levels/Stratum1MultiMobRoom.gd" id="1_room"]
+[ext_resource type="Script" path="res://scripts/levels/MultiMobRoom.gd" id="1_room"]
 [ext_resource type="Resource" path="res://resources/level_chunks/s1_room07.tres" id="2_chunk_def"]
 
 [node name="Stratum1Room07" type="Node2D"]

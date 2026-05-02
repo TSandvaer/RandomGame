@@ -3,11 +3,11 @@ extends GutTest
 ## assembles via `LevelAssembler`, spawns the right mob mix, and that the
 ## chunk graph stitches Room 1 -> Room 8 with continuous ports.
 ##
-## Paired with `scripts/levels/Stratum1MultiMobRoom.gd` and the seven
+## Paired with `scripts/levels/MultiMobRoom.gd` and the seven
 ## `resources/level_chunks/s1_room0N.tres` files. Per testing-bar §integration
 ## check.
 
-const Stratum1MultiMobRoomScript: Script = preload("res://scripts/levels/Stratum1MultiMobRoom.gd")
+const MultiMobRoomScript: Script = preload("res://scripts/levels/MultiMobRoom.gd")
 const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 const ChargerScript: Script = preload("res://scripts/mobs/Charger.gd")
 const ShooterScript: Script = preload("res://scripts/mobs/Shooter.gd")
@@ -46,10 +46,10 @@ const EXPECTED_MOB_COUNTS: Dictionary = {
 
 # ---- Helpers ---------------------------------------------------------
 
-func _load_room(scene_path: String) -> Stratum1MultiMobRoom:
+func _load_room(scene_path: String) -> MultiMobRoom:
 	var packed: PackedScene = load(scene_path)
 	assert_not_null(packed, "scene must load: %s" % scene_path)
-	var room: Stratum1MultiMobRoom = packed.instantiate()
+	var room: MultiMobRoom = packed.instantiate()
 	add_child_autofree(room)
 	return room
 
@@ -57,44 +57,44 @@ func _load_room(scene_path: String) -> Stratum1MultiMobRoom:
 # ---- 1. Each room loads cleanly -------------------------------------
 
 func test_room02_scene_loads() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room02"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room02"])
 	assert_not_null(room.chunk_def, "chunk_def assigned")
 	assert_eq(room.chunk_def.id, &"s1_room02")
 	assert_not_null(room.get_assembly(), "assembled on _ready")
 
 
 func test_room03_scene_loads() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room03"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room03"])
 	assert_eq(room.chunk_def.id, &"s1_room03")
 	assert_not_null(room.get_assembly())
 
 
 func test_room04_scene_loads() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room04"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room04"])
 	assert_eq(room.chunk_def.id, &"s1_room04")
 	assert_not_null(room.get_assembly())
 
 
 func test_room05_scene_loads() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room05"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room05"])
 	assert_eq(room.chunk_def.id, &"s1_room05")
 	assert_not_null(room.get_assembly())
 
 
 func test_room06_scene_loads() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room06"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room06"])
 	assert_eq(room.chunk_def.id, &"s1_room06")
 	assert_not_null(room.get_assembly())
 
 
 func test_room07_scene_loads() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room07"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room07"])
 	assert_eq(room.chunk_def.id, &"s1_room07")
 	assert_not_null(room.get_assembly())
 
 
 func test_room08_scene_loads() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room08"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room08"])
 	assert_eq(room.chunk_def.id, &"s1_room08")
 	assert_not_null(room.get_assembly())
 
@@ -103,7 +103,7 @@ func test_room08_scene_loads() -> void:
 
 func test_each_room_spawn_count_matches_chunk_def() -> void:
 	for room_id: StringName in ROOM_SCENES.keys():
-		var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[room_id])
+		var room: MultiMobRoom = _load_room(ROOM_SCENES[room_id])
 		var expected: int = int(EXPECTED_MOB_COUNTS[room_id])
 		var actual: int = room.get_spawned_mobs().size()
 		assert_eq(actual, expected, "%s mob count" % String(room_id))
@@ -112,7 +112,7 @@ func test_each_room_spawn_count_matches_chunk_def() -> void:
 
 
 func test_room02_spawns_two_grunts() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room02"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room02"])
 	var mobs: Array[Node] = room.get_spawned_mobs()
 	assert_eq(mobs.size(), 2)
 	for m: Node in mobs:
@@ -120,7 +120,7 @@ func test_room02_spawns_two_grunts() -> void:
 
 
 func test_room03_mixes_grunt_and_charger() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room03"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room03"])
 	var mobs: Array[Node] = room.get_spawned_mobs()
 	assert_eq(mobs.size(), 2)
 	var has_grunt: bool = false
@@ -135,20 +135,20 @@ func test_room03_mixes_grunt_and_charger() -> void:
 
 
 func test_room04_is_lone_shooter() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room04"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room04"])
 	var mobs: Array[Node] = room.get_spawned_mobs()
 	assert_eq(mobs.size(), 1)
 	assert_true(mobs[0] is Shooter, "room04 is a single-shooter intro")
 
 
 func test_room06_includes_healing_fountain() -> void:
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room06"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room06"])
 	assert_not_null(room.get_healing_fountain(), "room06 places a healing fountain (mid-stratum reward)")
 
 
 func test_room08_pre_boss_density() -> void:
 	# Final pre-boss arena: 1 grunt + 1 charger + 2 shooters = 4 total per spec.
-	var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room08"])
+	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room08"])
 	var mobs: Array[Node] = room.get_spawned_mobs()
 	assert_eq(mobs.size(), 4)
 	var grunt_count: int = 0
@@ -185,7 +185,7 @@ func test_each_chunk_uses_uma_canvas_constraints() -> void:
 
 func test_mobs_positioned_inside_bounds() -> void:
 	for room_id: StringName in ROOM_SCENES.keys():
-		var room: Stratum1MultiMobRoom = _load_room(ROOM_SCENES[room_id])
+		var room: MultiMobRoom = _load_room(ROOM_SCENES[room_id])
 		var bounds: Rect2 = room.get_bounds_px()
 		for m: Node in room.get_spawned_mobs():
 			var n: Node2D = m

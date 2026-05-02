@@ -1,9 +1,12 @@
-class_name Stratum1MultiMobRoom
+class_name MultiMobRoom
 extends Node2D
-## Shared room script for Stratum-1 rooms 02..08. Mirrors the assembly
-## pattern from `Stratum1Room01.gd` but supports the full M1 mob roster
-## (grunt / charger / shooter) plus optional healing fountain placement
-## and a `RoomGate` that locks behind the player on entry.
+## Generic multi-mob room script. Mirrors the assembly pattern from
+## `Stratum1Room01.gd` but supports a configurable mob roster plus optional
+## healing-fountain placement and a `RoomGate` that locks behind the player
+## on entry. M1 ships this driving stratum-1 rooms 02..08 with the
+## grunt / charger / shooter mob set; M2+ strata reuse the exact same
+## mechanism with a different `chunk_def` and the same scene-path exports
+## pointing at stratum-N mob scenes.
 ##
 ## Why one script for 7 rooms (instead of one-per-room like Room01):
 ##   - Behavior is identical room-to-room — only the chunk_def's mob spawn
@@ -13,7 +16,14 @@ extends Node2D
 ##     mechanism. Same data-driven spirit as `LevelChunkDef`.
 ##
 ## Each Room02..Room08 .tscn instances this script and points its
-## `chunk_def` export at the matching `s1_roomNN.tres`.
+## `chunk_def` export at the matching `s1_roomNN.tres`. M2 stratum-2
+## rooms will follow the same pattern with `s2_roomNN.tres` chunks.
+##
+## Renamed 2026-05-02 from `Stratum1MultiMobRoom` (W3-B2 multi-stratum
+## scaffold). Body has zero S1-specific assumptions — the mob_id list
+## (`grunt` / `charger` / `shooter`) is M1 *content* served via export
+## paths, not a class-name contract. M2 implementers extend the
+## `_spawn_mob` match block with new mob_ids as needed.
 ##
 ## Acceptance criteria touched:
 ##   - AC2 (player encounters varying mobs across the stratum).
@@ -73,7 +83,7 @@ var _healing_fountain: HealingFountain = null
 
 func _ready() -> void:
 	if chunk_def == null:
-		push_error("Stratum1MultiMobRoom: no chunk_def assigned")
+		push_error("MultiMobRoom: no chunk_def assigned")
 		return
 	_build()
 	_spawn_room_gate()
@@ -131,11 +141,11 @@ func _spawn_room_gate() -> void:
 		return
 	var packed: PackedScene = load(room_gate_scene_path) as PackedScene
 	if packed == null:
-		push_warning("Stratum1MultiMobRoom: gate scene failed to load at '%s'" % room_gate_scene_path)
+		push_warning("MultiMobRoom: gate scene failed to load at '%s'" % room_gate_scene_path)
 		return
 	var node: Node = packed.instantiate()
 	if not node is RoomGate:
-		push_error("Stratum1MultiMobRoom: gate scene root is not RoomGate")
+		push_error("MultiMobRoom: gate scene root is not RoomGate")
 		node.free()
 		return
 	_room_gate = node
@@ -154,11 +164,11 @@ func _spawn_healing_fountain() -> void:
 		return
 	var packed: PackedScene = load(healing_fountain_scene_path) as PackedScene
 	if packed == null:
-		push_warning("Stratum1MultiMobRoom: fountain scene failed to load")
+		push_warning("MultiMobRoom: fountain scene failed to load")
 		return
 	var node: Node = packed.instantiate()
 	if not node is HealingFountain:
-		push_error("Stratum1MultiMobRoom: fountain scene root is not HealingFountain")
+		push_error("MultiMobRoom: fountain scene root is not HealingFountain")
 		node.free()
 		return
 	_healing_fountain = node
@@ -185,10 +195,10 @@ func _spawn_mob(mob_id: StringName, _world_pos: Vector2) -> Node:
 		&"shooter":
 			scene = _get_shooter_scene()
 		_:
-			push_warning("Stratum1MultiMobRoom: unknown mob_id '%s'" % mob_id)
+			push_warning("MultiMobRoom: unknown mob_id '%s'" % mob_id)
 			return null
 	if scene == null:
-		push_warning("Stratum1MultiMobRoom: scene cache miss for mob_id '%s'" % mob_id)
+		push_warning("MultiMobRoom: scene cache miss for mob_id '%s'" % mob_id)
 		return null
 	return scene.instantiate()
 
