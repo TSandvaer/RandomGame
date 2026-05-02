@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MobDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/content/MobDef.gd" id="1_mob"]
+
+[resource]
+script = ExtResource("1_mob")
+id = &"shooter"
+display_name = "Shooter"
+sprite_path = ""
+hp_base = 40
+damage_base = 6
+move_speed = 60.0
+ai_behavior_tag = &"ranged_kiter"
+loot_table = null
+xp_reward = 14
