@@ -58,6 +58,19 @@ jobs:
           mv /tmp/gut-src/addons/gut addons/gut
           ls addons/gut/gut_cmdln.gd
 
+      - name: Stamp build SHA into project
+        run: |
+          set -euo pipefail
+          # Devon hook 1 — write the short git SHA to build_info.txt so the
+          # BuildInfo autoload renders it as the "build: abcdef1" footer.
+          # Tess m1-test-plan section "Build identification" requires every test
+          # run to record the SHA. ${GITHUB_SHA:0:7} is the 7-char short
+          # form Git uses by default. The same step lives in release-itch.yml
+          # so HTML5 / native exports also stamp the SHA.
+          short_sha="${GITHUB_SHA:0:7}"
+          echo -n "${short_sha}" > build_info.txt
+          echo "Stamped build_info.txt = ${short_sha}"
+
       - name: Headless import (asset import sanity)
         run: |
           set -euo pipefail

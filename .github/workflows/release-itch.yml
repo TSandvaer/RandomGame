@@ -84,6 +84,16 @@ jobs:
             mv /tmp/templates/* "$TEMPLATE_DIR/"
           fi
 
+      - name: Stamp build SHA into project
+        run: |
+          set -euo pipefail
+          # Devon hook 1 — write the short git SHA to build_info.txt so the
+          # exported build main-menu footer reads "build: <sha>". Mirrors
+          # the stamp step in ci.yml.
+          short_sha="${GITHUB_SHA:0:7}"
+          echo -n "${short_sha}" > build_info.txt
+          echo "Stamped build_info.txt = ${short_sha}"
+
       - name: Headless import
         run: godot --headless --import --quit-after 200
 
