@@ -65,7 +65,7 @@ func test_curve_handles_negative_or_zero_level_input() -> void:
 # --- Level-up timing ---------------------------------------------------
 
 func test_level_up_fires_at_exact_threshold() -> void:
-	var sig := watch_signals(_levels())
+	watch_signals(_levels())
 	# At L1, need exactly 100 XP for L2.
 	_levels().gain_xp(99)
 	assert_eq(_levels().current_level(), 1, "99 XP doesn't level up from L1")
@@ -80,7 +80,7 @@ func test_level_up_fires_at_exact_threshold() -> void:
 
 
 func test_xp_gained_signal_emits_with_actual_amount() -> void:
-	var sig := watch_signals(_levels())
+	watch_signals(_levels())
 	_levels().gain_xp(42)
 	assert_signal_emit_count(_levels(), "xp_gained", 1)
 	# Multiplier defaults to 1 in tests (DebugFlags.fast_xp_enabled is false).
@@ -93,7 +93,7 @@ func test_xp_gained_signal_emits_with_actual_amount() -> void:
 func test_single_gain_crosses_multiple_levels() -> void:
 	# Big gain at L1 — 100 + 282 = 382 brings us right to start-of-L3.
 	# Going to 1000 lands at L3 + (1000 - 100 - 282) = 618 XP into L3.
-	var sig := watch_signals(_levels())
+	watch_signals(_levels())
 	_levels().gain_xp(1000)
 	assert_eq(_levels().current_level(), 3, "1000 XP from L1 ends at L3")
 	assert_eq(_levels().current_xp(), 618, "overflow XP carries into next level")
@@ -108,7 +108,7 @@ func test_single_gain_crosses_multiple_levels() -> void:
 func test_huge_gain_clamps_at_max_level() -> void:
 	# 1_000_000 XP from L1 must land at MAX_LEVEL with 0 carried (the
 	# overflow at the top of the ladder is dropped per the API contract).
-	var sig := watch_signals(_levels())
+	watch_signals(_levels())
 	_levels().gain_xp(1_000_000)
 	assert_eq(_levels().current_level(), MAX_LEVEL, "huge gain caps at MAX_LEVEL")
 	assert_eq(_levels().current_xp(), 0, "no XP carries past MAX_LEVEL")
@@ -119,7 +119,7 @@ func test_huge_gain_clamps_at_max_level() -> void:
 # --- Edge cases -------------------------------------------------------
 
 func test_gain_zero_xp_is_noop() -> void:
-	var sig := watch_signals(_levels())
+	watch_signals(_levels())
 	_levels().gain_xp(0)
 	assert_eq(_levels().current_level(), 1)
 	assert_eq(_levels().current_xp(), 0)
@@ -130,7 +130,7 @@ func test_gain_zero_xp_is_noop() -> void:
 
 func test_gain_negative_xp_is_rejected() -> void:
 	# Don't accidentally "level down" from a bug. Reject negative.
-	var sig := watch_signals(_levels())
+	watch_signals(_levels())
 	_levels().gain_xp(50)
 	_levels().gain_xp(-9999)
 	assert_eq(_levels().current_xp(), 50,
@@ -144,7 +144,7 @@ func test_gain_at_max_level_is_silent_clamp() -> void:
 	# Drive to MAX_LEVEL then try to add more.
 	_levels().gain_xp(1_000_000)
 	assert_eq(_levels().current_level(), MAX_LEVEL)
-	var sig := watch_signals(_levels())
+	watch_signals(_levels())
 	_levels().gain_xp(500)
 	assert_eq(_levels().current_level(), MAX_LEVEL)
 	assert_eq(_levels().current_xp(), 0)
