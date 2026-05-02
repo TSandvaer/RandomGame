@@ -152,3 +152,14 @@
 - **Merged since last tick**: 2 PRs (#72 integration tests, #73 tess state), 1 ClickUp flip (`86c9kyvq4` parse-error bug → complete).
 - **Open issues**: none.
 - **M1 RC progress**: `591bcc8` — verified-coverage M1 RC (531 unit + 26 integration tests passing, 5646 asserts). Awaiting Sponsor return for human soak. Latest in-conversation soak target supersedes the originally-surfaced `9cd07cb`.
+
+## Tick 2026-05-02 20:15
+
+- **Roles working**: Devon (run-008 — CI hardening pass `86c9kxx8a`).
+- **Roles idle**: Priya, Uma, Drew, Tess.
+- **Open PRs**: none at tick start.
+- **Dispatched this tick**: Devon. Second consecutive idle tick prompted dispatch — CI hardening is pure infrastructure, doesn't add Sponsor-review burden. Devon picks 3-4 of 6 candidate hardening items (cache, runtime budget, concurrency control, retry, artifact retention; flake detection deferred since running CI 5x for noise is wasteful).
+- **Decisions made**: After 1 explicit-hold tick, productive dispatch on infrastructure work. Continuing to hold past 2 ticks felt like wasted compute when low-risk infra polish exists.
+- **Merged since last tick**: 1 PR (#74 explicit-hold tick log).
+- **Open issues**: none.
+- **M1 RC progress**: `591bcc8` verified-coverage build is the latest and most-tested. Sponsor's existing surface (`9cd07cb` link in conversation) is functionally equivalent. Awaiting his return for human soak — gating activity unchanged.
