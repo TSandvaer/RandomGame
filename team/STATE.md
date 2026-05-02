@@ -37,11 +37,10 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 ## Devon (Game Dev #1, lead)
 
 - Last updated: 2026-05-02
-- Status: idle (chunk done — all 6 week-1 Devon tasks landed)
-- Working on: —
-- Blocked on: nothing. Sandbox blocks `git push origin main` for this run; commits land locally on `main` and will sync on the next push window. ClickUp MCP dropped mid-run after task 3; tasks 4/5/6 status updates queued at `team/log/clickup-pending.md` (entries 001, 006, 007).
-- Deliverables this run: (1) project.godot + folder skeleton + Save autoload stub + GUT install README (commit 0902922 + decisions 492be2e). (2) `.github/workflows/ci.yml` + `tests/test_smoke.gd` canary (commit 20a8688). (3) `.github/workflows/release-itch.yml` + `team/devon-dev/itch-deploy.md` (commit 139a3d2). (4) `scripts/player/Player.gd` + `scenes/player/Player.tscn` + `tests/test_player_move.gd` (commits 2fc7340 + ee1f991, 9 GUT tests). (5) `scripts/combat/Hitbox.gd` + Player attack methods + `tests/test_hitbox.gd` (7) + `tests/test_player_attack.gd` (10) (commit d5852f9). (6) `scripts/save/Save.gd` full impl + `team/devon-dev/save-format.md` + `tests/test_save.gd` (14 GUT tests including v0->v1 migration forward-compat) (commit ddad8af). 4 decisions logged in DECISIONS.md (project layout, physics layers, GDScript style, GUT install policy). Total: 47 paired GUT tests + canary smoke. Followed testing bar: every feature commit pairs tests, all feature tasks flipped to `ready for qa test` for Tess (queued via fallback while MCP is down).
-- Next: When dispatched again — depending on Tess's verdicts, address bugs from her sweep of tasks 4-6; otherwise pick up week-2 work (per `team/priya-pl/week-2-backlog.md`): export_presets.cfg authoring (unblocks first real release-itch.yml run), 5 testability hooks tracked in clickup-pending entry 004 (build-SHA in main menu, debug fast-XP toggle, save-path README, stable mob spawn seed, HTML5 console error surfacing), level-up math + damage formula. Open question for orchestrator/Priya: sandbox `git push` block is repo-wide and prevents any agent from syncing — needs explicit policy from Sponsor before any commits leave local main.
+- Status: working (run 003 — ClickUp 86c9kxnqx: 5 testability hooks for M1 acceptance plan)
+- Working on: branch `devon/testability-hooks` — build SHA in main menu (CI stamp + HUD overlay), debug-only fast-XP toggle (Ctrl+Shift+X, debug-build gated), save-dir README writer (one-liner on first save), stable mob-spawn seed in test mode (`--test-mode` CLI/env flag), HTML5 console error surfacing verification + export-preset doc. Per-hook commits paired with GUT tests (`test_build_sha.gd`, `test_fast_xp_debug.gd`, `test_save_readme.gd`, `test_test_mode_seed.gd`).
+- Blocked on: —
+- Next: Open PR, label `ready for qa test`, stop. Tess merges. After dispatch — Tess bounce-list (if any) or week-2 backlog: export_presets.cfg, level-up math + damage formula.
 
 ## Drew (Game Dev #2)
 
