@@ -74,15 +74,28 @@ jobs:
       - name: Provide export templates
         run: |
           set -euo pipefail
-          # barichello/godot-ci pre-installs templates at /root/.local/share/godot/export_templates/${VERSION}.stable
-          # Confirm they're present; if not, download them.
-          TEMPLATE_DIR="/root/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
-          mkdir -p "$TEMPLATE_DIR"
-          if [ -z "$(ls -A "$TEMPLATE_DIR" 2>/dev/null)" ]; then
+          # barichello/godot-ci pre-installs templates at
+          #   /root/.local/share/godot/export_templates/${VERSION}.stable
+          # but inside GH Actions, the container runs with HOME=/github/home,
+          # so Godot searches /github/home/.local/share/godot/... and finds
+          # nothing. Copy the pre-installed set into the runner's HOME, and
+          # download as a fallback if the image lacks them.
+          GODOT_TEMPLATES_REL="export_templates/${GODOT_VERSION}.stable"
+          PREINSTALLED="/root/.local/share/godot/${GODOT_TEMPLATES_REL}"
+          RUNNER_HOME="${HOME:-/github/home}"
+          TARGET_DIR="${RUNNER_HOME}/.local/share/godot/${GODOT_TEMPLATES_REL}"
+          mkdir -p "$(dirname "${TARGET_DIR}")"
+          if [ -d "${PREINSTALLED}" ] && [ -n "$(ls -A "${PREINSTALLED}" 2>/dev/null)" ]; then
+            cp -r "${PREINSTALLED}" "${TARGET_DIR}"
+            echo "Copied pre-installed templates from ${PREINSTALLED} -> ${TARGET_DIR}"
+          else
+            mkdir -p "${TARGET_DIR}"
             curl -L -o /tmp/templates.tpz "https://downloads.tuxfamily.org/godotengine/${GODOT_VERSION}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
             unzip -o /tmp/templates.tpz -d /tmp/
-            mv /tmp/templates/* "$TEMPLATE_DIR/"
+            mv /tmp/templates/* "${TARGET_DIR}/"
+            echo "Downloaded templates to ${TARGET_DIR}"
           fi
+          ls "${TARGET_DIR}" | head -20
 
       - name: Stamp build SHA into project
         run: |
