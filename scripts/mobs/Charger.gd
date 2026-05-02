@@ -111,6 +111,18 @@ const CHARGE_HITBOX_REACH: float = 12.0
 ## zero when stuck; we measure post-slide displacement instead.
 const WALL_STOP_DISPLACEMENT_EPSILON: float = 0.5
 
+## Number of consecutive sub-epsilon-displacement frames required before
+## treating it as a wall hit. A single-frame trigger was too aggressive: in
+## headless tests `move_and_slide()` integrates over `get_physics_process_-
+## delta_time()` which can be near-zero before the engine has ticked physics,
+## producing sub-epsilon displacement on the first CHARGING tick even though
+## velocity is set correctly. Two-frame minimum keeps the wall-stop sensitive
+## in real gameplay (the second consecutive sub-epsilon tick is a real stuck
+## condition) while filtering the headless-test false positive. Captured by
+## CI runs 25260326711 + 25260666771 (test_killed_mid_charge +
+## test_velocity_during_charge tripping the wall-stop on charge-entry tick).
+const WALL_STOP_FRAMES_REQUIRED: int = 2
+
 ## Layer bits (mirror project.godot — same as Grunt).
 const LAYER_WORLD: int = 1 << 0          # bit 1
 const LAYER_PLAYER: int = 1 << 1         # bit 2
@@ -146,6 +158,12 @@ var _charge_dir: Vector2 = Vector2.RIGHT
 var _is_dead: bool = false
 var _last_position: Vector2 = Vector2.ZERO
 var _player: Node2D = null
+
+## Counter for consecutive sub-epsilon-displacement charging frames. Reset on
+## charge start (`_begin_charge`) and on any frame where displacement clears
+## the epsilon. When it reaches WALL_STOP_FRAMES_REQUIRED, _end_charge_into_wall
+## fires.
+var _wall_stop_frames: int = 0
 
 # Tracks which targets the current charge has already body-hit so a single
 # charge can't multi-tick the player. Reset at the start of each charge.
@@ -260,10 +278,19 @@ func _physics_process(delta: float) -> void:
 	# were already CHARGING at tick start AND are still CHARGING after the
 	# state handler — otherwise transitions in/out of charge in the same tick
 	# would fire spurious wall-stops.
+	# Require WALL_STOP_FRAMES_REQUIRED consecutive sub-epsilon ticks to
+	# tolerate a single-tick zero-displacement glitch (headless test envs
+	# where `get_physics_process_delta_time()` returns ~0 on the first
+	# CHARGING tick before the engine has stepped physics — see
+	# WALL_STOP_FRAMES_REQUIRED comment for the captured CI repro).
 	if entry_state == STATE_CHARGING and _state == STATE_CHARGING:
 		var moved: float = (global_position - pre).length()
 		if moved < WALL_STOP_DISPLACEMENT_EPSILON:
-			_end_charge_into_wall()
+			_wall_stop_frames += 1
+			if _wall_stop_frames >= WALL_STOP_FRAMES_REQUIRED:
+				_end_charge_into_wall()
+		else:
+			_wall_stop_frames = 0
 	_last_position = global_position
 
 
@@ -343,6 +370,7 @@ func _begin_charge() -> void:
 	# wall-stop check fires below because velocity was zero during the prior
 	# telegraph branch's move_and_slide and post-slide displacement is 0.
 	velocity = _charge_dir * charge_speed
+	_wall_stop_frames = 0
 	_set_state(STATE_CHARGING)
 
 
