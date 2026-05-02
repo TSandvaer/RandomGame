@@ -1,6 +1,14 @@
 # Risk Register — Embergrave M1
 
-Owner: Priya. Tick: 2026-05-02 (end of week 1). Rolling document — risks added, retired, and re-scored as M1 progresses.
+Owner: Priya. Tick: 2026-05-02 (mid-week-2 retro re-score). Rolling document — risks added, retired, and re-scored as M1 progresses.
+
+**Mid-week-2 re-score summary (2026-05-02):** Week-2 throughput overshot the plan (16 / 21 tickets shipped at retro tick). The top-5 reshuffle reflects what's actually load-bearing for week 3:
+
+- **Promoted to top-3:** R6 (NEW — Sponsor-found-bugs flood), R3 (escalated — HTML5 regression risk on RC4/RC5), R7 (NEW, promoted from W2 — affix balance sinkhole).
+- **Demoted but still tracked:** R1 (save migration — held through five schema bumps), R2 (Tess bottleneck — currently inverted, QA queue at 0), R4 (scope creep — clean week, three acceptable non-backlog items), R5 (agent collisions — narrowed to HEAD-pinning leak, fix scoped for week 3 W3-A7).
+- **New / re-prioritized:** R6 + R7 added; W2 promoted; R3 re-scored.
+
+See `team/priya-pl/week-2-retro-and-week-3-scope.md` for the retro narrative.
 
 ## Format
 
@@ -38,7 +46,7 @@ Top 5 are the active set tracked in heartbeat ticks. New risks land here as they
 
 ## R3 — Godot HTML5 export regression mid-build
 
-- **Probability:** med
+- **Probability:** high (escalated 2026-05-02 mid-w2 — RC4 `1a05d4b` adds new HTML5-edge surfaces: rooms 2-8, RoomGate, StratumProgression autoload, HealingFountain, OPFS-routed save bumps; pending RC5 will add the affix system + inventory UI on top)
 - **Impact:** high
 - **Why:** itch.io HTML5 is the Sponsor's playtest channel (per `team/priya-pl/tech-stack.md`). Godot's HTML5 export has known sharp edges — audio context, file system (OPFS vs localStorage), tab-blur behavior, console-error visibility. A regression that only manifests in HTML5 (not desktop dev runs) can hide for ticks.
 - **Mitigation:**
@@ -78,12 +86,37 @@ Top 5 are the active set tracked in heartbeat ticks. New risks land here as they
 - **Trigger / signal:** ≥2 rebase conflicts in a single Priya tick; an agent's STATE.md edit overwriting another's; PR re-pushes due to merge-conflict resolution.
 - **Owner:** orchestrator (dispatch shape), every agent (per-role discipline), Priya (file ownership conventions in `GIT_PROTOCOL.md`).
 
+## R6 — Sponsor-found-bugs flood when soak resumes (NEW 2026-05-02 mid-w2)
+
+- **Probability:** high
+- **Impact:** med
+- **Why:** Sponsor has been OUT for the back half of week 2. The active soak target `9cd07cb`, the polish build `1a05d4b`, and the pending RC5 (with affix system + inventory UI) all add substantial new surface (boss + 7 rooms + stat-allocation + descend + affix system) that no human has put a controller against. Even with our coverage discipline, a 30-min interactive run by a fresh human routinely surfaces 3–8 polish/edge-case bugs in a build with this much new content. None of the M1 ACs are likely to fail outright, but a fix-forward burst will land.
+- **Mitigation:**
+    - Reserve **B1 bug-bash + ~2 free dev ticks** in week 3 specifically for the post-soak fix-forward loop. Don't load week 3 to capacity assuming Sponsor finds nothing.
+    - First dispatch when Sponsor's bug list lands: **Tess** runs her own bug-bash on the same build to confirm/disprove each filed issue, *then* Devon/Drew fix-forward. Protects against false-positives during the human soak.
+    - Tess maintains the bug template + severity convention so the in-flow is structured, not free-form.
+- **Trigger / signal:** Sponsor returns and files ≥3 issues in any single soak session; cluster of issues all hitting the same subsystem indicates a deeper root-cause that should be fixed at the root not per-symptom.
+- **Owner:** Tess (triage + confirm), Devon/Drew (fix-forward), Priya (severity calls), orchestrator (capacity protection in week 3).
+
+## R7 — Affix balance hand-tuning sinkhole (promoted from W2, 2026-05-02 mid-w2)
+
+- **Probability:** high
+- **Impact:** med-high
+- **Why:** Promoted from watch-list. N7 affix system (`86c9kxx5p`) merged via PR #55 on 2026-05-02 with a count/tier-band spec deviation that Tess caught and routed to follow-up `86c9kyntj`. N8 (T1→T3 balance pass, `86c9kxx61`) is unstarted and is the next gate for AC #7. Bad balance numbers ship easily and are hard to test against (the assertion is "feels right," not a unit test). Without a pre-pinned tier value table, N8 turns into open-ended hand-tuning that swallows tick budget.
+- **Mitigation:**
+    - **Priya pre-pins the tier value table** in `team/priya-pl/affix-balance-pin.md` (week-3 deliverable) *before* Drew starts N8. Drew's task becomes "fill the TRES values" + "add GUT range-clamp tests" — not "design the table."
+    - GUT tests assert clamp behavior + monotonic tier progression (T1 < T2 < T3) so a typo'd value fails CI, not Tess's eye.
+    - N8 PR includes a soak follow-up: if it doesn't feel right, one balance-pass tick lands a tweak; the formula shape doesn't move.
+    - Fold the `86c9kyntj` count-fix into N8 PR — same surface, atomic balance pass.
+- **Trigger / signal:** N8 in flight for >2 ticks without a sign-off; multiple balance-tweak commits stacking on the same PR; Tess flagging "feels too easy / too hard" without specific numbers.
+- **Owner:** Priya (table pin), Drew (implement), Tess (validate via soak + GUT clamp).
+
 ---
 
 ## Watch-list (not in top 5 but tracked)
 
 - **W1 — Art bottleneck on Uma:** Uma is a single role; week-2 has two design-spec tickets (level-up panel, boss treatment) plus follow-up microcopy passes. If Drew's content authoring outpaces Uma's specs, Drew either improvises (risk to visual-direction lock) or stalls (risk to schedule). Mitigation: Priya prioritizes Uma's tickets over Priya's own non-blocking work; Drew authors against the visual-direction one-pager + palette as fallback.
-- **W2 — Affix balance hand-tuning sinkhole:** N8 (T1→T3 ranges) is a balance ticket that could swallow more tick budget than allocated. Mitigation: ship stub T1 values first via N7, balance pass is reversible until M1 sign-off (per week-2 backlog risk #3).
+- **W2 — Affix balance hand-tuning sinkhole:** **Promoted to R7 on 2026-05-02 mid-w2 retro** — see top-5 list above. Watch-list entry retained as a back-reference; do not double-count.
 - **W3 — Boss state-machine complexity:** N6 (stratum-1 boss) is the single most complex week-2 ticket. Mitigation: paired GUT for state transitions catches regressions early; Tess edge-probes specifically target combat edge cases the state machine exposes.
 - **W4 — Sponsor finds bug at sign-off:** the testing-bar exists to prevent this, but the residual probability is non-zero. Mitigation: the bar itself, plus the orchestrator gate that Sponsor sign-off pings only fire when zero blockers + zero majors are open.
 
