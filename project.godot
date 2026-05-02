@@ -25,6 +25,7 @@ DebugFlags="*res://scripts/debug/DebugFlags.gd"
 Levels="*res://scripts/progression/Levels.gd"
 PlayerStats="*res://scripts/progression/PlayerStats.gd"
 StratumProgression="*res://scripts/progression/StratumProgression.gd"
+Inventory="*res://scripts/inventory/Inventory.gd"
 
 [debug]
 
