@@ -53,25 +53,52 @@ The Tess-only `ready for qa test → complete` gate (per `TESTING_BAR.md`) maps 
 
 Pure docs / `chore(repo|ci|build)` / `design(spec)` PRs — Tess sign-off is **not** required. The orchestrator (or Priya for `chore(triage)` / `docs(team)`) may merge directly.
 
-## Concurrent agents
+## Concurrent agents — role-persistent worktrees (W3-A7 option A)
 
-Every agent is dispatched with **`isolation: "worktree"`** — the harness creates a temporary git worktree for each run. You operate in that worktree, not the main checkout. The orchestrator (and any agent that explicitly opted out of isolation) operates on the main checkout. Branches, the `.git` object database, and `origin` are shared across all worktrees; only the working directory and `HEAD` are per-worktree.
+The harness `isolation: "worktree"` Agent flag is **inactive in our setup** — it requires `WorktreeCreate` hooks the harness doesn't have. Without it, agents share the main checkout's `.git/HEAD`, which has produced four shared-HEAD-stomp incidents (Uma run-002 and run-003, Priya run-004, Tess run-018). See `team/log/w3-a7-worktree-isolation-proposal.md` for the full evidence and the option-A decision.
 
-What this means for you in practice:
+**Operative pattern: each role owns a persistent worktree.** Agents work in their role's sticky worktree; the orchestrator-class checkout `c:\Trunk\PRIVATE\RandomGame` is reserved for orchestrator surveys.
 
-- Your `git checkout`, `git commit`, branch state, and untracked files are isolated. You won't be stomped by a concurrent agent switching branches mid-run.
-- `git pull --rebase origin main` still pulls from shared origin — pick up merges that happened during your run.
-- Pushes, PRs, and merges work normally — `origin` is the shared truth.
-- Untracked files in your worktree do **not** leak into another agent's worktree or the orchestrator's main checkout. Don't rely on cross-agent visibility — use git for that.
+| Role | Worktree path |
+|------|---------------|
+| Priya | `C:/Trunk/PRIVATE/RandomGame-priya-wt` |
+| Uma | `C:/Trunk/PRIVATE/RandomGame-uma-wt` |
+| Devon | `C:/Trunk/PRIVATE/RandomGame-devon-wt` |
+| Drew | `C:/Trunk/PRIVATE/RandomGame-drew-wt` |
+| Tess | `C:/Trunk/PRIVATE/RandomGame-tess-wt` |
+| Orchestrator (own commits) | `C:/Trunk/PRIVATE/RandomGame-orch-wt` |
+| Orchestrator (surveys) | `c:\Trunk\PRIVATE\RandomGame` |
+
+**Standard run-start invocation** in every dispatch (orchestrator pastes this into briefs from `team/orchestrator/dispatch-template.md`):
+
+```bash
+cd C:/Trunk/PRIVATE/RandomGame-<your-role>-wt
+git fetch origin
+git checkout -B <your-role>/<task-name> origin/main
+# ... do work ...
+git push origin <your-role>/<task-name>:<your-role>/<task-name>
+```
+
+**Rules:**
+
+1. **Operate ONLY in your role's worktree.** Don't `cd` into another agent's worktree. Don't operate in the main checkout `c:\Trunk\PRIVATE\RandomGame` — that's the orchestrator's surveys and is contended.
+2. **Reset cleanly at run start.** `git checkout -B` always force-creates the new branch from `origin/main`. Don't try to recover prior in-flight work — every dispatch starts fresh.
+3. **Push by refspec.** `git push origin <branch>:<branch>` is robust against the worktree's local-tracking state.
+4. **Don't try to delete your sticky worktree on cleanup.** It's role-persistent; the orchestrator manages worktree lifecycle.
+5. **One agent per worktree at a time.** If the orchestrator needs to dispatch two agents from the same role concurrently (rare), the orchestrator creates an ephemeral second worktree and includes its path in the second brief.
+
+What you can rely on:
+
+- Your `git checkout`, `git commit`, branch state, and untracked files are isolated.
+- `git fetch origin` always works — `origin` is shared.
+- Pushes, PRs, and merges work normally.
 
 Conflict resolution on rebase is unchanged:
 
 1. If rebase conflicts in your own area, resolve and continue.
 2. If conflicts are in another role's area, abort the rebase, leave a note in `team/log/<your-role>-conflict.md`, and surface via STATE.md "Open decisions awaiting orchestrator" — don't blind-resolve another role's code.
 
-If you make no changes, the harness auto-cleans your worktree on exit. If you do make changes, the worktree path and branch are returned in your final report — orchestrator can inspect if needed.
-
-> Sequential agents (no concurrency expected) may be dispatched without `isolation: "worktree"` to skip the worktree-setup overhead. The orchestrator decides per dispatch.
+> Per-task ephemeral worktrees (`RandomGame-<role>-<task-slug>`) are also valid for one-off long-form work and may be created at the orchestrator's discretion. They are removed post-merge. The sticky-per-role pattern is the default.
 
 ## CI
 
