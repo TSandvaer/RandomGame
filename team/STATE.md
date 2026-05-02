@@ -45,11 +45,11 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ## Drew (Game Dev #2)
 
-- Last updated: 2026-05-01
+- Last updated: 2026-05-02
 - Status: working
-- Working on: Task 1 — TRES schema for MobDef + ItemDef + AffixDef + LootTableDef (`team/drew-dev/tres-schemas.md`).
-- Blocked on: Devon's scaffold (#1) for tasks 2–4 (Grunt mob, level POC, loot drop) — those touch the Godot project tree.
-- Next: After scaffold lands: (2) Grunt mob archetype, (3) Stratum-1 first room chunk-based assembly POC, (4) Gear drop on mob death (T1 weapon + T1 armor stub).
+- Working on: Run 002 — week-1 carry-overs from Priya's revised timeline. Implementing in order: (8) Grunt mob archetype + AI state machine, (9) Stratum-1 first room + chunk-based assembly POC, (10) LootRoller + 10-edge-case GUT tests. Schema implementation (`scripts/content/*.gd` + ContentFactory + seed TRES) bundled with task #8 per Priya's run-001 split decision.
+- Blocked on: nothing. Devon's scaffold + physics layers + Hitbox + Player landed in run-001. ClickUp MCP disconnected — status updates queued to `team/log/clickup-pending.md`.
+- Next: Per-task: feature branch → paired GUT tests in same commit → push → PR → label ready-for-qa → stop. Tess merges after sign-off.
 
 ## Tess (Tester)
 
