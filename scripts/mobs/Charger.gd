@@ -233,6 +233,12 @@ func _physics_process(delta: float) -> void:
 		return
 	_tick_timers(delta)
 
+	# Snapshot the entry state so we know whether CHARGING was already active
+	# coming into this tick. Same-tick transitions (telegraph -> charging) must
+	# not trip the wall-stop check on the first charge tick before motion has
+	# even been attempted.
+	var entry_state: StringName = _state
+
 	match _state:
 		STATE_IDLE:
 			_process_idle(delta)
@@ -249,9 +255,11 @@ func _physics_process(delta: float) -> void:
 
 	var pre: Vector2 = global_position
 	move_and_slide()
-	# After the slide, check for wall stop during charge. We do this AFTER
-	# move_and_slide so wall geometry is already resolved.
-	if _state == STATE_CHARGING:
+	# After the slide, check for wall stop during charge. Only fire when we
+	# were already CHARGING at tick start AND are still CHARGING after the
+	# state handler — otherwise transitions in/out of charge in the same tick
+	# would fire spurious wall-stops.
+	if entry_state == STATE_CHARGING and _state == STATE_CHARGING:
 		var moved: float = (global_position - pre).length()
 		if moved < WALL_STOP_DISPLACEMENT_EPSILON:
 			_end_charge_into_wall()
@@ -330,6 +338,10 @@ func _enter_telegraph() -> void:
 func _begin_charge() -> void:
 	_charge_time_left = CHARGE_MAX_DURATION
 	_charge_already_hit.clear()
+	# Apply charge velocity immediately on the transition tick. Otherwise the
+	# wall-stop check fires below because velocity was zero during the prior
+	# telegraph branch's move_and_slide and post-slide displacement is 0.
+	velocity = _charge_dir * charge_speed
 	_set_state(STATE_CHARGING)
 
 
