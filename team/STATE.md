@@ -17,11 +17,12 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ## Priya (Project Leader)
 
-- Last updated: 2026-05-01
-- Status: Phase 0 complete
-- Working on: Week-1 backlog dispatched. Awaiting first heartbeat to triage progress.
+- Last updated: 2026-05-02
+- Status: triage tick complete
+- Working on: Mid-week-1 triage done. Threaded the new testing-bar DoD into 10 ClickUp feature tasks (9 dev features + smoke test). Reassessed timeline — 8 features carry to week 2. Drafted week-2 backlog (`team/priya-pl/week-2-backlog.md`) with 20% buffer floor. 4 decisions appended to `DECISIONS.md`. Did not touch other roles' uncommitted in-flight work.
 - Blocked on: —
-- Next: Mid-week ClickUp triage; draft week-2 backlog; risk register; freeze design docs at end of week 1.
+- Next: At end of week 1, freeze game-concept/tech-stack/mvp-scope as v1 (#19), land risk register (#20), promote week-2 backlog to ClickUp (re-tag carry-overs + create new tickets with DoD blocks).
+- Note for orchestrator: no current escalations of my own. Watch the `ready for qa test` queue — task #2 (CI) is in there awaiting Tess; if depth grows past 3 between ticks, dispatch Tess per `TESTING_BAR.md` rule. Drew's task #7 ClickUp status is `to do` even though paper doc landed — non-blocking, his next dispatch will resolve. Note Uma flagged two cross-role calls in her section (visual-direction + inventory-on-death) — I'll consume these next dispatch; orchestrator can leave them for me unless urgent.
 
 ## Uma (UX Designer)
 

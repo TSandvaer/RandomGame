@@ -140,3 +140,37 @@ Format:
 - Reversibility: reversible — hooks can be removed post-M1 if they're a footgun. Build-SHA footer stays forever.
 - Affects: Devon (implements hooks 1, 2, 4, 5; documents 3), Tess (uses all five), Sponsor (must not see hook 2 — gate it).
 - Detail: `team/tess-qa/m1-test-plan.md` § "Notes for Devon & Drew (testability hooks needed)"
+
+## 2026-05-02 — Week-1 DoD threaded through ClickUp feature tasks
+
+- Decided by: Priya
+- Decision: All 9 active week-1 feature tasks (Devon's #2 CI, #3 butler, #4 movement, #5 attacks, #6 save, Drew's #7 schema, #8 grunt, #9 first room, #10 loot) plus the smoke-test task #17 had a "Done when" block appended to their ClickUp descriptions. Each block enumerates: paired GUT test path, green CI requirement, M1-AC integration check, three feature-specific edge-case probes (rapid input, mid-action interrupt, tab-blur or save-race per feature), and Tess sign-off requirement. Task #1 scaffold (already `complete`, pre-bar) was not retroactively gated. Pure docs/design tasks (Uma's 5, Tess's plan, Priya's 3) deliberately **not** bloated with the DoD block — they are exempt from #2/#4/#5 of the bar.
+- Why: The testing bar is binding but only enforceable if the artifact (ClickUp task) tells each role exactly what "done" means for *their* feature. Generic checklists get ignored; feature-specific edge cases (e.g., "tab-blur mid-dodge", "kill process during save write", "rolled-RNG statistical assertion over N=10000") get probed.
+- Reversibility: reversible — easy to edit task descriptions if the bar evolves.
+- Affects: Devon, Drew (clearer DoD), Tess (concrete sign-off checklist), Priya (enforcement is now pointing at line items, not vibes).
+
+## 2026-05-02 — Week-1 timeline reshuffle: 8 features carry to week 2
+
+- Decided by: Priya
+- Decision: 12 of 20 week-1 tasks remain on track for week-1 close (paper deliverables — Uma 5, Tess plan, Priya 3, plus Devon #1 done + #2 in QA queue + Drew #7 paper). 8 implementation tasks slip to week 2 — Devon's #3 (butler), #5 (attacks), #6 (save/load), and Drew's #8 (grunt), #9 (first room), #10 (loot), the schema *implementation* split out of #7, and conditionally Devon's #4 (movement) if not Tess-signed by week-1 close. M1 acceptance criteria unchanged; only week boundary moves. Detailed verdict at `team/priya-pl/week-1-revised-timeline.md`.
+- Why: Tess sign-off latency from the new bar adds ~1 tick per feature. Save/load is bar-flagged as deepest-coverage system (`TESTING_BAR.md` §Devon-and-Drew) and gets +1 tick of explicit buffer rather than getting cut corners. Better to slip a feature to week 2 with full tests than ship it on schedule with `tech-debt(...)` tags.
+- Reversibility: reversible — features can re-accelerate into w1 close if Tess sign-off cycles run faster than projected.
+- Affects: Devon (3 features carry), Drew (4 features carry), Tess (queue depth more important to manage than calendar week), orchestrator (heartbeat queue-depth rule from TESTING_BAR.md is now load-bearing).
+- Detail: `team/priya-pl/week-1-revised-timeline.md`
+
+## 2026-05-02 — Drew Task #7 split: paper this week, implementation paired with #8
+
+- Decided by: Priya
+- Decision: Drew's week-1 Task #7 (TRES schema authoring tooling) splits cleanly into (a) the spec doc `team/drew-dev/tres-schemas.md` — week-1, already paper-complete — and (b) the implementation deliverables (`MobDef.gd`, `ItemDef.gd`, `AffixDef.gd`, `LootTableDef.gd`, `ContentFactory` static factories, GUT smoke for factories, seed TRES files for one mob + two items). The implementation portion ships paired with Drew's Task #8 (grunt mob) in week 2, because that's where the schema gets its first real consumer and the paired GUT test is most informative.
+- Why: Testing bar requires paired tests. Authoring tooling without a consumer has no obvious test target; bundling implementation with #8 means the test exercises the schema *via* the grunt — closer to how it'll actually be used. Reduces test-for-test's-sake and produces stronger coverage.
+- Reversibility: reversible — Drew can ship the implementation on its own if w2 capacity allows.
+- Affects: Drew (split task in own ClickUp), Tess (sign-off arrives once with #8 not separately), Priya (carry-over count = 8 not 7).
+
+## 2026-05-02 — Week-2 backlog drafted with 20% buffer floor
+
+- Decided by: Priya
+- Decision: Week-2 backlog drafted at `team/priya-pl/week-2-backlog.md`. ~25 tickets total: 8 carry-overs + 14 new feature/design tickets + 5 buffer (bug bash, soak, CI hardening, test backfill, integration tests) = **20% buffer floor met** per testing bar §Priya. New work focus: level-up math + XP curve, damage formula, 2 mobs (shooter + charger), stratum-1 boss, affix system + balance pass, level-up UI implementation, save migration test. Critical path: save (C3) → level-up math (N1) → damage (N3) → affixes (N7) → boss (N6) → bug bash + soak. Backlog will be promoted to ClickUp at end of week 1, not now.
+- Why: Bar requires explicit ≥20% test buffer. Listing the buffer items (B1–B5) as named tickets — not "we'll do testing as we go" — turns the buffer into something the orchestrator can dispatch against and Priya can defend at week boundary.
+- Reversibility: reversible until ClickUp promotion at end of week 1.
+- Affects: all roles week 2.
+- Detail: `team/priya-pl/week-2-backlog.md`
