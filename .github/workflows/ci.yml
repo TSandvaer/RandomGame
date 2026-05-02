@@ -26,6 +26,13 @@ jobs:
     # the runtime here.
     container:
       image: barichello/godot-ci:4.3
+    # The barichello/godot-ci container's default shell is `sh -e`, which
+    # does not understand `set -o pipefail` and exits 2 immediately on any
+    # `run:` step that uses it. Force bash for every step so pipefail and
+    # other bashisms work. (Tess fix, 2026-05-02 — CI red since first push.)
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v4

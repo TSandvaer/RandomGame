@@ -35,6 +35,12 @@ jobs:
     runs-on: ubuntu-22.04
     container:
       image: barichello/godot-ci:4.3
+    # The barichello/godot-ci container's default shell is `sh -e`, which
+    # does not understand `set -o pipefail`. Force bash for all run steps in
+    # this job so pipefail and other bashisms work. (Tess fix, 2026-05-02.)
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
