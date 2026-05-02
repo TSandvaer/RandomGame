@@ -44,3 +44,6 @@ venv/
 
 # Logs
 *.log
+
+# Claude Code session state
+.claude/

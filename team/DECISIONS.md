@@ -113,3 +113,21 @@ Format:
 - Why: Smaller repo, fewer merge conflicts, single source of pin truth. GUT is not a runtime dependency of the shipped game.
 - Reversibility: reversible — switch to a submodule if the AssetLib install becomes a friction point.
 - Affects: Devon (CI), Tess (test runs), Drew (running tests locally).
+
+## 2026-05-01 — Content schema: TRES with composition, not inheritance
+
+- Decided by: Drew
+- Decision: M1 content schema is four `Resource` types — `MobDef`, `ItemDef`, `AffixDef`, `LootTableDef` — each `class_name`'d. Cross-references go via `ext_resource` (one canonical TRES per affix/item, drag-referenced from loot tables and items). Sub-resources (`ItemBaseStats`, `AffixValueRange`, `LootEntry`) used for grouped fields instead of flat `@export`s, so Godot inspector groups them and saves migrate cleanly. Affix value ranges are an `Array[AffixValueRange]` of length 3 (T1/T2/T3), one entry per shipped tier; will grow when T4–T6 land in M2/M3. Tier-driven affix count and roll algorithm live in `LootRoller` (single tunable point), not in `ItemDef`. Runtime mutable state lives on `ItemInstance` / mob nodes — TRES resources are immutable templates.
+- Why: TRES gives inspector editing, autocomplete via `class_name`, and version-controllable text-format authoring (per tech-stack.md). Composition over inheritance because slot-specific stat shapes will diverge in M2 (relics ≠ weapons) and we want to extend without breaking saved files. Matches the M1 spec exactly: weapon+armor slots only, T1–T3, 3-affix pool (`swift`, `vital`, `keen`).
+- Reversibility: reversible while M1 content is still being authored; sticky once Tess starts asserting against schema in tests and saves serialize ItemInstance with affix rolls.
+- Affects: Devon (engine — these resources are the contract for combat/save/loader code; needs to publish canonical stat-key StringNames for `AffixDef.stat_modified`), Uma (UI — `display_name`, `icon_path`, tier color, base_stats sub-resource shape are the inventory/tooltip surface), Tess (test data factories build off these classes), Priya (M1 affix value ranges marked as placeholders awaiting balance pin).
+- Detail: `team/drew-dev/tres-schemas.md`
+
+## 2026-05-02 — Testing bar raised — Sponsor will not debug
+
+- Decided by: Sponsor (directive) → orchestrator (codification)
+- Decision: New, binding **Definition of Done** at `team/TESTING_BAR.md`. Every feature task requires unit tests, green CI, integration check vs. M1 acceptance criteria, three edge-case probes, and **Tess sign-off** before flipping to `complete`. Devs cannot self-sign features; the `ready for qa test` → `complete` transition is Tess-only. Tess is promoted from plan-writer to active hammer; bug bashes are scheduled work; soak sessions required per release candidate. Priya owns enforcement — pushes without tests are reverted and tech-debt-tagged. Orchestrator gates Sponsor sign-off pings on zero-blocker, zero-major bug state.
+- Why: Sponsor stated *"I want you to use a lot of time testing, I don't want to debug and return findings all the time."* Sponsor's role is acceptance, not bug-finding. If the Sponsor finds a bug at sign-off, the team has failed.
+- Reversibility: one-way for Phase 1+.
+- Affects: all roles. Major impact on Tess (workload up), Devon/Drew (tests-with-features mandatory), Priya (week-2 backlog needs ≥20% test buffer), orchestrator (heartbeat now polices `ready for qa test` queue depth and blocks Sponsor pings on open bugs).
+- Detail: `team/TESTING_BAR.md`
