@@ -69,6 +69,16 @@ const ENTRY_SEQUENCE_DURATION: float = 1.8
 @export var door_trigger_position: Vector2 = Vector2(240.0, 250.0)
 @export var door_trigger_size: Vector2 = Vector2(80.0, 16.0)
 
+## res:// path to the StratumExit scene. Spawned (inactive) at room ready
+## and activated via `boss_died` plumbing. Indirected via export so tests
+## can opt into the real scene without coupling to its internal shape.
+@export_file("*.tscn") var stratum_exit_scene_path: String = "res://scenes/levels/StratumExit.tscn"
+
+## World-space position of the stratum exit portal. Default places it
+## near the top of the arena — opposite the door trigger, so the player
+## walks "deeper" to descend.
+@export var stratum_exit_position: Vector2 = Vector2(240.0, 30.0)
+
 # ---- Runtime ----------------------------------------------------------
 
 var _boss: Stratum1Boss = null
@@ -80,6 +90,7 @@ var _entry_started_time_ms: int = 0
 var _entry_completed_time_ms: int = 0
 var _stratum_exit_unlocked: bool = false
 var _loot_spawner: MobLootSpawner = null
+var _stratum_exit: StratumExit = null
 
 
 func _ready() -> void:
@@ -87,6 +98,7 @@ func _ready() -> void:
 	_loot_spawner.set_parent_for_pickups(self)
 	_build_door_trigger()
 	_spawn_boss()
+	_spawn_stratum_exit()
 
 
 # ---- Public API -------------------------------------------------------
@@ -97,6 +109,10 @@ func get_boss() -> Stratum1Boss:
 
 func get_door_trigger() -> Area2D:
 	return _door_trigger
+
+
+func get_stratum_exit() -> StratumExit:
+	return _stratum_exit
 
 
 func is_entry_sequence_active() -> bool:
@@ -212,8 +228,32 @@ func _on_boss_died(boss: Stratum1Boss, death_position: Vector2, mob_def: MobDef)
 	# separately to the boss's own `boss_died` signal for the time-freeze
 	# + ember dissolve; we don't drive those visuals from here.
 	_stratum_exit_unlocked = true
+	# Activate the StratumExit so the player can walk to it and descend.
+	# The exit was spawned INACTIVE in `_spawn_stratum_exit` — this is the
+	# moment it lights up.
+	if _stratum_exit != null:
+		_stratum_exit.activate()
 	stratum_exit_unlocked.emit()
 	boss_defeated.emit(boss, death_position)
+
+
+func _spawn_stratum_exit() -> void:
+	if stratum_exit_scene_path == "":
+		return
+	var packed: PackedScene = load(stratum_exit_scene_path) as PackedScene
+	if packed == null:
+		push_error("Stratum1BossRoom: failed to load StratumExit scene at '%s'" % stratum_exit_scene_path)
+		return
+	var node: Node = packed.instantiate()
+	if not node is StratumExit:
+		push_error("Stratum1BossRoom: StratumExit scene root is not StratumExit")
+		node.free()
+		return
+	_stratum_exit = node
+	# Override the exit's authored portal_position so it sits where this
+	# room wants it. The exit's own _ready will apply this on add_child.
+	_stratum_exit.portal_position = stratum_exit_position
+	add_child(_stratum_exit)
 
 
 # ---- Diagnostics ------------------------------------------------------
