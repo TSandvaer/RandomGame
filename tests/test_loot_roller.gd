@@ -151,6 +151,9 @@ func test_same_seed_produces_same_drops() -> void:
 
 func test_different_seeds_produce_different_drops_eventually() -> void:
 	# Sanity check that determinism comes from the seed, not from a constant.
+	# Comparing actual roll *sequences* (drop/no-drop pattern) — total
+	# counts can collide by coincidence, sequences cannot for any reasonable
+	# RNG of length > a handful of rolls.
 	var item: ItemDef = ContentFactory.make_item_def()
 	var t: LootTableDef = ContentFactory.make_loot_table({
 		"entries": [ContentFactory.make_loot_entry(item, 0.5, 0)],
@@ -158,12 +161,12 @@ func test_different_seeds_produce_different_drops_eventually() -> void:
 	})
 	var r1: LootRoller = _make_roller(1)
 	var r2: LootRoller = _make_roller(2)
-	var ct1: int = 0
-	var ct2: int = 0
+	var seq1: Array[int] = []
+	var seq2: Array[int] = []
 	for _i in 200:
-		ct1 += r1.roll(t).size()
-		ct2 += r2.roll(t).size()
-	assert_ne(ct1, ct2, "different seeds yield different total drops over a long run")
+		seq1.append(r1.roll(t).size())
+		seq2.append(r2.roll(t).size())
+	assert_ne(seq1, seq2, "different seeds yield different drop *sequences* over a long run")
 
 
 # ---- 9: Affix value distribution within tier range -----------------
