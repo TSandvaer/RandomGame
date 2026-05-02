@@ -33,6 +33,13 @@ jobs:
   import-and-test:
     name: Headless import + GUT
     runs-on: ubuntu-22.04
+    # Devon ci-hardening follow-up 2026-05-02 — workflow-level safety net.
+    # Recent baseline is ~1m20s; 10 minutes is plenty of headroom for a
+    # hung Godot import (deadlocked autoload _ready, infinite recursion in
+    # a TRES) or a runaway test runner without burning Actions minutes
+    # indefinitely. If we ever cross this, that's a signal to investigate
+    # rather than to bump the cap. See team/devon-dev/ci-hardening.md.
+    timeout-minutes: 10
     # barichello/godot-ci packages a Godot binary at the requested version,
     # plus the export templates we need for the release workflow. We only use
     # the runtime here.
@@ -78,7 +85,23 @@ jobs:
           restore-keys: |
             godot-import-${{ env.GODOT_VERSION }}-${{ env.GUT_VERSION }}-
 
+      # Devon ci-hardening follow-up 2026-05-02 — cache the GUT addon
+      # checkout keyed on GUT_VERSION (workflow env). Bumping the pin at
+      # the top of this file invalidates the cache automatically. On a
+      # warm hit the entire `Install GUT (pinned)` step below is skipped
+      # (its `if:` guard checks this step's cache-hit output) — saving
+      # the 5-10 s git-clone path. The retry-with-backoff still covers
+      # the cold path. Cache miss path is identical to the no-cache flow.
+      # See team/devon-dev/ci-hardening.md.
+      - name: Cache GUT addon
+        id: cache-gut
+        uses: actions/cache@v4
+        with:
+          path: addons/gut
+          key: gut-${{ env.GUT_VERSION }}-v1
+
       - name: Install GUT (pinned)
+        if: steps.cache-gut.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           # The bitwes/Gut repo is itself a Godot project — the actual addon
@@ -110,6 +133,14 @@ jobs:
           mkdir -p addons
           mv /tmp/gut-src/addons/gut addons/gut
           ls addons/gut/gut_cmdln.gd
+
+      - name: Verify GUT addon present
+        run: |
+          set -euo pipefail
+          # Defensive — covers both cache-hit and cold-clone paths. If
+          # this fails the GUT step would fail anyway with a less-clear
+          # error, so the early check just makes diagnosis cheaper.
+          test -f addons/gut/gut_cmdln.gd
 
       - name: Stamp build SHA into project
         run: |
