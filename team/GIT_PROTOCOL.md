@@ -47,11 +47,23 @@ Pure docs / `chore(repo|ci|build)` / `design(spec)` PRs — Tess sign-off is **n
 
 ## Concurrent agents
 
-Multiple agents may be running at once. Before pushing your branch:
+Every agent is dispatched with **`isolation: "worktree"`** — the harness creates a temporary git worktree for each run. You operate in that worktree, not the main checkout. The orchestrator (and any agent that explicitly opted out of isolation) operates on the main checkout. Branches, the `.git` object database, and `origin` are shared across all worktrees; only the working directory and `HEAD` are per-worktree.
 
-1. `git pull --rebase origin main` — pick up any merges that happened during your run.
-2. If rebase conflicts in your own area, resolve and continue. If conflicts are in another role's area, abort the rebase, leave a note in `team/log/<your-role>-conflict.md`, and surface via STATE.md "Open decisions awaiting orchestrator" — don't blind-resolve another role's code.
-3. Push to your feature branch, then PR, then merge per the workflow above.
+What this means for you in practice:
+
+- Your `git checkout`, `git commit`, branch state, and untracked files are isolated. You won't be stomped by a concurrent agent switching branches mid-run.
+- `git pull --rebase origin main` still pulls from shared origin — pick up merges that happened during your run.
+- Pushes, PRs, and merges work normally — `origin` is the shared truth.
+- Untracked files in your worktree do **not** leak into another agent's worktree or the orchestrator's main checkout. Don't rely on cross-agent visibility — use git for that.
+
+Conflict resolution on rebase is unchanged:
+
+1. If rebase conflicts in your own area, resolve and continue.
+2. If conflicts are in another role's area, abort the rebase, leave a note in `team/log/<your-role>-conflict.md`, and surface via STATE.md "Open decisions awaiting orchestrator" — don't blind-resolve another role's code.
+
+If you make no changes, the harness auto-cleans your worktree on exit. If you do make changes, the worktree path and branch are returned in your final report — orchestrator can inspect if needed.
+
+> Sequential agents (no concurrency expected) may be dispatched without `isolation: "worktree"` to skip the worktree-setup overhead. The orchestrator decides per dispatch.
 
 ## CI
 
