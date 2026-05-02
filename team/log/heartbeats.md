@@ -200,3 +200,15 @@
 - **Open issues**: Charger orphan-velocity flake — Devon flagged on PR #87's first CI run (`test_killed_mid_charge_no_orphan_motion`), second run passed without changes. Drew dispatched to diagnose+fix the underlying state-machine race (likely tied to Tess's run-005 PR #26 bounce hypothesis). CR-3 (StratumProgression null-check) parked. ClickUp queue at 8 entries pending (MCP still down).
 - **M1 RC progress**: `591bcc8` still verified-coverage soak target. After Devon CR-1+CR-2 + Drew charger-flake land (both small fixes), test totals settle at ~565 passing / 1 long-standing pending (GameState autoload). M1 surface-area unchanged for player. **No re-cut warranted** — Devon/Drew fixes are pure-bug-fixes against latent issues, no new user-facing behavior. RC `591bcc8` remains correct.
 - **Dispatch envelope status**: Half-A and Half-B-design + W3-B2 scaffold all closed. After Devon CR-1+CR-2 + Drew charger-flake land, the remaining safe-to-dispatch envelope narrows to: Priya M2 week-1 backlog draft (anticipatory), W3-B-extras (palette refinements per Uma's open questions, soak-readiness checklists). Bug-bash (`86c9kxx7h`) reserved for post-Sponsor.
+
+## Tick 2026-05-02 21:43
+
+- **Roles working**: Tess (run-020, review of Drew PR #94 charger flake fix), Priya (run-006, M2 week-1 backlog draft — anticipatory).
+- **Roles idle**: Uma, Devon, Drew (just landed PR #94).
+- **Open PRs**: PR #94 (`fix(mobs): charger orphan-velocity race`, awaiting Tess sign-off, head `dbdf843`+, 5 green CI runs proving stability).
+- **Dispatched this tick**: Tess (PR #94 review), Priya (M2 week-1 backlog).
+- **Decisions made**: Drew's charger-flake diagnosis was different from the dispatch hypothesis — race was wall-stop epsilon false-positive on tick-1 with `dt≈0`, not velocity-vs-death-cleanup as hypothesized. Drew followed `agent-verify-evidence.md`: pulled actual CI failure logs (3 fail repros + 5 success post-fix on same SHA) and traced root cause empirically. Fix is production-correct improvement (dropped frames no longer abort charges). M2 week-1 backlog dispatched as anticipatory work since dispatch envelope has narrowed — explicitly flagged as "draft, revisable post-Sponsor sign-off."
+- **Merged since last tick**: 2 PRs (#87 Devon CR-1+CR-2 fix + Tess sign-off, #93 Tess STATE run-019).
+- **Open issues**: M1 RC `591bcc8` still verified-coverage soak target. After PR #94 lands (charger fix), CI totals settle at 566 passing / 1 long-standing pending. Still no Sponsor message — interactive 30-min soak remains the gating activity.
+- **M1 RC progress**: Three M1-residual fixes landed in this 30-min window (CR-1, CR-2, charger flake). All are latent-bug fixes — no user-visible behavior change in M1's playable surface, no re-cut warranted. The build artifact `embergrave-html5-591bcc8` accurately represents the M1 player experience Sponsor will soak.
+- **Dispatch envelope status**: After PR #94 + Tess sign-off, only anticipatory M2 work remains (Priya backlog already in flight). Next tick may need to surface "all dispatchable closed" as a soft blocker — depends on Tess + Priya outcomes.
