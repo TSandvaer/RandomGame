@@ -16,3 +16,15 @@
 - **Open issues**: 2 open `bug(...)` ClickUp tasks against PR #6 will close when Tess approves the fix commits. PR #11's `pull_request` event didn't fire on its own; CI was triggered manually via `workflow_dispatch` — Tess's review needs to confirm CI is current.
 
 **M1 readiness check**: 4 of 7 acceptance criteria reachable on current main (movement+dodge+attacks+save). The remaining 3 (mob/loot/level) are all in `ready for qa test`. Once Tess clears those, M1 is ~80% reachable, pending audio/HUD wiring + the 5 testability hooks Devon is doing now. Not yet ready to ping Priya for M1 readiness assessment — wait for Tess's merge wave.
+
+## Tick 2026-05-02 16:15
+
+- **Roles working**: Tess (run-006 — 3-PR review + M1 soak), Drew (run-005 — stratum-1 boss), Uma (run-003 — audio direction).
+- **Roles idle**: Priya, Devon (just completed run-004).
+- **Roles blocked**: none.
+- **Open PRs**: #26 charger (Drew, fixed bounces, ready-for-qa), #33 shooter (Drew, fixed bounces, ready-for-qa), #35 level-up math (Devon, ready-for-qa). 3 items in queue → Tess dispatched.
+- **Dispatched this tick**: Tess (clear queue + fresh build trigger + M1 soak), Drew (stratum-1 boss `86c9kxx4t`), Uma (audio direction one-pager — also creates ClickUp ticket).
+- **Decisions made**: Audio direction work spins up a new ClickUp ticket since week-2 backlog didn't have one. Boss is dispatched as week-2 priority even though it's not strictly in the 7 M1 ACs that already shipped — keeps the M1 polish trajectory.
+- **Merged since last tick**: 7 PRs (#25 level-up panel, #27 RC build path, #28 boss intro, #29 backfill, #30 ci fix, #31 save migration fixture, #32 + #34 state).
+- **Open issues**: None blocking. Worktree contention causing minor branch-thrash for agents (logged by Uma + Drew + Tess in their reports) — agents work around with refspec pushes; protocol-side fix would need WorktreeCreate hooks we don't have.
+- **M1 RC progress**: BUILD ARTIFACT EXISTS (Devon's run-004 verified end-to-end). https://github.com/TSandvaer/RandomGame/actions/runs/25253490316. Tess will trigger a fresh build after merging the 3 ready-for-qa PRs, then soak the new artifact. **One Tess run away from M1 sign-off candidate.**
