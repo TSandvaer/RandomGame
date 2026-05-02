@@ -121,4 +121,21 @@ func test_authored_grunt_drops_loot_table_loads() -> void:
 	var table: LootTableDef = load("res://resources/loot_tables/grunt_drops.tres") as LootTableDef
 	assert_not_null(table)
 	assert_eq(table.roll_count, -1, "grunt drops use independent-roll mode")
-	assert_eq(table.entries.size(), 2, "drops one of: iron_sword, leather_vest")
+	# Post balance pass: 2 items x 3 tiers (T1/T2/T3) = 6 entries.
+	assert_eq(table.entries.size(), 6, "2 items (iron_sword, leather_vest) x 3 tier-modifiers")
+	# Verify tier-modifier shape: 3 entries per tier_modifier (0, 1, 2), one per item.
+	var tier_counts: Dictionary = {0: 0, 1: 0, 2: 0}
+	var item_counts: Dictionary = {}
+	for entry: LootEntry in table.entries:
+		assert_not_null(entry.item_def, "entry has item_def")
+		assert_true(tier_counts.has(entry.tier_modifier), "tier_modifier in {0,1,2}")
+		tier_counts[entry.tier_modifier] += 1
+		var iid: StringName = entry.item_def.id
+		item_counts[iid] = item_counts.get(iid, 0) + 1
+		assert_gt(entry.weight, 0.0, "entry weight is positive")
+	assert_eq(tier_counts[0], 2, "2 entries at tier_modifier 0 (T1)")
+	assert_eq(tier_counts[1], 2, "2 entries at tier_modifier 1 (T2)")
+	assert_eq(tier_counts[2], 2, "2 entries at tier_modifier 2 (T3)")
+	assert_eq(item_counts.size(), 2, "exactly 2 distinct items")
+	assert_eq(item_counts[&"iron_sword"], 3, "iron_sword across 3 tiers")
+	assert_eq(item_counts[&"leather_vest"], 3, "leather_vest across 3 tiers")

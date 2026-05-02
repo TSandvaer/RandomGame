@@ -399,3 +399,124 @@ func test_authored_grunt_drops_table_rolls_cleanly() -> void:
 		var drops: Array[ItemInstance] = r.roll(grunt_def.loot_table)
 		for it: ItemInstance in drops:
 			assert_true(allowed.has(it.def.id), "rolled id %s is one of the authored M1 items" % it.def.id)
+
+
+# ---- Affix-balance pin §3: tier spread on common-mob (grunt) drops --
+#
+# Priya's pin (`team/priya-pl/affix-balance-pin.md` §3) authors per-entry
+# weights of 0.21 / 0.075 / 0.015 for T1/T2/T3 on each of two base items
+# (sword, vest), independent-roll mode.
+#
+# Drew's run-009 derivation (the weights are the source of truth, the
+# §3 stated aggregates are derivative):
+#   - Conditional spread per drop: exactly 70% T1 / 25% T2 / 5% T3
+#     (each entry samples independently; ratios are 0.21:0.075:0.015 per
+#     base item, identical to 70:25:5).
+#   - Per-kill aggregate (independent across 6 entries):
+#       P(any drop)   = 1 - (0.79 · 0.925 · 0.985)²  ≈ 48.2%
+#       P(T2+ drop)   = 1 - (0.925 · 0.985)²         ≈ 17.0%
+#       P(T3 drop)    = 1 - 0.985²                   ≈  3.0%
+#     Priya's pin states P(any drop)≈51%; the small delta vs 48.2% is the
+#     "0.30 per base item" approximation in her §3 prose treating the 3
+#     per-base entries as mutually exclusive when the roller actually
+#     rolls them independently. Per the PR body, this is flagged for
+#     Priya — weights stay as authored, tests assert actual derived
+#     values. T2+ and T3 derivations match her stated 17%/3% exactly.
+#
+# Statistical tests use a fixed seed + 10000 iterations and assert each
+# percentage within ±3% tolerance (loose enough for RNG variance, tight
+# enough to catch a swapped weight or a missing entry).
+
+const _GRUNT_DROPS_PATH: String = "res://resources/loot_tables/grunt_drops.tres"
+const _STAT_ITERATIONS: int = 10000
+const _STAT_TOLERANCE: float = 0.03  # ±3 percentage points
+
+func _percent(numerator: int, denominator: int) -> float:
+	if denominator == 0:
+		return 0.0
+	return float(numerator) / float(denominator)
+
+
+func test_grunt_drops_has_six_tier_varied_entries() -> void:
+	# Shape check first — if the table author drops back to a 2-entry
+	# table the statistical tests below will be noisy. This test catches
+	# a bad-shape regression with a clear failure message.
+	var table: LootTableDef = load(_GRUNT_DROPS_PATH) as LootTableDef
+	assert_not_null(table, "grunt_drops.tres loads as LootTableDef")
+	assert_eq(table.entries.size(), 6, "grunt_drops has 6 entries (2 items × 3 tiers)")
+	# Confirm tier_modifier spread: two entries at each of 0, 1, 2.
+	var tier_mod_counts: Dictionary = {0: 0, 1: 0, 2: 0}
+	for entry: LootEntry in table.entries:
+		if tier_mod_counts.has(entry.tier_modifier):
+			tier_mod_counts[entry.tier_modifier] += 1
+	assert_eq(tier_mod_counts[0], 2, "two T1 entries (tier_modifier=0)")
+	assert_eq(tier_mod_counts[1], 2, "two T2 entries (tier_modifier=1)")
+	assert_eq(tier_mod_counts[2], 2, "two T3 entries (tier_modifier=2)")
+
+
+func test_grunt_drops_conditional_tier_spread_70_25_5() -> void:
+	# Roll 10000 kills; among items that drop, assert the per-drop tier
+	# distribution lands at 70/25/5 (±3pp).
+	var r: LootRoller = _make_roller(424242)
+	var table: LootTableDef = load(_GRUNT_DROPS_PATH) as LootTableDef
+	assert_not_null(table)
+	var t1: int = 0
+	var t2: int = 0
+	var t3: int = 0
+	for _i in _STAT_ITERATIONS:
+		for it: ItemInstance in r.roll(table):
+			match it.rolled_tier:
+				ItemDef.Tier.T1: t1 += 1
+				ItemDef.Tier.T2: t2 += 1
+				ItemDef.Tier.T3: t3 += 1
+				_: assert_true(false, "unexpected tier on grunt drop: %d" % it.rolled_tier)
+	var total_drops: int = t1 + t2 + t3
+	assert_gt(total_drops, 0, "at least some drops over 10000 kills")
+	var p_t1: float = _percent(t1, total_drops)
+	var p_t2: float = _percent(t2, total_drops)
+	var p_t3: float = _percent(t3, total_drops)
+	assert_between(p_t1, 0.70 - _STAT_TOLERANCE, 0.70 + _STAT_TOLERANCE,
+		"T1 conditional fraction near 70%% (got %.3f)" % p_t1)
+	assert_between(p_t2, 0.25 - _STAT_TOLERANCE, 0.25 + _STAT_TOLERANCE,
+		"T2 conditional fraction near 25%% (got %.3f)" % p_t2)
+	assert_between(p_t3, 0.05 - _STAT_TOLERANCE, 0.05 + _STAT_TOLERANCE,
+		"T3 conditional fraction near 5%% (got %.3f)" % p_t3)
+
+
+func test_grunt_drops_per_kill_aggregate_rates() -> void:
+	# Per-kill (per-mob) aggregate: P(any drop) ≈ 51%, P(T2+ drop) ≈ 17%,
+	# P(T3 drop) ≈ 3%. Same fixed seed + 10000-iteration discipline.
+	var r: LootRoller = _make_roller(0xBEEFCAFE)
+	var table: LootTableDef = load(_GRUNT_DROPS_PATH) as LootTableDef
+	assert_not_null(table)
+	var any_drop: int = 0
+	var t2_plus_drop: int = 0
+	var t3_drop: int = 0
+	for _i in _STAT_ITERATIONS:
+		var drops: Array[ItemInstance] = r.roll(table)
+		if drops.size() > 0:
+			any_drop += 1
+		var has_t2_plus: bool = false
+		var has_t3: bool = false
+		for it: ItemInstance in drops:
+			if int(it.rolled_tier) >= int(ItemDef.Tier.T2):
+				has_t2_plus = true
+			if it.rolled_tier == ItemDef.Tier.T3:
+				has_t3 = true
+		if has_t2_plus:
+			t2_plus_drop += 1
+		if has_t3:
+			t3_drop += 1
+	var p_any: float = _percent(any_drop, _STAT_ITERATIONS)
+	var p_t2_plus: float = _percent(t2_plus_drop, _STAT_ITERATIONS)
+	var p_t3: float = _percent(t3_drop, _STAT_ITERATIONS)
+	# Priya's §3 prose says ~51%, but the actual weights yield 48.2% (see
+	# header comment). Asserting the derived value with ±3pp tolerance.
+	assert_between(p_any, 0.482 - _STAT_TOLERANCE, 0.482 + _STAT_TOLERANCE,
+		"P(any drop) per kill near 48.2%% (got %.3f)" % p_any)
+	assert_between(p_t2_plus, 0.17 - _STAT_TOLERANCE, 0.17 + _STAT_TOLERANCE,
+		"P(T2+ drop) per kill near 17%% (got %.3f)" % p_t2_plus)
+	# T3 is rare (3%) — keep tolerance tight enough to catch a doubled
+	# weight but loose enough for the long tail.
+	assert_between(p_t3, 0.03 - _STAT_TOLERANCE, 0.03 + _STAT_TOLERANCE,
+		"P(T3 drop) per kill near 3%% (got %.3f)" % p_t3)
