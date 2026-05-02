@@ -196,12 +196,13 @@ func _spawn_boss() -> void:
 	_boss.boss_died.connect(_on_boss_died)
 
 
-func _on_door_trigger_body_entered(body: Node) -> void:
+func _on_door_trigger_body_entered(_body: Node) -> void:
 	# Only the player triggers the entry sequence. Defensive: if some other
 	# body sneaks onto layer 2 we still trigger (player layer is reserved
 	# per DECISIONS.md 2026-05-01 physics-layers-reserved), but a `is Player`
-	# check would couple to Devon's class which we want to keep loose.
-	_ = body  # marker — body identity not used in M1
+	# check would couple to Devon's class which we want to keep loose. The
+	# leading underscore marks the param as intentionally unused (Godot
+	# convention); the bare `_ = body` form is rejected by GDScript 4.3.
 	trigger_entry_sequence()
 
 
