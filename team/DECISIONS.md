@@ -201,3 +201,21 @@ Format:
 - Reversibility: reversible at any time — flag is per-dispatch. If the orchestrator finds worktree creation slow or wasteful for a tiny task, dispatch without it.
 - Affects: Orchestrator (changes the dispatch call shape going forward), all agents (their worktree path is no longer the project root — relevant only if a script hardcodes `c:\Trunk\PRIVATE\RandomGame`; none should). Disk: a few MB per concurrent agent. CI: untouched (CI runs against pushed branches, not local worktrees).
 - Detail: `team/GIT_PROTOCOL.md` "Concurrent agents" section.
+
+## 2026-05-02 — Testability hooks landed: surface, gates, and RNG ownership
+
+- Decided by: Devon (per dispatch authority — Godot-specific implementation details)
+- Decision: Five testability hooks landed in PR #19 (`devon/testability-hooks`, ClickUp `86c9kxnqx`). (1) Build-SHA stamp: CI writes `${GITHUB_SHA:0:7}` to `build_info.txt`; `BuildInfo` autoload renders it as `Main.tscn`'s `BuildLabel` footer; local fallback `dev-local`; gitignored. (2) Fast-XP toggle: Ctrl+Shift+X (physical keycode) on the new `DebugFlags` autoload; `xp_multiplier()` returns 100 vs 1; multiplier value `100x` is a placeholder and Priya owns final calibration via the level curve (week-2 N1) — single-source-of-truth in `DebugFlags.FAST_XP_MULTIPLIER`. (3) Save-dir README: `Save.save_game()` writes `user://README.txt` (location, schema_version, clear-procedure) on every save. (4) Test-mode mob seed: `--test-mode` CLI / `EMBERGRAVE_TEST_MODE` env pins `DebugFlags.mob_spawn_seed()` to `0x7E57C0DE`. (5) HTML5 console errors: verified Godot 4.3's default already routes `print`/`push_error`/`push_warning` + uncaught script errors to browser `console.log`/`console.error` — no code or export-preset change needed.
+- Why: Tess's M1 acceptance plan (`team/tess-qa/m1-test-plan.md` § "Notes for Devon & Drew") blew its time budget on AC4 (boss DPS) and AC7 (loot affix coverage) without these hooks. Cheap to expose, expensive to live without.
+- Reversibility: reversible — hooks can be removed post-M1; build-SHA footer stays forever (acceptance bookkeeping).
+- Affects: Tess (uses all five — manual procedure documented per-OS in `team/devon-dev/debug-flags.md`), Drew (next-week mob spawner integration: `rng.seed = DebugFlags.mob_spawn_seed()`), Sponsor (must not see hook 2 — `OS.is_debug_build()` triple-gates the chord, the flag, and the multiplier read).
+- Detail: `team/devon-dev/debug-flags.md`, PR #19.
+
+## 2026-05-02 — Loot RNG ownership stays with Drew's LootRoller
+
+- Decided by: Devon (clarification, no change to existing decision)
+- Decision: `DebugFlags` (Devon, this run) does NOT touch the global RNG, `randomize()`, or any RNG outside the mob-spawn path. `mob_spawn_seed()` returns a value the mob spawner explicitly assigns to its own `RandomNumberGenerator.seed`. `LootRoller` continues to own loot determinism via its own `seed_rng(int)` API per the content-schema decision (2026-05-01) and the loot-roller landing (PR #11). Test-mode flag affects mob layouts only; loot rolling stays as Drew designed it.
+- Why: Two seeded RNGs at different scopes (mob layouts; loot drops) is the right separation — testers can re-run a mob layout with consistent spawn placement *and* observe natural loot variance, or vice versa. Centralizing them under DebugFlags would couple subsystems that benefit from being independent.
+- Reversibility: reversible.
+- Affects: Drew (no change to LootRoller surface), Devon (DebugFlags scope contract), Tess (knows test-mode pins mobs only — loot still rolls free per pickup).
+

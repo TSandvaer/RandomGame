@@ -4,6 +4,14 @@ Remote: `https://github.com/TSandvaer/RandomGame.git`. Default branch: `main`. *
 
 ## Per-task workflow (mandatory for every role)
 
+**On task start — mandatory ClickUp visibility flip:**
+
+Before doing any work on a task, flip its ClickUp status from `to do` to **`in progress`** with `mcp__clickup__clickup_update_task`. This gives the Sponsor live visibility into what's currently in flight. If MCP is disconnected, queue the flip in `team/log/clickup-pending.md` per `team/CLICKUP_FALLBACK.md` and proceed; orchestrator flushes on next reconnect. Skip this for trivial run-state PRs (e.g. your own `chore(state): <role> idle` PR — that's not a backlog task).
+
+If you finish the task in the same run (typical for design docs, doc tasks, small fixes), the status will progress through `in progress → ready for qa test` (feature) or `in progress → complete` (docs/chore exempt) by the end of your run. The `in progress` window is meaningful for the Sponsor even if it's brief — it's the live signal of "what's being worked on right now."
+
+**On task completion (push + PR + merge):**
+
 When you finish a task (or a coherent chunk of work):
 
 1. `git status --short` to confirm what's staged.
