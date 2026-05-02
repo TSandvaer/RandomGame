@@ -141,3 +141,14 @@
 - **Merged since last tick**: 1 PR (#70 heartbeat 19:15 + soak log).
 - **Open issues**: none.
 - **M1 RC progress**: Verified-coverage artifact `591bcc8` is the most-trusted M1 RC. Sponsor's existing soak target (`9cd07cb`) still functional (same code path; just smaller-test-count claim was misleading). Awaiting Sponsor return.
+
+## Tick 2026-05-02 19:55
+
+- **Roles working**: none (all 5 idle).
+- **Roles idle**: Priya, Uma, Devon, Drew, Tess.
+- **Open PRs**: none.
+- **Dispatched this tick**: NONE — deliberate hold.
+- **Decisions made**: Holding dispatch. Sponsor is OUT and the gating activity is the human soak. The team has shipped 7/7 M1 ACs + full week-2 polish (4 mob types + boss + 8 rooms + level-up + damage formula + stratum exit + stat-allocation UI + inventory UI + affix system T1) + retros + integration tests. M1 RC artifact `591bcc8` is the verified-coverage build (557 tests passing). Continuing to dispatch polish work just to "keep busy" would generate review-burden without moving the gating needle (Sponsor's soak). Holding is the correct response when Sponsor is out and gates are theirs to clear.
+- **Merged since last tick**: 2 PRs (#72 integration tests, #73 tess state), 1 ClickUp flip (`86c9kyvq4` parse-error bug → complete).
+- **Open issues**: none.
+- **M1 RC progress**: `591bcc8` — verified-coverage M1 RC (531 unit + 26 integration tests passing, 5646 asserts). Awaiting Sponsor return for human soak. Latest in-conversation soak target supersedes the originally-surfaced `9cd07cb`.
