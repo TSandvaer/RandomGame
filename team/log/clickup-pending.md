@@ -62,6 +62,17 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - created_at: 2026-05-01T (mid-run)
 - attempts: 1 (MCP returned "ClickUp is not connected")
 
+## ENTRY 2026-05-01-006
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: 86c9kwhu7
+    status: ready for qa test
+- reason: feat(player) light + heavy attack hitboxes landed in commit d5852f9. Hitbox.gd + Player.gd attack methods + 17 paired GUT tests across test_hitbox.gd (7) and test_player_attack.gd (10). Layer separation per DECISIONS 2026-05-01. Tess to verify per testing bar with edge-case probes (rapid-fire double-press, dodge mid-attack, attack with no targets, multi-overlap collapse).
+- created_at: 2026-05-01T10:14
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
 ## ENTRY 2026-05-01-005
 
 - op: create_task
