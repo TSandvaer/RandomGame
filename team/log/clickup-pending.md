@@ -42,3 +42,60 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - created_at: 2026-05-02T20:30
 - attempts: 1
 - note: **Supersedes ENTRY 020 (and the stale ENTRY 019).** Tess run 017 — PR #78 signed off and squash-merged at `04e2907` after independent verification of Devon run-009's cold/warm cache claim via `gh run view --json` on runs 25258478843 (cold — `Install GUT (pinned)` ran) / 25258516097 (warm — step skipped, both caches hit) / 25258623012 (final green on `57fae10`). PR #76 retroactively spot-checked — concurrency / `.godot/` cache / bounded GUT retry / `if: failure()` artifact upload all sane. PR #76 + PR #78 together close `86c9kxx8a`. CI hardening verified via run-log evidence rather than GUT tests (appropriate for CI-config changes). Process slip filed in `team/log/process-incidents.md` (Devon run-008 self-merged PR #76 under a wide reading of `chore(ci)` exemption; line 54 of GIT_PROTOCOL.md actually grants exemption from Tess sign-off, not self-merge license — orchestrator/Priya are the merging identities). Apply ONLY this entry (021) on next MCP reconnect; ENTRY 020's `ready for qa test` is now stale. Replay order: 018 (`in progress`) → 021 (`complete`). 019 + 020 should be skipped (terminal status of 021 overrides).
+
+## ENTRY 2026-05-02-022
+- op: create_task
+- list_id: 901523123922
+- payload:
+    name: "bug(html5): InventoryPanel + StatAllocationPanel `_exit_tree` does not restore Engine.time_scale"
+    description: |
+      **Discovered by:** Tess run 018, W3-A5 HTML5 RC audit on 591bcc8 (`team/tess-qa/html5-rc-audit-591bcc8.md` §4 CR-1 + CR-2).
+
+      **Files:**
+      - `scripts/ui/InventoryPanel.gd` (CR-1)
+      - `scripts/ui/StatAllocationPanel.gd` (CR-2)
+
+      **Behavior:** Both panels' `open()` snapshots `Engine.time_scale` (default 1.0) and sets it to `TIME_SLOW_FACTOR` (0.10 per Uma LU-09 / IS-time-slow). `close()` restores. **Neither has an `_exit_tree()` guard.** If the panel node is freed while `_open == true` (scene reload, autoload reset between scenes, browser tab-blur during scene change in HTML5), `Engine.time_scale` stays at 0.10 — game runs at 10% until a manual restore.
+
+      **Severity:** medium. Latent (doesn't manifest in M1 main-scene flow today), but HTML5 tab-blur patterns make this harder to predict than native. R3 retro escalation surface.
+
+      **Suggested fix (one line each):**
+      ```
+      func _exit_tree() -> void:
+          if _open:
+              Engine.time_scale = _previous_time_scale
+      ```
+
+      **Tests already locked in (PENDING):** `tests/integration/test_html5_invariants.gd` ships TI-6 + TI-7 as `pending("CR-1/CR-2 fix not yet landed")`. Fix-PR flips the `pending(...)` to the live assertions sketched in the test comment (one commit, paired-test discipline preserved).
+
+      **Tags:** `html5`, `bug`, `week-3`
+    priority: 3
+    tags: ["html5", "bug", "week-3"]
+- created_at: 2026-05-02T20:50
+- attempts: 0
+- note: Tess run 018 — code-fix-recommended findings CR-1 + CR-2 from W3-A5 HTML5 RC audit. Filed as one ticket since both fixes are the same one-line pattern in two adjacent panel files. MCP disconnected this session; queueing per CLICKUP_FALLBACK.md. Devon picks up.
+
+## ENTRY 2026-05-02-023
+- op: create_task
+- list_id: 901523123922
+- payload:
+    name: "chore(progression): drop dead null-check in StratumProgression.restore_from_save_data"
+    description: |
+      **Discovered by:** Tess run 018, W3-A5 HTML5 RC audit on 591bcc8 (`team/tess-qa/html5-rc-audit-591bcc8.md` §4 CR-3).
+
+      **File:** `scripts/progression/StratumProgression.gd:116-119`.
+
+      **Behavior:** function signature is `func restore_from_save_data(data: Dictionary) -> void`. The body has `if data == null: return` on line 118. **Dead code** — a typed `Dictionary` param cannot receive null in GDScript 4.3 (passing null type-errors at the call site). Function comment claims "tolerates null" but that's not actually possible.
+
+      **Severity:** low. Cosmetic. No behavioral defect.
+
+      **Suggested fix (option A — preferred):** drop lines 118-119 (`if data == null: return`) and update the docstring to "tolerates missing keys (defaults to empty progression)". The empty-dict path already works (existing test_stratum_progression coverage at line 115 verifies it).
+
+      **Suggested fix (option B):** if the docstring's tolerance is *meant* to be real, change signature to `data: Variant` and keep the null-check. (Probably overkill for M1.)
+
+      **Tags:** `progression`, `chore`, `week-3`
+    priority: 4
+    tags: ["progression", "chore", "week-3"]
+- created_at: 2026-05-02T20:50
+- attempts: 0
+- note: Tess run 018 — CR-3 follow-up from W3-A5 HTML5 RC audit. Low severity; can be deferred or land alongside ENTRY 022's fix. Devon picks up.
