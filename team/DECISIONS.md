@@ -81,3 +81,35 @@ Format:
 - Why: Concept, stack, scope, and backlog are all locked. Team can start executing.
 - Reversibility: one-way.
 - Affects: all.
+
+## 2026-05-01 — Project layout: Godot project at repo root
+
+- Decided by: Devon
+- Decision: `project.godot` lives at the **repo root**, not in a `/game` subdirectory. Standard folders: `scenes/`, `scripts/` (with `scripts/save/`, `scripts/player/`, etc.), `assets/`, `resources/` (TRES content), `tests/` (GUT), `addons/` (third-party plugins). Aseprite/audio sources go in `art/` and `audio/` subfolders at root, ignored from Godot import via `.gdignore` if needed later.
+- Why: Tech-stack doc proposed `/game` as the Godot root, but a single-engine repo with the engine at root keeps CI commands simpler (`godot --path .`), keeps itch.io HTML5 export paths shallow, and matches Godot community convention. Scripts/scenes split by domain instead of one giant folder.
+- Reversibility: reversible early, sticky once Drew lands content.
+- Affects: Drew (resources/, scripts/), Tess (test paths), CI (workflow paths).
+
+## 2026-05-01 — Physics layers reserved
+
+- Decided by: Devon
+- Decision: 2D physics layers reserved in `project.godot`: 1=world, 2=player, 3=player_hitbox, 4=enemy, 5=enemy_hitbox, 6=pickups. Player attacks live on layer 3 and mask layer 4. Enemy attacks live on layer 5 and mask layer 2. Dodge i-frames temporarily clear the player's layer-2 collision so enemy hitboxes pass through.
+- Why: Layer separation is the cleanest way to express "player attack only damages enemies and vice versa" without runtime owner checks. Locked early so Drew's grunt mob (#8) can rely on these slots.
+- Reversibility: reversible but cheap to leave alone.
+- Affects: Drew (mob hitboxes), Devon (player hitboxes).
+
+## 2026-05-01 — GDScript style: typed-first
+
+- Decided by: Devon
+- Decision: GDScript code uses **explicit type hints** on every var, parameter, and return. `_ready() -> void:` not `_ready():`. Project debug warnings flag untyped declarations (`gdscript/warnings/untyped_declaration=1`). Class names use `class_name` for any node intended to be referenced outside its scene. Snake_case for vars/functions, PascalCase for class/scene names, SCREAMING_SNAKE for consts.
+- Why: Catches refactor breakage at parse time, gives Drew autocomplete on shared APIs, makes save schema concrete. Cost is a few extra characters per declaration.
+- Reversibility: reversible, but cheap to keep.
+- Affects: Devon, Drew (all GDScript).
+
+## 2026-05-01 — GUT not vendored; CI installs at runtime
+
+- Decided by: Devon
+- Decision: We do not commit the GUT addon source to `addons/gut/`. CI clones `bitwes/Gut` at workflow time, pinned to **v9.3.0**. Local devs install via Godot AssetLib. Pin is documented in `addons/gut/README.md` and the CI workflow.
+- Why: Smaller repo, fewer merge conflicts, single source of pin truth. GUT is not a runtime dependency of the shipped game.
+- Reversibility: reversible — switch to a submodule if the AssetLib install becomes a friction point.
+- Affects: Devon (CI), Tess (test runs), Drew (running tests locally).
