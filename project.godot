@@ -23,6 +23,7 @@ Save="*res://scripts/save/Save.gd"
 BuildInfo="*res://scripts/debug/BuildInfo.gd"
 DebugFlags="*res://scripts/debug/DebugFlags.gd"
 Levels="*res://scripts/progression/Levels.gd"
+StratumProgression="*res://scripts/progression/StratumProgression.gd"
 
 [debug]
 
