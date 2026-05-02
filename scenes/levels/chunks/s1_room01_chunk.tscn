@@ -1,0 +1,39 @@
+[gd_scene load_steps=2 format=3 uid="uid://b0embergrave_s1room01_chunk"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_h"]
+size = Vector2(480, 32)
+
+[node name="S1Room01Chunk" type="Node2D"]
+
+[node name="Floor" type="ColorRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 256.0
+color = Color(0.36, 0.31, 0.24, 1)
+
+[node name="WallNorth" type="StaticBody2D" parent="."]
+position = Vector2(240, 16)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallNorth"]
+shape = SubResource("RectangleShape2D_wall_h")
+
+[node name="Sprite" type="ColorRect" parent="WallNorth"]
+offset_left = -240.0
+offset_top = -16.0
+offset_right = 240.0
+offset_bottom = 16.0
+color = Color(0.18, 0.14, 0.11, 1)
+
+[node name="WallSouth" type="StaticBody2D" parent="."]
+position = Vector2(240, 240)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallSouth"]
+shape = SubResource("RectangleShape2D_wall_h")
+
+[node name="Sprite" type="ColorRect" parent="WallSouth"]
+offset_left = -240.0
+offset_top = -16.0
+offset_right = 240.0
+offset_bottom = 16.0
+color = Color(0.18, 0.14, 0.11, 1)
