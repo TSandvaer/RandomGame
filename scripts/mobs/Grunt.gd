@@ -95,6 +95,7 @@ const LAYER_PLAYER: int = 1 << 1         # bit 2
 const LAYER_ENEMY: int = 1 << 3          # bit 4
 
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
+const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
 # ---- Inspector --------------------------------------------------------
 
@@ -250,9 +251,14 @@ func _process_telegraph(_delta: float) -> void:
 # ---- Swings -----------------------------------------------------------
 
 func _swing_light(dir: Vector2) -> void:
+	# Damage routed through the formula utility. Reads MobDef.damage_base +
+	# the player's Vigor mitigation. Vigor is read at swing-spawn time, not
+	# hit-land time — by-design, mid-swing player stat changes (impossible
+	# in M1, but rationalised) don't retroactively alter an in-flight swing.
+	var hit_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
 	var hb: Hitbox = _spawn_hitbox(
 		dir,
-		damage_base,
+		hit_dmg,
 		dir * LIGHT_KNOCKBACK,
 		LIGHT_HITBOX_REACH,
 		LIGHT_HITBOX_RADIUS,
@@ -264,7 +270,12 @@ func _swing_light(dir: Vector2) -> void:
 
 
 func _swing_heavy(dir: Vector2) -> void:
-	var heavy_dmg: int = int(round(damage_base * HEAVY_DAMAGE_MULTIPLIER))
+	# Heavy = light * HEAVY_DAMAGE_MULTIPLIER on top of the formula output.
+	# The formula handles base damage + Vigor mitigation; the heavy multi
+	# stays here because it's a *grunt-specific* attack-shape decision (not
+	# the player's light/heavy attack-type tag from Damage.gd).
+	var base_hit: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
+	var heavy_dmg: int = int(round(float(base_hit) * HEAVY_DAMAGE_MULTIPLIER))
 	var hb: Hitbox = _spawn_hitbox(
 		dir,
 		heavy_dmg,
@@ -389,6 +400,17 @@ func _apply_layers() -> void:
 		collision_layer = LAYER_ENEMY
 	if collision_mask == 0 or collision_mask == BARE_DEFAULT_LAYER:
 		collision_mask = LAYER_WORLD | LAYER_PLAYER
+
+
+## Read the player's Vigor stat for the damage formula. Returns 0 if the
+## player ref is unset (test-bare grunt) or the player node doesn't expose
+## get_vigor (defensive: no crash if a non-Player target sneaks in).
+func _player_vigor() -> int:
+	if _player == null:
+		return 0
+	if not _player.has_method("get_vigor"):
+		return 0
+	return int(_player.get_vigor())
 
 
 func _resolve_player() -> void:

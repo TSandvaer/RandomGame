@@ -12,11 +12,20 @@ extends CharacterBody2D
 ##   - During dodge i-frames the player's collision_layer is cleared so
 ##     enemy hitboxes (mask: layer 2) miss. World collision (layer 1) still
 ##     blocks via collision_mask, so you can't dodge through walls.
-##   - Light attack: 8 damage, 0.18s recovery, 0.10s hitbox lifetime.
-##   - Heavy attack: 18 damage, 0.40s recovery, 0.14s hitbox lifetime.
+##   - Light attack: 0.18s recovery, 0.10s hitbox lifetime. Damage is
+##     computed via Damage.compute_player_damage(equipped_weapon, edge,
+##     ATTACK_LIGHT) — no flat constant. With no weapon equipped, fist =
+##     1 damage flat (per Damage.FIST_DAMAGE).
+##   - Heavy attack: 0.40s recovery, 0.14s hitbox lifetime. Damage is the
+##     light-damage value scaled by Damage.HEAVY_MULT (1.6x final).
 ##   - Attacks cannot be initiated mid-dodge; dodge can interrupt attack
 ##     recovery (gives the player an out — Hades convention).
 ##   - Sprint costs no resource in M1; a stamina meter is parked for M2.
+##   - Equipped weapon and Edge/Vigor stats live on this node — set by the
+##     equipment system (M2 task) and the level-up allocation flow (Uma's
+##     LevelUpPanel + Devon's stat-allocation work). Damage formula reads
+##     them; setters fire `equipped_weapon_changed` / `stat_changed` for
+##     HUD listeners.
 
 # ---- Signals ------------------------------------------------------------
 
@@ -32,6 +41,16 @@ signal iframes_ended()
 ## Emitted whenever the player spawns an attack hitbox. Useful for VFX
 ## hooks and tests that want to verify an attack actually fired.
 signal attack_spawned(kind: StringName, hitbox: Node)
+
+## Emitted when the equipped weapon changes (equip / unequip). HUD listens
+## to refresh the weapon-stat panel. New weapon (or null on unequip) on the
+## right.
+signal equipped_weapon_changed(new_weapon)
+
+## Emitted when a character stat (Vigor / Focus / Edge) changes from level-
+## up allocation. Carries the stat name and new value so the HUD can pick
+## the relevant block to refresh without a full snapshot read.
+signal stat_changed(stat: StringName, new_value: int)
 
 # ---- Tuning constants ---------------------------------------------------
 
@@ -49,16 +68,15 @@ const DODGE_SPEED: float = 360.0
 const DODGE_DURATION: float = 0.30
 const DODGE_COOLDOWN: float = 0.45  # measured from dodge START
 
-# Light: short reach, fast recovery, low damage.
-# Heavy: longer reach, slower recovery, higher damage.
-const LIGHT_DAMAGE: int = 8
+# Light: short reach, fast recovery. Damage comes from Damage.gd formula
+# (weapon_base + Edge + light/heavy multiplier).
 const LIGHT_KNOCKBACK: float = 80.0
 const LIGHT_REACH: float = 28.0
 const LIGHT_HITBOX_RADIUS: float = 18.0
 const LIGHT_HITBOX_LIFETIME: float = 0.10
 const LIGHT_RECOVERY: float = 0.18
 
-const HEAVY_DAMAGE: int = 18
+# Heavy: longer reach, slower recovery. Damage scaled by Damage.HEAVY_MULT.
 const HEAVY_KNOCKBACK: float = 180.0
 const HEAVY_REACH: float = 36.0
 const HEAVY_HITBOX_RADIUS: float = 22.0
@@ -66,6 +84,7 @@ const HEAVY_HITBOX_LIFETIME: float = 0.14
 const HEAVY_RECOVERY: float = 0.40
 
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
+const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
 # ---- Runtime state ------------------------------------------------------
 
@@ -84,6 +103,16 @@ var _attack_recovery_left: float = 0.0
 # Collision layer to restore after dodge i-frames clear it.
 const PLAYER_LAYER_BIT: int = 2  # see project.godot 2d_physics/layer_2 = "player"
 var _saved_collision_layer: int = 0
+
+# ---- Equipment + character stats ---------------------------------------
+# Read by Damage.compute_player_damage at attack time. Set by the equipment
+# system (M2) and the level-up allocation flow (Uma's LevelUpPanel +
+# Devon's stat-allocation work). Defaults match Save.DEFAULT_PAYLOAD —
+# null weapon (fist-fights the first room), zero stat allocation.
+var _equipped_weapon: ItemDef = null
+var _vigor: int = 0
+var _focus: int = 0
+var _edge: int = 0
 
 
 func _ready() -> void:
@@ -140,6 +169,60 @@ func get_facing() -> Vector2:
 	return _facing
 
 
+## Returns the currently-equipped weapon ItemDef, or null if unarmed.
+func get_equipped_weapon() -> ItemDef:
+	return _equipped_weapon
+
+
+## Equip / unequip the weapon (pass null to unequip). Fires
+## `equipped_weapon_changed`. M1 contract: only one weapon slot.
+func set_equipped_weapon(weapon: ItemDef) -> void:
+	if weapon == _equipped_weapon:
+		return
+	_equipped_weapon = weapon
+	equipped_weapon_changed.emit(weapon)
+
+
+## Edge stat — read by Damage.compute_player_damage to scale weapon damage.
+func get_edge() -> int:
+	return _edge
+
+
+## Vigor stat — read by Damage.compute_mob_damage to mitigate incoming hits.
+func get_vigor() -> int:
+	return _vigor
+
+
+## Focus stat — currently unused by the damage formula but tracked here so
+## the level-up allocation flow has a single home for V/F/E.
+func get_focus() -> int:
+	return _focus
+
+
+## Set Vigor / Focus / Edge to an absolute value (e.g. when restoring from
+## save). Negative values clamp to 0. Fires `stat_changed` if the value
+## actually changes.
+func set_stat(stat: StringName, value: int) -> void:
+	var clean: int = max(0, value)
+	match stat:
+		&"vigor":
+			if _vigor == clean:
+				return
+			_vigor = clean
+		&"focus":
+			if _focus == clean:
+				return
+			_focus = clean
+		&"edge":
+			if _edge == clean:
+				return
+			_edge = clean
+		_:
+			push_warning("Player.set_stat: unknown stat '%s'" % stat)
+			return
+	stat_changed.emit(stat, clean)
+
+
 ## Public state transitioner. Tests use it; gameplay should let the
 ## physics process drive transitions.
 func set_state(new_state: StringName) -> void:
@@ -180,21 +263,22 @@ func try_attack(kind: StringName, dir: Vector2 = Vector2.ZERO) -> Node:
 	var d: Vector2 = dir.normalized() if dir.length_squared() > 0.0 else _facing
 	_facing = d
 
-	var damage: int
+	# Damage routed through the formula utility. Reads equipped weapon +
+	# Edge stat, returns floored int. Fist (no weapon) = 1 damage flat per
+	# Damage.FIST_DAMAGE.
+	var damage: int = DamageScript.compute_player_damage(_equipped_weapon, _edge, kind)
 	var knockback_strength: float
 	var reach: float
 	var radius: float
 	var lifetime: float
 	var recovery: float
 	if kind == ATTACK_LIGHT:
-		damage = LIGHT_DAMAGE
 		knockback_strength = LIGHT_KNOCKBACK
 		reach = LIGHT_REACH
 		radius = LIGHT_HITBOX_RADIUS
 		lifetime = LIGHT_HITBOX_LIFETIME
 		recovery = LIGHT_RECOVERY
 	else:
-		damage = HEAVY_DAMAGE
 		knockback_strength = HEAVY_KNOCKBACK
 		reach = HEAVY_REACH
 		radius = HEAVY_HITBOX_RADIUS
