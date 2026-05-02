@@ -9,6 +9,8 @@ boss_mob_def_path = "res://resources/mobs/stratum1_boss.tres"
 boss_spawn_position = Vector2(240, 135)
 door_trigger_position = Vector2(240, 250)
 door_trigger_size = Vector2(80, 16)
+stratum_exit_scene_path = "res://scenes/levels/StratumExit.tscn"
+stratum_exit_position = Vector2(240, 30)
 
 [node name="ArenaFloor" type="ColorRect" parent="."]
 offset_left = 0.0
