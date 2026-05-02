@@ -1,5 +1,16 @@
 # MVP Scope — Embergrave
 
+## v1 — frozen 2026-05-02
+
+This document is **v1-frozen** as of end-of-week-1. M1 acceptance criteria below are the canonical contract for Sponsor sign-off. Any change after this date must:
+
+1. Land in a `## Changes` section appended to the bottom of this doc, with date + rationale + `Decided by`.
+2. Not silently edit the v1 content above.
+
+Rationale per `team/DECISIONS.md` (2026-05-01 mvp-scope entry + 2026-05-02 testing-bar entry): Tess's M1 test plan and the team's testing-bar gate are scoped to these acceptance criteria; freezing prevents the goalposts moving mid-QA.
+
+---
+
 ## M1 — First Playable (Sponsor sign-off candidate #1)
 
 The smallest build that proves the core loop is fun. Sponsor plays it; we either keep going or pivot.

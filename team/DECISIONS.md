@@ -219,3 +219,28 @@ Format:
 - Reversibility: reversible.
 - Affects: Drew (no change to LootRoller surface), Devon (DebugFlags scope contract), Tess (knows test-mode pins mobs only — loot still rolls free per pickup).
 
+## 2026-05-02 — Week-2 backlog promoted to ClickUp; carry-over count corrected to 1
+
+- Decided by: Priya
+- Decision: Week-2 backlog drafted in `team/priya-pl/week-2-backlog.md` promoted to ClickUp list `901523123922`. **20 new tickets** created (N1–N14 from the draft + 6 buffer items B1–B6) and the **single open carry-over** (`86c9kwhte` butler) re-tagged with `week-2` while preserving `week-1`. Carry-over count is **1**, not the 8 the draft anticipated, because Devon's runs 002/003 and Drew's run 002 + Tess's run 003 closed the bulk of the carry-over set in flight (movement, attacks, save/load, grunt, first room, loot pipeline all merged + Tess-signed; schema implementation merged paired with grunt). Buffer ratio = **6 / 21 = 28.6%** — exceeds 20% floor per `TESTING_BAR.md`.
+- Why: The week-2 backlog draft was authored mid-week-1 against an assumption that Drew and Devon would have ~8 features still open at week-1 close. Reality outpaced the plan. Promoting the backlog as drafted (8 carry-over tickets) would have created confusing duplicates against already-merged work. Correcting the count and noting it explicitly in DECISIONS.md keeps the heartbeat ticks honest about what's actually in flight.
+- Reversibility: reversible — tickets are editable; if scope re-shifts (e.g. butler bounces back from QA with major bugs and needs a re-scope), Priya re-tags / re-titles.
+- Affects: all roles week 2 — they have a real backlog to dispatch against. Orchestrator (dispatchable queue depth: ~20 fresh tickets), Devon (5 dev tickets — N1, N2, N3, N9, B3), Drew (8 dev tickets — N4, N5, N6, N7, N8, N10, N11 + carry C1 once Tess signs butler), Uma (2 design tickets — N13, N14), Tess (5 QA tickets — N12, B1, B2, B4, B5), Priya (1 — B6 mid-week retro).
+- Detail: `team/priya-pl/week-2-backlog.md` (draft + tracking), `team/priya-pl/risk-register.md` (covers scope-creep risk R4).
+
+## 2026-05-02 — Week-1 design docs frozen as v1
+
+- Decided by: Priya
+- Decision: `team/priya-pl/game-concept.md`, `team/priya-pl/tech-stack.md`, and `team/priya-pl/mvp-scope.md` are marked **v1-frozen** as of 2026-05-02. A `## v1 — frozen 2026-05-02` block at the top of each doc states the freeze contract: any change after this date lands in a `## Changes` section with date + rationale + `Decided by`, never as a silent edit.
+- Why: M1 build is in week 2. Drew's content authoring, Devon's engine work, and Tess's acceptance plan all anchor on these three docs. Drift mid-build causes silent breakage (e.g. mob count changes from 3 to 4 in mvp-scope but Drew's not told). Freezing forces any change through DECISIONS.md so every role sees it.
+- Reversibility: reversible — the freeze itself is a convention, not a technical lock. Easy to land a `## Changes` entry if the team agrees a v1 update is warranted.
+- Affects: all roles. Specifically Priya (gatekeeper), Drew (content references mvp-scope mob list), Tess (acceptance plan keyed to mvp-scope ACs), Devon (tech-stack lock for export presets and CI).
+
+## 2026-05-02 — Top 5 risks logged in risk register
+
+- Decided by: Priya
+- Decision: Risk register lands at `team/priya-pl/risk-register.md`. Top 5 active risks: R1 save migration breakage, R2 Tess sign-off bottleneck, R3 Godot HTML5 export regression, R4 scope creep into M1, R5 concurrent-agent merge collisions. Plus 4 watch-list items (Uma art bottleneck, affix balance sinkhole, boss state-machine complexity, Sponsor-finds-bug-at-sign-off). Each risk has probability, impact, mitigation, trigger / signal, and owner.
+- Why: Closing week-1 deliverable per `mvp-scope.md` and the week-1 backlog (`86c9kwhyy`). Risk register is a heartbeat-tick artifact — orchestrator scans for `blocker`-severity bugs that pattern-match a risk and escalates the risk's probability accordingly. Watch-list keeps lower-priority risks visible without crowding the top 5.
+- Reversibility: rolling document — risks added, retired, re-scored as M1 progresses.
+- Affects: orchestrator (heartbeat scan target), Priya (rolling owner), all roles (each risk has a named owner).
+- Detail: `team/priya-pl/risk-register.md`.

@@ -1,6 +1,6 @@
-# Week 2 Backlog — Embergrave (Draft)
+# Week 2 Backlog — Embergrave
 
-Owner: Priya. Drafted: 2026-05-02. **Not yet in ClickUp** — week-2 tasks are created at end of week-1, after the actual carry-over set is final.
+Owner: Priya. Drafted: 2026-05-02 (mid-w1). **Promoted to ClickUp 2026-05-02 (end-of-w1)** — see `## Promotion log` at the bottom for ticket IDs and the carry-over correction.
 
 ## Goal of week 2
 
@@ -100,3 +100,36 @@ End of week 1, Priya:
 1. Re-tags carry-overs C1–C8 from `week-1` → `week-2` (existing task IDs preserved).
 2. Creates N1–N14 + B1–B5 as new ClickUp tasks with `week-2` tag, descriptions including the **same DoD block** appended this tick to w1 features.
 3. Posts week-2 summary into `STATE.md` Priya section.
+
+## Promotion log (2026-05-02)
+
+**Carry-over correction:** the draft anticipated 8 carry-overs. **Reality at end-of-w1: 1 carry-over.** Most carry-overs in the draft were closed in flight by Devon (movement, attacks, save/load merged + Tess-signed) and Drew (grunt, first room, loot pipeline merged + Tess-signed; schema implementation merged paired with grunt per the run-001 split). The C7 schema task is `ready for qa test` (`86c9kwhvd`) — it's a paper doc + code; not counted as carry-over since it's the same paperwork ticket that always was. The remaining open carry-over is **C1 butler (`86c9kwhte`)** — already `ready for qa test`; awaiting Tess. Tagged `week-1` + `week-2`.
+
+**New tickets created in ClickUp (list 901523123922):**
+
+| Draft ID | Ticket name | ClickUp ID |
+|----------|-------------|------------|
+| N1 | feat(progression): level-up math + XP curve (1→5) | `86c9kxx2t` |
+| N2 | feat(progression): stat-point allocation UI | `86c9kxx2y` |
+| N3 | feat(combat): damage formula pass | `86c9kxx3m` |
+| N4 | feat(mobs): shooter mob | `86c9kxx3z` |
+| N5 | feat(mobs): charger mob | `86c9kxx46` |
+| N6 | feat(boss): stratum-1 boss | `86c9kxx4t` |
+| N7 | feat(gear): affix system T1 | `86c9kxx5p` |
+| N8 | feat(gear): affix balance T1→T3 | `86c9kxx61` |
+| N9 | feat(ui): inventory & stats panel | `86c9kxx66` |
+| N10 | feat(level): rooms 2–8 of stratum 1 | `86c9kxx6c` |
+| N11 | feat(level): stratum exit + descend screen | `86c9kxx6z` |
+| N12 | test(save): forward-compat migration v0→v1 | `86c9kxx73` |
+| N13 | design(ux): level-up panel + tooltip language | `86c9kxx79` |
+| N14 | design(ux): boss intro / health-bar treatment | `86c9kxx7e` |
+| B1 | qa(bugbash): end-of-week-2 exploratory pass | `86c9kxx7h` |
+| B2 | qa(soak): 30-min uninterrupted RC1 | `86c9kxx80` |
+| B3 | chore(ci): hardening — flake/cache/budget | `86c9kxx8a` |
+| B4 | qa(tests): backfill GUT for any w1 missing | `86c9kxx8h` |
+| B5 | qa(integration): GUT scene tests for ACs #2/#3/#6 | `86c9kxx8x` |
+| B6 | chore(decisions): mid-w2 retro + w3 scoping | `86c9kxx94` |
+
+**Buffer count:** 6 / 21 tickets = **28.6%** — exceeds 20% floor per `TESTING_BAR.md` §Priya.
+
+**DoD block status:** every feature ticket (N1–N12) ships with a `Done when` block per `TESTING_BAR.md` (paired GUT, green CI, M1-AC integration check, three edge-case probes, Tess sign-off). Design tickets (N13, N14) and pure-QA / chore tickets (B1, B2, B3, B6) carry the testing-bar exemption documented in their descriptions.

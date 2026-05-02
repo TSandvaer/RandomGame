@@ -1,5 +1,16 @@
 # Game Concept — Embergrave
 
+## v1 — frozen 2026-05-02
+
+This document is **v1-frozen** as of end-of-week-1. Content below is the canonical M1 design contract. Any change after this date must:
+
+1. Land in a `## Changes` section appended to the bottom of this doc, with date + rationale + `Decided by`.
+2. Not silently edit the v1 content above.
+
+Rationale per `team/DECISIONS.md` (2026-05-01 game-concept entry): the team needs a fixed contract during M1 build so Drew's content authoring, Devon's engine work, and Tess's acceptance plan stay aligned.
+
+---
+
 ## At a glance
 
 - **Working title:** Embergrave

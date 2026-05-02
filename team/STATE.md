@@ -18,11 +18,12 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 ## Priya (Project Leader)
 
 - Last updated: 2026-05-02
-- Status: triage tick complete
-- Working on: Mid-week-1 triage done. Threaded the new testing-bar DoD into 10 ClickUp feature tasks (9 dev features + smoke test). Reassessed timeline — 8 features carry to week 2. Drafted week-2 backlog (`team/priya-pl/week-2-backlog.md`) with 20% buffer floor. 4 decisions appended to `DECISIONS.md`. Did not touch other roles' uncommitted in-flight work.
+- Status: idle (chunk done — run 003: week-1 close-out + week-2 promotion landed)
+- Working on: —
 - Blocked on: —
-- Next: At end of week 1, freeze game-concept/tech-stack/mvp-scope as v1 (#19), land risk register (#20), promote week-2 backlog to ClickUp (re-tag carry-overs + create new tickets with DoD blocks).
-- Note for orchestrator: no current escalations of my own. Watch the `ready for qa test` queue — task #2 (CI) is in there awaiting Tess; if depth grows past 3 between ticks, dispatch Tess per `TESTING_BAR.md` rule. Drew's task #7 ClickUp status is `to do` even though paper doc landed — non-blocking, his next dispatch will resolve. Note Uma flagged two cross-role calls in her section (visual-direction + inventory-on-death) — I'll consume these next dispatch; orchestrator can leave them for me unless urgent.
+- Deliverables this run: (a) **Week-2 backlog promoted to ClickUp**: 20 new tickets created in list `901523123922` (N1–N14 + B1–B6) — IDs `86c9kxx2t` through `86c9kxx94`. Single carry-over `86c9kwhte` (butler) re-tagged with `week-2` while preserving `week-1`. Buffer ratio 6/21 = 28.6% (exceeds 20% floor per `TESTING_BAR.md`). Reality-correction logged: only 1 carry-over not 8 — Devon and Drew closed most of the draft's anticipated carry-over set in run 002/003. (b) **Risk register** at `team/priya-pl/risk-register.md` — top 5 (save migration, Tess bottleneck, HTML5 regression, scope creep, agent merge collisions) + 4 watch-list. (c) **v1 freeze** of `game-concept.md`, `tech-stack.md`, `mvp-scope.md` — `## v1 — frozen 2026-05-02` heading + change-policy stub on each. (d) Three DECISIONS.md entries appended: week-2 promotion, v1 freeze, risk register landing.
+- Next: When dispatched again — week-2 mid-week retro (B6 ticket `86c9kxx94`) when week-2 has run a few ticks; consume any new cross-role calls from STATE.md; refresh risk register if any risks materialize. Once butler PR merges, drop `week-1` tag from `86c9kwhte` so it cleanly reads as `week-2` only.
+- Note for orchestrator: no escalations from PL. Week-2 backlog is now dispatchable. Suggested first dispatches off the new tickets: Devon → N1 (`86c9kxx2t` level-up curve, anchor for progression chain), Drew → N4 or N5 (`86c9kxx3z` shooter / `86c9kxx46` charger — independent of save/loot, clean parallel). Tess → N12 save-migration test (`86c9kxx73`) once Devon's save schema is stable post-test-hooks merge. Uma → N13 / N14 design specs (`86c9kxx79` / `86c9kxx7e`) — both feed dev tickets so prioritize before mid-week.
 
 ## Uma (UX Designer)
 
