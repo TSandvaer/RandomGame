@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Pin once. Bump in lockstep across this workflow, addons/gut/README.md,
+# and .github/workflows/release-itch.yml.
+env:
+  GODOT_VERSION: "4.3"
+  GODOT_STATUS: "stable"
+  GUT_VERSION: "v9.3.0"
+
+permissions:
+  contents: read
+
+jobs:
+  import-and-test:
+    name: Headless import + GUT
+    runs-on: ubuntu-22.04
+    # barichello/godot-ci packages a Godot binary at the requested version,
+    # plus the export templates we need for the release workflow. We only use
+    # the runtime here.
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # GUT lives outside this repo (decision: not vendored). Shallow
+          # clone is fine because we don't need history for CI.
+          fetch-depth: 1
+
+      - name: Show Godot version
+        run: godot --version
+
+      - name: Install GUT (pinned)
+        run: |
+          set -euo pipefail
+          # Avoid running git inside the addons/ folder if it ever already
+          # contained source — we want a clean checkout pinned to GUT_VERSION.
+          rm -rf addons/gut
+          git clone --depth 1 --branch "${GUT_VERSION}" https://github.com/bitwes/Gut.git addons/gut
+          ls addons/gut
+
+      - name: Headless import (asset import sanity)
+        run: |
+          set -euo pipefail
+          # `--import` exits 0 if the project loads & all assets import cleanly.
+          # `--headless` is required on the CI image (no display).
+          # `--quit-after 200` guards against import hangs.
+          godot --headless --import --quit-after 200
+          # Confirm the import cache materialised.
+          test -d .godot
+
+      - name: Run GUT tests
+        run: |
+          set -euo pipefail
+          # `-gexit` makes GUT exit with non-zero on test failures, so the
+          # CI step fails accordingly. `-gdir=res://tests` discovers any
+          # test_*.gd files. If the tests/ folder has only the .gdkeep file
+          # GUT exits 0 with "no tests found" — that's fine for week 1.
+          godot --headless \
+                -s addons/gut/gut_cmdln.gd \
+                -gdir=res://tests \
+                -ginclude_subdirs \
+                -gexit
