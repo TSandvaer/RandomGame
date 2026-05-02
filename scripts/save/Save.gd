@@ -22,6 +22,13 @@ const SAVE_DIR: String = "user://"
 const SAVE_FILE_FMT: String = "save_%d.json"
 const TMP_SUFFIX: String = ".tmp"
 
+# Hook 3 (testability) — when save_game writes a save, also drop a one-liner
+# README in the same dir explaining where saves live, the schema_version,
+# and how to clear them. For Tess's manual setup per `team/tess-qa/m1-test-plan.md`
+# AC3-T03 + AC6.
+const README_FILENAME: String = "README.txt"
+const README_PATH: String = SAVE_DIR + README_FILENAME
+
 const SCHEMA_VERSION: int = 1
 
 # Default empty payload schema. Mutated by gameplay then handed back to save_game.
@@ -83,7 +90,11 @@ func save_game(slot: int = 0, data: Variant = null) -> bool:
 	var ok: bool = atomic_write(save_path(slot), json_str)
 	if not ok:
 		push_error("[Save] save_game(%d) failed at atomic_write" % slot)
-	return ok
+		return false
+	# Hook 3 — drop the testability README next to the save file. Idempotent;
+	# overwrites a stale README on every save (cheap, single short string).
+	_write_readme()
+	return true
 
 
 ## Load slot. Returns the migrated `data` Dictionary on success, or {} on
@@ -178,3 +189,40 @@ func _migrate_v0_to_v1(data: Dictionary) -> Dictionary:
 	if not data.has("character"):
 		data["character"] = DEFAULT_PAYLOAD["character"].duplicate(true)
 	return data
+
+# ---- Testability README -------------------------------------------------
+
+## Writes a one-liner README to the save dir explaining where saves live,
+## the schema_version, and how to clear them. Called from `save_game` after
+## a successful write. Tess uses this for AC3-T03 + AC6 manual-test setup.
+##
+## Idempotent — re-writing on every save is cheap (string is short) and
+## guarantees the schema_version line tracks the running build. Tests
+## verify the README exists, mentions schema_version=N, and has a "delete"
+## hint.
+func _write_readme() -> void:
+	var abs_path: String = ProjectSettings.globalize_path(SAVE_DIR)
+	var contents: String = (
+		"Embergrave save files\n"
+		+ "=====================\n"
+		+ "\n"
+		+ "Save files: save_<slot>.json (one per slot, slot 0 is default).\n"
+		+ "Location:   %s (Godot user://)\n" % abs_path
+		+ "Format:     JSON, schema_version=%d (see team/devon-dev/save-format.md).\n" % SCHEMA_VERSION
+		+ "\n"
+		+ "To start a fresh run / clear saves:\n"
+		+ "  1. Quit the game.\n"
+		+ "  2. Delete save_*.json in this directory.\n"
+		+ "  3. Relaunch.\n"
+		+ "\n"
+		+ "Do NOT delete save_*.json.tmp manually mid-write — those are crash-\n"
+		+ "safe staging files used by atomic_write(). They auto-clean on the\n"
+		+ "next successful save.\n"
+	)
+	var f: FileAccess = FileAccess.open(README_PATH, FileAccess.WRITE)
+	if f == null:
+		# Non-fatal: a missing README is a testability convenience, not a bug.
+		push_warning("[Save] could not write README at %s (err %d)" % [README_PATH, FileAccess.get_open_error()])
+		return
+	f.store_string(contents)
+	f.close()
