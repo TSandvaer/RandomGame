@@ -17,6 +17,18 @@ env:
 permissions:
   contents: read
 
+# Devon ci-hardening 2026-05-02 — cancel an in-flight CI run on the same
+# branch / PR when a new commit lands. The dominant cost in this workflow
+# is the ~85 s container pull on `Initialize containers`; a rapid-fire
+# push series (typo, typo-fix, ...) used to queue every commit. With
+# cancel-in-progress only the latest commit on a branch holds the runner.
+# `main` is excluded from cancellation so a push-to-main run is never
+# cancelled by a follow-up PR run; PR runs against different branches do
+# not collide because the group is keyed on github.ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   import-and-test:
     name: Headless import + GUT
@@ -44,6 +56,28 @@ jobs:
       - name: Show Godot version
         run: godot --version
 
+      # Devon ci-hardening 2026-05-02 — cache the Godot asset-import
+      # database (`.godot/`) between runs so the second-and-onward run
+      # skips re-importing every scene/texture/.tres. The miss path is
+      # identical to the no-cache flow — `godot --headless --import`
+      # rebuilds `.godot/` from scratch — so there is no second code path
+      # to maintain. The key is the hash of every file Godot treats as
+      # importable input plus the Godot version pin: any meaningful
+      # content change invalidates the cache and we re-import (correctness
+      # over speed). GUT_VERSION is included because changing the GUT pin
+      # can introduce new importables under addons/gut/. The restore-key
+      # falls back to the most recent cache for this Godot+GUT pair so a
+      # cold cache after a small content-only edit still gets a partial
+      # warm start.
+      - name: Cache Godot import (.godot)
+        id: cache-godot-import
+        uses: actions/cache@v4
+        with:
+          path: .godot
+          key: godot-import-${{ env.GODOT_VERSION }}-${{ env.GUT_VERSION }}-${{ hashFiles('project.godot', '**/*.tscn', '**/*.tres', '**/*.gd', '**/*.png', '**/*.svg', '**/*.ttf') }}
+          restore-keys: |
+            godot-import-${{ env.GODOT_VERSION }}-${{ env.GUT_VERSION }}-
+
       - name: Install GUT (pinned)
         run: |
           set -euo pipefail
@@ -52,8 +86,27 @@ jobs:
           # move the inner `addons/gut/` to our `addons/gut/`. (Tess fix
           # 2026-05-02 — previously cloned the whole repo to addons/gut/,
           # which left gut_cmdln.gd at addons/gut/addons/gut/gut_cmdln.gd.)
+          # Devon ci-hardening 2026-05-02 — wrap the clone in a 3-attempt
+          # retry to absorb transient github.com network blips
+          # (intermittent ECONNRESET / 500 from clone is the most common
+          # cold-CI flake when the runner happens to land on a flaky
+          # egress). The clone takes <1 s on success; 3 attempts with
+          # 5 s/15 s backoff caps the worst case at ~22 s vs. an
+          # immediate red run + re-queue.
           rm -rf addons/gut /tmp/gut-src
-          git clone --depth 1 --branch "${GUT_VERSION}" https://github.com/bitwes/Gut.git /tmp/gut-src
+          attempt=0
+          max_attempts=3
+          until git clone --depth 1 --branch "${GUT_VERSION}" https://github.com/bitwes/Gut.git /tmp/gut-src; do
+            attempt=$((attempt + 1))
+            if [ "${attempt}" -ge "${max_attempts}" ]; then
+              echo "GUT clone failed after ${max_attempts} attempts" >&2
+              exit 1
+            fi
+            backoff=$((attempt * 10 - 5))   # 5s, 15s
+            echo "GUT clone attempt ${attempt} failed; retrying in ${backoff}s..." >&2
+            rm -rf /tmp/gut-src
+            sleep "${backoff}"
+          done
           mkdir -p addons
           mv /tmp/gut-src/addons/gut addons/gut
           ls addons/gut/gut_cmdln.gd
@@ -77,6 +130,8 @@ jobs:
           # `--import` exits 0 if the project loads & all assets import cleanly.
           # `--headless` is required on the CI image (no display).
           # `--quit-after 200` guards against import hangs.
+          # On a cache hit the import database is already present and
+          # Godot only re-imports anything whose source file changed.
           godot --headless --import --quit-after 200
           # Confirm the import cache materialised.
           test -d .godot
@@ -88,8 +143,34 @@ jobs:
           # CI step fails accordingly. `-gdir=res://tests` discovers any
           # test_*.gd files. If the tests/ folder has only the .gdkeep file
           # GUT exits 0 with "no tests found" — that's fine for week 1.
+          # Devon ci-hardening 2026-05-02 — emit a JUnit XML report
+          # (-gjunit_xml_file, GUT v9.3.0+) into ./test-reports/ so failed
+          # runs upload structured per-test data. The XML is only useful
+          # when tests fail, so it is uploaded conditionally below. Path
+          # is pre-created because GUT does not create parent dirs.
+          mkdir -p test-reports
           godot --headless \
                 -s addons/gut/gut_cmdln.gd \
                 -gdir=res://tests \
                 -ginclude_subdirs \
+                -gjunit_xml_file=test-reports/gut-results.xml \
                 -gexit
+
+      # Devon ci-hardening 2026-05-02 — on a failed run, upload the GUT
+      # JUnit XML plus build_info.txt so the next agent (Tess / Devon) can
+      # investigate without re-running CI. Always-on upload would consume
+      # artifact quota on every green push; the `if: failure()` guard
+      # scopes it to red runs where the artifact is actually useful.
+      # Retention is short (7 days) — green-and-recent runs do not need
+      # post-mortem material; older runs are unrooted from current
+      # debugging anyway.
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-test-artifacts-${{ github.run_id }}
+          path: |
+            test-reports/
+            build_info.txt
+          retention-days: 7
+          if-no-files-found: ignore
