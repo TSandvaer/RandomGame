@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="AffixDef" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/content/AffixDef.gd" id="1_affix"]
+[ext_resource type="Script" path="res://scripts/content/AffixValueRange.gd" id="2_range"]
+
+[sub_resource type="Resource" id="Resource_vital_t1"]
+script = ExtResource("2_range")
+min_value = 4.0
+max_value = 8.0
+
+[sub_resource type="Resource" id="Resource_vital_t2"]
+script = ExtResource("2_range")
+min_value = 8.0
+max_value = 14.0
+
+[sub_resource type="Resource" id="Resource_vital_t3"]
+script = ExtResource("2_range")
+min_value = 14.0
+max_value = 22.0
+
+[resource]
+script = ExtResource("1_affix")
+id = &"vital"
+name = "of Vitality"
+stat_modified = &"max_hp"
+value_ranges = [SubResource("Resource_vital_t1"), SubResource("Resource_vital_t2"), SubResource("Resource_vital_t3")]
+apply_mode = 0

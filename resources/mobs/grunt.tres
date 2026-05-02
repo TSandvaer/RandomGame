@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MobDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/content/MobDef.gd" id="1_mob"]
+[ext_resource type="Resource" path="res://resources/loot_tables/grunt_drops.tres" id="2_loot"]
+
+[resource]
+script = ExtResource("1_mob")
+id = &"grunt"
+display_name = "Grunt"
+sprite_path = ""
+hp_base = 50
+damage_base = 5
+move_speed = 60.0
+ai_behavior_tag = &"melee_chaser"
+loot_table = ExtResource("2_loot")
+xp_reward = 10
