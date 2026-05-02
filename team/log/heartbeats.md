@@ -109,3 +109,14 @@
 - **Merged since last tick**: 2 PRs (#60 inventory UI, #62 tess state run-013).
 - **Open issues**: None blocking. Worktree thrash continues but no incident this tick (single-agent dispatch).
 - **M1 RC progress**: Inventory-inclusive RC artifact `embergrave-html5-ceb6430` on `ceb6430`. Documented in soak log. Sponsor's soak target hasn't been updated — `9cd07cb` ping stands. Sponsor will see all build options in-conversation when they return.
+
+## Tick 2026-05-02 18:55
+
+- **Roles working**: Drew (run-010 — fix stale assertion in PR #65 per Tess's bounce).
+- **Roles idle**: Priya, Uma, Devon, Tess (run-014 done).
+- **Open PRs**: #65 affix balance (BOUNCED, awaiting Drew's one-line fix; CI red).
+- **Dispatched this tick**: Drew (mechanical fix — `tests/test_content_factory.gd:124` stale `entries.size == 2` assertion).
+- **Decisions made**: Continue throttled dispatch — only one agent at a time now that M1 is feature-complete on main and we're in QA polish phase. Tess flagged a pre-existing `Stratum1BossRoom` parse error in CI log but it's unrelated and not blocking.
+- **Merged since last tick**: 2 PRs (#64 affix-balance pin, #66 tess state run-014).
+- **Open issues**: PR #65 stale assertion (Drew fixing). Pre-existing `Stratum1BossRoom` parse warnings noted by Tess but unrelated to current work.
+- **M1 RC progress**: Active soak target `9cd07cb`. Latest with full UI loop `ceb6430`. Sponsor surfaced; awaiting return.
