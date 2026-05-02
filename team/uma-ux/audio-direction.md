@@ -84,7 +84,7 @@ Coverage: every audio cue M1+M2 needs. Priority column maps to sourcing order â€
 | `mus-boss-stratum1-ph1`| Music | (M2) Boss phase 1 stem (drum + cello)                  | tense                  | ~60 s loop, layer-A   | hand-composed (stem of mus-boss-stratum1)                | M2         |
 | `mus-boss-stratum1-ph2`| Music | (M2) Boss phase 2 stem (adds piano + horn)             | escalating             | ~60 s loop, layer-B   | hand-composed (stem of mus-boss-stratum1)                | M2         |
 | `mus-boss-stratum1-ph3`| Music | (M2) Boss phase 3 stem (full ensemble + bell)          | climactic              | ~60 s loop, layer-C   | hand-composed (stem of mus-boss-stratum1)                | M2         |
-| `mus-stratum2-bgm`     | Music | (M2) Player in stratum-2 (Sunken Library)              | quiet, eerie, teal-bronze | ~120 s loop          | hand-composed                                            | M2         |
+| `mus-stratum2-bgm`     | Music | (M2) Player in stratum-2 (Cinder Vaults)               | pressure-depth, slow frame-drum heartbeat, sustained cello drone, occasional bronze-bell strike (heat-blasted iron strut), rust-warm | ~120 s loop          | hand-composed                                            | M2         |
 | `mus-victory-pad`      | Music | Boss-defeated Beat F4 â†’ stratum-clear ambient resume   | quiet relief, simple cello chord | 4 s sustained, no loop | hand-composed                                  | M1 must    |
 
 ### Ambient
