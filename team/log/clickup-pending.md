@@ -73,6 +73,17 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - created_at: 2026-05-01T10:14
 - attempts: 1 (MCP returned "ClickUp is not connected")
 
+## ENTRY 2026-05-01-007
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: 86c9kwhuq
+    status: ready for qa test
+- reason: feat(save) JSON save/load skeleton landed in commit ddad8af. Save.gd autoload (no longer stub) with envelope + schema_version + atomic_write + v0->v1 migration. team/devon-dev/save-format.md documents the contract. 14 paired GUT tests in tests/test_save.gd covering round-trip, deep-nest persistence, migration, future-schema pass-through, corrupt JSON, atomic write semantics. Forward-compat test that the bar singled out as required is included (test_migrate_v0_save_to_v1_adds_meta_block).
+- created_at: 2026-05-01T10:18
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
 ## ENTRY 2026-05-01-005
 
 - op: create_task
