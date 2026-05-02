@@ -1,0 +1,8 @@
+# Drew run log — run 001
+
+[2026-05-01 09:55] start: dispatched on week-1 Drew tasks 7–10. Read ROLES, GIT_PROTOCOL, CLICKUP_FALLBACK, tech-stack, game-concept, mvp-scope, week-1-backlog. Confirmed scaffold not yet on disk at run start.
+[2026-05-01 10:05] task 7 (TRES schemas): drafted `team/drew-dev/tres-schemas.md` covering MobDef, ItemDef + ItemBaseStats, AffixDef + AffixValueRange, LootTableDef + LootEntry. GDScript class signatures, file layout, M1 affix pool placeholder values, validation hooks, sign-off checklist, M2/M3 forward extensions.
+[2026-05-01 10:15] noticed Devon's scaffold landed in repo while I was writing. Aligned `res://resources/...` paths with Devon's project-layout decision.
+[2026-05-01 10:20] task 7 done. Logged cross-role schema decision in `team/DECISIONS.md`. Stopping after task 1 per dispatch instruction "stop after 1–2, better to nail the schema than rush implementation". Tasks 8–10 deferred to next run.
+[2026-05-01 10:25] mid-flight directive: testing bar raised. Read `team/TESTING_BAR.md`. Schema doc itself is exempt from unit tests but must be testable — added "Test data factories" section to `tres-schemas.md` with `ContentFactory` pattern (per-Resource `make_*(overrides)` static methods), explicit edge-case list for the upcoming LootRoller (10 cases), and Tess-facing GUT example. Sign-off checklist amended with factory + smoke test items.
+[2026-05-01 10:30] tasks 8–10 will land paired with GUT tests in same commit. ClickUp status will go to `ready for qa test` (not `complete`) when those land — Tess flips to `complete`. Scaffold landed locally during this run but I'm holding tasks 8–10 for next run per "stop after 1–2".
