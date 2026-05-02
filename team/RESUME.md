@@ -1,64 +1,87 @@
-# Resume Note — orchestrator paused 2026-05-02 (second pause, end of week 1)
+# Resume Note — orchestrator stopped 2026-05-02 (third stop, M1 complete)
 
-Sponsor said "pause until I return." Heartbeat cron `42fa7fdb` is **cancelled**. No new dispatches will fire automatically.
+Sponsor said "stop when you are done with your current jobs." Heartbeat cron `c4c0f127` is **cancelled**. No new dispatches will fire automatically. Session is preserved — see `C:/Users/538252/.claude/projects/c--Trunk-PRIVATE-RandomGame/sessions/session-2026-05-02-1958-embergrave-m1-awaiting-soak.md` for the full state file with files-touched, decisions, and next-steps; that is the canonical resume artifact.
 
-## State at pause
+## State at stop
 
-- **Phase**: Week 1 of M1 is **CLOSED**. All 20 week-1 tasks complete or carried into week 2. Week-2 backlog is now live in ClickUp (21 tickets, 28.6% buffer).
-- **Repo**: https://github.com/TSandvaer/RandomGame on `main`. Tip: `0c9bfad` (Priya's week-1 close-out PR #23). 23 PRs merged total, ~25 commits.
-- **M1 acceptance criteria**: **7 of 7** shipped + signed off. The build is end-to-end runnable on `main` for the first time. 67+ paired GUT tests, CI green.
-- **Testing bar**: held throughout. Every feature came with paired tests, green CI, three edge-case probes, and Tess sign-off.
-- **Decision trail**: `team/DECISIONS.md` — 16+ entries logged (Phase 0 + Phase 1 + week-1 close-out).
+- **Phase**: Week 2 of M1 is **fully shipped**. Every week-2 ticket is complete or absorbed; remaining are the soak (Sponsor's) and the bug-bash (Tess's, end-of-week-2). Week-3 backlog drafted by Priya at `team/priya-pl/week-2-retro-and-week-3-scope.md`.
+- **Repo**: https://github.com/TSandvaer/RandomGame on `main`. Tip: `8ed4da0` (Devon run-008 state). 77+ PRs merged this session.
+- **M1 acceptance criteria**: 7 of 7 shipped + signed off + integration-tested. The build is end-to-end runnable + soak-ready.
+- **Test inventory**: 557 GUT tests (557/556/1-pending/0-failing, 5646 asserts).
+- **Testing bar**: held throughout. Every feature merged came with paired tests, green CI, three edge-case probes, Tess sign-off.
+- **Decision trail**: `team/DECISIONS.md` — 25+ entries.
 
-## What landed this session
+## What landed this session (highlights)
 
-- Game pitch + Godot 4.3 stack + M1 spec + 20-task backlog (Priya, Phase 0).
-- Godot project scaffold + CI (GUT) + butler pipeline + player movement/dodge/attacks + JSON save/load + 5 testability hooks (Devon, runs 001 + 003).
-- TRES content schemas + Grunt mob + Stratum-1 first room + LootRoller (Drew, runs 001 + 002).
-- Player journey + inventory/HUD mocks + visual direction (pixel art, 96 px/tile, 480×270 canvas) + death-restart flow + palette (Uma, run 001).
-- M1 acceptance test plan + bug template + automated smoke plan + Phase A GUT tests + 4 review/merge runs (Tess, runs 001 + 002 + 003 + 004).
-- Mid-week-1 triage + week-2 backlog promotion + design-doc freeze v1 + risk register (Priya, runs 002 + 003).
+(See `team/DECISIONS.md` for the full audit trail.)
 
-## Agent status at pause
+- **Phase 0**: Game pitch + Godot 4.3 stack + M1 spec + 20-task week-1 backlog (Priya).
+- **Week 1**: Godot scaffold, CI (GUT) + butler pipeline, player movement/dodge/attacks, JSON save/load with v0→v1→v2→v3 migration, full Uma design pass (player journey, inventory, HUD, visual direction at 96 px/tile + 480x270 canvas, palette, death-restart flow), M1 test plan + Phase A GUT tests, 5 testability hooks.
+- **Week 2**: charger + shooter + boss (3 phases, "lying segment-bar" health), level-up math (`100*level^1.5`, cap 5), damage formula (Edge/Vigor scaling), stratum exit + descend screen, rooms 2-8 of stratum 1 + RoomGate + StratumProgression, audio direction one-pager + 60+ cue list, level-up panel design, boss intro design, stat-allocation UI (Vigor/Focus/Edge), inventory UI (Tab open, 8x3 grid, tooltips), affix system T1 (swift/vital/keen → move_speed/vigor/edge), affix balance pass.
+- **QA + infrastructure**: 4 RC re-cuts (`69a14c1` → `d803d3d` → `9cd07cb` → `1a05d4b` → `ceb6430` → `591bcc8`), Phase A + integration GUT tests, save migration fixtures, CI hardening pass (concurrency, .godot cache, GUT retry, failure artifacts), worktree-isolation v1 attempt.
+- **Mid-week-2 retro + week-3 scope** (Priya).
+- **Stratum1BossRoom parse-error incident**: Tess caught a real silent-skip bug, fresh Drew agent refused to fix it, orchestrator verified via CI logs and made the fix directly. +31 previously-invisible tests now run AND pass. Operational learning logged in memory at `agent-verify-evidence.md`.
+
+## Agent status at stop
 
 | Agent | Status |
 |---|---|
-| Priya | idle (run-003 done — week-1 closed, week-2 backlog live) |
-| Uma | idle (run-001 done) |
-| Devon | idle (runs 001 + 003 done) |
-| Drew | idle (runs 001 + 002 done) |
-| Tess | idle (runs 001 + 002 + 003 + 004 done; QA queue empty) |
+| Priya | idle (run-005 done — affix-balance pin + retro live) |
+| Uma | idle (run-003 done — audio direction live) |
+| Devon | idle (run-008 done — CI hardening live; PR #78 follow-up still open, see "Loose ends" below) |
+| Drew | idle (run-010 done — last action was fixing PR #65 stale assertion) |
+| Tess | idle (run-016 done — integration GUT scene tests live; closed `86c9kyvq4` Stratum1BossRoom bug) |
+
+## Loose ends
+
+1. **PR #78 — `chore(ci): hardening — cache + timeout + quarantine doc`** (Devon `devon/ci-hardening-followup` branch) — open, complementary to merged PR #76. Adds `timeout-minutes: 10` workflow safety, `actions/cache@v4` for the GUT addon checkout, and a "verify GUT addon present" defensive step + flake-quarantine documentation. **CI hasn't run on the branch** (statusCheckRollup empty) — needs a `gh workflow run ci.yml --ref devon/ci-hardening-followup` to attach a green check before merge. Per protocol, `chore(ci)` is exempt from Tess sign-off, so the orchestrator can self-merge once CI is green. **Do this on resume.**
+
+2. **ClickUp pending queue**: 2 entries (018, 019) for `86c9kxx8a` (Devon CI hardening) — `to do → in progress → complete` flips queued during MCP disconnection. Heartbeat will flush on next reconnect; orchestrator can also flush manually via `mcp__clickup__clickup_update_task`.
+
+3. **Three follow-up tickets** carry forward (low priority, no blocking dependency):
+   - `86c9kyntj` (affix-count revisit, Priya) — closed during Priya run-005 (no change needed).
+   - `86c9kyuav` (grunt_drops weights literal-51% align, Priya) — open, low priority; Sponsor's soak data can inform whether this matters.
+   - **None are blocking.**
 
 ## Remaining gates before Sponsor sign-off on M1
 
-1. **Tess soak** — 30-min uninterrupted playthrough on the M1 RC build (per testing bar). Not yet dispatched.
-2. **Build artifact** — needs an HTML5 export. Two paths:
-   - **Auto via tag push** (cleanest): Sponsor adds `BUTLER_API_KEY`, `ITCH_USER`, `ITCH_GAME` to GitHub secrets. Then any `v0.1.0-m1-rc1` tag triggers `release-itch.yml` and uploads to itch.io. Single secret-config step.
-   - **Manual local export**: someone with Godot 4.3 installed runs a local HTML5 export. Slower but no Sponsor setup.
+1. **Sponsor's interactive 30-min soak** — the only gating activity. He has the build links in-conversation:
+   - Verified: `embergrave-html5-591bcc8` at https://github.com/TSandvaer/RandomGame/actions/runs/25257278509
+   - Earlier surfaced: `embergrave-html5-9cd07cb` at https://github.com/TSandvaer/RandomGame/actions/runs/25254997647 (functionally equivalent; smaller test count claim was misleading because of the parse-error silent-skip bug since fixed)
+2. **No other gates** — feature work is complete, integration tested, CI green, soak template is ready (`team/tess-qa/soak-template.md`).
 
-## Operational learnings logged
+## What to do when Sponsor says "go" or returns
 
-- `main` is harness-protected → all changes via PR + `gh pr merge --admin`.
-- Direct push to default branch + force-push are denied.
-- `isolation: "worktree"` on Agent dispatches needs WorktreeCreate hooks in settings.json (not configured). Agents share the main checkout. Orchestrator uses dedicated worktree at `C:/Trunk/PRIVATE/RandomGame-orch-wt` to avoid commit pollution.
+**The state file is the canonical resume artifact** at:
+`C:/Users/538252/.claude/projects/c--Trunk-PRIVATE-RandomGame/sessions/session-2026-05-02-1958-embergrave-m1-awaiting-soak.md`
+
+Read it first. It has files, decisions, next-steps, and useful commands.
+
+Quick playbook:
+
+1. **Survey**: `cd /c/Trunk/PRIVATE/RandomGame-orch-wt && git fetch origin && git reset --hard origin/main && git log origin/main --oneline --max-count=10` and `gh pr list --state open --json number,title`.
+2. **Re-arm heartbeat**: `CronCreate` with the heartbeat prompt (the body is in `team/log/heartbeats.md` — copy from any prior tick that quoted it).
+3. **Land PR #78 if appropriate**: `gh workflow run ci.yml --ref devon/ci-hardening-followup` → wait for green → `gh pr merge 78 --squash --delete-branch --admin`.
+4. **Flush ClickUp pending**: try `mcp__clickup__clickup_filter_tasks` first; if MCP up, drain `team/log/clickup-pending.md`.
+5. **Decide path** based on Sponsor's message:
+   - **Signed off**: dispatch week-3 work per Priya's plan. Half A is M1 close-out polish (mostly done already). Half B is M2 onset (stash UI design, stratum-2 chunk lib scaffold, stratum-2 palette, persistent character meta v1 schema). Promote those to ClickUp tickets via Priya if needed.
+   - **Bounced with bugs**: Tess files them as `bug(...)` ClickUp tasks; Devon/Drew fix in PRs; re-soak.
+   - **Asked a question**: just answer it, don't auto-dispatch.
+
+## Operational learnings (also logged in memory)
+
+- `main` is harness-protected → all changes via PR + `gh pr merge --admin`. Direct push and force-push denied.
+- `isolation: "worktree"` on Agent dispatches needs `WorktreeCreate` hooks in settings.json (not configured). Agents share the main checkout. Orchestrator uses dedicated worktree at `C:/Trunk/PRIVATE/RandomGame-orch-wt`.
 - Agents flip ClickUp `to do → in progress` on task start for live Sponsor visibility.
-- Sponsor authorized `Bash(git push origin main:*)` etc. in `.claude/settings.local.json` but harness still treats default-branch pushes as a blanket block — so all merges go through `gh pr merge --admin`. The permission rule is dormant but harmless.
+- Sponsor authorized push-to-main permission rules but harness still blocks direct main pushes — `gh pr merge --admin` is the only path.
+- **Agents must verify against actual evidence** (CI logs, file contents, repro output) before refusing or asserting impossibility — a fresh Drew agent confidently refused a real bug claiming the premise was fabricated; CI logs proved otherwise.
 
-## What to do when Sponsor says "go"
+## Checkpoint metrics at stop
 
-1. **Survey**: `git log origin/main --oneline --max-count=10` and `mcp__clickup__clickup_filter_tasks` on RandomGame list (`901523123922`). Read `team/STATE.md`.
-2. **Re-arm heartbeat**: `CronCreate` (same prompt as before; 7/27/47-minute cadence).
-3. **Decide path for M1 RC build**: ask Sponsor whether to set up itch.io secrets (path 1) or do manual export (path 2). If Sponsor doesn't want to choose, default to path 2: dispatch a developer with manual-export instructions and assume Godot 4.3 is installed somewhere reachable.
-4. **Dispatch Tess for soak** once an RC build exists. She runs the 30-min soak per `team/tess-qa/soak-template.md`, files findings as `bug(...)` ClickUp tasks.
-5. **Build the soak result into a Sponsor sign-off message** — list 7-of-7 acceptance criteria with their test IDs, soak findings (target: zero blocker / zero major), and the play link.
-6. **Otherwise dispatch week-2 work**: Priya recommended Devon→N1, Drew→N4 or N5, Tess→N12 once save schema settles, Uma→N13/N14 priority. See `team/STATE.md` Priya section for the per-agent suggested next-tasks list.
-
-## Checkpoint metrics at pause
-
-- Commits on `main`: ~25.
-- PRs merged: 23.
-- ClickUp: 19/20 week-1 complete, 1 carry-over (butler) absorbed into week-2. Week-2 backlog populated (21 tickets, 28.6% buffer).
+- Commits on `main`: 80+.
+- PRs merged: 77.
+- ClickUp: all 21 week-2 tickets closed (or carried into week-3); week-3 backlog drafted but not yet promoted.
 - Open `blocker` or `major` bugs: 0.
-- 67+ paired GUT tests, CI green.
+- 557 paired GUT tests, CI green.
 
-The team is in **excellent** shape. Sponsor can pause without anything decaying.
+The team is in **excellent** shape. Sponsor can return at any time without anything decaying.
