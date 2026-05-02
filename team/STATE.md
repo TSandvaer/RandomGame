@@ -25,19 +25,19 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ## Uma (UX Designer)
 
-- Last updated: 2026-05-01 (by Priya, dispatching)
-- Status: ready to start
-- Working on: —
-- Blocked on: nothing — can start immediately.
-- Next: Pick up these in order: (1) Player journey map title→first-kill→first-death (`team/uma-ux/player-journey.md`), (2) Inventory & stats panel mockup, (3) HUD mockup, (4) Visual direction one-pager + palette + reference board, (5) Death & restart-run flow. See ClickUp `week-1` tagged tasks owned by Uma.
+- Last updated: 2026-05-01
+- Status: working
+- Working on: (1) Player journey map → (2) Inventory & stats panel → (3) HUD → (4) Visual direction + palette → (5) Death & restart flow.
+- Blocked on: —
+- Next: Land design docs in order; sync ClickUp on each.
 
 ## Devon (Game Dev #1, lead)
 
-- Last updated: 2026-05-01 (by Priya, dispatching)
-- Status: ready to start
-- Working on: —
+- Last updated: 2026-05-01
+- Status: working
+- Working on: Task 1 — Scaffold Godot 4.3 project & repo layout
 - Blocked on: nothing — top of critical path. Stack is **Godot 4.3 + GDScript + JSON saves + GitHub Actions CI + itch.io HTML5 distribution**.
-- Next: (1) **Scaffold Godot 4.3 project & repo layout — URGENT, unblocks team**, (2) GitHub Actions CI (headless import + GUT), (3) itch.io butler upload pipeline, (4) Player movement + dodge-roll, (5) Light/heavy attack hitboxes, (6) JSON save/load skeleton.
+- Next: (2) GitHub Actions CI (headless import + GUT), (3) itch.io butler upload pipeline, (4) Player movement + dodge-roll, (5) Light/heavy attack hitboxes, (6) JSON save/load skeleton.
 
 ## Drew (Game Dev #2)
 
