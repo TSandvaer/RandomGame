@@ -53,12 +53,11 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ## Tess (Tester)
 
-- Last updated: 2026-05-01
-- Status: idle (chunk done — 5 QA spec docs landed)
-- Working on: —
-- Blocked on: nothing. Role expanded mid-run per `team/TESTING_BAR.md` (Sponsor's "no debugging" directive): Tess is now active hammer + sole `ready for qa test → complete` gate + mandatory ≥3 edge-case probes per feature + scheduled bug bashes + soak sessions per release candidate.
-- Deliverables this run: `team/tess-qa/m1-test-plan.md` (35 manual cases across 7 ACs + regression sweep + 8-probe edge-case matrix + Tess-only sign-off flow), `bug-template.md` (severity matched to TESTING_BAR.md), `automated-smoke-plan.md` (30 unit + 10 integration GUT tests inventoried), `test-environments.md` (primary = Chrome/Win11 HTML5 + Firefox + Windows native), `soak-template.md` (30-min soak per release candidate). Devon's scaffold + GUT CI + initial player scene landed during this run → Phase A GUT test code writable next tick.
-- Next: Phase A GUT tests (`tu-boot-*`, `tu-autoload-*`, `tu-save-*`, `ti-save-*` — 9 unit + 2 integration). Then Phase B as combat/grunt/loot land in `ready for qa test`. Triage `ready for qa test` queue every tick.
+- Last updated: 2026-05-02
+- Status: working (run 002)
+- Working on: Run 002 — Task A: retro-verifying Devon's tasks 2/4/5/6/17 against current `main` and queueing ClickUp `ready for qa test → complete` flips. Task B: Phase A GUT tests (`tu-boot-*`, `tu-autoload-*`, `tu-save-*`, `ti-save-*`). Task C: review any open feature PRs (none non-mine at run start). **CI is red since 2026-05-02** — workflow uses `set -o pipefail` under the container's `sh -e` shell which lacks the `pipefail` option, so every step exits 2 before any test runs. Filing as `blocker` and fixing forward in `tess/ci-shell-bash` before any other PR merges, since CI must be green for the squash-merge admin path.
+- Blocked on: ClickUp MCP disconnected this run — flips queue into `team/log/clickup-pending.md` per fallback protocol.
+- Next: Land CI fix → land Phase A tests → flip retro sign-offs (queued) → end-of-run idle.
 
 ---
 
