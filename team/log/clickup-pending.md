@@ -108,3 +108,12 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - created_at: 2026-05-02T21:30
 - attempts: 0
 - note: **Devon run-011** — CR-1 + CR-2 fix landed in PR `devon/cr-1-cr-2-time-scale-guard` (`fix(ui): _exit_tree restores Engine.time_scale on InventoryPanel + StatAllocationPanel`). Both panels now have a `_exit_tree()` guard restoring `Engine.time_scale = _previous_time_scale` if `_open` is true; idempotent vs. normal `close()` (sets `_open = false` after restore so a second `_exit_tree` after a normal `close()` is a no-op). Tess's TI-6 / TI-7 in `tests/integration/test_html5_invariants.gd` flipped from `pending(...)` to live assertions per the test-comment sketch (one commit, paired-test discipline). Test count delta: 563 → 565 passing / 3 → 1 pending (remaining pending = `tests/test_autoloads.gd:67` GameState autoload). CR-3 deferred per dispatch (out of scope this PR). PR awaits Tess sign-off; **NOT self-merging** (`fix(ui)` is not exempt from Tess sign-off per `team/GIT_PROTOCOL.md`).
+
+## ENTRY 2026-05-02-025
+- op: update_task
+- task_id: <pending: resolves to ENTRY 022's ClickUp ID once created — supersedes ENTRY 024>
+- payload:
+    status: complete
+- created_at: 2026-05-02T22:00
+- attempts: 0
+- note: **Tess run-019** — signed off and merged Devon's PR #87 (`fix(ui): _exit_tree restores Engine.time_scale on InventoryPanel + StatAllocationPanel`) at squash commit `98a344ef1b9b3088b79d68e552c2ad50c6278137`. CI verified green on head SHA `55f0325` (run 25259904834 attempt 3: 565p / 1p / 0f / 5850 asserts) — test count math holds main `563p / 3p` → branch `565p / 1p` (TI-6 + TI-7 flipped pending → passing per audit CR-1 + CR-2). Both panels' `_exit_tree` guards match the audit-doc prescription exactly (`if _open: Engine.time_scale = _previous_time_scale; _open = false` — idempotent vs. normal close, no-op on double invocation). **Charger flake trail (NOT introduced by this PR):** attempts 1 AND 2 of run 25259904834 both failed on `tests/test_charger.gd::test_killed_mid_charge_no_orphan_motion` (Devon's PR comment captured only attempt 1 — attempt 2 had same shape plus charge-velocity 180→0 and sideways-knock 500→0 assertions). Bumps flake rate to ≥2/3 on this repro window — real state-machine race in `scripts/mobs/Charger.gd`, not a one-shot blip. Drew dispatched in parallel to investigate. Supersedes ENTRY 024 (Devon's `ready for qa test`). Re-cut skipped (panels not yet HUD-wired in Main.tscn — fix is latent-bug coverage, doesn't change the M1 RC playable surface).
