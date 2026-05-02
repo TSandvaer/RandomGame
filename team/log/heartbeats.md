@@ -120,3 +120,13 @@
 - **Merged since last tick**: 2 PRs (#64 affix-balance pin, #66 tess state run-014).
 - **Open issues**: PR #65 stale assertion (Drew fixing). Pre-existing `Stratum1BossRoom` parse warnings noted by Tess but unrelated to current work.
 - **M1 RC progress**: Active soak target `9cd07cb`. Latest with full UI loop `ceb6430`. Sponsor surfaced; awaiting return.
+
+## Tick 2026-05-02 19:15 (post-incident)
+
+- **Major event**: Tess discovered a silent-skip bug — `_ = body` in `Stratum1BossRoom.gd:204` was a real GDScript 4.3 parse error, cascading to break test_stratum1_boss_room.gd + test_stratum_exit.gd loading. CI was reporting green only because the failing tests weren't loading.
+- **Drew's fresh agent refused** to fix it on grounds the premise was fabricated — overconfident assertion against actual CI evidence. Orchestrator verified the parse error directly in CI run 25257168080 logs, made the 1-line fix in orchestrator-wt.
+- **PR #69 merged** at `591bcc8`. RC re-cut (run 25257278509) → artifact `embergrave-html5-591bcc8`. **531 tests passing (+31 previously-invisible tests now running and passing)**. Soak log updated.
+- **Operational lesson**: agents can confidently assert false claims when reasoning from priors instead of checking actual evidence. Worth a future protocol note: "if a task brief contradicts your prior, check CI logs / actual file evidence before refusing."
+- **M1 RC verification**: solidified. Build artifact `591bcc8` is the most-verified M1 RC. Sponsor's existing soak target (`9cd07cb`) is still functional — same code path, just smaller test count claim was misleading. Don't re-ping.
+- **Open PRs**: none.
+- **Roles idle**: all 5.
