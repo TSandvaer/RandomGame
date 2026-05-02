@@ -65,3 +65,14 @@
 - **Merged since last tick**: 4 PRs (#45/#47 stratum exit rebased, #46 heartbeat 16:55, #48 tess state run-009).
 - **Open issues**: Drew flagged worktree concurrent-stripping incident again — a parallel agent's `git checkout` clobbered his working tree mid-commit, requiring follow-up commits. Compounding evidence the protocol-side fix should be `WorktreeCreate` hooks in settings.json. Logged for Sponsor's eventual review; not blocking work.
 - **M1 RC progress**: Final-final RC artifact `embergrave-html5-9cd07cb` (full M1 polish stack including stratum exit). Sponsor surfaced earlier with this artifact link in the in-conversation message; awaiting Sponsor return for human soak.
+
+## Tick 2026-05-02 17:35
+
+- **Roles working**: Tess (run-011 — review PR #52 stat-allocation UI), Drew (run-008 — affix system T1).
+- **Roles idle**: Priya, Uma, Devon.
+- **Open PRs**: #52 stat-allocation UI (Devon, ready-for-qa, 35 paired tests, save schema v2→v3).
+- **Dispatched this tick**: Tess (PR #52 review), Drew (affix system T1).
+- **Decisions made**: Continued steady-state week-2 throughput. Holding on dispatching Priya for mid-week-2 retro until at least one more cycle of feature work lands — avoids retro-on-still-moving-target.
+- **Merged since last tick**: 1 PR (#51 tess state run-010).
+- **Open issues**: Worktree thrash continues to be a per-agent friction — Devon's run-006 hit 2 incidents. Resolved each time via chained-bash idiom. Protocol-side fix is harness hooks; not blocking.
+- **M1 RC progress**: Sponsor has artifact `9cd07cb` (boss-inclusive M1 RC). Latest polish artifact `1a05d4b` (rooms 2-8 included) documented in soak log. Stat-allocation UI will land soon; further re-cuts at Tess's discretion.
