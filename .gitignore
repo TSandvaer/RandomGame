@@ -5,6 +5,11 @@
 export.cfg
 export_presets.cfg
 
+# CI-stamped build identification (BuildInfo autoload). Generated per-build
+# by .github/workflows/ci.yml and release-itch.yml. Local dev runs
+# without this file and BuildInfo falls back to "dev-local".
+build_info.txt
+
 # Build outputs
 build/
 exports/

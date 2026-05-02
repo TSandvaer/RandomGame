@@ -20,6 +20,7 @@ boot_splash/show_image=false
 [autoload]
 
 Save="*res://scripts/save/Save.gd"
+BuildInfo="*res://scripts/debug/BuildInfo.gd"
 
 [debug]
 
