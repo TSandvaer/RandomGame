@@ -1,0 +1,183 @@
+name: Release to GitHub (M1 RC build)
+
+# Secret-free release path. Produces an HTML5 build, zips it, and either
+# - uploads it as a workflow artifact (manual dispatch), or
+# - attaches it to a GitHub Release (tag push of v*-rc* / v*-m1-*).
+#
+# This is the M1 sign-off path while itch.io secrets aren't configured.
+# Tess and the Sponsor download the artifact from the run / release page.
+# Setup checklist for triggering / consumption lives in
+#   team/devon-dev/m1-rc-build.md.
+#
+# Sister workflow .github/workflows/release-itch.yml requires
+# BUTLER_API_KEY / ITCH_USER / ITCH_GAME secrets and pushes to itch.io.
+# Either workflow can be the source of a Sponsor playtest URL.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_label:
+        description: "Optional label for the artifact (e.g. 'rc1', 'm1-preview'). Affects the artifact name only."
+        required: false
+        default: "manual"
+  push:
+    tags:
+      - "v*-rc*"
+      - "v*-m1-*"
+      - "m1-rc*"
+
+env:
+  GODOT_VERSION: "4.3"
+  EXPORT_NAME: "embergrave"
+
+permissions:
+  contents: write   # needed by softprops/action-gh-release on tag pushes
+
+jobs:
+  export-html5:
+    name: Export HTML5 (Godot 4.3 headless)
+    runs-on: ubuntu-22.04
+    container:
+      image: barichello/godot-ci:4.3
+    # Match ci.yml — barichello/godot-ci's default `sh -e` shell breaks on
+    # `set -o pipefail`. Force bash for every step.
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      zip_name: ${{ steps.zip.outputs.zip_name }}
+      short_sha: ${{ steps.stamp.outputs.short_sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Show Godot version
+        run: godot --version
+
+      - name: Provide export templates
+        run: |
+          set -euo pipefail
+          # barichello/godot-ci pre-installs templates at:
+          #   /root/.local/share/godot/export_templates/${VERSION}.stable
+          # Download as a fallback if the image was rebuilt without them.
+          TEMPLATE_DIR="/root/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$TEMPLATE_DIR"
+          if [ -z "$(ls -A "$TEMPLATE_DIR" 2>/dev/null)" ]; then
+            curl -L -o /tmp/templates.tpz "https://downloads.tuxfamily.org/godotengine/${GODOT_VERSION}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+            unzip -o /tmp/templates.tpz -d /tmp/
+            mv /tmp/templates/* "$TEMPLATE_DIR/"
+          fi
+
+      - name: Stamp build SHA into project
+        id: stamp
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA:0:7}"
+          echo -n "${short_sha}" > build_info.txt
+          echo "Stamped build_info.txt = ${short_sha}"
+          echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Headless import (asset import sanity)
+        run: |
+          set -euo pipefail
+          godot --headless --import --quit-after 200
+          test -d .godot
+
+      - name: Verify HTML5 preset present
+        run: |
+          set -euo pipefail
+          # Sanity check: the preset name must match the matrix entry below
+          # AND match the [preset.X] name field in export_presets.cfg.
+          test -f export_presets.cfg
+          grep -q 'name="HTML5"' export_presets.cfg
+
+      - name: Create output dir
+        run: mkdir -p build/web
+
+      - name: Export HTML5
+        run: |
+          set -euo pipefail
+          godot --headless --export-release "HTML5" "build/web/index.html"
+          ls -la build/web/
+
+      - name: Verify HTML5 output
+        run: |
+          set -euo pipefail
+          # Smoke-check that the four pieces of an HTML5 export landed.
+          # Godot 4.3 produces: index.html, index.js, index.wasm, index.pck
+          # (or index.audio.position.worklet.js + index.audio.worklet.js for some configs).
+          test -f build/web/index.html
+          test -f build/web/index.js
+          test -f build/web/index.wasm
+          test -f build/web/index.pck
+
+      - name: Determine release label
+        id: label
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            label="${GITHUB_REF_NAME}"
+          else
+            label="${{ github.event.inputs.release_label }}"
+            if [ -z "$label" ]; then
+              label="manual"
+            fi
+          fi
+          # Replace forward slashes (rare in tag names but safe).
+          label="${label//\//-}"
+          echo "label=${label}" >> "$GITHUB_OUTPUT"
+
+      - name: Zip HTML5 build
+        id: zip
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          zip_name="${EXPORT_NAME}-html5-${{ steps.stamp.outputs.short_sha }}-${{ steps.label.outputs.label }}.zip"
+          (cd build/web && zip -r "../../release/${zip_name}" .)
+          ls -la release/
+          echo "zip_name=${zip_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact (workflow run)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.EXPORT_NAME }}-html5-${{ steps.stamp.outputs.short_sha }}
+          path: release/${{ steps.zip.outputs.zip_name }}
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Stage zip for release job
+        # Tag pushes also create a Release; persist the zip across jobs.
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-zip
+          path: release/${{ steps.zip.outputs.zip_name }}
+          retention-days: 1
+          if-no-files-found: error
+
+  github-release:
+    name: Attach HTML5 zip to GitHub Release
+    needs: export-html5
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download release zip
+        uses: actions/download-artifact@v4
+        with:
+          name: release-zip
+          path: release/
+
+      - name: List
+        run: ls -la release/
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.zip
+          generate_release_notes: true
+          # Don't fail re-runs on the same tag.
+          fail_on_unmatched_files: true

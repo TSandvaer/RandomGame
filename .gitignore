@@ -3,7 +3,9 @@
 *.import
 *.translation
 export.cfg
-export_presets.cfg
+# NOTE: export_presets.cfg is intentionally NOT ignored — it's the contract
+# the CI release workflows (release-itch.yml, release-github.yml) consume to
+# produce HTML5 / Windows / macOS / Linux builds. Keep it under VCS.
 
 # CI-stamped build identification (BuildInfo autoload). Generated per-build
 # by .github/workflows/ci.yml and release-itch.yml. Local dev runs
