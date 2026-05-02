@@ -152,6 +152,17 @@ Format per `team/CLICKUP_FALLBACK.md`. Move synced entries to `clickup-synced.md
 - created_at: 2026-05-02T (drew-run-002)
 - attempts: 1 (MCP returned "ClickUp is not connected")
 
+## ENTRY 2026-05-02-012
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "feat(level): stratum-1 first room — chunk-based assembly POC"
+    status: ready for qa test
+- reason: Drew run-002 task #9. PR opened on `drew/stratum1-first-room` (stacked on `drew/grunt-mob` so the Grunt scene resolves; depends on PR #6 merging first). Lands `scripts/levels/{LevelChunkDef,MobSpawnPoint,ChunkPort,LevelAssembler,Stratum1Room01}.gd` + `scenes/levels/Stratum1Room01.tscn` + `scenes/levels/chunks/s1_room01_chunk.tscn` + `resources/level_chunks/s1_room01.tres`. Architecture supports many chunks but ships only one for M1; mobs referenced by `mob_id: StringName` (decoupled from MobDef tree). 22 paired GUT tests across `tests/test_level_chunk.gd` (16) and `tests/test_stratum1_room.gd` (6 integration). New design doc `team/drew-dev/level-chunks.md`. Tess merges after sign-off.
+- created_at: 2026-05-02T (drew-run-002)
+- attempts: 1 (MCP returned "ClickUp is not connected")
+
 ## ENTRY 2026-05-02-010
 
 - op: update_task
