@@ -1,0 +1,15 @@
+{
+  "saved_at": "2026-04-10T08:00:00",
+  "data": {
+    "character": {
+      "name": "Fresh-Knight",
+      "level": 1,
+      "xp": 0,
+      "vigor": 0,
+      "focus": 0,
+      "edge": 0,
+      "hp_current": 100,
+      "hp_max": 100
+    }
+  }
+}

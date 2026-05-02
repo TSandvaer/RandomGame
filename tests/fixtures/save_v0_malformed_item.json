@@ -1,0 +1,20 @@
+{
+  "saved_at": "2026-04-12T15:22:01",
+  "data": {
+    "character": {
+      "name": "Curious-Knight",
+      "level": 2,
+      "xp": 250,
+      "vigor": 1,
+      "focus": 0,
+      "edge": 0,
+      "hp_current": 80,
+      "hp_max": 100
+    },
+    "stash": [
+      {"id": "weapon_iron_sword", "tier": 2, "rolled_affixes": [], "stack_count": 1},
+      "this_is_not_a_dict_just_a_string",
+      {"id": "weapon_missing_fields"}
+    ]
+  }
+}
