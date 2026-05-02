@@ -1,0 +1,46 @@
+# Godot 4
+.godot/
+*.import
+*.translation
+export.cfg
+export_presets.cfg
+
+# Build outputs
+build/
+exports/
+dist/
+*.exe
+*.dmg
+*.zip
+*.pck
+*.tar.gz
+
+# IDE / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Secrets / local
+.env
+.env.local
+*.local
+
+# Node (CI tooling, Aseprite scripts, etc.)
+node_modules/
+npm-debug.log
+
+# Python (asset tooling)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Logs
+*.log
