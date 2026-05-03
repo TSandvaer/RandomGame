@@ -359,8 +359,10 @@ func test_boss_fight_phases_and_descend_signal_chain() -> void:
 	# Skip the 1.8s intro to keep the test deterministic + fast.
 	boss_room.complete_entry_sequence_for_test()
 	await get_tree().process_frame
-	assert_eq(boss.get_state(), Stratum1Boss.STATE_IDLE,
-		"AC8: boss wakes after entry sequence")
+	# After wake(), boss state goes IDLE; during the next physics tick the
+	# AI transitions to CHASING (player is in aggro range). Either is "awake."
+	assert_false(boss.is_dormant(),
+		"AC8: boss wakes after entry sequence (state=%s)" % str(boss.get_state()))
 	# Watch boss_died + stratum_exit_unlocked.
 	watch_signals(boss_room)
 	# Walk the boss down through phase transitions — same pattern as
