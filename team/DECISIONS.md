@@ -367,3 +367,5 @@ Format:
 ## 2026-05-03 — Risk register refreshed: R3/R5/R7 closed-or-demoted, R6 escalated to high impact, R11+R12 added.
 
 ## 2026-05-03 — M2 week-2 backlog drafted (anticipatory; revisable post-Sponsor M1 sign-off and week-1 close).
+
+## 2026-05-03 — Performance budget locked: 60 FPS / <100 MB / <100 draw calls / <100ms save-roundtrip / <10 MB artifact / <3s boot. Detail: team/priya-pl/performance-budget.md.
