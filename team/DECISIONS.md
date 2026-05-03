@@ -366,4 +366,23 @@ Format:
 
 ## 2026-05-03 — Risk register refreshed: R3/R5/R7 closed-or-demoted, R6 escalated to high impact, R11+R12 added.
 
+## 2026-05-03 — M2 week-2 backlog drafted (anticipatory; revisable post-Sponsor M1 sign-off and week-1 close).
+
+## 2026-05-03 — M2 audio sourcing pipeline scoped: 5 routes (freesound 45% / hand-Foley 26% / hand-composed 23% / procedural 5% / AI-curated 1%), 10-cue M2-w1 first-pass subset locked, R10 placeholder-fallback discipline preserved. Detail: `team/uma-ux/audio-sourcing-pipeline.md`.
+
+## 2026-05-03 — Hitboxes defensively check initial overlaps on spawn (`86c9m36zh` — root-cause UNCONFIRMED)
+
+- Decided by: Devon (recommended; Tess judgment pending per PR #109 body)
+- Decision: `Hitbox.gd::_ready` defers a `_check_initial_overlaps` sweep that walks `get_overlapping_bodies()` + `get_overlapping_areas()` and calls `_try_apply_hit(target)` for each. Future Area2D-based combat surfaces (boss-specific hitboxes, projectile splash, charged-attack rings) SHOULD follow the same idiom — making the contract explicit prevents reliance on undocumented engine behavior even when current Godot versions handle it correctly.
+- Why: Sponsor's M1 soak on RC `4484196` reported combat non-functional. Orchestrator hypothesized that Godot 4 Area2D doesn't fire `body_entered` for pre-existing overlaps. **Empirical verification disagreed**: tests-only branch from main (PR #110, now closed) confirmed Godot 4.3 headless DOES fire `body_entered` correctly for the fresh-Area2D + already-overlapping-body case (run `25283207409` — all 6 new tests pass on `main` WITHOUT the fix). The hypothesis as stated is not validated. The fix is shipped as a defensive measure (harmless, makes contract explicit, may help HTML5 export edge cases that headless tests don't reach), NOT a confirmed root-cause fix. Sponsor's bug remains under investigation; this PR may or may not resolve it. Even so, the new test infrastructure (`tests/integration/test_hitbox_overlapping_at_spawn.gd`) is strictly valuable: it's the first coverage in the codebase that exercises the actual Hitbox signal flow rather than calling `_try_apply_hit` directly, and is independently worth landing.
+- Reversibility: reversible — the sweep is one block; if a future combat-shape change ever requires entry-only semantics it can be opt-in via a flag. The single-hit-per-target invariant (`_hit_already`) is unaffected: a body swept at spawn cannot be re-hit by a later `body_entered`.
+- Affects: Devon (Hitbox.gd owner, paired test author); Drew (mob-spawned hitboxes inherit the defensive sweep via the shared Hitbox.gd code path; no per-mob change required); Tess (paired-test pattern — every future Hitbox-style test SHOULD let the engine fire signals OR explicitly document why it's bypassing them; ALSO: HTML5 repro of Sponsor's bug is the next investigation if defensive fix doesn't resolve re-soak).
+- Detail: PR #109 `devon/fix-combat-hits`, ClickUp `86c9m36zh`, file `scripts/combat/Hitbox.gd::_check_initial_overlaps`. Verification matrix: fix-branch CI run `25283183811` green (605 tests / 604 passing); tests-on-main verification CI run `25283207409` ALSO green (regression NOT locked in — proves Godot 4.3 headless handles the case correctly without the fix).
+
+## 2026-05-03 — Performance budget locked: 60 FPS / <100 MB / <100 draw calls / <100ms save-roundtrip / <10 MB artifact / <3s boot. Detail: team/priya-pl/performance-budget.md.
+
+## 2026-05-03 — Sponsor-soak checklist drafted: structured pre-flight + per-AC probe targets (7 ACs) + output template + 30-45min full / 15min express time budget + fidelity-expectation guardrails + 14-row carry-forward probe list (SP-1..SP-7 from html5-rc-audit-591bcc8.md + BB-1..BB-8 from m1-bugbash-4484196.md). Detail: `team/uma-ux/sponsor-soak-checklist.md`.
+
+## 2026-05-03 — RESUME.md rewritten to reflect post-M1-integration state, MARIAN-TUTOR rules adoption, and current dispatch envelope. Detail: PR #123.
+
 ## 2026-05-03 — Mob-side combat visual feedback landed (consumes Uma's spec): hit-flash + death-tween + ember-burst + boss-climax shake/hold implemented inline on Grunt/Charger/Shooter/Stratum1Boss; CPUParticles2D burst parented to room (survives mob queue_free); `mob_died`/`boss_died` frame-1 contract preserved (loot + room-clear unaffected); paired GUT tests `tests/test_combat_visuals.gd` lock the timings + the frame-1 contract. Detail: PR `drew/mob-visual-feedback`, ClickUp `86c9m390d`.
