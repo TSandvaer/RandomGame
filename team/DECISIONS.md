@@ -381,4 +381,6 @@ Format:
 
 ## 2026-05-03 — Performance budget locked: 60 FPS / <100 MB / <100 draw calls / <100ms save-roundtrip / <10 MB artifact / <3s boot. Detail: team/priya-pl/performance-budget.md.
 
-## 2026-05-03 — RESUME.md rewritten to reflect post-M1-integration state, MARIAN-TUTOR rules adoption, and current dispatch envelope. Detail: PR <new>.
+## 2026-05-03 — Sponsor-soak checklist drafted: structured pre-flight + per-AC probe targets (7 ACs) + output template + 30-45min full / 15min express time budget + fidelity-expectation guardrails + 14-row carry-forward probe list (SP-1..SP-7 from html5-rc-audit-591bcc8.md + BB-1..BB-8 from m1-bugbash-4484196.md). Detail: `team/uma-ux/sponsor-soak-checklist.md`.
+
+## 2026-05-03 — RESUME.md rewritten to reflect post-M1-integration state, MARIAN-TUTOR rules adoption, and current dispatch envelope. Detail: PR #123.
