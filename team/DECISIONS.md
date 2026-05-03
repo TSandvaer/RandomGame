@@ -381,4 +381,12 @@ Format:
 
 ## 2026-05-03 — Performance budget locked: 60 FPS / <100 MB / <100 draw calls / <100ms save-roundtrip / <10 MB artifact / <3s boot. Detail: team/priya-pl/performance-budget.md.
 
+## 2026-05-03 — Sponsor-soak checklist drafted: structured pre-flight + per-AC probe targets (7 ACs) + output template + 30-45min full / 15min express time budget + fidelity-expectation guardrails + 14-row carry-forward probe list (SP-1..SP-7 from html5-rc-audit-591bcc8.md + BB-1..BB-8 from m1-bugbash-4484196.md). Detail: `team/uma-ux/sponsor-soak-checklist.md`.
+
+## 2026-05-03 — RESUME.md rewritten to reflect post-M1-integration state, MARIAN-TUTOR rules adoption, and current dispatch envelope. Detail: PR #123.
+
+## 2026-05-03 — Mob-side combat visual feedback landed (consumes Uma's spec): hit-flash + death-tween + ember-burst + boss-climax shake/hold implemented inline on Grunt/Charger/Shooter/Stratum1Boss; CPUParticles2D burst parented to room (survives mob queue_free); `mob_died`/`boss_died` frame-1 contract preserved (loot + room-clear unaffected); paired GUT tests `tests/test_combat_visuals.gd` lock the timings + the frame-1 contract. Detail: PR `drew/mob-visual-feedback`, ClickUp `86c9m390d`.
+
+## 2026-05-03 — Save-resolver fix landed: `Main.gd::_load_save_or_defaults` no longer ships no-op item/affix resolvers (BB-2 / `86c9m3911`). NEW `scripts/content/ContentRegistry.gd` scans `res://resources/items/**/*.tres` + `res://resources/affixes/*.tres` at boot and supplies real resolver Callables to `Inventory.restore_from_save`. Public accessors `Main.get_item_resolver() / get_affix_resolver()` so tests drive the same Callable production uses (closes product-vs-component gap). Save schema unchanged at v3 (M2 owns v4). Detail: PR `devon/fix-bb2-save-resolvers`, ClickUp `86c9m3911`.
+
 ## 2026-05-03 — Player-side combat visual feedback landed: ember Polygon2D swing-wedge sized to LIGHT/HEAVY reach+radius (alpha 0.55/0.70, lifetime = hitbox lifetime 0.10/0.14s) + 60ms two-step modulate flash on every attack spawn, kill-and-restart on overlapping attacks, no cue on rejected attacks. Implements Uma `team/uma-ux/combat-visual-feedback.md` §1 verbatim — every number derived from `LIGHT_REACH`/`LIGHT_HITBOX_RADIUS`/`LIGHT_HITBOX_LIFETIME`/`HEAVY_*` constants in `scripts/player/Player.gd`. ClickUp `86c9m3ck4`, PR `devon/player-visual-feedback`.

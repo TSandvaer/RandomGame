@@ -111,12 +111,25 @@ var _stat_pip_label: Label = null
 # and `_exit_tree` fire on shutdown.
 var _saved_on_quit: bool = false
 
+# Content registry — scans res://resources/items + res://resources/affixes at
+# boot and supplies the save-resolver Callables consumed by
+# `Inventory.restore_from_save`. Built in `_ready` before the save loads so
+# the resolvers can rebuild full ItemInstances on restore.
+#
+# Per BB-2 (`86c9m3911`): the previous shipping code passed two no-op
+# resolvers here, which silently dropped every saved item. The registry +
+# the resolver Callables it exposes are the production fix.
+var _content_registry: ContentRegistry = null
+
 
 func _ready() -> void:
 	# We listen for the OS close-request to autosave. Without this, browsers
 	# tab-closing would lose run state.
 	get_tree().auto_accept_quit = false
 	_loot_spawner = MobLootSpawner.new()
+	# Build the content registry FIRST — `_load_save_or_defaults` consumes its
+	# resolver callables, so it must exist before that runs (same _ready).
+	_content_registry = ContentRegistry.new().load_all()
 	_build_world_root()
 	_build_hud()
 	_build_inventory_panel()
@@ -232,6 +245,29 @@ func force_descend_for_test() -> void:
 ## Returns true on success.
 func save_now(slot: int = SAVE_SLOT) -> bool:
 	return _persist_to_save(slot)
+
+
+## Access the content registry (for tests + future systems).
+func get_content_registry() -> ContentRegistry:
+	return _content_registry
+
+
+## Returns the **production** item-resolver Callable used by the save-load
+## path. Tests should drive this same Callable into Inventory.restore_from_save
+## so a future regression of "Main uses no-ops, test uses shims" is impossible.
+func get_item_resolver() -> Callable:
+	if _content_registry == null:
+		# Shouldn't happen — `_ready` always builds the registry — but stay
+		# defensive so a partially-constructed Main in unit tests doesn't crash.
+		return func(_id: StringName) -> Resource: return null
+	return _content_registry.item_resolver_callable()
+
+
+## Returns the production affix-resolver Callable. See `get_item_resolver`.
+func get_affix_resolver() -> Callable:
+	if _content_registry == null:
+		return func(_id: StringName) -> Resource: return null
+	return _content_registry.affix_resolver_callable()
 
 
 # ---- World / scene construction --------------------------------------
@@ -600,12 +636,16 @@ func _load_save_or_defaults() -> void:
 			var hp_cur_saved: int = int(ch.get("hp_current", hp_max_saved))
 			_player.hp_max = max(1, hp_max_saved)
 			_player.set_hp(hp_cur_saved)
-	# Restore Inventory (no-op resolvers in M1; ItemDef registry is stub).
+	# Restore Inventory using real resolvers from the ContentRegistry. Per
+	# BB-2 (`86c9m3911`) the previous no-op resolvers dropped every saved
+	# item silently. The registry was scanned in `_ready` before this runs.
 	var inventory: Node = _inventory()
 	if inventory != null:
-		var noop_item: Callable = func(_id: StringName) -> Resource: return null
-		var noop_affix: Callable = func(_id: StringName) -> Resource: return null
-		inventory.restore_from_save(data, noop_item, noop_affix)
+		inventory.restore_from_save(
+			data,
+			get_item_resolver(),
+			get_affix_resolver(),
+		)
 	# Restore stratum progression.
 	var sp: Node = _stratum_progression()
 	if sp != null:
