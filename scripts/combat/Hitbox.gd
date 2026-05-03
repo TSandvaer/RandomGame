@@ -50,6 +50,16 @@ func _ready() -> void:
 	# Connect Area2D body/area entered to a unified handler.
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
+	# Catch bodies/areas already overlapping the hitbox the moment it spawns.
+	# Godot 4 Area2D quirk (regression `86c9m36zh`, M1 soak): `body_entered`
+	# only fires on entry events. When the player attacks a mob that is
+	# already in melee range, the hitbox spawns ALREADY overlapping the mob —
+	# `body_entered` never fires and the hit silently no-ops. We defer the
+	# check by one physics frame because `get_overlapping_bodies()` returns
+	# empty until the engine has computed overlaps for the just-added Area2D.
+	# `_try_apply_hit` is single-hit-per-target via `_hit_already`, so a
+	# legitimate `body_entered` later in the lifetime won't double-hit.
+	call_deferred("_check_initial_overlaps")
 
 
 func _physics_process(delta: float) -> void:
@@ -100,6 +110,20 @@ func _on_body_entered(body: Node) -> void:
 
 func _on_area_entered(area: Area2D) -> void:
 	_try_apply_hit(area)
+
+
+## Sweep bodies/areas already overlapping this hitbox at spawn. Called
+## via `call_deferred` from `_ready` so the engine has had a physics frame
+## to populate the overlap tables. Guarded by `is_inside_tree` because a
+## hitbox queue_free'd before its deferred call lands (e.g. tests that
+## construct + free immediately) must not crash trying to query overlaps.
+func _check_initial_overlaps() -> void:
+	if not is_inside_tree():
+		return
+	for body in get_overlapping_bodies():
+		_try_apply_hit(body)
+	for area in get_overlapping_areas():
+		_try_apply_hit(area)
 
 
 func _try_apply_hit(target: Node) -> void:
