@@ -89,6 +89,19 @@ const HEAVY_TELEGRAPH_DURATION: float = 0.65
 ## HP fraction at-or-below which the heavy telegraph fires (one-shot).
 const HEAVY_TELEGRAPH_HP_FRAC: float = 0.30
 
+## Visual-feedback timings (per `team/uma-ux/combat-visual-feedback.md` §2 + §3).
+## Hit-flash: white modulate for 80ms total — 20ms tween-in, 20ms hold,
+## 40ms tween-back. Death tween: 200ms scale-down + alpha-fade. Particles:
+## 6 ember particles (24 for boss subclass via override).
+const HIT_FLASH_IN: float = 0.020
+const HIT_FLASH_HOLD: float = 0.020
+const HIT_FLASH_OUT: float = 0.040
+const DEATH_TWEEN_DURATION: float = 0.200
+const DEATH_PARTICLE_COUNT: int = 6
+const DEATH_TARGET_SCALE: float = 0.6
+const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
+const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
+
 ## Layer bits (mirror project.godot).
 const LAYER_WORLD: int = 1 << 0          # bit 1
 const LAYER_PLAYER: int = 1 << 1         # bit 2
@@ -116,6 +129,15 @@ var _attack_recovery_left: float = 0.0
 var _telegraph_time_left: float = 0.0
 var _heavy_telegraph_fired: bool = false  # one-shot guard
 var _is_dead: bool = false
+
+# VFX runtime — paired with the hit-flash + death-tween cues from
+# `team/uma-ux/combat-visual-feedback.md`. Tween refs are kept so a
+# second hit during the flash kills + restarts the running tween (per §2
+# edge case) and so the death tween can be queried by tests.
+var _hit_flash_tween: Tween = null
+var _death_tween: Tween = null
+var _modulate_at_rest: Color = Color(1, 1, 1, 1)
+var _captured_modulate_at_rest: bool = false
 
 ## NodePath (or Node ref) to the player. Optional — spawner sets this. If
 ## unset, the grunt looks for the first node in the "player" group at _ready.
@@ -179,6 +201,11 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	var clean_amount: int = max(0, amount)
 	hp_current = max(0, hp_current - clean_amount)
 	damaged.emit(clean_amount, hp_current, source)
+	# Visual: white hit-flash, kicked off only when actual damage was dealt
+	# (matches Uma `combat-visual-feedback.md` §2 — skip the i-frame /
+	# clamped-to-zero path).
+	if clean_amount > 0:
+		_play_hit_flash()
 	# Apply knockback as an instantaneous velocity bump. Decays naturally
 	# next physics tick when the AI sets velocity from chase.
 	if knockback.length_squared() > 0.0:
@@ -350,10 +377,104 @@ func _die() -> void:
 	_attack_recovery_left = 0.0
 	velocity = Vector2.ZERO
 	_set_state(STATE_DEAD)
+	# CRITICAL CONTRACT (Uma `combat-visual-feedback.md` §3a): mob_died fires
+	# at the START of the death sequence, NOT after the visual tween, so loot
+	# drop + room-clear logic execute on the existing frame regardless of the
+	# 200ms decay animation. The death tween + ember-burst run *after* this
+	# emit; queue_free is called on tween_finished, replacing the old
+	# call_deferred("queue_free") that fired instantly.
 	mob_died.emit(self, global_position, mob_def)
-	# Defer free so any signal listeners running inside the same tick can
-	# read state before the node is gone.
-	call_deferred("queue_free")
+	# Spawn the ember-burst particles, parented to the room (NOT self) so
+	# the burst persists past queue_free.
+	_spawn_death_particles()
+	# Run the scale-down + fade tween, then queue_free on completion.
+	_play_death_tween()
+
+
+# ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
+
+## §2 hit-flash: white modulate for 80ms (20ms in + 20ms hold + 40ms out).
+## Second-hit-during-flash kills the running tween and restarts fresh from
+## start so flashes don't accumulate or extend.
+func _play_hit_flash() -> void:
+	if _is_dead:
+		return
+	# Capture the starting modulate exactly once per life so the tween-back
+	# returns to the authored color (the .tscn ships ColorRect tints).
+	if not _captured_modulate_at_rest:
+		_modulate_at_rest = modulate
+		_captured_modulate_at_rest = true
+	# Cancel any in-flight flash tween — restart from start.
+	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
+		_hit_flash_tween.kill()
+	if not is_inside_tree():
+		# Defensive — tweens require a tree. Tests sometimes call into
+		# take_damage on a freshly-instanced bare node before add_child.
+		modulate = _modulate_at_rest
+		return
+	_hit_flash_tween = create_tween()
+	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
+	# Hold step — tween to the same value over HIT_FLASH_HOLD seconds.
+	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+	_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
+
+
+## §3a death tween: 200ms parallel scale 1.0→0.6 + modulate.a 1.0→0.0,
+## then queue_free on tween_finished.
+func _play_death_tween() -> void:
+	# Kill any active hit-flash tween — death visuals override.
+	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
+		_hit_flash_tween.kill()
+		_hit_flash_tween = null
+	if not is_inside_tree():
+		# Defensive — bare-instanced test mobs may not be in the tree.
+		queue_free()
+		return
+	_death_tween = create_tween()
+	_death_tween.set_parallel(true)
+	_death_tween.tween_property(self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
+	_death_tween.finished.connect(_on_death_tween_finished)
+
+
+func _on_death_tween_finished() -> void:
+	# Real queue_free now that the visual decay has played.
+	queue_free()
+
+
+## §3b ember burst: spawn a CPUParticles2D at this mob's global position,
+## parented to the room (get_parent()) so the burst outlives the mob's
+## queue_free. 6 particles for normal mobs (24 for the boss subclass).
+func _spawn_death_particles() -> void:
+	var room: Node = get_parent()
+	if room == null:
+		# No parent = no room (test edge). Skip the burst — visual-only.
+		return
+	var burst: CPUParticles2D = CPUParticles2D.new()
+	burst.global_position = global_position
+	burst.amount = DEATH_PARTICLE_COUNT
+	burst.one_shot = true
+	burst.explosiveness = 1.0
+	burst.lifetime = 0.30
+	burst.emitting = true
+	# 360° spread; 30–60 px/s initial speed; slight upward gravity (embers rise).
+	burst.direction = Vector2.UP
+	burst.spread = 180.0
+	burst.initial_velocity_min = 30.0
+	burst.initial_velocity_max = 60.0
+	burst.gravity = Vector2(0.0, -40.0)
+	# 2×2 logical-px particles per Uma §3b (stays inside the 4-px shake budget).
+	burst.scale_amount_min = 1.0
+	burst.scale_amount_max = 1.0
+	# Color ramp: ember light → ember deep across the particle's lifetime.
+	var ramp: Gradient = Gradient.new()
+	ramp.set_color(0, EMBER_LIGHT)
+	ramp.set_color(1, EMBER_DEEP)
+	burst.color_ramp = ramp
+	# Defer add_child so we can keep room.add_child safe across signal
+	# emission contexts; queue_free the burst when emission finishes.
+	room.add_child(burst)
+	burst.finished.connect(burst.queue_free)
 
 
 # ---- Helpers ----------------------------------------------------------

@@ -384,3 +384,5 @@ Format:
 ## 2026-05-03 — Sponsor-soak checklist drafted: structured pre-flight + per-AC probe targets (7 ACs) + output template + 30-45min full / 15min express time budget + fidelity-expectation guardrails + 14-row carry-forward probe list (SP-1..SP-7 from html5-rc-audit-591bcc8.md + BB-1..BB-8 from m1-bugbash-4484196.md). Detail: `team/uma-ux/sponsor-soak-checklist.md`.
 
 ## 2026-05-03 — RESUME.md rewritten to reflect post-M1-integration state, MARIAN-TUTOR rules adoption, and current dispatch envelope. Detail: PR #123.
+
+## 2026-05-03 — Mob-side combat visual feedback landed (consumes Uma's spec): hit-flash + death-tween + ember-burst + boss-climax shake/hold implemented inline on Grunt/Charger/Shooter/Stratum1Boss; CPUParticles2D burst parented to room (survives mob queue_free); `mob_died`/`boss_died` frame-1 contract preserved (loot + room-clear unaffected); paired GUT tests `tests/test_combat_visuals.gd` lock the timings + the frame-1 contract. Detail: PR `drew/mob-visual-feedback`, ClickUp `86c9m390d`.

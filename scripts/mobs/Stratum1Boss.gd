@@ -150,6 +150,22 @@ const PHASE_TRANSITION_DURATION: float = 0.60
 const ENRAGE_SPEED_MULT: float = 1.5
 const ENRAGE_RECOVERY_MULT: float = 0.7  # 30% shorter recoveries
 
+## Visual-feedback timings (per `team/uma-ux/combat-visual-feedback.md` §2 + §3).
+## Boss climax: same shape as grunts but bumps to 24 particles + 4-px
+## screen-shake (within VD-09 budget) + an extra 400ms hold *before* the
+## scale-down + fade plays. Hit-flash matches the cross-mob 80ms rule.
+const HIT_FLASH_IN: float = 0.020
+const HIT_FLASH_HOLD: float = 0.020
+const HIT_FLASH_OUT: float = 0.040
+const DEATH_TWEEN_DURATION: float = 0.200
+const DEATH_PARTICLE_COUNT: int = 24
+const DEATH_TARGET_SCALE: float = 0.6
+const BOSS_DEATH_HOLD: float = 0.400
+const BOSS_SHAKE_MAGNITUDE: float = 4.0   # logical px (VD-09 max budget)
+const BOSS_SHAKE_DURATION: float = 0.150
+const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
+const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
+
 ## Layer bits (mirror project.godot — same as Grunt/Charger).
 const LAYER_WORLD: int = 1 << 0          # bit 1
 const LAYER_PLAYER: int = 1 << 1         # bit 2
@@ -205,6 +221,13 @@ var _is_dead: bool = false
 var _pending_phase: int = PHASE_1
 
 var _player: Node2D = null
+
+# VFX runtime — see `team/uma-ux/combat-visual-feedback.md` §2 + §3 climax.
+var _hit_flash_tween: Tween = null
+var _death_tween: Tween = null
+var _shake_tween: Tween = null
+var _modulate_at_rest: Color = Color(1, 1, 1, 1)
+var _captured_modulate_at_rest: bool = false
 
 
 func _ready() -> void:
@@ -291,6 +314,10 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	var clean_amount: int = max(0, amount)
 	hp_current = max(0, hp_current - clean_amount)
 	damaged.emit(clean_amount, hp_current, source)
+	# Visual: white hit-flash on every actual-damage take_damage (Uma §2 —
+	# same rule across all mob types).
+	if clean_amount > 0:
+		_play_hit_flash()
 	# Knockback applied as instantaneous velocity. Boss is a heavy unit so
 	# the actual visual displacement is small; this still gives the player
 	# the satisfaction of "I hit it." We skip knockback during the
@@ -561,10 +588,116 @@ func _die() -> void:
 	_phase_transition_left = 0.0
 	velocity = Vector2.ZERO
 	_set_state(STATE_DEAD)
+	# CRITICAL CONTRACT (Uma `combat-visual-feedback.md` §3a): boss_died
+	# fires at the START of the death sequence (this frame), NOT after the
+	# climax decay. The cinematic layer + MobLootSpawner.on_mob_died run on
+	# this frame regardless of the +400ms hold + 200ms tween below.
 	boss_died.emit(self, global_position, mob_def)
-	# Defer free so cinematic layer + loot spawner subscribers run on the
-	# same tick before the node is gone.
-	call_deferred("queue_free")
+	# Climax burst: 24 ember particles parented to the room.
+	_spawn_death_particles()
+	# Climax shake: 4-logical-px screen-shake within VD-09 budget.
+	_play_climax_shake()
+	# Climax tween: extra 400ms hold *then* the standard 200ms decay.
+	_play_boss_death_sequence()
+
+
+# ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
+
+## §2 hit-flash. Identical rule across all mob types.
+func _play_hit_flash() -> void:
+	if _is_dead:
+		return
+	if not _captured_modulate_at_rest:
+		_modulate_at_rest = modulate
+		_captured_modulate_at_rest = true
+	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
+		_hit_flash_tween.kill()
+	if not is_inside_tree():
+		modulate = _modulate_at_rest
+		return
+	_hit_flash_tween = create_tween()
+	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
+	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+	_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
+
+
+## §3 boss-death: 400ms hold + 200ms scale-down/fade tween, then queue_free.
+## Hold leverages tween_interval so timeline + finished signal still fire.
+func _play_boss_death_sequence() -> void:
+	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
+		_hit_flash_tween.kill()
+		_hit_flash_tween = null
+	if not is_inside_tree():
+		queue_free()
+		return
+	_death_tween = create_tween()
+	# Sequential by default — first the hold, then a parallel scale+fade.
+	_death_tween.tween_interval(BOSS_DEATH_HOLD)
+	_death_tween.tween_property(self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+	# Run the modulate fade in parallel with the scale tween (set_parallel
+	# only flips the *next* step, so use parallel() chained from this step).
+	_death_tween.parallel().tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
+	_death_tween.finished.connect(_on_death_tween_finished)
+
+
+func _on_death_tween_finished() -> void:
+	queue_free()
+
+
+## §3 boss-climax shake: jiggle the boss's Sprite child by ±4 logical px on
+## a short tween. We shake the boss's own visual (not a Camera2D) because
+## the M1 play loop has no in-tree Camera2D yet — this still reads as a
+## "screen-jolt" against the static background and stays inside VD-09's
+## 4-logical-px budget. When Devon adds a real Camera2D in M2 the boss can
+## subscribe a CameraShake autoload here without changing the cue's shape.
+func _play_climax_shake() -> void:
+	if not is_inside_tree():
+		return
+	if _shake_tween != null and _shake_tween.is_valid():
+		_shake_tween.kill()
+	# Shake the boss's own position (the CharacterBody2D itself). M1 play
+	# loop has no in-tree Camera2D yet, so a self-shake reads as the
+	# "screen-jolt" cue against the static background, staying inside
+	# VD-09's 4-logical-px budget. When Devon adds a real Camera2D in M2,
+	# this can be re-routed to a CameraShake autoload without changing the
+	# cue shape — the tween magnitude + duration are the load-bearing
+	# numbers, not the target node.
+	var rest_offset: Vector2 = position
+	_shake_tween = create_tween()
+	# Quick three-step jiggle: +x, -x, back to rest. Each leg is 1/3 of the
+	# total so the whole shake fits inside BOSS_SHAKE_DURATION.
+	var leg: float = BOSS_SHAKE_DURATION / 3.0
+	_shake_tween.tween_property(self, "position", rest_offset + Vector2(BOSS_SHAKE_MAGNITUDE, 0.0), leg)
+	_shake_tween.tween_property(self, "position", rest_offset + Vector2(-BOSS_SHAKE_MAGNITUDE, 0.0), leg)
+	_shake_tween.tween_property(self, "position", rest_offset, leg)
+
+
+## §3 boss-climax burst: 24 ember particles parented to the room (so they
+## persist past queue_free). Same shape as grunt burst, 4× the volume.
+func _spawn_death_particles() -> void:
+	var room: Node = get_parent()
+	if room == null:
+		return
+	var burst: CPUParticles2D = CPUParticles2D.new()
+	burst.global_position = global_position
+	burst.amount = DEATH_PARTICLE_COUNT
+	burst.one_shot = true
+	burst.explosiveness = 1.0
+	burst.lifetime = 0.30
+	burst.emitting = true
+	burst.direction = Vector2.UP
+	burst.spread = 180.0
+	burst.initial_velocity_min = 30.0
+	burst.initial_velocity_max = 60.0
+	burst.gravity = Vector2(0.0, -40.0)
+	burst.scale_amount_min = 1.0
+	burst.scale_amount_max = 1.0
+	var ramp: Gradient = Gradient.new()
+	ramp.set_color(0, EMBER_LIGHT)
+	ramp.set_color(1, EMBER_DEEP)
+	burst.color_ramp = ramp
+	room.add_child(burst)
+	burst.finished.connect(burst.queue_free)
 
 
 # ---- Helpers ----------------------------------------------------------
