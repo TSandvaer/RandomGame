@@ -256,6 +256,55 @@ func test_first_kill_grants_xp_and_loot_into_inventory() -> void:
 		])
 
 
+# ---- AC4b: Sponsor's "click-while-touching-grunt" repro (#86c9m36zh) -
+
+func test_attack_while_overlapping_grunt_damages_grunt_via_signal_flow() -> void:
+	# Sponsor's interactive soak repro: spam-clicking left mouse with a grunt
+	# physically touching the player must damage the grunt. Pre-fix this
+	# silently no-op'd because the player-team Hitbox.gd Area2D's
+	# body_entered signal didn't fire for the pre-existing overlap. The
+	# `_walk_in_and_kill` helper above masked the bug by calling
+	# `hb._try_apply_hit(target)` directly — bypassing the engine signal
+	# layer that real input goes through.
+	#
+	# This test drives the same code path the player's left-mouse-click
+	# triggers (Player.try_attack -> _spawn_hitbox -> Hitbox in tree), then
+	# lets Godot's physics layer detect the overlap. Asserts grunt HP
+	# decreased via the actual integration. NO `_try_apply_hit` call.
+	var main: Main = _instantiate_main() as Main
+	await get_tree().process_frame
+	var room: Node = main.get_current_room()
+	var grunt: Grunt = _first_grunt(room)
+	assert_not_null(grunt, "AC4b: grunt to attack")
+	var p: Player = main.get_player()
+	# Stand the player ON TOP of the grunt — Sponsor's "grunts touching me"
+	# repro shape. With the player + grunt at the same position, any hitbox
+	# spawned at facing*reach near the player's origin geometrically overlaps
+	# the grunt's body collider on _ready.
+	p.global_position = grunt.global_position
+	await get_tree().physics_frame
+	var hp_before: int = grunt.get_hp()
+	# Fire the attack via the real input-layer surface the click handler
+	# would call. Direction RIGHT puts the hitbox at facing*reach = (28,0)
+	# from the player; with the grunt at the same global position, the
+	# hitbox's circle (radius 18) still encloses part of the grunt's body
+	# collider. We override the hitbox's global_position to the grunt's
+	# position to remove tuning sensitivity from this regression test —
+	# the bug class is "spawn overlapping = no hit", not the geometry of
+	# Player.LIGHT_REACH vs grunt collider radius.
+	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT) as Hitbox
+	assert_not_null(hb, "AC4b: try_attack returns spawned hitbox")
+	hb.global_position = grunt.global_position
+	# Let the engine compute overlaps + the deferred initial-overlap check.
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	assert_lt(grunt.get_hp(), hp_before,
+		"AC4b/86c9m36zh: clicking attack while overlapping grunt must damage grunt via signal flow (hp %d -> %d)" % [
+			hp_before, grunt.get_hp(),
+		])
+
+
 # ---- AC5: Levels.level_up auto-opens StatAllocationPanel ------------
 
 func test_level_up_opens_stat_panel_and_allocation_works() -> void:
