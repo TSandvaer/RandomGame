@@ -369,3 +369,5 @@ Format:
 ## 2026-05-03 — M2 week-2 backlog drafted (anticipatory; revisable post-Sponsor M1 sign-off and week-1 close).
 
 ## 2026-05-03 — M2 audio sourcing pipeline scoped: 5 routes (freesound 45% / hand-Foley 26% / hand-composed 23% / procedural 5% / AI-curated 1%), 10-cue M2-w1 first-pass subset locked, R10 placeholder-fallback discipline preserved. Detail: `team/uma-ux/audio-sourcing-pipeline.md`.
+
+## 2026-05-03 — Save-resolver fix landed: `Main.gd::_load_save_or_defaults` no longer ships no-op item/affix resolvers (BB-2 / `86c9m3911`). NEW `scripts/content/ContentRegistry.gd` scans `res://resources/items/**/*.tres` + `res://resources/affixes/*.tres` at boot and supplies real resolver Callables to `Inventory.restore_from_save`. Public accessors `Main.get_item_resolver() / get_affix_resolver()` so tests drive the same Callable production uses (closes product-vs-component gap). Save schema unchanged at v3 (M2 owns v4). Detail: PR `devon/fix-bb2-save-resolvers`, ClickUp `86c9m3911`.

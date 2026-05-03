@@ -431,6 +431,124 @@ func test_save_now_persists_full_state_for_load() -> void:
 	_save().delete_save(0)
 
 
+func test_save_load_round_trips_inventory_items_via_production_resolvers() -> void:
+	# BB-2 / `86c9m3911` paired regression test. Pre-fix: Main.gd's save-load
+	# wiring used no-op resolvers, so any saved Inventory item was silently
+	# dropped on reload. This test drives the **production** save -> wipe ->
+	# load path (Main.save_now -> reset -> Save.load_game ->
+	# Inventory.restore_from_save with the resolver Main exposes) and asserts
+	# items round-trip with their item_id + affixes intact.
+	#
+	# **Why this fails on `main` and passes on the fix branch:** the resolver
+	# we hand to `Inventory.restore_from_save` is the very same Callable
+	# Main.gd uses in production (`main.get_item_resolver()` /
+	# `get_affix_resolver()`). Pre-fix those return `null`-returning lambdas;
+	# post-fix they call into the ContentRegistry and resolve real ItemDefs.
+	# Having the test drive Main's accessor — not a hand-rolled shim —
+	# closes the product-vs-component gap that allowed BB-2 to ship.
+	var main: Main = _instantiate_main() as Main
+	await get_tree().process_frame
+	# Load real ItemDef + AffixDef from disk. Match the iron_sword fixture
+	# Drew authored at res://resources/items/weapons/iron_sword.tres.
+	var iron: ItemDef = load("res://resources/items/weapons/iron_sword.tres") as ItemDef
+	var swift: AffixDef = load("res://resources/affixes/swift.tres") as AffixDef
+	assert_not_null(iron, "fixture: iron_sword.tres must load (test relies on real content)")
+	assert_not_null(swift, "fixture: swift.tres must load")
+	# Sanity: the production resolver exposed by Main resolves these ids. If
+	# this assertion fires, the registry didn't pick up the resources and the
+	# rest of the test is moot.
+	var prod_item_resolver: Callable = main.get_item_resolver()
+	var prod_affix_resolver: Callable = main.get_affix_resolver()
+	assert_eq(
+		prod_item_resolver.call(&"iron_sword"), iron,
+		"AC9/BB-2: production item resolver returns the real ItemDef")
+	assert_eq(
+		prod_affix_resolver.call(&"swift"), swift,
+		"AC9/BB-2: production affix resolver returns the real AffixDef")
+	# Build an item with one rolled affix; put one copy in the inventory and
+	# one in the equipped weapon slot. Build typed arrays explicitly because
+	# `rolled_affixes` is `Array[AffixRoll]`.
+	var inv_item: ItemInstance = ItemInstance.new(iron, ItemDef.Tier.T2)
+	var inv_affixes: Array[AffixRoll] = [AffixRoll.new(swift, 0.075)]
+	inv_item.rolled_affixes = inv_affixes
+	var eq_item: ItemInstance = ItemInstance.new(iron, ItemDef.Tier.T1)
+	var eq_affixes: Array[AffixRoll] = [AffixRoll.new(swift, 0.040)]
+	eq_item.rolled_affixes = eq_affixes
+	var inventory: Node = _inventory()
+	inventory.add(inv_item)
+	inventory.add(eq_item)
+	inventory.equip(eq_item, &"weapon")
+	# Sanity pre-state.
+	assert_eq(inventory.get_items().size(), 1, "pre-save: one item in inventory")
+	assert_not_null(inventory.get_equipped(&"weapon"), "pre-save: weapon equipped")
+	# Save through the production path.
+	assert_true(main.save_now(0), "production save_now succeeds")
+	# Wipe in-RAM state — simulates a quit + relaunch. Production reload runs
+	# `_load_save_or_defaults` from `_ready`; here we drive the same load
+	# manually because the engine doesn't re-instantiate the autoloads in
+	# the test harness.
+	inventory.reset()
+	assert_eq(inventory.get_items().size(), 0, "post-wipe: inventory empty")
+	assert_null(inventory.get_equipped(&"weapon"), "post-wipe: weapon slot empty")
+	# Drive the SAME resolvers Main uses in production. (Hand-rolling shim
+	# resolvers here would re-introduce the BB-2 product-vs-component gap.)
+	var loaded: Dictionary = _save().load_game(0)
+	assert_false(loaded.is_empty(), "load_game returns persisted data")
+	inventory.restore_from_save(loaded, prod_item_resolver, prod_affix_resolver)
+	# Assert: items survived round-trip with id + affixes.
+	var items: Array = inventory.get_items()
+	assert_eq(items.size(), 1, "BB-2: 1 inventory item survives round-trip")
+	var restored_inv: ItemInstance = items[0] as ItemInstance
+	assert_not_null(restored_inv, "BB-2: restored inventory item is a real ItemInstance")
+	assert_not_null(restored_inv.def, "BB-2: restored ItemInstance has resolved ItemDef")
+	assert_eq(restored_inv.def.id, &"iron_sword", "BB-2: id round-trips")
+	assert_eq(int(restored_inv.rolled_tier), int(ItemDef.Tier.T2), "BB-2: tier round-trips")
+	assert_eq(restored_inv.rolled_affixes.size(), 1, "BB-2: affix count round-trips")
+	var restored_aff: AffixRoll = restored_inv.rolled_affixes[0]
+	assert_eq(restored_aff.def.id, &"swift", "BB-2: affix id round-trips")
+	assert_almost_eq(restored_aff.rolled_value, 0.075, 1e-6, "BB-2: affix rolled_value round-trips")
+	# Equipped weapon survived too.
+	var restored_eq: ItemInstance = inventory.get_equipped(&"weapon") as ItemInstance
+	assert_not_null(restored_eq, "BB-2: equipped weapon survives round-trip")
+	assert_eq(restored_eq.def.id, &"iron_sword", "BB-2: equipped weapon id round-trips")
+	assert_eq(restored_eq.rolled_affixes.size(), 1, "BB-2: equipped weapon affix count round-trips")
+	assert_eq(restored_eq.rolled_affixes[0].def.id, &"swift", "BB-2: equipped affix id round-trips")
+	assert_almost_eq(
+		restored_eq.rolled_affixes[0].rolled_value, 0.040, 1e-6,
+		"BB-2: equipped affix value round-trips")
+	# Cleanup.
+	_save().delete_save(0)
+
+
+func test_main_get_resolvers_match_resolvers_used_by_load() -> void:
+	# Defense-in-depth: even if the round-trip test above somehow drove the
+	# wrong Callable, this test pins that the resolver returned by Main's
+	# accessor resolves the same fixture ItemDef as a direct registry lookup.
+	# A future change that quietly diverges Main's accessor from the registry
+	# fails here.
+	var main: Main = _instantiate_main() as Main
+	await get_tree().process_frame
+	var iron: ItemDef = load("res://resources/items/weapons/iron_sword.tres") as ItemDef
+	var swift: AffixDef = load("res://resources/affixes/swift.tres") as AffixDef
+	assert_not_null(iron)
+	assert_not_null(swift)
+	var registry: ContentRegistry = main.get_content_registry()
+	assert_not_null(registry, "BB-2: Main exposes a populated ContentRegistry")
+	assert_eq(registry.resolve_item(&"iron_sword"), iron,
+		"BB-2: registry resolves iron_sword to the real ItemDef")
+	assert_eq(registry.resolve_affix(&"swift"), swift,
+		"BB-2: registry resolves swift to the real AffixDef")
+	# Resolver-Callable parity: must yield the same resource as direct lookup.
+	assert_eq(main.get_item_resolver().call(&"iron_sword"), iron,
+		"BB-2: production item resolver matches direct registry resolve")
+	assert_eq(main.get_affix_resolver().call(&"swift"), swift,
+		"BB-2: production affix resolver matches direct registry resolve")
+	# Unknown id resolves to null (defensive — saves with stale ids load
+	# without crashing).
+	assert_null(main.get_item_resolver().call(&"definitely_not_a_real_item_id"),
+		"BB-2: unknown item id resolves to null without crashing")
+
+
 func test_load_on_boot_restores_state() -> void:
 	# Pre-stage a save file, then instantiate Main; verify autoloads are
 	# restored from the save. This exercises Main._load_save_or_defaults.

@@ -97,18 +97,23 @@ func _snapshot_to_payload() -> Dictionary:
 
 # Restore each autoload from a payload — mirrors the production "Continue"
 # flow that runs after Save.load_game.
+#
+# Uses a real ContentRegistry (same class Main.gd holds in production) so a
+# regression of "test passes with shims, product breaks at runtime" — the
+# exact pattern that caused BB-2 (`86c9m3911`) — cannot ship through this
+# test again.
 func _restore_from_payload(data: Dictionary) -> void:
 	if data.is_empty():
 		return
 	var character: Dictionary = data.get("character", {})
 	_levels().set_state(int(character.get("level", 1)), int(character.get("xp", 0)))
 	_stats().restore_from_character(character)
-	# Inventory restore needs item / affix resolvers. For an empty-inventory
-	# integration we can pass no-op resolvers (returns null -> dropped).
-	# Tests that need real items set up resolvers explicitly.
-	var noop_item: Callable = func(_id: StringName) -> Resource: return null
-	var noop_affix: Callable = func(_id: StringName) -> Resource: return null
-	_inventory().restore_from_save(data, noop_item, noop_affix)
+	var registry: ContentRegistry = ContentRegistry.new().load_all()
+	_inventory().restore_from_save(
+		data,
+		registry.item_resolver_callable(),
+		registry.affix_resolver_callable(),
+	)
 	_stratum().restore_from_save_data(data)
 
 
