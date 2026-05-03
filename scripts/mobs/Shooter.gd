@@ -446,9 +446,7 @@ func _spawn_death_particles() -> void:
 	var ramp: Gradient = Gradient.new()
 	ramp.set_color(0, EMBER_LIGHT)
 	ramp.set_color(1, EMBER_DEEP)
-	var grad_tex: GradientTexture1D = GradientTexture1D.new()
-	grad_tex.gradient = ramp
-	burst.color_ramp = grad_tex
+	burst.color_ramp = ramp
 	room.add_child(burst)
 	burst.finished.connect(burst.queue_free)
 
