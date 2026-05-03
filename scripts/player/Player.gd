@@ -52,6 +52,22 @@ signal equipped_weapon_changed(new_weapon)
 ## the relevant block to refresh without a full snapshot read.
 signal stat_changed(stat: StringName, new_value: int)
 
+## Emitted when the player takes damage. Carries the damage amount, the
+## remaining HP, and the source node (the hitbox owner — typically a mob).
+## HUD listens for damage-flash + ghost-bar drain.
+signal damaged(amount: int, hp_remaining: int, source: Node)
+
+## Emitted when player HP changes for any reason (damage, heal, restore-from-save).
+## HUD listens to refresh the HP bar.
+signal hp_changed(hp_current: int, hp_max: int)
+
+## Emitted when the player's HP hits zero. The Main controller subscribes to
+## this to drive the death/respawn flow per the M1 death rule
+## (level + equipped survive, unequipped + run-progress reset).
+## Fires exactly once per Player lifetime — the player is then expected to be
+## removed from the tree by the controller.
+signal player_died(death_position: Vector2)
+
 # ---- Tuning constants ---------------------------------------------------
 
 const STATE_IDLE: StringName = &"idle"
@@ -127,6 +143,21 @@ var _move_speed_bonus: float = 0.0
 # Affix application reads from `_equipped[*].rolled_affixes`.
 var _equipped_items: Dictionary = {}
 
+# ---- HP / death --------------------------------------------------------
+# Baseline HP matches Save.DEFAULT_PAYLOAD ("hp_current": 100, "hp_max": 100).
+# Vigor scaling is M2 polish — for M1 we ship a flat 100/100 so the loop is
+# legible and the death rule has a deterministic threshold.
+const DEFAULT_HP_MAX: int = 100
+
+# Public-readable HP fields. Match the Save schema's character.hp_current /
+# hp_max keys so save-roundtrip is mechanical.
+var hp_current: int = DEFAULT_HP_MAX
+var hp_max: int = DEFAULT_HP_MAX
+
+# One-shot death latch — `player_died` fires exactly once per Player
+# lifetime. Subsequent take_damage calls during the death frame are no-ops.
+var _is_dead: bool = false
+
 
 func _ready() -> void:
 	# Seed the saved layer mask from whatever the scene authored. Tests may
@@ -135,6 +166,10 @@ func _ready() -> void:
 	if collision_layer == 0:
 		collision_layer = 1 << (PLAYER_LAYER_BIT - 1)
 	_saved_collision_layer = collision_layer
+	# Register in the "player" group so other systems (Pickup, Grunt's
+	# `_resolve_player`, InventoryPanel `_player_node`) find this node via
+	# group lookup. Idempotent: add_to_group is a no-op if already in the group.
+	add_to_group("player")
 
 
 func _physics_process(delta: float) -> void:
@@ -373,6 +408,91 @@ func get_focus() -> int:
 	if ps != null:
 		return int(ps.get_stat(&"focus"))
 	return _focus
+
+
+## Take damage from a hitbox. Duck-typed contract matched by `Hitbox.gd`
+## (`target.take_damage(amount, knockback, source)`).
+##
+## - Damage during STATE_DODGE i-frames is also blocked at the physics layer
+##   (Player.gd::_enter_iframes clears collision_layer), but we belt-and-
+##   suspender the case here too: if a manual `_try_apply_hit` is invoked
+##   during dodge (test or scripted hit), we honor the i-frame state.
+## - Damage during the dead state is ignored (idempotent).
+## - Negative amounts clamp to 0 (no incidental healing via hitbox bug).
+## - When HP hits zero, `player_died` emits exactly once and `_is_dead`
+##   latches. Owning controller (Main.gd) subscribes to player_died and
+##   drives the death/respawn flow per the M1 death rule.
+func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
+	if _is_dead:
+		return
+	if _is_invulnerable:
+		return
+	var clean_amount: int = max(0, amount)
+	if clean_amount == 0:
+		return
+	hp_current = max(0, hp_current - clean_amount)
+	damaged.emit(clean_amount, hp_current, source)
+	hp_changed.emit(hp_current, hp_max)
+	# Knockback applied as instantaneous velocity bump. Decays naturally
+	# next physics tick (the state machine resets velocity from input).
+	if knockback.length_squared() > 0.0:
+		velocity = knockback
+	if hp_current == 0:
+		_die()
+
+
+## Heal `amount` HP, clamped at hp_max. No-op while dead. Fires `hp_changed`.
+## Used by HealingFountain + the respawn flow (full-heal on death-restart).
+func heal(amount: int) -> void:
+	if _is_dead:
+		return
+	if amount <= 0:
+		return
+	var before: int = hp_current
+	hp_current = min(hp_max, hp_current + amount)
+	if hp_current != before:
+		hp_changed.emit(hp_current, hp_max)
+
+
+## Direct setter — used by the save-load path to restore exact HP state.
+## Clamps to [0, hp_max]. Does NOT fire `player_died` even if value is 0
+## (the load path is already past the death-rule application).
+func set_hp(value: int) -> void:
+	hp_current = clamp(value, 0, hp_max)
+	hp_changed.emit(hp_current, hp_max)
+
+
+## Reset HP to full + clear the dead latch. Used by the respawn flow to
+## recycle the same Player node OR by tests asserting clean state. Does
+## NOT fire `player_died`; emits `hp_changed` for HUD listeners.
+func revive_full_hp() -> void:
+	_is_dead = false
+	hp_current = hp_max
+	hp_changed.emit(hp_current, hp_max)
+
+
+## Returns true if the player has died (HP hit zero this lifetime).
+func is_dead() -> bool:
+	return _is_dead
+
+
+## Internal: drive the death-transition. Idempotent — emits player_died
+## exactly once even under multi-hit collapse (if two enemy hitboxes
+## land in the same frame, the second is short-circuited by `_is_dead`).
+func _die() -> void:
+	if _is_dead:
+		return
+	_is_dead = true
+	# Cancel in-flight attack/dodge so a death-during-dodge doesn't leak
+	# i-frames into the next life. We DON'T set state to a "dead" tag
+	# (Player.gd has no STATE_DEAD constant — owning controller frees the
+	# node anyway).
+	_attack_recovery_left = 0.0
+	_dodge_time_left = 0.0
+	if _is_invulnerable:
+		_exit_iframes()
+	velocity = Vector2.ZERO
+	player_died.emit(global_position)
 
 
 ## Internal helper — fetch the PlayerStats autoload if it's registered.
