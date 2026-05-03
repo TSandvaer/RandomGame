@@ -24,3 +24,21 @@ Entry mapping (queue → action taken):
 - ENTRY 026 (create fix(mobs) charger flake with status complete) — applied; created `86c9kzmfm` with terminal status accepted on create.
 
 Tags noted: `mobs`, `charger`, `ci-flake`, `html5`, `progression` are NOT existing tags in the ClickUp space — only `bug`, `chore`, `week-3` are recognized. The created tasks have only the recognized tags applied. If those tag categories are needed long-term, Sponsor or Priya can add them at the space level.)
+
+---
+
+## ENTRY 2026-05-03-027
+
+- op: update_task
+- list_id: 901523123922
+- payload:
+    task_id: "86c9m3b3x"
+    status: "ready for qa test"
+    note: |
+      Uma run-010 — PR #121 opened (`design(ux): Sponsor-soak prep checklist + probe-target enumeration`).
+      Closes T-EXP-7 (P1) from `team/priya-pl/backlog-expansion-2026-05-02.md`.
+      NEW doc `team/uma-ux/sponsor-soak-checklist.md` (~340 lines, 9 sections + caveat).
+      Ticket already at `in progress`; per `clickup-status-as-hard-gate.md` paired-flip rule, would normally fire in same tool round as `gh pr create` — but MCP returned 'not connected' on the live attempt. Queued here for next-tick flush.
+- created_at: 2026-05-03T (Uma run-010)
+- attempts: 1 (MCP not connected at attempt time)
+
