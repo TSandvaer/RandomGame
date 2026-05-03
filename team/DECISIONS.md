@@ -380,3 +380,5 @@ Format:
 - Detail: PR #109 `devon/fix-combat-hits`, ClickUp `86c9m36zh`, file `scripts/combat/Hitbox.gd::_check_initial_overlaps`. Verification matrix: fix-branch CI run `25283183811` green (605 tests / 604 passing); tests-on-main verification CI run `25283207409` ALSO green (regression NOT locked in — proves Godot 4.3 headless handles the case correctly without the fix).
 
 ## 2026-05-03 — Performance budget locked: 60 FPS / <100 MB / <100 draw calls / <100ms save-roundtrip / <10 MB artifact / <3s boot. Detail: team/priya-pl/performance-budget.md.
+
+## 2026-05-03 — Player-side combat visual feedback landed: ember Polygon2D swing-wedge sized to LIGHT/HEAVY reach+radius (alpha 0.55/0.70, lifetime = hitbox lifetime 0.10/0.14s) + 60ms two-step modulate flash on every attack spawn, kill-and-restart on overlapping attacks, no cue on rejected attacks. Implements Uma `team/uma-ux/combat-visual-feedback.md` §1 verbatim — every number derived from `LIGHT_REACH`/`LIGHT_HITBOX_RADIUS`/`LIGHT_HITBOX_LIFETIME`/`HEAVY_*` constants in `scripts/player/Player.gd`. ClickUp `86c9m3ck4`, PR `devon/player-visual-feedback`.

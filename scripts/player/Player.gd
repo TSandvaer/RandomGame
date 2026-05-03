@@ -42,6 +42,12 @@ signal iframes_ended()
 ## hooks and tests that want to verify an attack actually fired.
 signal attack_spawned(kind: StringName, hitbox: Node)
 
+## Emitted whenever a swing-wedge VFX node is spawned (per
+## `team/uma-ux/combat-visual-feedback.md` §1). Tests subscribe to assert
+## the wedge appears with correct sizing/alpha/lifetime; gameplay code can
+## ignore. Carries the spawned Polygon2D and the attack kind.
+signal swing_wedge_spawned(kind: StringName, wedge: Node)
+
 ## Emitted when the equipped weapon changes (equip / unequip). HUD listens
 ## to refresh the weapon-stat panel. New weapon (or null on unequip) on the
 ## right.
@@ -102,6 +108,26 @@ const HEAVY_RECOVERY: float = 0.40
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
+# ---- Visual-feedback constants (per team/uma-ux/combat-visual-feedback.md §1)
+# Ember-color directional wedge spawned during the hitbox-lifetime window.
+# Wedge length matches LIGHT/HEAVY_REACH; half-width matches the hitbox
+# circle radius — so the placeholder cue reads where the hit actually lands.
+# Color/alpha and lifetimes are locked by Uma's spec, NOT priors.
+const SWING_WEDGE_COLOR_RGB: Color = Color(1.0, 0.4156862745, 0.1647058824)  # #FF6A2A
+const SWING_WEDGE_ALPHA_LIGHT: float = 0.55
+const SWING_WEDGE_ALPHA_HEAVY: float = 0.70
+
+# Player ember-flash modulate — 60ms total: 30ms toward ember, 30ms back to
+# white. Ember-tint per spec: Color(1.4, 1.0, 0.7, 1) (slight luminance boost).
+# Both attack types use the same flash duration.
+const SWING_FLASH_TINT: Color = Color(1.4, 1.0, 0.7, 1.0)
+const SWING_FLASH_HALF_DURATION: float = 0.030  # 30ms each way → 60ms total
+
+# Z-index per spec: above floor, below player body. The wedge is parented to
+# the Player so it follows position; setting z_index to -1 puts it behind the
+# Player's own children (Sprite ColorRect at z=0).
+const SWING_WEDGE_Z_INDEX: int = -1
+
 # ---- Runtime state ------------------------------------------------------
 
 var _state: StringName = STATE_IDLE
@@ -115,6 +141,14 @@ var _is_invulnerable: bool = false
 
 # Attack bookkeeping
 var _attack_recovery_left: float = 0.0
+
+# Visual-feedback bookkeeping — track the active swing-wedge + flash tween
+# so we can apply the kill-and-restart pattern Uma's spec calls out: a second
+# attack fired during the previous attack's recovery replaces the old cue
+# rather than stacking. Both fields are weakly-referenced (we null them on
+# tween_finished) so we don't keep stale Node/Tween references alive.
+var _active_swing_wedge: Polygon2D = null
+var _active_flash_tween: Tween = null
 
 # Collision layer to restore after dodge i-frames clear it.
 const PLAYER_LAYER_BIT: int = 2  # see project.godot 2d_physics/layer_2 = "player"
@@ -598,6 +632,16 @@ func try_attack(kind: StringName, dir: Vector2 = Vector2.ZERO) -> Node:
 	var hitbox: Hitbox = _spawn_hitbox(d, damage, d * knockback_strength, reach, radius, lifetime)
 	_attack_recovery_left = recovery
 	set_state(STATE_ATTACK)
+
+	# Visual-feedback cues per `team/uma-ux/combat-visual-feedback.md` §1:
+	# (a) ember directional wedge sized to the actual hitbox numbers, fades
+	#     out over the hitbox-lifetime window;
+	# (b) 60ms ember-tint modulate flash on the player.
+	# Spec §1 explicitly derives every number from the LIGHT/HEAVY tuning
+	# constants above — no priors, no "typical action-game" reasoning.
+	_spawn_swing_wedge(kind, d, reach, radius, lifetime)
+	_play_swing_flash()
+
 	attack_spawned.emit(kind, hitbox)
 	return hitbox
 
@@ -670,6 +714,88 @@ func _exit_iframes() -> void:
 	_is_invulnerable = false
 	collision_layer = _saved_collision_layer
 	iframes_ended.emit()
+
+
+# ---- Visual feedback ---------------------------------------------------
+
+## Spawn the ember directional wedge (§1a in `combat-visual-feedback.md`).
+## Polygon2D triangle parented to Player, oriented along `dir`, length =
+## `reach`, half-width = `radius`. Fade-out over `lifetime` then queue_free.
+##
+## Kill-and-restart: if a previous wedge from an earlier attack is still
+## fading, free it before spawning the new one so the cues don't stack —
+## matches Uma's hit-flash pattern in §2.
+func _spawn_swing_wedge(kind: StringName, dir: Vector2, reach: float, radius: float, lifetime: float) -> Polygon2D:
+	# Drop any in-flight wedge so the new attack's cue is the only one
+	# visible. is_instance_valid covers the case where _on_wedge_finished
+	# already nulled the ref but the queue_free hasn't been processed yet.
+	if _active_swing_wedge != null and is_instance_valid(_active_swing_wedge):
+		_active_swing_wedge.queue_free()
+	_active_swing_wedge = null
+
+	var wedge: Polygon2D = Polygon2D.new()
+	# Three-vertex triangle: tip at (reach, 0), back-corners at (0, ±radius).
+	# Local space; we rotate the whole polygon to match `dir` below.
+	wedge.polygon = PackedVector2Array([
+		Vector2(reach, 0.0),
+		Vector2(0.0, -radius),
+		Vector2(0.0, radius),
+	])
+	var alpha: float = SWING_WEDGE_ALPHA_HEAVY if kind == ATTACK_HEAVY else SWING_WEDGE_ALPHA_LIGHT
+	var rgba: Color = SWING_WEDGE_COLOR_RGB
+	rgba.a = alpha
+	wedge.color = rgba
+	# Rotate so the tip points along `dir`. atan2(y, x) gives the radian
+	# angle of the vector measured from +X — matches the wedge's local +X tip.
+	wedge.rotation = dir.angle()
+	# Z-index per spec: above floor, below player body. Wedge sits behind
+	# the Player's Sprite ColorRect (z=0) so it reads as a flash extending
+	# from the player rather than stamped over them.
+	wedge.z_index = SWING_WEDGE_Z_INDEX
+	# Set lifetime as metadata so tests can read it back without inspecting
+	# tween internals (Tween has no public elapsed-duration getter).
+	wedge.set_meta("lifetime", lifetime)
+	wedge.set_meta("kind", kind)
+	add_child(wedge)
+	_active_swing_wedge = wedge
+	swing_wedge_spawned.emit(kind, wedge)
+
+	# Fade alpha to 0 over the hitbox-lifetime window, then queue_free. We
+	# tween modulate.a (not the polygon's color.a directly) so the spec's
+	# "tween modulate:a, 0.0, LIFETIME" line is honored verbatim.
+	var tween: Tween = create_tween()
+	tween.tween_property(wedge, "modulate:a", 0.0, lifetime)
+	tween.tween_callback(Callable(self, "_on_wedge_finished").bind(wedge))
+	return wedge
+
+
+## Play the 60ms ember-tint modulate flash (§1b). 30ms toward
+## `SWING_FLASH_TINT`, then 30ms back to white. Both attack types share
+## this duration. Kill-and-restart on overlapping calls.
+func _play_swing_flash() -> void:
+	# Kill any in-flight flash so the new attack's tint is clean. If the
+	# tween has already finished naturally, kill() is a safe no-op.
+	if _active_flash_tween != null and _active_flash_tween.is_valid():
+		_active_flash_tween.kill()
+	# Force-snap to white so a kill-during-tint-down doesn't leave the
+	# player a permanent ember color.
+	modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+	var tween: Tween = create_tween()
+	tween.tween_property(self, "modulate", SWING_FLASH_TINT, SWING_FLASH_HALF_DURATION)
+	tween.tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 1.0), SWING_FLASH_HALF_DURATION)
+	_active_flash_tween = tween
+
+
+## Internal: tween-finished callback for the swing wedge. Frees the node and
+## clears the active reference (only if this exact wedge is still the
+## active one — a newer attack may have already replaced it).
+func _on_wedge_finished(wedge: Polygon2D) -> void:
+	if not is_instance_valid(wedge):
+		return
+	if _active_swing_wedge == wedge:
+		_active_swing_wedge = null
+	wedge.queue_free()
 
 
 # ---- Hitbox spawn -------------------------------------------------------
