@@ -366,6 +366,10 @@ Format:
 
 ## 2026-05-03 — Risk register refreshed: R3/R5/R7 closed-or-demoted, R6 escalated to high impact, R11+R12 added.
 
+## 2026-05-03 — M2 week-2 backlog drafted (anticipatory; revisable post-Sponsor M1 sign-off and week-1 close).
+
+## 2026-05-03 — M2 audio sourcing pipeline scoped: 5 routes (freesound 45% / hand-Foley 26% / hand-composed 23% / procedural 5% / AI-curated 1%), 10-cue M2-w1 first-pass subset locked, R10 placeholder-fallback discipline preserved. Detail: `team/uma-ux/audio-sourcing-pipeline.md`.
+
 ## 2026-05-03 — Hitboxes defensively check initial overlaps on spawn (`86c9m36zh` — root-cause UNCONFIRMED)
 
 - Decided by: Devon (recommended; Tess judgment pending per PR #109 body)
