@@ -19,8 +19,17 @@ extends Node2D
 ## in a marker fake without coupling the assembler to Grunt's spec.
 @export_file("*.tscn") var grunt_scene_path: String = "res://scenes/mobs/Grunt.tscn"
 
-# Cached load to avoid re-parsing the scene per spawn.
+## res:// path to the Grunt MobDef. Applied to each spawned grunt so its
+## `mob_def` reference is set (HP/damage/xp_reward/loot_table all flow from
+## here). Without this the mob_died signal carries `mob_def == null`, which
+## makes the Levels.subscribe_to_mob and MobLootSpawner pipelines silently
+## no-op on the kill — caught at integration time by
+## `tests/integration/test_m1_play_loop.gd::test_first_kill_grants_xp_and_loot_into_inventory`.
+@export_file("*.tres") var grunt_mob_def_path: String = "res://resources/mobs/grunt.tres"
+
+# Cached loads to avoid re-parsing the scene / TRES per spawn.
 var _grunt_scene_cache: PackedScene = null
+var _grunt_def_cache: MobDef = null
 
 # The assembled result, exposed for tests / save code that wants to
 # enumerate spawned mobs after `_ready`.
@@ -76,6 +85,13 @@ func _spawn_mob(mob_id: StringName, _world_pos: Vector2) -> Node:
 			push_warning("Stratum1Room01: grunt scene failed to load at '%s'" % grunt_scene_path)
 			return null
 		var node: Node = scene.instantiate()
+		# Apply the grunt MobDef so HP/damage/xp_reward/loot_table flow from
+		# the authored .tres. Without this, `mob_def` stays null and the
+		# Levels + loot pipelines silently no-op on kill (the mob_died signal
+		# carries mob_def=null).
+		var def: MobDef = _get_grunt_def()
+		if def != null:
+			(node as Grunt).mob_def = def
 		# Resolve the player at runtime via group lookup. The Grunt's own
 		# `_resolve_player` does this on _ready, but we set it explicitly
 		# here too for headless tests where _ready may have already fired.
@@ -91,3 +107,12 @@ func _get_grunt_scene() -> PackedScene:
 		return null
 	_grunt_scene_cache = load(grunt_scene_path) as PackedScene
 	return _grunt_scene_cache
+
+
+func _get_grunt_def() -> MobDef:
+	if _grunt_def_cache != null:
+		return _grunt_def_cache
+	if grunt_mob_def_path == "":
+		return null
+	_grunt_def_cache = load(grunt_mob_def_path) as MobDef
+	return _grunt_def_cache

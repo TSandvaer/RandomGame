@@ -119,13 +119,24 @@ func test_empty_file_falls_through_to_dev_local() -> void:
 
 # --- Main scene wiring ---------------------------------------------------
 
-func test_main_scene_has_build_label_node() -> void:
-	# The Main scene must carry a BuildLabel child so Main.gd can update it
-	# at _ready. Tess's manual test reads this label off the scene.
+func test_main_scene_mounts_build_label_at_runtime() -> void:
+	# Per `feat(integration)` run-013: Main.tscn no longer carries authored
+	# child nodes — `Main.gd::_ready` now constructs the HUD CanvasLayer (with
+	# its `BuildLabel` child) at runtime. We verify the runtime construction
+	# by adding the scene to the tree and asserting the HUD child appears.
 	var packed: PackedScene = load("res://scenes/Main.tscn")
 	assert_not_null(packed)
 	var instance: Node = packed.instantiate()
-	var label: Node = instance.get_node_or_null("BuildLabel")
-	assert_not_null(label, "Main.tscn must have a BuildLabel child")
+	# Reset autoloads so this test doesn't pick up state from siblings.
+	var save_node: Node = Engine.get_main_loop().root.get_node_or_null("Save")
+	if save_node != null and save_node.has_save(0):
+		save_node.delete_save(0)
+	# Adding to the tree fires _ready, which builds the HUD.
+	add_child_autofree(instance)
+	# The HUD CanvasLayer is named "HUD"; its BuildLabel child renders the
+	# `BuildInfo.display_label` value.
+	var hud: Node = instance.find_child("HUD", true, false)
+	assert_not_null(hud, "Main runtime mounts a HUD CanvasLayer")
+	var label: Node = hud.find_child("BuildLabel", true, false)
+	assert_not_null(label, "HUD mounts a BuildLabel child at _ready")
 	assert_true(label is Label, "BuildLabel must be a Label node")
-	instance.free()

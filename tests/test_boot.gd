@@ -24,16 +24,25 @@ func test_main_scene_path_matches_project_setting() -> void:
 
 
 func test_main_scene_instantiates() -> void:
+	# Per `feat(integration)` run-013: Main.tscn is now an empty Node2D
+	# carrying `Main.gd`. `_ready` (fired when the scene is added to the
+	# tree) builds the world / HUD / Player / panels at runtime. We verify
+	# both that the .tscn loads (no parse errors) AND that the runtime
+	# scaffolding spawns a Player node when `_ready` fires.
 	var packed: PackedScene = load("res://scenes/Main.tscn")
 	assert_not_null(packed, "Main.tscn must load")
 	assert_true(packed.can_instantiate(), "Main.tscn must be instantiable (no parse errors)")
 	var instance: Node = packed.instantiate()
 	assert_not_null(instance, "Main.tscn instantiate() must return a node")
-	# The Main scene contains the Player as a sub-instance — verify the tree
-	# integrates without orphan errors. (A typo in Player.tscn surfaces here.)
-	assert_not_null(instance.get_node_or_null("Player"),
-		"Main scene must include a Player child (boot wiring contract)")
-	instance.free()
+	# Reset save slot so the test runs clean across siblings.
+	var save_node: Node = Engine.get_main_loop().root.get_node_or_null("Save")
+	if save_node != null and save_node.has_save(0):
+		save_node.delete_save(0)
+	add_child_autofree(instance)
+	# After _ready, Main has spawned the Player as a child of its World root.
+	# Walk the tree to find it (it lives under World, not directly under Main).
+	var player: Node = instance.find_child("Player", true, false)
+	assert_not_null(player, "Main runtime must spawn a Player node (boot wiring contract)")
 
 
 # --- tu-boot-02 ----------------------------------------------------------

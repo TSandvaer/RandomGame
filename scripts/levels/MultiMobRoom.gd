@@ -55,6 +55,14 @@ signal room_cleared()
 @export_file("*.tscn") var charger_scene_path: String = "res://scenes/mobs/Charger.tscn"
 @export_file("*.tscn") var shooter_scene_path: String = "res://scenes/mobs/Shooter.tscn"
 
+## res:// paths to the mob MobDef TRES files. Applied to each spawned mob
+## so its `mob_def` reference is set (HP/damage/xp_reward/loot_table flow
+## from here). Without this, `mob_def` stays null and the Levels/loot
+## pipelines silently no-op on kill — same fix as Stratum1Room01.
+@export_file("*.tres") var grunt_mob_def_path: String = "res://resources/mobs/grunt.tres"
+@export_file("*.tres") var charger_mob_def_path: String = "res://resources/mobs/charger.tres"
+@export_file("*.tres") var shooter_mob_def_path: String = "res://resources/mobs/shooter.tres"
+
 ## res:// paths to the optional dressing scenes.
 @export_file("*.tscn") var room_gate_scene_path: String = "res://scenes/levels/RoomGate.tscn"
 @export_file("*.tscn") var healing_fountain_scene_path: String = "res://scenes/levels/HealingFountain.tscn"
@@ -71,10 +79,13 @@ signal room_cleared()
 
 # ---- Runtime ---------------------------------------------------------
 
-# Cached scene loads to avoid re-parsing per spawn.
+# Cached scene + def loads to avoid re-parsing per spawn.
 var _grunt_scene_cache: PackedScene = null
 var _charger_scene_cache: PackedScene = null
 var _shooter_scene_cache: PackedScene = null
+var _grunt_def_cache: MobDef = null
+var _charger_def_cache: MobDef = null
+var _shooter_def_cache: MobDef = null
 
 var _assembly: LevelAssembler.AssemblyResult = null
 var _room_gate: RoomGate = null
@@ -187,20 +198,29 @@ func _register_mobs_with_gate() -> void:
 
 func _spawn_mob(mob_id: StringName, _world_pos: Vector2) -> Node:
 	var scene: PackedScene = null
+	var def: MobDef = null
 	match mob_id:
 		&"grunt":
 			scene = _get_grunt_scene()
+			def = _get_grunt_def()
 		&"charger":
 			scene = _get_charger_scene()
+			def = _get_charger_def()
 		&"shooter":
 			scene = _get_shooter_scene()
+			def = _get_shooter_def()
 		_:
 			push_warning("MultiMobRoom: unknown mob_id '%s'" % mob_id)
 			return null
 	if scene == null:
 		push_warning("MultiMobRoom: scene cache miss for mob_id '%s'" % mob_id)
 		return null
-	return scene.instantiate()
+	var node: Node = scene.instantiate()
+	# Apply the MobDef so kill -> mob_died -> XP/loot pipelines see a non-null
+	# mob_def payload (otherwise both pipelines silently no-op).
+	if def != null and "mob_def" in node:
+		node.mob_def = def
+	return node
 
 
 func _get_grunt_scene() -> PackedScene:
@@ -219,6 +239,24 @@ func _get_shooter_scene() -> PackedScene:
 	if _shooter_scene_cache == null and shooter_scene_path != "":
 		_shooter_scene_cache = load(shooter_scene_path) as PackedScene
 	return _shooter_scene_cache
+
+
+func _get_grunt_def() -> MobDef:
+	if _grunt_def_cache == null and grunt_mob_def_path != "":
+		_grunt_def_cache = load(grunt_mob_def_path) as MobDef
+	return _grunt_def_cache
+
+
+func _get_charger_def() -> MobDef:
+	if _charger_def_cache == null and charger_mob_def_path != "":
+		_charger_def_cache = load(charger_mob_def_path) as MobDef
+	return _charger_def_cache
+
+
+func _get_shooter_def() -> MobDef:
+	if _shooter_def_cache == null and shooter_mob_def_path != "":
+		_shooter_def_cache = load(shooter_mob_def_path) as MobDef
+	return _shooter_def_cache
 
 
 # ---- Internal -------------------------------------------------------

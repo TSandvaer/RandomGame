@@ -1,25 +1,6 @@
-[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_main"]
+[gd_scene load_steps=2 format=3 uid="uid://b0embergrave_main"]
 
 [ext_resource type="Script" path="res://scenes/Main.gd" id="1_main"]
-[ext_resource type="PackedScene" uid="uid://b0embergrave_player" path="res://scenes/player/Player.tscn" id="2_player"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
-
-[node name="Banner" type="Label" parent="."]
-offset_left = 40.0
-offset_top = 40.0
-offset_right = 800.0
-offset_bottom = 120.0
-text = "Embergrave — boot OK. WASD to move, Shift to sprint, Space to dodge."
-
-[node name="BuildLabel" type="Label" parent="."]
-offset_left = 16.0
-offset_top = 692.0
-offset_right = 320.0
-offset_bottom = 712.0
-modulate = Color(0.55, 0.55, 0.6, 0.85)
-text = "build: dev-local"
-
-[node name="Player" parent="." instance=ExtResource("2_player")]
-position = Vector2(640, 360)
