@@ -380,3 +380,5 @@ Format:
 - Detail: PR #109 `devon/fix-combat-hits`, ClickUp `86c9m36zh`, file `scripts/combat/Hitbox.gd::_check_initial_overlaps`. Verification matrix: fix-branch CI run `25283183811` green (605 tests / 604 passing); tests-on-main verification CI run `25283207409` ALSO green (regression NOT locked in — proves Godot 4.3 headless handles the case correctly without the fix).
 
 ## 2026-05-03 — Performance budget locked: 60 FPS / <100 MB / <100 draw calls / <100ms save-roundtrip / <10 MB artifact / <3s boot. Detail: team/priya-pl/performance-budget.md.
+
+## 2026-05-03 — RESUME.md rewritten to reflect post-M1-integration state, MARIAN-TUTOR rules adoption, and current dispatch envelope. Detail: PR <new>.
