@@ -365,3 +365,5 @@ Format:
 ## 2026-05-03 — Combat visual feedback locked: ember swing-wedge + 60ms player ember-flash on attack spawn; 80ms white hit-flash on every mob take_damage; 200ms scale-down+fade death tween + 6-particle ember burst (boss 24 particles + 4px shake + 400ms hold) replacing instant queue_free; cross-mob consistency across grunt/charger/shooter/boss; mob_died still fires on _die-start frame so loot+room-clear unaffected. Detail: `team/uma-ux/combat-visual-feedback.md`.
 
 ## 2026-05-03 — Risk register refreshed: R3/R5/R7 closed-or-demoted, R6 escalated to high impact, R11+R12 added.
+
+## 2026-05-03 — Mob-side combat visual feedback landed (consumes Uma's spec): hit-flash + death-tween + ember-burst + boss-climax shake/hold implemented inline on Grunt/Charger/Shooter/Stratum1Boss; CPUParticles2D burst parented to room (survives mob queue_free); `mob_died`/`boss_died` frame-1 contract preserved (loot + room-clear unaffected); paired GUT tests `tests/test_combat_visuals.gd` lock the timings + the frame-1 contract. Detail: PR `drew/mob-visual-feedback`, ClickUp `86c9m390d`.

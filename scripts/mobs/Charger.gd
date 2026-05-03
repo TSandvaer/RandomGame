@@ -123,6 +123,17 @@ const WALL_STOP_DISPLACEMENT_EPSILON: float = 0.5
 ## test_velocity_during_charge tripping the wall-stop on charge-entry tick).
 const WALL_STOP_FRAMES_REQUIRED: int = 2
 
+## Visual-feedback timings (per `team/uma-ux/combat-visual-feedback.md` §2 + §3).
+## Same rule as Grunt — 80ms hit-flash, 200ms death-tween, 6 particles.
+const HIT_FLASH_IN: float = 0.020
+const HIT_FLASH_HOLD: float = 0.020
+const HIT_FLASH_OUT: float = 0.040
+const DEATH_TWEEN_DURATION: float = 0.200
+const DEATH_PARTICLE_COUNT: int = 6
+const DEATH_TARGET_SCALE: float = 0.6
+const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
+const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
+
 ## Layer bits (mirror project.godot — same as Grunt).
 const LAYER_WORLD: int = 1 << 0          # bit 1
 const LAYER_PLAYER: int = 1 << 1         # bit 2
@@ -168,6 +179,12 @@ var _wall_stop_frames: int = 0
 # Tracks which targets the current charge has already body-hit so a single
 # charge can't multi-tick the player. Reset at the start of each charge.
 var _charge_already_hit: Array[Node] = []
+
+# VFX runtime — see `team/uma-ux/combat-visual-feedback.md` §2 + §3.
+var _hit_flash_tween: Tween = null
+var _death_tween: Tween = null
+var _modulate_at_rest: Color = Color(1, 1, 1, 1)
+var _captured_modulate_at_rest: bool = false
 
 
 func _ready() -> void:
@@ -237,6 +254,9 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	var final_amount: int = int(round(clean_amount * multiplier))
 	hp_current = max(0, hp_current - final_amount)
 	damaged.emit(final_amount, hp_current, source)
+	# Visual: white hit-flash on every actual-damage take_damage (Uma §2).
+	if final_amount > 0:
+		_play_hit_flash()
 	# Skip knockback during charge — a dashing charger's momentum is
 	# load-bearing; punting it sideways breaks the silhouette of the attack.
 	if _state != STATE_CHARGING and knockback.length_squared() > 0.0:
@@ -440,9 +460,78 @@ func _die() -> void:
 	_spotted_hold_left = 0.0
 	velocity = Vector2.ZERO
 	_set_state(STATE_DEAD)
+	# CRITICAL CONTRACT (Uma `combat-visual-feedback.md` §3a): mob_died fires
+	# at the START of the death sequence, not after the visual tween. Loot +
+	# room-clear logic still execute on this frame; the 200ms visual decay
+	# does not gate progression.
 	mob_died.emit(self, global_position, mob_def)
-	# Defer free so any signal listeners running this tick still see state.
-	call_deferred("queue_free")
+	_spawn_death_particles()
+	_play_death_tween()
+
+
+# ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
+
+func _play_hit_flash() -> void:
+	if _is_dead:
+		return
+	if not _captured_modulate_at_rest:
+		_modulate_at_rest = modulate
+		_captured_modulate_at_rest = true
+	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
+		_hit_flash_tween.kill()
+	if not is_inside_tree():
+		modulate = _modulate_at_rest
+		return
+	_hit_flash_tween = create_tween()
+	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
+	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+	_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
+
+
+func _play_death_tween() -> void:
+	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
+		_hit_flash_tween.kill()
+		_hit_flash_tween = null
+	if not is_inside_tree():
+		queue_free()
+		return
+	_death_tween = create_tween()
+	_death_tween.set_parallel(true)
+	_death_tween.tween_property(self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
+	_death_tween.finished.connect(_on_death_tween_finished)
+
+
+func _on_death_tween_finished() -> void:
+	queue_free()
+
+
+func _spawn_death_particles() -> void:
+	var room: Node = get_parent()
+	if room == null:
+		return
+	var burst: CPUParticles2D = CPUParticles2D.new()
+	burst.global_position = global_position
+	burst.amount = DEATH_PARTICLE_COUNT
+	burst.one_shot = true
+	burst.explosiveness = 1.0
+	burst.lifetime = 0.30
+	burst.emitting = true
+	burst.direction = Vector2.UP
+	burst.spread = 180.0
+	burst.initial_velocity_min = 30.0
+	burst.initial_velocity_max = 60.0
+	burst.gravity = Vector2(0.0, -40.0)
+	burst.scale_amount_min = 1.0
+	burst.scale_amount_max = 1.0
+	var ramp: Gradient = Gradient.new()
+	ramp.set_color(0, EMBER_LIGHT)
+	ramp.set_color(1, EMBER_DEEP)
+	var grad_tex: GradientTexture1D = GradientTexture1D.new()
+	grad_tex.gradient = ramp
+	burst.color_ramp = grad_tex
+	room.add_child(burst)
+	burst.finished.connect(burst.queue_free)
 
 
 # ---- Helpers ----------------------------------------------------------
