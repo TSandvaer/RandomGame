@@ -127,6 +127,37 @@ jobs:
           test -f build/web/index.wasm
           test -f build/web/index.pck
 
+      - name: Verify build_info.txt shipped in .pck (BB-1 regression gate)
+        run: |
+          set -euo pipefail
+          # BB-1 / ClickUp 86c9m390b — Tess run-024 found the HTML5 RC's HUD
+          # footer always read "build: dev-local" because export_presets.cfg's
+          # `export_filter="all_resources"` strips plain .txt files from the
+          # .pck, so BuildInfo.gd's `FileAccess.file_exists("res://build_info.txt")`
+          # returned false on the shipped artifact. Fix is `include_filter="build_info.txt"`
+          # in every preset. This step is the regression gate: assert the
+          # 7-char short SHA bytes appear inside `index.pck`. The .pck is a
+          # binary archive that stores file paths + raw contents back-to-back;
+          # since `build_info.txt` is exactly the 7 SHA bytes, those bytes
+          # must be findable via `grep -aF` in the pck. If this fails, the
+          # include_filter regressed (or someone re-ran the editor and let
+          # Godot rewrite the preset block).
+          short_sha="${{ steps.stamp.outputs.short_sha }}"
+          if ! grep -aFq "${short_sha}" build/web/index.pck; then
+            echo "ERROR: short SHA '${short_sha}' not found in build/web/index.pck" >&2
+            echo "BB-1 regressed — build_info.txt is not in the export bundle." >&2
+            echo "Check export_presets.cfg HTML5 preset has include_filter=\"build_info.txt\"." >&2
+            exit 1
+          fi
+          # Also assert the literal filename is in the pck's path table —
+          # cheaper than a full pack inspection but distinguishes "SHA bytes
+          # happen to collide" from "the file is actually packed".
+          if ! grep -aFq "build_info.txt" build/web/index.pck; then
+            echo "ERROR: 'build_info.txt' filename not found in build/web/index.pck path table" >&2
+            exit 1
+          fi
+          echo "OK: build_info.txt (containing '${short_sha}') is shipped in index.pck"
+
       - name: Determine release label
         id: label
         run: |
