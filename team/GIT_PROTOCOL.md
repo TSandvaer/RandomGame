@@ -51,7 +51,74 @@ The Tess-only `ready for qa test → complete` gate (per `TESTING_BAR.md`) maps 
   - **Approves and merges**: `gh pr review <PR#> --approve --body "<sign-off note>"` then `gh pr merge <PR#> --squash --delete-branch --admin`. Then flips ClickUp to `complete`.
   - **Bounces**: `gh pr review <PR#> --request-changes --body "<bug list with severity>"`. Files `bug(scope):` ClickUp tasks per `team/tess-qa/bug-template.md` and leaves the PR open until devs push fixes.
 
-Pure docs / `chore(repo|ci|build)` / `design(spec)` PRs — Tess sign-off is **not** required. The orchestrator (or Priya for `chore(triage)` / `docs(team)`) may merge directly.
+Pure docs / `chore(repo|ci|build)` / `design(spec)` PRs — Tess sign-off is **not** required, **but the merging identity must still be the orchestrator (or Priya for `chore(triage)` / `docs(team)`). Devs do NOT self-merge their own PRs in any category.** The exemption is from Tess sign-off, not a self-merge license. (See `team/log/process-incidents.md` 2026-05-02 entry for the precipitating incident.)
+
+## ClickUp lifecycle as hard gate
+
+Every ticket lifecycle event has a paired ClickUp status move that fires in the **same tool round** as the action — not "remember to do later." This is a hard gate, not advisory bookkeeping. The Sponsor relies on the ClickUp board as live ground truth; a lying board destroys that trust.
+
+| Event | ClickUp move | Who fires it |
+|---|---|---|
+| Orchestrator dispatches an agent on a ticket | `to do` → `in progress` | Orchestrator (or agent at run-start) |
+| Agent opens PR (feat/fix) | `in progress` → `ready for qa test` | Agent in PR-open flow |
+| Agent opens PR (chore/docs/design exempt) | `in progress` → `ready for qa test` (for orchestrator visibility) | Agent in PR-open flow |
+| Tess merges (feat/fix) | `ready for qa test` → `complete` | Tess in merge step |
+| Orchestrator merges (chore/docs/design) | `ready for qa test` → `complete` | Orchestrator in merge step |
+| Tess bounces | `ready for qa test` → `in progress` | Tess in bounce comment |
+
+**Rules:**
+
+1. **Same tool round.** The ClickUp `update_task` call goes in the same response as the dispatch / `gh pr create` / `gh pr merge` — not a follow-up. "Queue and forget" is the failure mode.
+2. **MCP down → fallback queue.** If `mcp__clickup__clickup_*` is unreachable, queue the flip in `team/log/clickup-pending.md` per `team/CLICKUP_FALLBACK.md`, and the orchestrator flushes on reconnect.
+3. **Heartbeat audit sweep.** Every heartbeat tick the orchestrator runs `mcp__clickup__clickup_filter_tasks list_ids=["901523123922"] statuses=["in progress","ready for qa test"]` and reconciles each ticket against reality (agent running? PR open? merged?). Discrepancies are fixed in the same tick.
+4. **Tickets created mid-flight.** If Tess (or any role) discovers a bug and files a `bug(...)` ticket, set the initial status correctly: `complete` if the fix already shipped, default if the work is upcoming.
+
+**Mantra:** the ClickUp board is the truth. Don't lie to it.
+
+## Self-Test Report (UX-visible PRs)
+
+Any PR that touches a **player-visible surface** (scene tree, UI, visual feedback, audio cue, input affordance, save format, level content) MUST include a **Self-Test Report comment from the author** before Tess reviews. Tess's review starts from the report, not from a cold-read of the diff.
+
+**Categories that REQUIRE a Self-Test Report:**
+
+- `feat(integration)`, `feat(ui)`, `feat(combat)`, `feat(level)`, `feat(audio)`, `feat(progression)`, `feat(gear)`
+- `fix(ui)`, `fix(combat)`, `fix(level)`, `fix(audio)`, `fix(integration)`
+- `design(spec)` only when the spec is consumed by an in-flight `feat` PR (otherwise design is paper-only)
+
+**Categories that do NOT require it (CI green is sufficient):**
+
+- `chore(ci|repo|build)`
+- `docs(team|scope)`
+- `chore(state|orchestrator|planning)`
+- `test(...)` (test-only PRs)
+- `.tres`-only data refactors
+
+**Report format (paste as a PR comment after `gh pr create`):**
+
+```markdown
+## Self-Test Report
+
+**Build artifact:** <run ID + zip name + sha>
+**Scene path:** <e.g. res://scenes/Main.tscn or test scene used for verification>
+**Verification method:** <browser+local server / godot --headless / GUT integration test waypoint>
+
+### AC walkthrough
+- [x] AC1: <description> — observed: <what you saw/heard>
+- [x] AC2: ...
+- [ ] AC3: <if not personally verified — explain why and what's covered by automated tests>
+
+### Side-effect inventory
+- <other surface that might be affected>: <expected vs. observed>
+
+### Open concerns / known gaps
+<anything you noticed but is out of this PR's scope>
+```
+
+**Headless-environment fallback:** if the agent has no browser binary (GUT-only environment), the Self-Test Report uses `godot --headless` to load the actual entry scene + drive the play loop programmatically (Devon PR #107 pattern). The verification section notes "verified via headless integration test, no browser repro available — Sponsor's interactive soak is the final gate."
+
+**Tess's review path:** read the Self-Test Report first; spot-check ≥1 AC + ≥1 side-effect against the report; then sign off or bounce. **If the report is missing on a UX-visible PR, bounce it back immediately with "Self-Test Report missing" — don't burn review budget cold-reading the diff.**
+
+**Why:** the M1 Main.tscn-stub miss (~30 PRs of "feature-complete" claims while the runnable build was a week-1 boot stub) would have been caught on the first PR if every author had to point at the actual playable surface. See `team/log/process-incidents.md` and orchestrator memory `self-test-report-gate.md` + `product-vs-component-completeness.md`.
 
 ## Concurrent agents — role-persistent worktrees (W3-A7 option A)
 

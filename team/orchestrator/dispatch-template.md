@@ -6,6 +6,20 @@ Standard snippets the orchestrator pastes into every Agent brief. Centralizing t
 
 ---
 
+## Scoped contract (mandatory in every dispatch)
+
+Pin the agent's allowed file scope + role boundary so they don't blind-resolve into another agent's lane on conflict. Block goes near the top of the brief, after the task-specific summary and before the worktree state.
+
+```markdown
+**Scoped contract:**
+- **Owned files / directories (you may edit):** <list — e.g. `team/uma-ux/<your-doc>.md`, `scripts/player/Player.gd`, `tests/test_player_*.gd`>.
+- **Read-only references (read but do NOT edit):** <list — e.g. `scripts/combat/Hitbox.gd`, `team/uma-ux/combat-visual-feedback.md`>.
+- **Out of scope (do NOT touch — surface a flag instead):** other roles' design docs, other agents' in-flight branches, `team/STATE.md` sections that aren't your role's.
+- **Conflict rule:** if your work would require touching a file outside this scope, STOP and surface a one-line note in your run-log + `team/STATE.md` "Open decisions awaiting orchestrator." Don't blind-resolve into another role's area.
+```
+
+Replace placeholders with the task-specific scope. Skip the block only for trivial idle-tick state PRs.
+
 ## Worktree state (mandatory in every dispatch)
 
 ```markdown
@@ -47,6 +61,53 @@ Replace `<your-role>` with the literal role name (priya / uma / devon / drew / t
 - Bump your run number to the next integer (read your section to find the current run; increment by 1).
 - Include the update in the same PR as your task work — don't open a separate `chore(state)` PR per task. (Idle-tick state PRs are still allowed; this rule is about per-task efficiency.)
 ```
+
+## ClickUp lifecycle (paired flips, same tool round as the action)
+
+Every ticket lifecycle event is a paired ClickUp status move that fires in the SAME tool round as the corresponding action. Per `team/GIT_PROTOCOL.md` § "ClickUp lifecycle as hard gate" + orchestrator memory `clickup-status-as-hard-gate.md`.
+
+```markdown
+**ClickUp lifecycle (paired flips, NOT advisory):**
+- **At run-start** (if orchestrator hasn't already flipped): `mcp__clickup__clickup_update_task task_id=<ticket> status="in progress"`. Same tool round as your first work.
+- **On PR open** (`gh pr create`): immediately fire `mcp__clickup__clickup_update_task task_id=<ticket> status="ready for qa test"` in the same response. The orchestrator-side dispatch flip + your PR-open flip = two complementary safeguards.
+- **MCP unreachable:** queue the flip in `team/log/clickup-pending.md` per `team/CLICKUP_FALLBACK.md` (`ENTRY NNN: <ticket_id> -> <new_status> (reason: <one-line>)`). Orchestrator flushes on reconnect.
+- **Don't lie to the board.** If you can't open the PR (ran into a blocker), don't flip to `ready for qa test` — keep it at `in progress` and surface the blocker.
+```
+
+## Self-Test Report (UX-visible PRs only)
+
+Required for `feat(integration|ui|combat|level|audio|progression|gear)`, `fix(ui|combat|level|audio|integration)`, and `design(spec)` when the spec is consumed by an in-flight `feat` PR. NOT required for `chore(ci|repo|build|state|orchestrator|planning)`, `docs(team|scope)`, `test(...)`, or `.tres`-only data refactors.
+
+Per `team/GIT_PROTOCOL.md` § "Self-Test Report (UX-visible PRs)" + orchestrator memory `self-test-report-gate.md`.
+
+```markdown
+**Self-Test Report (REQUIRED before Tess review):**
+
+After `gh pr create`, post a PR comment with the Self-Test Report. Tess's review starts from this report, not from a cold-read of the diff. If you skip it, Tess bounces immediately.
+
+Comment template:
+
+## Self-Test Report
+
+**Build artifact:** <run ID + zip name + sha>
+**Scene path:** <res://scenes/Main.tscn or test scene used for verification>
+**Verification method:** <browser+local server / godot --headless / GUT integration test waypoint>
+
+### AC walkthrough
+- [x] AC1: <description> — observed: <what you saw/heard>
+- [x] AC2: ...
+- [ ] AC3: <if not personally verified — explain why + what's covered by automated tests>
+
+### Side-effect inventory
+- <other surface that might be affected>: <expected vs. observed>
+
+### Open concerns / known gaps
+<anything noticed but out of this PR's scope>
+
+**Headless fallback:** if your environment has no browser, drive `godot --headless` against the actual entry scene (Devon PR #107 pattern), capture the GUT integration-test output, and note: "verified via headless integration test, no browser repro available — Sponsor's interactive soak is the final gate."
+```
+
+For `chore`/`docs`/`test`/data PRs that don't need a Self-Test Report, replace the block with: `**Self-Test:** <one-line confirmation of what was checked — e.g. "diffed sections against memory rules; no contradictions with sibling docs">.`
 
 ## Done clause (mandatory in every dispatch)
 
