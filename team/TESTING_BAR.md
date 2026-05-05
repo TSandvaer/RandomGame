@@ -16,10 +16,33 @@ A task is **not** "complete" until ALL of the following:
 2. **Unit tests exist** — for any system with non-trivial logic (state machines, save/load, combat math, loot rolling, level progression). Use GUT in Godot, run via `--script gut/cmdline.gd` headless. Aim for **the meaningful behaviors** to be tested, not 100% line coverage. If a feature genuinely cannot be unit-tested (pure visual / scene composition), say so explicitly in the commit message.
 3. **CI green** — GitHub Actions workflow passes on the commit. No "I'll fix CI later." No skipping flaky tests — fix or quarantine with a follow-up ClickUp task.
 4. **Integration check vs. M1 acceptance criteria** — if the feature touches one of the 7 M1 acceptance criteria in `team/priya-pl/mvp-scope.md`, the corresponding test from Tess's plan (`team/tess-qa/m1-test-plan.md`) must pass. Run it. Document the result in the ClickUp task description before flipping to `ready for qa test`.
-5. **Tess signs off** — Tess (or her agent on the next heartbeat) flips the task from `ready for qa test` to `complete`. Devs do **not** flip their own features to `complete`. The status flow is mandatory: `to do` → `in progress` (if available) → `ready for qa test` → `complete`. Skipping `ready for qa test` is forbidden for feature work.
-6. **Edge cases probed** — Tess explicitly tests at least three failure modes per feature (rapid input, mid-action interrupt, save/load round-trip across the feature's state, OS-level interruption like tab-blur for HTML5). Findings either land as a fix in the same task or as a follow-up `bug(...)` task with severity.
+5. **Tess signs off** — Tess (or her agent on the next heartbeat) flips the task from `ready for qa test` to `complete`. Devs do **not** flip their own features to `complete`. The status flow is mandatory: `to do` → `in progress` → `ready for qa test` → `complete`. Skipping `ready for qa test` is forbidden for feature work.
+6. **Self-Test Report posted (UX-visible PRs)** — for any PR touching a player-visible surface (scene tree, UI, visual feedback, audio cue, input affordance, save format, level content), the **author posts a Self-Test Report comment on the PR before Tess's review begins**. Tess's review starts from the report, not from a cold-read of the diff. If the report is missing on a UX-visible PR, Tess bounces it immediately — don't burn review budget cold-reading a UX diff. Categories that REQUIRE the report: `feat(integration|ui|combat|level|audio|progression|gear)`, `fix(ui|combat|level|audio|integration)`, `design(spec)` when consumed by an in-flight `feat` PR. Format + headless fallback in `team/GIT_PROTOCOL.md` § "Self-Test Report (UX-visible PRs)" and orchestrator memory `self-test-report-gate.md`. Categories that do NOT require it (CI green is sufficient): `chore(ci|repo|build|state|orchestrator|planning)`, `docs(team|scope)`, `test(...)`, `.tres`-only data refactors.
+7. **Edge cases probed** — Tess explicitly tests at least three failure modes per feature (rapid input, mid-action interrupt, save/load round-trip across the feature's state, OS-level interruption like tab-blur for HTML5). Findings either land as a fix in the same task or as a follow-up `bug(...)` task with severity.
 
-Exempt from #2, #4, #5: pure documentation tasks (`docs(...)`, `design(spec): ...`). They still need #1 and #3.
+Exempt from #2, #4, #5, #6: pure documentation tasks (`docs(...)`, `design(spec): ...` not consumed by an in-flight feat). They still need #1 and #3.
+
+---
+
+## Product completeness ≠ component completeness
+
+Component-level test coverage and CI-green status are NOT proof the product is shippable. A feature is not "complete" until it is **instantiated in the entry-scene's runtime tree** and reachable through the same path the player uses.
+
+- **CI green + paired tests** = component-complete. The unit/integration tests prove the system works in isolation.
+- **Component instantiated in the play surface** (entry scene loads it; it appears in the runnable build artifact) = product-complete.
+- **Sponsor sign-off requires product-complete**, not component-complete.
+
+**Practical applications:**
+
+1. Treat any agent report of "feature-complete" as **component-complete only** until you have independently verified the integration surface — read the entry-scene file (`scenes/Main.tscn` or whatever `run/main_scene` points at) and confirm the new system is instantiated there or in a scene that Main.tscn loads.
+2. Watch for "(Note, not blocking)" or similar throwaway flags in QA reports. If any reviewer writes "X is not yet wired into Main.tscn" or "Main.tscn is still a stub," that is a P0 flag, not a side note. Elevate to a gating ticket.
+3. Don't dispatch features faster than you integrate them. If 5 subsystems land but `Main.tscn` hasn't been touched in those 5 PRs, you are accumulating integration debt. Stop feature dispatch and dispatch an integration pass before claiming any milestone-level "complete."
+4. For HTML5/web specifically: **the build artifact is the truth.** Don't claim "shippable" until you (or an agent) has triggered a release build, downloaded the artifact, extracted it, and either visually inspected the entry scene or driven an end-to-end integration test through the same path the player uses.
+5. Tickets that say "implement the panel" are NOT the same as "wire the panel into the game." Make wiring explicit on every UI/system ticket — in the dispatch brief, in the acceptance criteria, in the Done clause.
+
+**Backstory:** the M1 Main.tscn-stub miss — ~30+ PRs of "feature-complete" claims while the runnable build was a week-1 boot stub — is the cautionary tale. CI passed; tests passed; the artifact was a player square on a black banner. The Sponsor's first 2-minute soak exposed the gap. See orchestrator memory `product-vs-component-completeness.md` for the full incident write-up.
+
+**Mantra:** components pass tests. Products integrate. Don't conflate them.
 
 ---
 
