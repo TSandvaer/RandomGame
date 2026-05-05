@@ -136,4 +136,15 @@ func _try_apply_hit(target: Node) -> void:
 	# both expose `take_damage(amount: int, knockback: Vector2, source: Node)`.
 	if target.has_method("take_damage"):
 		target.take_damage(damage, knockback, _source)
+	_combat_trace("Hitbox.hit",
+		"team=%s target=%s damage=%d" % [team, target.name, damage])
 	hit_target.emit(target, damage, _source)
+
+
+## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
+func _combat_trace(tag: String, msg: String = "") -> void:
+	var df: Node = null
+	if is_inside_tree():
+		df = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(tag, msg)

@@ -488,6 +488,8 @@ func _play_hit_flash() -> void:
 	_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
 
 
+## **HTML5 safety-net** (Sponsor soak `embergrave-html5-0e77a92`): see Grunt
+## `_play_death_tween` for the full rationale. Mirror of the same pattern.
 func _play_death_tween() -> void:
 	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
 		_hit_flash_tween.kill()
@@ -500,10 +502,32 @@ func _play_death_tween() -> void:
 	_death_tween.tween_property(self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
 	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
+	# Safety-net: parallel timer fires queue_free even if tween_finished hangs.
+	var timer: SceneTreeTimer = get_tree().create_timer(DEATH_TWEEN_DURATION + 0.2)
+	timer.timeout.connect(_force_queue_free)
 
 
 func _on_death_tween_finished() -> void:
+	_force_queue_free()
+
+
+## Idempotent queue_free. Both the tween-finished path AND the HTML5 safety-
+## net timer call this; whichever lands first wins, the second is a no-op.
+func _force_queue_free() -> void:
+	if is_queued_for_deletion():
+		_combat_trace("Charger._force_queue_free", "already queued — second-caller no-op")
+		return
+	_combat_trace("Charger._force_queue_free", "freeing now")
 	queue_free()
+
+
+## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
+func _combat_trace(tag: String, msg: String = "") -> void:
+	var df: Node = null
+	if is_inside_tree():
+		df = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(tag, msg)
 
 
 func _spawn_death_particles() -> void:

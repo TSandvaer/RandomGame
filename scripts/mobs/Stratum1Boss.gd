@@ -623,6 +623,11 @@ func _play_hit_flash() -> void:
 
 ## §3 boss-death: 400ms hold + 200ms scale-down/fade tween, then queue_free.
 ## Hold leverages tween_interval so timeline + finished signal still fire.
+##
+## **HTML5 safety-net** (Sponsor soak `embergrave-html5-0e77a92`): see Grunt
+## `_play_death_tween` for the full rationale. Boss timer uses
+## BOSS_DEATH_HOLD + DEATH_TWEEN_DURATION + 0.2s slack so the climax hold +
+## decay both fit under the safety budget.
 func _play_boss_death_sequence() -> void:
 	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
 		_hit_flash_tween.kill()
@@ -638,10 +643,31 @@ func _play_boss_death_sequence() -> void:
 	# only flips the *next* step, so use parallel() chained from this step).
 	_death_tween.parallel().tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
+	# Safety-net: parallel timer fires queue_free even if tween_finished hangs.
+	var timer: SceneTreeTimer = get_tree().create_timer(BOSS_DEATH_HOLD + DEATH_TWEEN_DURATION + 0.2)
+	timer.timeout.connect(_force_queue_free)
 
 
 func _on_death_tween_finished() -> void:
+	_force_queue_free()
+
+
+## Idempotent queue_free. See Grunt._force_queue_free for the contract.
+func _force_queue_free() -> void:
+	if is_queued_for_deletion():
+		_combat_trace("Stratum1Boss._force_queue_free", "already queued — second-caller no-op")
+		return
+	_combat_trace("Stratum1Boss._force_queue_free", "freeing now")
 	queue_free()
+
+
+## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
+func _combat_trace(tag: String, msg: String = "") -> void:
+	var df: Node = null
+	if is_inside_tree():
+		df = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(tag, msg)
 
 
 ## §3 boss-climax shake: jiggle the boss's Sprite child by ±4 logical px on

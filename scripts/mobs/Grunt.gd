@@ -197,9 +197,13 @@ func apply_mob_def(def: MobDef) -> void:
 ## - Kills the grunt and emits `mob_died` exactly once when HP hits 0.
 func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	if _is_dead:
+		_combat_trace("Grunt.take_damage", "IGNORED already_dead amount=%d" % amount)
 		return
 	var clean_amount: int = max(0, amount)
+	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - clean_amount)
+	_combat_trace("Grunt.take_damage",
+		"amount=%d hp=%d->%d" % [clean_amount, hp_before, hp_current])
 	damaged.emit(clean_amount, hp_current, source)
 	# Visual: white hit-flash, kicked off only when actual damage was dealt
 	# (matches Uma `combat-visual-feedback.md` §2 — skip the i-frame /
@@ -371,6 +375,7 @@ func _die() -> void:
 	if _is_dead:
 		return
 	_is_dead = true
+	_combat_trace("Grunt._die", "starting death sequence")
 	# Cancel any pending action timers so a death-during-telegraph doesn't
 	# pop a heavy swing on a corpse.
 	_telegraph_time_left = 0.0
@@ -417,10 +422,23 @@ func _play_hit_flash() -> void:
 	# Hold step — tween to the same value over HIT_FLASH_HOLD seconds.
 	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 	_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
+	_combat_trace("Grunt._play_hit_flash",
+		"tween_valid=%s rest=(%.2f,%.2f,%.2f)" % [_hit_flash_tween.is_valid(), _modulate_at_rest.r, _modulate_at_rest.g, _modulate_at_rest.b])
 
 
 ## §3a death tween: 200ms parallel scale 1.0→0.6 + modulate.a 1.0→0.0,
 ## then queue_free on tween_finished.
+##
+## **HTML5 safety-net (Sponsor soak `embergrave-html5-0e77a92`):** in the
+## `gl_compatibility` HTML5 export, the tween's `finished` signal has been
+## observed to fire late or not at all, so mobs never queue_free → they keep
+## attacking the player → combat loop hangs. To prevent the functional
+## regression we ALSO arm a SceneTreeTimer for `DEATH_TWEEN_DURATION + 0.2s`
+## that calls `_force_queue_free`. Whichever path triggers first frees the
+## node; the second is a guarded no-op (queue_free is idempotent + we early-
+## return when the node is already queued / freed). This decouples the combat
+## loop from the visual layer so even a fully broken Tween still lets mobs
+## die. The 0.2s slack covers HTML5 frame-budget jitter at low-fps.
 func _play_death_tween() -> void:
 	# Kill any active hit-flash tween — death visuals override.
 	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
@@ -435,11 +453,39 @@ func _play_death_tween() -> void:
 	_death_tween.tween_property(self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
 	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
+	# HTML5 safety-net: parallel timer that fires queue_free even if
+	# tween_finished never lands. Slack = 0.2s past the tween duration so
+	# the tween (when it works) wins the race and we don't free mid-decay.
+	var timer: SceneTreeTimer = get_tree().create_timer(DEATH_TWEEN_DURATION + 0.2)
+	timer.timeout.connect(_force_queue_free)
+	_combat_trace("Grunt._play_death_tween",
+		"tween_valid=%s timer_armed=%.3fs" % [_death_tween.is_valid(), DEATH_TWEEN_DURATION + 0.2])
 
 
 func _on_death_tween_finished() -> void:
 	# Real queue_free now that the visual decay has played.
+	_combat_trace("Grunt._on_death_tween_finished", "calling _force_queue_free via tween path")
+	_force_queue_free()
+
+
+## Idempotent queue_free. Safe to call from both the tween-finished path AND
+## the HTML5 safety-net timer; whichever lands first wins. Guards on
+## is_queued_for_deletion so the second caller is a no-op.
+func _force_queue_free() -> void:
+	if is_queued_for_deletion():
+		_combat_trace("Grunt._force_queue_free", "already queued — second-caller no-op")
+		return
+	_combat_trace("Grunt._force_queue_free", "freeing now")
 	queue_free()
+
+
+## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
+func _combat_trace(tag: String, msg: String = "") -> void:
+	var df: Node = null
+	if is_inside_tree():
+		df = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(tag, msg)
 
 
 ## §3b ember burst: spawn a CPUParticles2D at this mob's global position,

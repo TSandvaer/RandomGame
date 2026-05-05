@@ -599,12 +599,16 @@ func try_dodge(dir: Vector2) -> bool:
 ## intended hit direction; if zero, uses current facing.
 func try_attack(kind: StringName, dir: Vector2 = Vector2.ZERO) -> Node:
 	if not can_attack():
+		_combat_trace("Player.try_attack",
+			"REJECTED kind=%s state=%s recovery=%.3f" % [kind, _state, _attack_recovery_left])
 		return null
 	if kind != ATTACK_LIGHT and kind != ATTACK_HEAVY:
 		push_warning("Player.try_attack: unknown kind '%s'" % kind)
 		return null
 	var d: Vector2 = dir.normalized() if dir.length_squared() > 0.0 else _facing
 	_facing = d
+	_combat_trace("Player.try_attack",
+		"FIRED kind=%s facing=(%.1f,%.1f)" % [kind, d.x, d.y])
 
 	# Damage routed through the formula utility. Reads equipped weapon +
 	# Edge stat, returns floored int. Fist (no weapon) = 1 damage flat per
@@ -642,8 +646,20 @@ func try_attack(kind: StringName, dir: Vector2 = Vector2.ZERO) -> Node:
 	_spawn_swing_wedge(kind, d, reach, radius, lifetime)
 	_play_swing_flash()
 
+	_combat_trace("Player.try_attack", "POST damage=%d hitbox=%s" % [damage, hitbox])
 	attack_spawned.emit(kind, hitbox)
 	return hitbox
+
+
+## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
+## Inlined here so the Player has no autoload-fallback footgun in tests that
+## bare-instance a Player without the autoload registered.
+func _combat_trace(tag: String, msg: String = "") -> void:
+	var df: Node = null
+	if is_inside_tree():
+		df = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(tag, msg)
 
 
 # ---- State handlers -----------------------------------------------------
@@ -766,6 +782,8 @@ func _spawn_swing_wedge(kind: StringName, dir: Vector2, reach: float, radius: fl
 	var tween: Tween = create_tween()
 	tween.tween_property(wedge, "modulate:a", 0.0, lifetime)
 	tween.tween_callback(Callable(self, "_on_wedge_finished").bind(wedge))
+	_combat_trace("Player.swing_wedge",
+		"spawned kind=%s lifetime=%.3f tween_valid=%s alpha=%.2f" % [kind, lifetime, tween.is_valid(), rgba.a])
 	return wedge
 
 
@@ -785,6 +803,8 @@ func _play_swing_flash() -> void:
 	tween.tween_property(self, "modulate", SWING_FLASH_TINT, SWING_FLASH_HALF_DURATION)
 	tween.tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 1.0), SWING_FLASH_HALF_DURATION)
 	_active_flash_tween = tween
+	_combat_trace("Player.swing_flash",
+		"tween_valid=%s tint=(%.2f,%.2f,%.2f) duration=%.3f" % [tween.is_valid(), SWING_FLASH_TINT.r, SWING_FLASH_TINT.g, SWING_FLASH_TINT.b, SWING_FLASH_HALF_DURATION * 2.0])
 
 
 ## Internal: tween-finished callback for the swing wedge. Frees the node and

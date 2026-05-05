@@ -53,11 +53,39 @@ func _ready() -> void:
 	# so mob spawn seed stays free. See `_resolve_test_mode()` for gating.
 	_resolve_test_mode()
 	# Single boot-time line for Tess's grep.
-	print("[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s" % [
+	print("[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s web=%s" % [
 		OS.is_debug_build(),
 		test_mode_enabled,
 		fast_xp_enabled,
+		OS.has_feature("web"),
 	])
+
+
+## Combat-trace gate (Sponsor soak `embergrave-html5-0e77a92`). When running
+## in the HTML5 export (`OS.has_feature("web") == true`), combat-pipeline code
+## paths emit a line via `combat_trace(tag, msg)` so Sponsor can capture the
+## chain via F12 DevTools console. Off everywhere else — desktop/headless GUT
+## stay quiet so test logs don't fill with chatter.
+##
+## The diagnostic build for Sponsor's next soak relies on this trace to
+## confirm WHICH step in the `try_attack → Hitbox → mob.take_damage →
+## _play_hit_flash → _die → tween → _force_queue_free` chain actually fires
+## (or doesn't fire) under the HTML5 web canvas + gl_compatibility renderer.
+func combat_trace_enabled() -> bool:
+	return OS.has_feature("web")
+
+
+## Emit a combat-trace line. Tag is the source (e.g. "Player.try_attack",
+## "Hitbox.hit", "Grunt.die"); msg is free-form context. No-op when
+## combat_trace_enabled() is false. Centralised so the print format is
+## stable and Sponsor's grep over DevTools output is reliable.
+func combat_trace(tag: String, msg: String = "") -> void:
+	if not combat_trace_enabled():
+		return
+	if msg.is_empty():
+		print("[combat-trace] %s" % tag)
+	else:
+		print("[combat-trace] %s | %s" % [tag, msg])
 
 
 ## Receives unhandled input. Only debug builds wire the chord — release
