@@ -299,3 +299,107 @@ func test_multi_level_catch_up_keeps_panel_open() -> void:
 	# 3 -> 0 — should auto-dismiss now.
 	assert_false(panel.is_open(),
 		"panel auto-dismisses on spending the final banked point")
+
+
+# =======================================================================
+# BB-4 (`86c9m395d`): P-key reopen handler
+# =======================================================================
+#
+# Tess bug-bash run-024 caught: panel auto-opens on level-up, player presses
+# Esc to bank, then expects "press P" (per docstring + HUD pip cue) to
+# reopen — but no P-key handler existed. These tests lock the fix:
+#
+#   1. P after a close-with-bank reopens the panel (the load-bearing repro).
+#   2. P while open closes (idempotent toggle).
+#   3. P with empty bank is a silent no-op (don't open an empty panel —
+#      Tess's "verification gate" in `m1-bugbash-4484196.md` §BB-4).
+#   4. Live `_unhandled_input` path raised via Input.parse_input_event so
+#      we cover the wiring in production, not just `force_p_keypress_for_test`.
+
+func _send_p_key_event() -> void:
+	var ev: InputEventKey = InputEventKey.new()
+	ev.pressed = true
+	ev.echo = false
+	ev.physical_keycode = KEY_P
+	Input.parse_input_event(ev)
+	# Drain the event queue so _unhandled_input fires before we assert.
+	# parse_input_event posts to the queue; flush + advance one process tick.
+	Input.flush_buffered_events()
+
+
+func test_p_key_reopens_panel_after_close_with_banked_points() -> void:
+	# The exact Tess run-024 repro: open panel, close (bank), P-key reopens.
+	var panel: StatAllocationPanel = _make_panel()
+	_ps().add_unspent_points(1)
+	panel.open(false)
+	assert_true(panel.is_open(), "panel opened (auto-open simulation)")
+	panel.close()
+	assert_false(panel.is_open(), "panel closed (bank with 1 point left)")
+	assert_eq(_ps().get_unspent_points(), 1,
+		"point still banked after close")
+	# This is the load-bearing assertion — pre-fix this would stay false.
+	panel.force_p_keypress_for_test()
+	assert_true(panel.is_open(),
+		"BB-4: P-key reopens panel after close with banked points")
+
+
+func test_p_key_toggles_closed_when_panel_already_open() -> void:
+	# Idempotent toggle — pressing P with the panel already open closes it.
+	var panel: StatAllocationPanel = _make_panel()
+	_ps().add_unspent_points(2)
+	panel.open(false)
+	assert_true(panel.is_open(), "open before toggle")
+	panel.force_p_keypress_for_test()
+	assert_false(panel.is_open(),
+		"BB-4: P toggles closed when already open")
+	# And points are NOT auto-spent on the toggle-close.
+	assert_eq(_ps().get_unspent_points(), 2,
+		"toggle-close preserves banked points (Esc-equivalent semantics)")
+
+
+func test_p_key_is_noop_when_bank_empty() -> void:
+	# Per Tess `m1-bugbash-4484196.md` §BB-4 verification gate: P with an
+	# empty bank should NOT open the panel. The HUD pip is hidden in this
+	# state — opening would be a UX dead-end (no points to spend).
+	var panel: StatAllocationPanel = _make_panel()
+	assert_false(panel.is_open(), "starts closed")
+	assert_eq(_ps().get_unspent_points(), 0, "bank empty before press")
+	panel.force_p_keypress_for_test()
+	assert_false(panel.is_open(),
+		"BB-4: P with empty bank does NOT open (don't open empty panel)")
+
+
+func test_p_key_full_cycle_open_close_reopen_close() -> void:
+	# The full Tess run-024 cycle: open -> close -> P reopen -> P close.
+	# Single test asserts at least one open-then-reopen cycle (Self-Test
+	# Report mandates the cycle is exercised).
+	var panel: StatAllocationPanel = _make_panel()
+	_ps().add_unspent_points(2)
+	panel.open(false)
+	assert_true(panel.is_open(), "step 1: open")
+	panel.close()
+	assert_false(panel.is_open(), "step 2: close (banks 2)")
+	panel.force_p_keypress_for_test()
+	assert_true(panel.is_open(), "step 3: P reopens")
+	panel.force_p_keypress_for_test()
+	assert_false(panel.is_open(), "step 4: P closes again")
+	# Bank is intact across the whole cycle (no toggle ate a point).
+	assert_eq(_ps().get_unspent_points(), 2,
+		"full toggle cycle preserves the 2 banked points")
+
+
+func test_p_key_via_live_input_event_reopens_panel() -> void:
+	# Defense-in-depth — drive the actual `_unhandled_input` wiring (NOT
+	# the test-only `force_p_keypress_for_test` shim) so a future regression
+	# of "the helper works but the live event handler doesn't" fails here.
+	var panel: StatAllocationPanel = _make_panel()
+	_ps().add_unspent_points(1)
+	panel.open(false)
+	panel.close()
+	assert_false(panel.is_open(), "closed before live P press")
+	# Raise a real KEY_P pressed event through the engine's input pipeline.
+	_send_p_key_event()
+	# _unhandled_input runs at end-of-frame; one process tick is enough.
+	await get_tree().process_frame
+	assert_true(panel.is_open(),
+		"BB-4: live P keypress through _unhandled_input reopens the panel")
