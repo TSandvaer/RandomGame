@@ -106,6 +106,7 @@ var _level_label: Label = null
 var _room_label: Label = null
 var _build_label: Label = null
 var _stat_pip_label: Label = null
+var _boot_banner_label: Label = null
 
 # Save-on-quit guard so we don't double-write when both NOTIFICATION_WM_CLOSE_REQUEST
 # and `_exit_tree` fire on shutdown.
@@ -191,6 +192,13 @@ func get_descend_screen() -> CanvasLayer:
 
 func get_hud() -> CanvasLayer:
 	return _hud
+
+
+## Returns the boot-banner Label that lists all 7 player input actions
+## (per `project.godot` §[input]). Used by the paired test
+## `tests/test_boot_banner.gd` and any future onboarding tweak.
+func get_boot_banner_label() -> Label:
+	return _boot_banner_label
 
 
 func is_boss_room_active() -> bool:
@@ -554,6 +562,42 @@ func _build_hud() -> void:
 	_stat_pip_label.text = ""
 	_stat_pip_label.visible = false
 	_hud.add_child(_stat_pip_label)
+
+	# Bottom-center boot banner — the only on-screen control reference in M1
+	# (no in-game tutorial). Lists every input action from `project.godot`
+	# §[input] so a first-time player has all 7 verbs visible. Per Uma
+	# `player-journey.md` PJ-09: white text at 60% opacity, no panel
+	# background, bottom-centered. Single Label with newline-separated lines
+	# keeps font + alignment consistent with the other HUD widgets and
+	# preserves spacing if any single line is later edited.
+	#
+	# BB-5 (`86c9m3969`): pre-fix banner mentioned only WASD / Shift / Space —
+	# missing LMB (light attack) + RMB (heavy attack) made attacks invisible
+	# to first-time players. Fully spelling out the 7 controls closes the
+	# onboarding gap surfaced in Tess run-024 bug-bash.
+	var banner_lines: Array[String] = [
+		"WASD to move",
+		"Shift to sprint",
+		"Space to dodge",
+		"LMB to attack",
+		"RMB to heavy attack",
+		"Tab for inventory",
+		"P to allocate stats",
+	]
+	_boot_banner_label = Label.new()
+	_boot_banner_label.name = "BootBanner"
+	_boot_banner_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_boot_banner_label.offset_left = 0.0
+	_boot_banner_label.offset_top = -150.0
+	_boot_banner_label.offset_right = 0.0
+	_boot_banner_label.offset_bottom = -32.0
+	_boot_banner_label.add_theme_color_override("font_color", Color(0.9098, 0.8941, 0.8392, 0.6))
+	_boot_banner_label.add_theme_font_size_override("font_size", 12)
+	_boot_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_boot_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_boot_banner_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boot_banner_label.text = "\n".join(banner_lines)
+	_hud.add_child(_boot_banner_label)
 
 
 func _build_inventory_panel() -> void:
