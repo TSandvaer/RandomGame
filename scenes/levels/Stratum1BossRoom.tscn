@@ -1,6 +1,15 @@
-[gd_scene load_steps=2 format=3 uid="uid://b0embergrave_stratum1_boss_room"]
+[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_stratum1_boss_room"]
 
 [ext_resource type="Script" path="res://scripts/levels/Stratum1BossRoom.gd" id="1_room"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_boss_wall_n"]
+size = Vector2(480, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_boss_wall_s"]
+size = Vector2(480, 16)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_boss_wall_v"]
+size = Vector2(32, 270)
 
 [node name="Stratum1BossRoom" type="Node2D"]
 script = ExtResource("1_room")
@@ -18,3 +27,55 @@ offset_top = 0.0
 offset_right = 480.0
 offset_bottom = 270.0
 color = Color(0.07, 0.06, 0.09, 1)
+
+[node name="WallNorth" type="StaticBody2D" parent="."]
+position = Vector2(240, 16)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallNorth"]
+shape = SubResource("RectangleShape2D_boss_wall_n")
+
+[node name="Sprite" type="ColorRect" parent="WallNorth"]
+offset_left = -240.0
+offset_top = -16.0
+offset_right = 240.0
+offset_bottom = 16.0
+color = Color(0.12, 0.09, 0.14, 1)
+
+[node name="WallSouth" type="StaticBody2D" parent="."]
+position = Vector2(240, 262)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallSouth"]
+shape = SubResource("RectangleShape2D_boss_wall_s")
+
+[node name="Sprite" type="ColorRect" parent="WallSouth"]
+offset_left = -240.0
+offset_top = -8.0
+offset_right = 240.0
+offset_bottom = 8.0
+color = Color(0.12, 0.09, 0.14, 1)
+
+[node name="WallWest" type="StaticBody2D" parent="."]
+position = Vector2(16, 135)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallWest"]
+shape = SubResource("RectangleShape2D_boss_wall_v")
+
+[node name="Sprite" type="ColorRect" parent="WallWest"]
+offset_left = -16.0
+offset_top = -135.0
+offset_right = 16.0
+offset_bottom = 135.0
+color = Color(0.12, 0.09, 0.14, 1)
+
+[node name="WallEast" type="StaticBody2D" parent="."]
+position = Vector2(464, 135)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallEast"]
+shape = SubResource("RectangleShape2D_boss_wall_v")
+
+[node name="Sprite" type="ColorRect" parent="WallEast"]
+offset_left = -16.0
+offset_top = -135.0
+offset_right = 16.0
+offset_bottom = 135.0
+color = Color(0.12, 0.09, 0.14, 1)

@@ -46,6 +46,24 @@ func assemble_single(chunk_def: LevelChunkDef, mob_factory: Callable = Callable(
 	var size_px: Vector2i = chunk_def.size_px()
 	result.bounds_px = Rect2(Vector2.ZERO, size_px)
 
+	# Instantiate the authored chunk geometry scene, if any. This is what
+	# carries the floor sprite + perimeter wall StaticBody2Ds that prevent
+	# the player from walking off the room edge into the void (BB-3 fix —
+	# `86c9m393a`). Prior to this, `scene_path` was declared on the chunk
+	# def but never loaded, so rooms shipped with no floor or walls at
+	# runtime.
+	if chunk_def.scene_path != "":
+		var packed: PackedScene = load(chunk_def.scene_path) as PackedScene
+		if packed != null:
+			var geometry: Node = packed.instantiate()
+			if geometry != null:
+				result.root.add_child(geometry)
+		else:
+			push_warning(
+				"LevelAssembler: chunk_def.scene_path '%s' failed to load (geometry skipped)"
+					% chunk_def.scene_path
+			)
+
 	# Entry world position — for M1 single-chunk rooms, it's the entry
 	# port if defined, else the chunk's center.
 	var entry_port: ChunkPort = chunk_def.get_entry_port()
