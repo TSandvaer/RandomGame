@@ -34,7 +34,8 @@ extends CanvasLayer
 ## ## Test surface
 ##   `open()` / `close(bank)` are public so tests can drive without raising
 ##   real input events. `is_open()`, `get_time_slow_factor()`,
-##   `force_press_for_test(StringName)` for deterministic key probes.
+##   `force_press_for_test(StringName)` for deterministic key probes,
+##   `force_p_keypress_for_test()` for the BB-4 P-key toggle path.
 
 # ---- Signals ---------------------------------------------------------
 
@@ -219,15 +220,50 @@ func force_press_for_test(key: StringName) -> void:
 
 # ---- Input -----------------------------------------------------------
 
+## Modal-stacking rule (BB-4 `86c9m395d`):
+##
+##   P key opens the panel ONLY when:
+##     1. The panel is currently closed (toggle behavior — pressing P while
+##        open closes it, mirroring InventoryPanel's Tab toggle pattern).
+##     2. PlayerStats has unspent points to spend (per Tess's bug-bash
+##        `team/tess-qa/m1-bugbash-4484196.md` §BB-4 "don't open an empty
+##        panel"). Banking 0 points is a UX dead-end — the HUD pip is
+##        already hidden in that case (`Main._on_unspent_points_changed`),
+##        so the keybinding follows suit.
+##
+##   We do NOT inspect other modals (InventoryPanel, DescendScreen) here.
+##   Each modal is a CanvasLayer with its own `_unhandled_input`, and Godot
+##   delivers `_unhandled_input` to higher CanvasLayer.layer values first.
+##   InventoryPanel + StatAllocationPanel both use `PANEL_LAYER = 80`;
+##   DescendScreen uses 100. As long as one of them calls
+##   `get_viewport().set_input_as_handled()` on its consumed events
+##   (which they do — see InventoryPanel `_unhandled_input` Tab branch),
+##   the other won't see the event. The only case where both could fire
+##   simultaneously is two panels open with the same hotkey — but P and
+##   Tab don't collide and the Esc paths each call set_input_as_handled.
+##
+##   Edge probe — pause / cutscene: Engine.time_scale tweaks alone don't
+##   pause `_unhandled_input` delivery. If a future cutscene system needs
+##   to lock input, it should pause via `get_tree().paused = true` plus
+##   `process_mode = Node.PROCESS_MODE_PAUSABLE` on this CanvasLayer
+##   (default). That's a separate cutscene-controller concern; this
+##   handler stays simple.
 func _unhandled_input(event: InputEvent) -> void:
-	if not _open:
-		return
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	var key_event: InputEventKey = event as InputEventKey
 	# Use physical_keycode so layout doesn't matter (matches DebugFlags
 	# convention).
 	var pk: int = key_event.physical_keycode
+	# P-key path is handled regardless of `_open` — it's the toggle entry-
+	# point that the BB-4 bug fix wires (docstring + HUD pip cue both
+	# advertise it).
+	if pk == KEY_P:
+		get_viewport().set_input_as_handled()
+		_handle_toggle_keypress()
+		return
+	if not _open:
+		return
 	match pk:
 		KEY_1, KEY_KP_1:
 			get_viewport().set_input_as_handled()
@@ -244,6 +280,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_ESCAPE:
 			get_viewport().set_input_as_handled()
 			close()
+
+
+## P-key toggle behavior. Open if closed-and-bank>0; close if currently open.
+## Public so tests can drive without raising real input events (mirrors
+## `force_press_for_test` for the in-panel keys).
+func force_p_keypress_for_test() -> void:
+	_handle_toggle_keypress()
+
+
+func _handle_toggle_keypress() -> void:
+	if _open:
+		# Toggle close — banks any remaining points (LU-22 / Esc-equivalent).
+		close()
+		return
+	# Closed — only open if there are points to spend. An empty bank means
+	# the HUD pip is hidden anyway and there's nothing for the player to do.
+	if _get_unspent() <= 0:
+		return
+	open(false)
 
 
 # ---- Auto-open (LU-05) -----------------------------------------------
