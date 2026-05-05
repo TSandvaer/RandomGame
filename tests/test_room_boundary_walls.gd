@@ -208,8 +208,15 @@ func test_boss_room_door_trigger_still_reachable() -> void:
 		var r: Rect2 = _wall_world_rect(w)
 		if r.size == Vector2.ZERO:
 			continue
-		# South wall: bottom edge at y=270 (within 4 px).
-		if absf((r.position.y + r.size.y) - 270.0) <= 4.0:
+		# South wall: bottom edge at y=270 (within 4 px) AND horizontally
+		# oriented (width > height). The east/west perimeter walls are
+		# 32x270 verticals — their bottom edge ALSO touches y=270, so we
+		# additionally require `size.x > size.y` to exclude them. Without
+		# this filter `WallEast` / `WallWest` (position.y=0) would drag
+		# `south_wall_top` to 0 and false-positive the door-trigger
+		# occlusion assertion.
+		var is_horizontal: bool = r.size.x > r.size.y
+		if is_horizontal and absf((r.position.y + r.size.y) - 270.0) <= 4.0:
 			south_wall_top = minf(south_wall_top, r.position.y)
 	assert_lt(south_wall_top, 270.0, "south wall present")
 	# Trigger's south edge is y=258 — wall must start at or below that so the
