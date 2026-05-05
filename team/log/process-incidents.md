@@ -26,3 +26,63 @@ Format per entry:
 - Why it didn't cause a defect: PR #76's CI hardening is correct and CI on `main` stayed green through and after the merge. The follow-up PR #78 (Devon run-009) was routed through Tess per the corrected reading.
 - Protocol clarification: `team/GIT_PROTOCOL.md` line 54 currently reads `Pure docs / chore(repo|ci|build) / design(spec) PRs — Tess sign-off is **not** required. The orchestrator (or Priya for chore(triage) / docs(team)) may merge directly.` This grants exemption FROM Tess sign-off, not a self-merge license — the merge authority is "the orchestrator (or Priya...)", not the originating dev. Suggested edit: tighten line 54 to make merge authority explicit, e.g. `Tess sign-off is not required, but the merging identity must still be the orchestrator (or Priya for chore(triage) / docs(team)). Devs do not self-merge their own PRs in any category.`
 - Action taken: log only. PR #76's work stands. If a second self-merge incident lands, escalate to Priya for a `docs(team): clarify chore(ci) merge authority` PR against `GIT_PROTOCOL.md`.
+
+---
+
+## 2026-05-02 — Worktree-isolation v3 — 4-occurrence shared-HEAD friction pattern
+
+- Filed by: Priya (run 013, normalization sweep — covers 4 in-session occurrences originally surfaced by Orchestrator W3-A7 proposal)
+- Severity: medium (pure friction tax — no defect, but recurred 4× in a single session)
+- Repeat?: 4th occurrence (consolidated; threshold for protocol-clarification action met)
+- What happened: Across one session, four agents had `.git/HEAD` flipped under them mid-tool-call by parallel dispatches sharing the orchestrator-class checkout `c:\Trunk\PRIVATE\RandomGame`. (i) Uma run-002 — `git checkout -b` landed Uma's HEAD on `devon/levelup-math` instead of newly-created `uma/audio-direction`; recovered via cherry-pick + `git branch -f`. (ii) Uma run-003 — same root cause during audio-direction work; cherry-pick recovery again. (iii) Priya run-004 — HEAD shifted to `tess/run-012-state-v2` mid-tool-call during mid-week-2 retro; one stash-pop conflict cost. (iv) Tess run-018 — main checkout was on `uma/stash-ui-v1-design` mid-Tess-run when Uma's parallel W3-B1 dispatch landed PR #82 on `origin/main`; recovered via stash → checkout `tess/w3-a5-html5-audit` → fast-forward rebase onto `c8a6b69` → pop. Each occurrence cost 1-3 tool turns of recovery.
+- Why it didn't cause a defect: All four recovered cleanly without rewriting anyone else's history; no merged-PR mistakes, no data loss, no production-side incidents.
+- Protocol clarification: `team/orchestrator/dispatch-template.md` and `team/GIT_PROTOCOL.md` were updated by W3-A7 v3 to mandate per-role persistent worktrees (`RandomGame-<role>-wt`) with a brief-template snippet pinning `cd <worktree> && git fetch origin && git checkout -B <role>/<task-name> origin/main` at run-start. Codification source: `team/log/w3-a7-worktree-isolation-proposal.md` §2 (Option A.1).
+- Action taken: clarification PR filed (W3-A7 v3 dispatch-template + GIT_PROTOCOL worktree section landed pre-PR-#127). Pattern is now expected to be eliminated; this entry exists for retroactive log completeness and pattern-watch — if a 5th occurrence lands AFTER worktree-v3 brief is in place, escalate to Devon for harness-side `WorktreeCreate` hook (option B in the proposal).
+
+---
+
+## 2026-05-02 — Spec-sketch vs. ticket-implementation drift (N7 affix-count)
+
+- Filed by: Priya (run 013, normalization sweep — pattern surfaced during N7 affix work)
+- Severity: low
+- Repeat?: first occurrence (logged for pattern-watch)
+- What happened: Drew's N7 affix implementation kept the existing affix-schema (count + ranges per rarity) rather than the count specifically sketched in the N7 ticket body. Drew's implementation is sound and matches the prior balance-pin doc; the ticket sketch's count was a casual estimate, not a balance decision. Tess flagged the mismatch during review; Priya confirmed the existing schema as source-of-truth.
+- Why it didn't cause a defect: existing balance-pin (`team/priya-pl/affix-balance-pin.md`) is the actual decision record; ticket sketches are working notes. Drew's read of "follow the pin, not the ticket sketch" was the correct call. PR landed without revision needed.
+- Protocol clarification: ticket bodies sometimes contain quick-sketch numbers that contradict pinned design docs. Convention: when a ticket sketch and a design pin disagree, the design pin wins; the implementer should call out the discrepancy in the PR body (one-liner: "Ticket sketch said X, balance-pin says Y, kept Y — flagging for Priya"). Suggested addition to `team/orchestrator/dispatch-template.md` "Scoped contract" block: "Ticket-body numbers are sketches unless explicitly cited from a design pin. When in doubt, pinned design > ticket sketch; flag the discrepancy in PR body."
+- Action taken: log only — first occurrence. If pattern recurs (≥3 occurrences), file a `docs(team)` PR adding the convention to `dispatch-template.md`.
+
+---
+
+## 2026-05-02 — `clickup-pending.md` parallel-edit conflict pattern (default-to-main resolution)
+
+- Filed by: Priya (run 013, normalization sweep)
+- Severity: low
+- Repeat?: 2nd occurrence (logged for pattern-watch)
+- What happened: `team/log/clickup-pending.md` was edited by two agents in parallel ticks across separate dispatches; merge surfaced a textual conflict on the queue rows. Both agents' adds were valid (different ticket IDs, same file region). Resolver defaulted to `main`'s version and re-appended the local add as a fresh row, rather than attempting a hand-merge that risked losing either side's intent.
+- Why it didn't cause a defect: queue rows are append-only metadata; no row was actually lost. The "default to main + re-append local" strategy preserves both sides' intent and is reversible if either entry was already processed.
+- Protocol clarification: `clickup-pending.md` is a hot-spot for parallel edits because every dispatch pairs ClickUp queue actions with a same-tick log line. Convention now in use: on conflict, prefer `main`'s version and re-append local adds at the bottom of the queue section. Codified in `team/orchestrator/dispatch-template.md` "Scoped contract" / conflict-rule block (PR #127 added the Scoped-contract block; the file-conflict line is implicit in "preempts blind-resolve into another role's lane" — explicit codification deferred unless this hits a 3rd occurrence).
+- Action taken: log only. Pattern-watch: if a 3rd parallel-edit conflict lands on this file, file an explicit `docs(team)` clarification adding "default-to-main + re-append" verbatim to `dispatch-template.md`.
+
+---
+
+## 2026-05-03 — PR-body test-count drift (Drew run-012)
+
+- Filed by: Priya (run 013, normalization sweep — pattern surfaced during Drew run-012 review)
+- Severity: low
+- Repeat?: first occurrence (logged for pattern-watch)
+- What happened: Drew run-012 PR body claimed "30 tests added" while the actual diff added 28. The 2-test gap came from two test cases that were drafted in the working branch but consolidated into existing parametric cases before push; the PR body was authored before the consolidation and not updated. Tess caught the drift on review and confirmed the actual count was correct.
+- Why it didn't cause a defect: the test suite is correct; only the PR body was stale. CI green on the actual 28; no test was missing.
+- Protocol clarification: PR-body claims about test counts (and other concrete numbers — file counts, line deltas, AC checkbox states) drift if authored pre-final-push. Convention reminder: re-read your own diff after final `git push` and reconcile any concrete numerical claims in the PR body. `team/TESTING_BAR.md` Self-Test Report DoD (added in PR #127) implicitly captures this for UX-visible PRs; for non-UX-visible PRs, the discipline is informal.
+- Action taken: log only — first occurrence. If pattern recurs, consider extending the Self-Test Report convention to all PRs with a "test-count line in PR body must match diff" check.
+
+---
+
+## 2026-05-04 — Harness-identity self-approval pattern (cross-run)
+
+- Filed by: Priya (run 013, normalization sweep — pattern surfaced across runs 010-022)
+- Severity: low
+- Repeat?: Nth occurrence (logged once retroactively — recurs every time a docs/chore PR opens because GitHub blocks self-review by the same identity)
+- What happened: Across runs 010 through 022, multiple agents attempted `gh pr review --approve` on PRs they had themselves opened. GitHub's API correctly rejects with "can not approve your own pull request" because the harness-bound identity `RandomGame Orchestrator` is the author of every commit and every PR opened by every agent in the system. The agents' intent was sometimes to record a "self-test passed, ready for Tess" signal; the rejection surfaced repeatedly because no agent's local memory carried the prior occurrence.
+- Why it didn't cause a defect: GitHub blocks the action server-side; nothing merged through self-approval. Agents fell back to PR-body Self-Test Reports or comments instead.
+- Protocol clarification: harness-identity is shared across all five named agents and the orchestrator (single GitHub identity `RandomGame Orchestrator`). "Self-approval" can never succeed and should not be attempted. The Self-Test Report convention added to `team/GIT_PROTOCOL.md` and `team/TESTING_BAR.md` in PR #127 is the canonical channel for "author-side green" signal, replacing any past attempt to use `gh pr review --approve` on own PR. Reviewer-identity authority belongs to Tess (or orchestrator for `docs(team)` / `chore(ci|repo|build)` exemptions); self-approval is structurally impossible in this team's harness.
+- Action taken: log only (retroactive, consolidated across N occurrences). Pattern is now structurally addressed by the Self-Test Report convention; future occurrences should be near-zero. If an agent still attempts self-approval after PR #127's conventions land, treat as a brief-comprehension miss and reinforce the dispatch template wording.
