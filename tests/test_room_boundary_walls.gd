@@ -197,8 +197,16 @@ func test_boss_room_door_trigger_still_reachable() -> void:
 	# Walls must not occlude the boss-room door trigger. The trigger is at
 	# (240, 250) size (80, 16) — i.e. world rect (200..280, 242..258). The
 	# player approaches from the north (spawn at 240, 200) and walks south.
-	# The south wall must start AT OR SOUTH OF y=258 so the player can reach
-	# the trigger before being stopped.
+	#
+	# Reachability invariant: an Area2D trigger fires on body_entered when
+	# the player's collision shape OVERLAPS the trigger rect — StaticBody2D
+	# walls don't block Area2D detection, only physical motion. So as long
+	# as the south wall's TOP edge sits at or south of the trigger's NORTH
+	# edge (y=242), the player's body will overlap the trigger before hit-
+	# ting the wall and `body_entered` fires. The 4-px overlap between
+	# WallSouth (y=254..270) and the trigger (y=242..258) authored in the
+	# scene is intentional — it guarantees the trigger fires even for a
+	# zero-radius collision shape.
 	var inst: Node = _instantiate(BOSS_SCENE_PATH)
 	var walls: Array = _collect_walls(inst)
 	# Find the south wall (touches the south edge y=270).
@@ -219,11 +227,12 @@ func test_boss_room_door_trigger_still_reachable() -> void:
 		if is_horizontal and absf((r.position.y + r.size.y) - 270.0) <= 4.0:
 			south_wall_top = minf(south_wall_top, r.position.y)
 	assert_lt(south_wall_top, 270.0, "south wall present")
-	# Trigger's south edge is y=258 — wall must start at or below that so the
-	# player can walk into the trigger.
-	assert_gte(south_wall_top, 258.0,
-		"south wall starts at y=%.1f — must be >= 258 to leave the door trigger reachable"
-			% south_wall_top)
+	# Trigger's NORTH edge is y=242 — south wall's top must sit at or south
+	# of that so the player overlaps the trigger before being stopped.
+	const TRIGGER_NORTH_EDGE_Y: float = 242.0
+	assert_gte(south_wall_top, TRIGGER_NORTH_EDGE_Y,
+		"south wall top is y=%.1f — must be >= %.1f (trigger north edge) to leave the door trigger reachable"
+			% [south_wall_top, TRIGGER_NORTH_EDGE_Y])
 
 
 # ---- 4. Room scene smoke (each scene loads with walls present) ----
