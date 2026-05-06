@@ -44,6 +44,21 @@ Replace `<your-role>` with the literal role name (priya / uma / devon / drew / t
 **Lesson reminder (load-bearing this session):** `agent-verify-evidence.md` — pull actual file contents and CI evidence before refusing or asserting impossibility. The earlier-this-session `Stratum1BossRoom.gd:204` incident — a Drew agent confidently refused to fix a real GDScript parse error citing language-design priors, while CI logs proved the bug was real — is the cautionary tale. **Verify, don't reason from priors.**
 ```
 
+## Visual-primitive test bar (paste when dispatch touches tweens / modulate / color-anim / particles)
+
+Per `team/TESTING_BAR.md` § "Visual primitives — observable delta required" (added post-PR-#115/#122 white-on-white incident).
+
+```markdown
+**Visual-primitive test bar (load-bearing for tween / modulate / color-anim / particle PRs):**
+- Tier 1 (mandatory): paired test asserts `target ≠ rest` for any tweened visual property. `assert_ne(target_color, rest_color)`. White-on-white tweens are the cautionary tale — `tween.is_valid() == true` is necessary but **insufficient**.
+- Tier 2 (mandatory for cascading modulate on parented nodes): paired test asserts the modulate is applied to the **visible-draw node** (Sprite2D / ColorRect / Polygon2D), not to a parent CharacterBody2D / Node2D whose child has its own non-white modulate. Modulate cascades multiplicatively; flashing the parent body is a no-op for any child whose own modulate is non-white.
+- Tier 3 (aspirational): framebuffer pixel-delta sample at the affected region. Deferred until a `--rendering-driver opengl3` headed CI lane lands; today, Tier 1 + Tier 2 are the binding floor.
+- HTML5 verification: tween / modulate / Polygon2D / CPUParticles2D PRs are subject to the HTML5 visual-verification gate per `html5-visual-verification-gate.md`. Headless GUT green is not enough; the Self-Test Report must capture an HTML5 export soak before Tess approves.
+- Reference: `team/log/2026-05-html5-visual-feedback-no-op-postmortem.md` for the cautionary tale (PR #115 + #122 shipped tween-based feedback that asserted "tween fires" without asserting "visual changes"; bug shipped to production for ~3 days before Sponsor's `[combat-trace]` soak caught it).
+```
+
+The block is mandatory for `feat(combat|ui|level|integration|gear|progression)` and `fix(...)` on the same scopes when the PR introduces or modifies a visual primitive. Skip when the PR is `chore(...)` / `docs(...)` / `test(...)` or touches no visual primitives.
+
 ## Merge identity (mandatory in every dispatch)
 
 ```markdown

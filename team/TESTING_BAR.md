@@ -46,6 +46,65 @@ Component-level test coverage and CI-green status are NOT proof the product is s
 
 ---
 
+## Visual primitives — observable delta required
+
+When a test exercises a tween, modulate change, color/alpha animation, particle burst, or any other visual primitive, asserting `tween.is_valid()` / `tween.is_running()` / "the tween fires" is **necessary but insufficient**. A passing tween-liveness assertion can mask a no-op visual. The test MUST also assert one or more of the following, at the strongest tier feasible for the primitive under test:
+
+1. **Tier 1 (mandatory, cheapest) — target ≠ rest.** Assert that the tween's target value is materially different from the rest/start value. For modulate flashes: `assert_ne(target_color, rest_color)`. For scale tweens: `assert_ne(target_scale, rest_scale)`. White → white is a tween, but it is not a *visible flash*. A one-liner that catches the entire class of white-on-white / no-op-target bugs.
+
+2. **Tier 2 (mandatory for parented modulate / cascading visual properties) — applied to the visible-draw node.** Modulate cascades multiplicatively (`rendered = child.modulate × parent.modulate × ...`). For modulate tweens on parented nodes: the test must verify the modulate is applied to the *visible-draw* node (the Sprite2D / ColorRect / Polygon2D that actually paints), not to a parent CharacterBody2D / Node2D whose draw is nominal and whose child has its own non-white modulate. If the spec says "flash the mob white" and the implementation tweens the parent body's modulate while the child sprite has modulate `Color(0.8, 0.5, 0.3, 1)`, the cascade produces `0.8 × 1.0 = 0.8` on the red channel — barely a flash. Pin the modulate-target assertion to the actual visible-draw node.
+
+3. **Tier 3 (aspirational, where feasible) — framebuffer pixel-delta.** Sample the rendered framebuffer at the affected region (`Viewport.get_texture().get_image()`) and compare pixel deltas across the tween window. The strongest assertion class: pixels actually changed where the spec says they should. **Caveat — headless rendering does not paint the framebuffer.** Godot's `--headless` flag (the default in our GUT CI) skips the renderer entirely; pixel-delta tests run under `--headless` will trivially "pass" with all-zero pixels. For framebuffer assertions to be meaningful, the test must run under `--rendering-driver opengl3` headed mode (e.g. via xvfb on Linux runners). This is non-trivial CI work; until a renderer-painting lane lands, framebuffer assertions are deferred and the Tier 1 + Tier 2 assertions are the binding floor.
+
+4. **HTML5-specific — pair with the HTML5 visual-verification gate.** Tweens, modulates, Polygon2D, and CPUParticles2D PRs are subject to the pre-existing HTML5 visual-verification rule (orchestrator memory `html5-visual-verification-gate.md`). Headless GUT tests are insufficient to catch renderer-specific failure modes (HDR clamp on `gl_compatibility`, Polygon2D z-index drift, etc.). The Self-Test Report must capture an actual HTML5 export soak before Tess approves; merging a tween/modulate PR on headless-CI-green alone is not within the bar.
+
+**Why this rule exists:** PR #115 (mob hit-flash) and PR #122 (player swing-wedge + ember-flash) both shipped tween-based visual feedback whose paired tests asserted `tween_valid == true`, constant equality, and tween-end behavior — all green. None asserted observable color delta or visible-draw-target landing. **The mob hit-flash tween was a literal no-op** (white target on white rest, applied to a parent CharacterBody2D whose child Sprite has a non-white modulate that cascades the flash away). The bug shipped 2026-05-03 and was only caught 2026-05-06 by Sponsor's HTML5 `[combat-trace]` soak — three days of "feature-complete" status while the on-screen reality was that combat had no visual feedback at all.
+
+**Concrete examples — Tier 1 one-liner additions:**
+
+```gdscript
+# In test_combat_visuals.gd (Drew's lane, applies to mob hit-flash):
+func test_grunt_hit_flash_target_color_differs_from_rest():
+    var g = _spawn_grunt()
+    var rest = g.modulate
+    var target = Grunt.HIT_FLASH_TARGET_COLOR  # the new constant Drew exposes for the fix
+    assert_ne(target, rest, "hit-flash target color must differ from rest — white-on-white is a no-op")
+
+# In test_player_visual_feedback.gd (Devon's lane, applies to player ember-flash):
+func test_player_ember_flash_target_tint_differs_from_rest():
+    var p = _spawn_player()
+    var rest = p.modulate
+    var target = Player.EMBER_FLASH_TINT  # Color(1.4, 1.0, 0.7, 1) on desktop, sub-1.0-clamped fallback on web
+    assert_ne(target, rest, "ember-flash target tint must differ from rest — clamp-to-rest is a no-op")
+```
+
+**Concrete examples — Tier 2 visible-draw-target check:**
+
+```gdscript
+# In test_combat_visuals.gd:
+func test_grunt_hit_flash_applied_to_visible_sprite_not_parent_body():
+    var g = _spawn_grunt()
+    g.take_damage(1, Vector2.ZERO, null)
+    # The visible-draw target is the child Sprite2D / ColorRect, not the CharacterBody2D itself.
+    var visible_target = g.get_node("VisibleSprite")  # whatever the project convention is
+    assert_eq(visible_target.modulate, Grunt.HIT_FLASH_TARGET_COLOR,
+        "hit-flash modulate must land on the visible-draw node; parent-only is cascade-trapped")
+```
+
+**What this rule does NOT require:**
+
+- It does not require Tier 3 (framebuffer-pixel-delta) on every visual test today. Tier 3 is aspirational pending a renderer-painting CI lane.
+- It does not require retro-fitting already-merged tests. Existing `test_combat_visuals.gd` and `test_player_visual_feedback.gd` are owned by Drew's `86c9ncd9g` fix PR + Devon's HDR/Polygon2D fix PRs respectively — they will land the Tier 1 + Tier 2 assertions in the same PR as their functional fix, per `tests-with-features` rule above.
+- It does not block `chore` / `docs` / `test`-only PRs that don't introduce new visual primitives.
+
+**See also:**
+
+- `team/log/2026-05-html5-visual-feedback-no-op-postmortem.md` — full incident write-up.
+- `team/log/process-incidents.md` — pattern-watch entry for this incident.
+- Orchestrator memory `html5-visual-verification-gate.md` — the renderer-side complement to this rule.
+
+---
+
 ## What changes for each role
 
 ### Tess
