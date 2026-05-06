@@ -62,11 +62,48 @@ var _source: Node = null
 var _expired_already: bool = false
 
 
+func _init() -> void:
+	# Physics-flush safety (run-002 P0 wave 2, ticket 86c9nx1dx — Sponsor's
+	# `embergrave-html5-fcbe466` retest, sustained-spam panic).
+	#
+	# Projectile is an Area2D. `Shooter._spawn_projectile` runs inside
+	# `_physics_process` (via `_process_firing`), so the projectile's
+	# add_child can land while the engine is mid-flush of a prior tick's
+	# body_entered queue — the same Godot 4 forbidden mutation as the
+	# Hitbox spawn-path panic. Symptom:
+	#
+	#     USER ERROR: Can't change this state while flushing queries.
+	#
+	# Fix: enter the tree with monitoring/monitorable OFF; flip them back
+	# on inside the deferred `_activate_monitoring` call from `_ready`,
+	# which lands after the flush completes. Identical pattern to
+	# `Hitbox.gd::_init` — see Hitbox for the full rationale.
+	#
+	# Pairs with PR #142's death-path Area2D-add defers and the wave-2
+	# Hitbox fix in this same PR.
+	monitoring = false
+	monitorable = false
+
+
 func _ready() -> void:
 	_life_left = lifetime
 	_apply_team_layers()
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
+	# Re-enable monitoring after the physics flush. See `_init` for context.
+	call_deferred("_activate_monitoring")
+
+
+## Turns monitoring/monitorable back on after the spawn-tick physics flush
+## has completed. Guarded by `is_inside_tree` because a projectile that
+## expires (or is freed by tests) before this lands must not crash.
+func _activate_monitoring() -> void:
+	if not is_inside_tree():
+		return
+	if _expired_already:
+		return
+	monitoring = true
+	monitorable = true
 
 
 func _physics_process(delta: float) -> void:
