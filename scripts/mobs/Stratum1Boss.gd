@@ -744,7 +744,10 @@ func _spawn_death_particles() -> void:
 	ramp.set_color(0, EMBER_LIGHT)
 	ramp.set_color(1, EMBER_DEEP)
 	burst.color_ramp = ramp
-	room.add_child(burst)
+	# Physics-flush safety: see Grunt._spawn_death_particles for full rationale.
+	# `_die` runs during the physics-step body_entered chain; deferred add_child
+	# avoids Godot 4's "Can't change this state while flushing queries" panic.
+	room.call_deferred("add_child", burst)
 	burst.finished.connect(burst.queue_free)
 
 

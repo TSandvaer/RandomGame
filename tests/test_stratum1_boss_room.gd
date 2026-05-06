@@ -157,6 +157,9 @@ func test_boss_death_drops_loot_into_room() -> void:
 	boss._physics_process(Stratum1Boss.PHASE_TRANSITION_DURATION + 0.01)
 	boss.take_damage(198, Vector2.ZERO, null)
 	assert_true(boss.is_dead())
+	# Pickup add_child is deferred (physics-flush safety per `_die` P0
+	# fix run-002). Await one frame for the deferred call to land.
+	await get_tree().process_frame
 	# At least one Pickup child under the room.
 	var pickup_count: int = 0
 	for c: Node in room.get_children():

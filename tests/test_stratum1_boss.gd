@@ -329,8 +329,11 @@ func test_boss_death_drops_loot_via_spawner() -> void:
 	b._physics_process(Stratum1Boss.PHASE_TRANSITION_DURATION + 0.01)
 	_hit(b, 33)
 	assert_true(b.is_dead())
-	# The on_mob_died handler ran inline on the signal emit. parent has at
-	# least one Pickup child if loot spawned.
+	# The on_mob_died handler ran inline on the signal emit, but the
+	# Pickup add_child is now deferred (physics-flush safety per `_die`
+	# P0 fix run-002). Await one frame for the deferred call to land.
+	await get_tree().process_frame
+	# parent has at least one Pickup child if loot spawned.
 	var pickup_count: int = 0
 	for c: Node in parent.get_children():
 		if c is Pickup:

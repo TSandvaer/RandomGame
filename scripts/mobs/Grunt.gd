@@ -563,9 +563,15 @@ func _spawn_death_particles() -> void:
 	ramp.set_color(0, EMBER_LIGHT)
 	ramp.set_color(1, EMBER_DEEP)
 	burst.color_ramp = ramp
-	# Defer add_child so we can keep room.add_child safe across signal
-	# emission contexts; queue_free the burst when emission finishes.
-	room.add_child(burst)
+	# Physics-flush safety: this method is called from `_die`, which itself
+	# runs during the physics-step body_entered chain. Adding a Node2D-derived
+	# burst node synchronously can trigger Godot 4's "Can't change this state
+	# while flushing queries" panic and abort the rest of the death sequence
+	# (run-002 P0, ticket TBA — Sponsor's `embergrave-html5-4ab2813` retest).
+	# `call_deferred` lands the add_child after the physics flush completes,
+	# letting `_play_death_tween` + the `_force_queue_free` safety-net both
+	# run cleanly.
+	room.call_deferred("add_child", burst)
 	burst.finished.connect(burst.queue_free)
 
 
