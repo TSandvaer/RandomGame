@@ -139,6 +139,22 @@ var _death_tween: Tween = null
 var _modulate_at_rest: Color = Color(1, 1, 1, 1)
 var _captured_modulate_at_rest: bool = false
 
+# Hit-flash target — the Sprite ColorRect child (per Grunt.tscn). Cached on
+# first hit so the flash tween can target the *visible* color directly.
+# Fallback to `self` (CharacterBody2D modulate) for bare-instanced test mobs
+# that don't ship a Sprite child.
+#
+# Bug C fix (Sponsor soak `embergrave-html5-f62991f`): the previous flash
+# tweened the parent CharacterBody2D's modulate from white -> white -> white,
+# a no-op that produced no visible flash on ANY platform (the trace line
+# `Grunt._play_hit_flash | rest=(1.00,1.00,1.00)` confirmed both rest AND
+# tween-target were white, double no-op). Tweening the Sprite ColorRect's
+# `color` property directly bypasses modulate cascading entirely and
+# guarantees a visible flash on every renderer.
+var _hit_flash_target: CanvasItem = null
+var _hit_flash_uses_sprite: bool = false  # true -> tween Sprite.color, false -> self.modulate
+var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
+
 ## NodePath (or Node ref) to the player. Optional — spawner sets this. If
 ## unset, the grunt looks for the first node in the "player" group at _ready.
 @export var player_node_path: NodePath
@@ -398,14 +414,33 @@ func _die() -> void:
 
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
 
-## §2 hit-flash: white modulate for 80ms (20ms in + 20ms hold + 40ms out).
+## §2 hit-flash: white flash for 80ms (20ms in + 20ms hold + 40ms out).
 ## Second-hit-during-flash kills the running tween and restarts fresh from
 ## start so flashes don't accumulate or extend.
+##
+## **Bug C fix:** tweens the **Sprite ColorRect child's `color` property**
+## (not the parent CharacterBody2D's `modulate`) so the flash is actually
+## visible. The mob `.tscn` files ship a Sprite child with a non-white tint
+## (e.g. Grunt's `Color(0.55, 0.18, 0.22, 1)` dark-red); tweening that color
+## from rest -> white -> rest produces a visible flash on every renderer
+## (HTML5 included). Bare-instanced test mobs without a Sprite child fall
+## back to the legacy modulate-tween path (still no-op visually but preserves
+## the tween-shape contract that test_combat_visuals.gd asserts).
 func _play_hit_flash() -> void:
 	if _is_dead:
 		return
-	# Capture the starting modulate exactly once per life so the tween-back
-	# returns to the authored color (the .tscn ships ColorRect tints).
+	# Resolve the flash target on first hit: prefer Sprite child (.tscn-loaded
+	# mobs), fall back to self/modulate (bare-instanced test mobs).
+	if _hit_flash_target == null:
+		var sprite: Node = get_node_or_null("Sprite")
+		if sprite is ColorRect:
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_sprite_color_at_rest = (sprite as ColorRect).color
+		else:
+			_hit_flash_target = self
+			_hit_flash_uses_sprite = false
+	# Capture the starting modulate exactly once per life (legacy fallback path).
 	if not _captured_modulate_at_rest:
 		_modulate_at_rest = modulate
 		_captured_modulate_at_rest = true
@@ -418,12 +453,23 @@ func _play_hit_flash() -> void:
 		modulate = _modulate_at_rest
 		return
 	_hit_flash_tween = create_tween()
-	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
-	# Hold step — tween to the same value over HIT_FLASH_HOLD seconds.
-	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
-	_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
-	_combat_trace("Grunt._play_hit_flash",
-		"tween_valid=%s rest=(%.2f,%.2f,%.2f)" % [_hit_flash_tween.is_valid(), _modulate_at_rest.r, _modulate_at_rest.g, _modulate_at_rest.b])
+	if _hit_flash_uses_sprite:
+		# White-flash on the Sprite ColorRect's color (Bug C fix).
+		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
+		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, HIT_FLASH_OUT)
+		_combat_trace("Grunt._play_hit_flash",
+			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f) target=white" %
+			[_hit_flash_tween.is_valid(), _sprite_color_at_rest.r, _sprite_color_at_rest.g, _sprite_color_at_rest.b])
+	else:
+		# Legacy fallback (bare-instanced mobs in tests — preserves contract).
+		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
+		_combat_trace("Grunt._play_hit_flash",
+			"modulate-fallback tween_valid=%s rest=(%.2f,%.2f,%.2f)" %
+			[_hit_flash_tween.is_valid(), _modulate_at_rest.r, _modulate_at_rest.g, _modulate_at_rest.b])
 
 
 ## §3a death tween: 200ms parallel scale 1.0→0.6 + modulate.a 1.0→0.0,
