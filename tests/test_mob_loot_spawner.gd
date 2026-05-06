@@ -44,6 +44,8 @@ func test_spawner_spawns_pickups_for_each_rolled_drop() -> void:
 	var pickup: Pickup = spawned[0]
 	assert_not_null(pickup.item, "pickup carries an ItemInstance")
 	assert_eq(pickup.item.def, item, "pickup item references the same ItemDef")
+	# add_child is deferred (physics-flush safety per `_die` P0 fix run-002).
+	await get_tree().process_frame
 	assert_eq(pickup.get_parent(), room, "pickup parented under the room root")
 
 
@@ -92,6 +94,10 @@ func test_grunt_death_through_signal_wires_to_spawner() -> void:
 	# Kill.
 	g.take_damage(20, Vector2.ZERO, null)
 	assert_true(g.is_dead())
+	# Pickup add_child is deferred (physics-flush safety per `_die` P0 fix
+	# run-002 — Pickup is an Area2D and can't be added during physics
+	# query flush). Await one frame for the deferred call to land.
+	await get_tree().process_frame
 	# Verify pickups parented under room.
 	var pickups: Array[Pickup] = []
 	for child: Node in room.get_children():

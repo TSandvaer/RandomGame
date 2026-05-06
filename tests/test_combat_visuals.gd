@@ -378,8 +378,11 @@ func test_grunt_death_particles_parented_to_room_not_self() -> void:
 	room.add_child(g)
 	# Pre-condition: no CPUParticles2D anywhere yet.
 	assert_eq(_count_particles_under(room), 0)
-	# Lethal damage.
+	# Lethal damage. Burst add_child is deferred (physics-flush safety per
+	# `_die` P0 fix run-002), so we await one frame for the deferred call
+	# to land before asserting the burst is in the tree.
 	g.take_damage(g.get_max_hp(), Vector2.ZERO, null)
+	await get_tree().process_frame
 	# Burst spawned under room (not under grunt — grunt's death tween is
 	# about to fade it out and queue_free).
 	assert_eq(_count_particles_under(room), 1, "burst parented to room")
@@ -396,6 +399,8 @@ func test_boss_death_particles_count_is_24() -> void:
 	b.skip_intro_for_tests = true
 	room.add_child(b)
 	b.take_damage(b.get_max_hp(), Vector2.ZERO, null)
+	# Burst add_child is deferred (physics-flush safety, run-002 P0).
+	await get_tree().process_frame
 	# Find the burst and assert its `amount`.
 	var burst: CPUParticles2D = _first_particle_under(room)
 	assert_not_null(burst, "boss spawns a burst under the room")
