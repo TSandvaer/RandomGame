@@ -90,12 +90,25 @@ const HEAVY_TELEGRAPH_DURATION: float = 0.65
 const HEAVY_TELEGRAPH_HP_FRAC: float = 0.30
 
 ## Visual-feedback timings (per `team/uma-ux/combat-visual-feedback.md` §2 + §3).
-## Hit-flash: white modulate for 80ms total — 20ms tween-in, 20ms hold,
+## Hit-flash: bright modulate for 80ms total — 20ms tween-in, 20ms hold,
 ## 40ms tween-back. Death tween: 200ms scale-down + alpha-fade. Particles:
 ## 6 ember particles (24 for boss subclass via override).
 const HIT_FLASH_IN: float = 0.020
 const HIT_FLASH_HOLD: float = 0.020
 const HIT_FLASH_OUT: float = 0.040
+## Hit-flash modulate target. **NOT pure white** — Uma's spec called for a
+## "white modulate" but `modulate` is multiplicative against the underlying
+## sprite color. `Color(1,1,1,1)` is the multiplicative identity, so a tween
+## from white-to-white-back-to-rest is a no-op everywhere (the white-on-white
+## bug shipped in PR #115/#136 — Devon flagged in PR #136 review, ticket
+## 86c9ncd9g). The fix: overbright modulate `(2.5, 2.5, 2.5, 1.0)`. On a
+## colored ColorRect (e.g. Grunt's `Color(0.55, 0.18, 0.22)`) this multiplies
+## to `(1.375, 0.45, 0.55)` which clamps to displayable max → a clearly
+## brighter pinkish-white flash. On HTML5 `gl_compatibility` the >1.0
+## components clamp to 1.0 in the sRGB framebuffer, which IS the visible
+## "white flash" Uma's spec intends. Same constant across all four mobs
+## per Uma §6 cross-mob consistency rule.
+const HIT_FLASH_COLOR: Color = Color(2.5, 2.5, 2.5, 1.0)
 const DEATH_TWEEN_DURATION: float = 0.200
 const DEATH_PARTICLE_COUNT: int = 6
 const DEATH_TARGET_SCALE: float = 0.6
@@ -418,12 +431,12 @@ func _play_hit_flash() -> void:
 		modulate = _modulate_at_rest
 		return
 	_hit_flash_tween = create_tween()
-	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
+	_hit_flash_tween.tween_property(self, "modulate", HIT_FLASH_COLOR, HIT_FLASH_IN)
 	# Hold step — tween to the same value over HIT_FLASH_HOLD seconds.
-	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+	_hit_flash_tween.tween_property(self, "modulate", HIT_FLASH_COLOR, HIT_FLASH_HOLD)
 	_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
 	_combat_trace("Grunt._play_hit_flash",
-		"tween_valid=%s rest=(%.2f,%.2f,%.2f)" % [_hit_flash_tween.is_valid(), _modulate_at_rest.r, _modulate_at_rest.g, _modulate_at_rest.b])
+		"tween_valid=%s rest=(%.2f,%.2f,%.2f) flash=(%.2f,%.2f,%.2f)" % [_hit_flash_tween.is_valid(), _modulate_at_rest.r, _modulate_at_rest.g, _modulate_at_rest.b, HIT_FLASH_COLOR.r, HIT_FLASH_COLOR.g, HIT_FLASH_COLOR.b])
 
 
 ## §3a death tween: 200ms parallel scale 1.0→0.6 + modulate.a 1.0→0.0,

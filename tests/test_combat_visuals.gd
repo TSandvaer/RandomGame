@@ -112,6 +112,89 @@ func test_all_mobs_have_identical_hit_flash_rule() -> void:
 	assert_eq(Grunt.HIT_FLASH_OUT, Stratum1Boss.HIT_FLASH_OUT)
 
 
+# ---- Hit-flash: observable color delta (white-on-white bug fix, 86c9ncd9g) --
+#
+# Why these tests exist: PR #115 / PR #136's hit-flash shipped with target
+# `Color(1,1,1,1)` — the multiplicative identity for `modulate`. The previous
+# `test_*_hit_flash_starts_tween_on_take_damage` tests only asserted
+# `tween_valid=true`, which a no-op tween still passes. The visual bug shipped
+# anyway because no test checked that the tweened color *differed from rest*.
+# These paired tests close that gap by asserting (a) HIT_FLASH_COLOR is not
+# the multiplicative identity, (b) it's overbright (component > 1.0) so it
+# brightens any colored sprite, and (c) all four mobs share the same color
+# constant per Uma §6 cross-mob consistency.
+
+func test_grunt_hit_flash_color_is_not_multiplicative_identity() -> void:
+	# Load-bearing assertion: the flash target must produce a visible delta
+	# when multiplied against any non-zero sprite color. `Color(1,1,1,1)` is
+	# the identity and would render no flash — that's the bug we're fixing.
+	assert_ne(Grunt.HIT_FLASH_COLOR, Color(1, 1, 1, 1),
+		"hit-flash target must NOT be multiplicative identity (Uma §2 / 86c9ncd9g)")
+
+
+func test_grunt_hit_flash_color_is_overbright() -> void:
+	# Overbright (component > 1.0) is what lets the flash visibly brighten
+	# a tinted sprite via multiplicative modulate. <=1.0 components on a
+	# dark sprite would *darken* it (wrong direction).
+	assert_gt(Grunt.HIT_FLASH_COLOR.r, 1.0, "flash R must overbright")
+	assert_gt(Grunt.HIT_FLASH_COLOR.g, 1.0, "flash G must overbright")
+	assert_gt(Grunt.HIT_FLASH_COLOR.b, 1.0, "flash B must overbright")
+	assert_almost_eq(Grunt.HIT_FLASH_COLOR.a, 1.0, 0.0001,
+		"flash alpha stays at 1.0 (no fade during flash)")
+
+
+func test_grunt_hit_flash_color_differs_from_rest() -> void:
+	# Concrete delta on Grunt.tscn's actual sprite tint. Grunt's "Sprite"
+	# ColorRect is `Color(0.55, 0.18, 0.22)`. The rendered flash color is
+	# `HIT_FLASH_COLOR * sprite_color` (modulate is multiplicative). On HTML5
+	# sRGB-clamped pipelines the result clamps to (1.0, sprite.g, sprite.b)
+	# — visibly brighter than rest. We verify the multiplied-and-clamped
+	# result differs from the unflashed sprite color by at least one channel.
+	var sprite_color: Color = Color(0.55, 0.18, 0.22, 1.0)
+	var flashed: Color = Color(
+		min(1.0, Grunt.HIT_FLASH_COLOR.r * sprite_color.r),
+		min(1.0, Grunt.HIT_FLASH_COLOR.g * sprite_color.g),
+		min(1.0, Grunt.HIT_FLASH_COLOR.b * sprite_color.b),
+		Grunt.HIT_FLASH_COLOR.a * sprite_color.a)
+	# At least one channel must change observably between rest and flash.
+	var delta: float = absf(flashed.r - sprite_color.r) \
+		+ absf(flashed.g - sprite_color.g) \
+		+ absf(flashed.b - sprite_color.b)
+	assert_gt(delta, 0.05, "flash must produce >0.05 cumulative-channel delta vs rest sprite")
+
+
+func test_all_mobs_share_hit_flash_color() -> void:
+	# Cross-mob consistency: all four mobs MUST flash the same color so
+	# combat reads consistently regardless of which mob you hit.
+	assert_eq(Grunt.HIT_FLASH_COLOR, Charger.HIT_FLASH_COLOR,
+		"Charger flash matches Grunt (Uma §6)")
+	assert_eq(Grunt.HIT_FLASH_COLOR, Shooter.HIT_FLASH_COLOR,
+		"Shooter flash matches Grunt (Uma §6)")
+	assert_eq(Grunt.HIT_FLASH_COLOR, Stratum1Boss.HIT_FLASH_COLOR,
+		"Stratum1Boss flash matches Grunt (Uma §6)")
+
+
+func test_grunt_take_damage_flash_target_is_not_rest() -> void:
+	# Integration: after take_damage, the running tween's *active step* must
+	# be tweening toward HIT_FLASH_COLOR (not _modulate_at_rest). We can't
+	# poke the tween's internal step cursor portably, but we CAN assert the
+	# pre-tween state (parent.modulate ≈ rest) flips toward flash within one
+	# physics tick — observable end-of-frame state change, not just
+	# tween-existence.
+	var g: Grunt = _make_grunt()
+	# Force a known rest state so the assertion is unambiguous.
+	g.modulate = Color(0.5, 0.5, 0.5, 1.0)
+	g.take_damage(5, Vector2.ZERO, null)
+	# Advance one physics frame so the tween's first step ticks.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	# Modulate must have moved toward HIT_FLASH_COLOR (away from the 0.5 rest).
+	# Each channel of HIT_FLASH_COLOR (2.5) is greater than rest (0.5), so
+	# the modulate's R component must have increased.
+	assert_gt(g.modulate.r, 0.5,
+		"after one frame the tween advances modulate.r away from rest toward HIT_FLASH_COLOR — proves NON-no-op tween")
+
+
 # ---- Hit-flash: zero-damage path is silent -----------------------
 
 func test_grunt_zero_damage_does_not_start_flash() -> void:

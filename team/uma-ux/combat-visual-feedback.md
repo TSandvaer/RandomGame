@@ -55,13 +55,15 @@ Every timing number below derives directly from these constants. No priors, no "
 **Choice: white modulate flash, 80 ms.**
 
 - On every mob's `take_damage(amount, knockback, source)` (Grunt/Charger/Shooter/Stratum1Boss — same rule for all four), tween:
-  - `modulate` → `Color(1, 1, 1, 1)` (full white, full alpha) over **20 ms**.
+  - `modulate` → **`Color(2.5, 2.5, 2.5, 1.0)`** (overbright; clamps to displayable max → reads as bright-white flash) over **20 ms**.
   - hold **20 ms**.
   - tween back to original modulate over **40 ms**.
   - **Total: 80 ms.**
 - Only fires when `clean_amount > 0` (skip the i-frame / dead-state early returns at the top of `take_damage` — already there in `_die()` latch).
 
 **Rationale:** Standard option from the dispatch (white-flash) chosen over shake (disorients on a 480×270 internal canvas with 4-logical-px shake budget; better reserved for boss death) and over darken (palette is already low-value; darkening reads as a tile-color shift, not a hit). 80 ms is short enough not to mask the hit-stop's 60 ms but long enough to register at 60 fps (~5 frames). Single rule across all four mob types per dispatch §6 cross-system consistency.
+
+**Why overbright `(2.5, 2.5, 2.5)` instead of `Color(1, 1, 1, 1)` (Drew run-2026-05-06, ticket 86c9ncd9g):** `modulate` is *multiplicative* against the underlying sprite color, not additive. `Color(1, 1, 1, 1)` is the multiplicative identity, so a tween from `rest → white → white → rest` is a no-op everywhere — `(0.55, 0.18, 0.22) × (1, 1, 1) = (0.55, 0.18, 0.22)`, no visible flash. Original spec assumed sprite tint lived in the parent's `modulate` (so flashing modulate to white would override the tint), but Stratum-1 mob `.tscn`s carry the tint in a child `ColorRect.color` field and leave parent modulate at `(1, 1, 1, 1)`. PR #115 / PR #136 shipped this no-op; Devon flagged it in the PR #136 review. The fix: overbright modulate `(2.5, 2.5, 2.5, 1.0)`. On a colored sprite this multiplies to e.g. `(1.375, 0.45, 0.55)` which clamps in the sRGB framebuffer to `(1.0, 0.45, 0.55)` — visibly brighter pinkish-white flash. On HTML5 `gl_compatibility` the >1.0 clamp is the visible "white flash" we want. Paired tests in `tests/test_combat_visuals.gd` enforce: HIT_FLASH_COLOR ≠ identity, components > 1.0, and the after-one-frame `modulate.r` actually moves away from rest (catches the no-op-tween regression directly, not just `tween_valid`).
 
 **Edge case:** the second hit before the flash completes — restart the tween from scratch. Each `take_damage` is its own 80-ms cue; flashes don't accumulate or extend. `Tween.kill()` + new tween if a previous flash is still active.
 

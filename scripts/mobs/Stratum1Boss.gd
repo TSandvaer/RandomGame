@@ -157,6 +157,9 @@ const ENRAGE_RECOVERY_MULT: float = 0.7  # 30% shorter recoveries
 const HIT_FLASH_IN: float = 0.020
 const HIT_FLASH_HOLD: float = 0.020
 const HIT_FLASH_OUT: float = 0.040
+## Overbright hit-flash target. Mirrors Grunt.HIT_FLASH_COLOR — see Grunt.gd
+## for full rationale (white-on-white bug fix per ticket 86c9ncd9g).
+const HIT_FLASH_COLOR: Color = Color(2.5, 2.5, 2.5, 1.0)
 const DEATH_TWEEN_DURATION: float = 0.200
 const DEATH_PARTICLE_COUNT: int = 24
 const DEATH_TARGET_SCALE: float = 0.6
@@ -616,8 +619,8 @@ func _play_hit_flash() -> void:
 		modulate = _modulate_at_rest
 		return
 	_hit_flash_tween = create_tween()
-	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
-	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+	_hit_flash_tween.tween_property(self, "modulate", HIT_FLASH_COLOR, HIT_FLASH_IN)
+	_hit_flash_tween.tween_property(self, "modulate", HIT_FLASH_COLOR, HIT_FLASH_HOLD)
 	_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
 
 
