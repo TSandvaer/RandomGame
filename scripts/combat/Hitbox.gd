@@ -44,6 +44,39 @@ var _hit_already: Array[Node] = []
 var _source: Node = null
 
 
+func _init() -> void:
+	# Physics-flush safety (run-002 P0 wave 2, ticket 86c9nx1dx — Sponsor's
+	# `embergrave-html5-fcbe466` retest, ~30 rapid Player swings):
+	#
+	# Hitbox is an Area2D. When a hitbox is spawned during a swing whose
+	# spawn site runs inside `_physics_process` (Player.try_attack +
+	# every mob's `_swing_*`), and the engine is mid-flush of a prior
+	# tick's body_entered queue, calling `add_child(hitbox)` mutates
+	# physics-monitoring state during the flush. Godot 4 panics with:
+	#
+	#     USER ERROR: Can't change this state while flushing queries. Use
+	#     call_deferred() or set_deferred() to change monitoring state instead.
+	#
+	# The panic aborts the rest of the call chain (the player's try_attack
+	# returns early, the mob's swing recovery state never sets, etc.).
+	#
+	# Fix: enter the tree with monitoring/monitorable OFF, so add_child
+	# itself does NOT touch the physics-monitoring state. We turn them
+	# back on inside `_activate_and_check_initial_overlaps`, which is
+	# `call_deferred`'d from `_ready` — by the time it runs, the physics
+	# flush has completed and toggling monitoring is safe.
+	#
+	# Setting these in `_init` (not `_ready`) is load-bearing: `_ready`
+	# runs DURING `add_child`, so by then the engine is already evaluating
+	# the add. Properties set during `_init` are in place before the node
+	# is added.
+	#
+	# Pairs with PR #142's MobLootSpawner / _spawn_death_particles defers
+	# (death-path Area2D adds — same root cause, different sites).
+	monitoring = false
+	monitorable = false
+
+
 func _ready() -> void:
 	_life_left = lifetime
 	_apply_team_layers()
@@ -59,7 +92,10 @@ func _ready() -> void:
 	# empty until the engine has computed overlaps for the just-added Area2D.
 	# `_try_apply_hit` is single-hit-per-target via `_hit_already`, so a
 	# legitimate `body_entered` later in the lifetime won't double-hit.
-	call_deferred("_check_initial_overlaps")
+	#
+	# Wave-2 fix (ticket 86c9nx1dx): the same deferred call also flips
+	# monitoring/monitorable back on. See `_init` for the panic context.
+	call_deferred("_activate_and_check_initial_overlaps")
 
 
 func _physics_process(delta: float) -> void:
@@ -112,18 +148,39 @@ func _on_area_entered(area: Area2D) -> void:
 	_try_apply_hit(area)
 
 
-## Sweep bodies/areas already overlapping this hitbox at spawn. Called
-## via `call_deferred` from `_ready` so the engine has had a physics frame
-## to populate the overlap tables. Guarded by `is_inside_tree` because a
-## hitbox queue_free'd before its deferred call lands (e.g. tests that
-## construct + free immediately) must not crash trying to query overlaps.
-func _check_initial_overlaps() -> void:
+## Activate physics monitoring and sweep bodies/areas already overlapping
+## this hitbox at spawn. Called via `call_deferred` from `_ready` so:
+##   1. The engine has finished flushing prior-tick physics queries, making
+##      it safe to flip `monitoring` / `monitorable` back on (run-002 P0
+##      wave 2, ticket 86c9nx1dx — see `_init` for the full panic context).
+##   2. `get_overlapping_bodies()` has had a physics frame to populate the
+##      overlap tables for the just-added Area2D (regression 86c9m36zh —
+##      pre-existing overlaps don't fire `body_entered`, hits would no-op
+##      without this sweep).
+##
+## Guarded by `is_inside_tree` because a hitbox queue_free'd before its
+## deferred call lands (e.g. tests that construct + free immediately) must
+## not crash trying to query overlaps.
+func _activate_and_check_initial_overlaps() -> void:
 	if not is_inside_tree():
 		return
+	# Re-enable monitoring/monitorable now that the physics flush is over.
+	# Order is load-bearing: monitoring must be true before
+	# `get_overlapping_bodies` returns anything.
+	monitoring = true
+	monitorable = true
 	for body in get_overlapping_bodies():
 		_try_apply_hit(body)
 	for area in get_overlapping_areas():
 		_try_apply_hit(area)
+
+
+## Back-compat shim — kept so any external caller (tests, future spawners)
+## that explicitly invokes the previous name still works after the rename.
+## Forwards to `_activate_and_check_initial_overlaps` which does the same
+## sweep PLUS re-enables monitoring (the wave-2 P0 fix).
+func _check_initial_overlaps() -> void:
+	_activate_and_check_initial_overlaps()
 
 
 func _try_apply_hit(target: Node) -> void:
