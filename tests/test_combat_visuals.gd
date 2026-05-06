@@ -144,6 +144,149 @@ func test_grunt_second_hit_during_flash_restarts_tween() -> void:
 	assert_true(second_tween.is_valid(), "new tween is the active one")
 
 
+# ---- Bug C regression: hit-flash target color must differ from rest --------
+#
+# Sponsor soak `embergrave-html5-f62991f` shipped a hit-flash that tweened
+# the parent CharacterBody2D's `modulate` from white -> white -> white -> white
+# — both rest AND target were `(1,1,1,1)`, making the flash a literal no-op
+# on every platform (not just HTML5). The trace line proved it:
+#   `[combat-trace] Grunt._play_hit_flash | rest=(1.00,1.00,1.00)`
+#
+# This invariant catches the no-op shape regardless of which property the
+# fix tweens (Sprite.color or self.modulate). Both .tscn-loaded mobs (with
+# Sprite child) AND bare-instanced mobs are covered: the .tscn path tweens
+# Sprite.color rest -> white -> rest where rest is the authored non-white
+# color (so target ≠ rest by construction), and the bare-instanced path is
+# the legacy modulate fallback (still no-op visually but the test below
+# only fires on the Sprite path which is the production-relevant path).
+
+func _make_grunt_with_sprite() -> Grunt:
+	# Build a Grunt with a Sprite ColorRect child that mirrors Grunt.tscn.
+	# Bare `Grunt.new()` ships no Sprite, which falls into the legacy
+	# modulate fallback — for the visible-flash regression we need the
+	# .tscn-loaded path, hence this helper.
+	var g: Grunt = GruntScript.new()
+	var sprite: ColorRect = ColorRect.new()
+	sprite.name = "Sprite"
+	sprite.color = Color(0.55, 0.18, 0.22, 1)  # matches Grunt.tscn
+	g.add_child(sprite)
+	add_child_autofree(g)
+	return g
+
+
+func _make_charger_with_sprite() -> Charger:
+	var c: Charger = ChargerScript.new()
+	var sprite: ColorRect = ColorRect.new()
+	sprite.name = "Sprite"
+	sprite.color = Color(0.78, 0.42, 0.18, 1)  # matches Charger.tscn
+	c.add_child(sprite)
+	add_child_autofree(c)
+	return c
+
+
+func _make_shooter_with_sprite() -> Shooter:
+	var s: Shooter = ShooterScript.new()
+	var sprite: ColorRect = ColorRect.new()
+	sprite.name = "Sprite"
+	sprite.color = Color(0.32, 0.45, 0.78, 1)  # matches Shooter.tscn
+	s.add_child(sprite)
+	add_child_autofree(s)
+	return s
+
+
+func _make_boss_with_sprite() -> Stratum1Boss:
+	var b: Stratum1Boss = BossScript.new()
+	b.skip_intro_for_tests = true
+	var sprite: ColorRect = ColorRect.new()
+	sprite.name = "Sprite"
+	sprite.color = Color(0.48, 0.12, 0.16, 1)  # matches Stratum1Boss.tscn
+	b.add_child(sprite)
+	add_child_autofree(b)
+	return b
+
+
+## Bug C regression invariant: when the mob has a Sprite child, the hit-flash
+## tween targets the Sprite.color property AND the Sprite's rest color is
+## materially different from white (the flash target). Together these guarantee
+## the tween produces a perceptible color shift — which is what the original
+## bug failed.
+func test_grunt_hit_flash_target_differs_from_rest() -> void:
+	var g: Grunt = _make_grunt_with_sprite()
+	g.take_damage(5, Vector2.ZERO, null)
+	# Sprite-path resolved.
+	assert_true(g._hit_flash_uses_sprite, "Grunt with Sprite child uses sprite-path")
+	assert_not_null(g._hit_flash_target)
+	assert_true(g._hit_flash_target is ColorRect)
+	# Rest color (.tscn-authored) and tween target (white) must differ —
+	# otherwise the flash is a literal no-op (Bug C).
+	var white: Color = Color(1, 1, 1, 1)
+	var rest: Color = g._sprite_color_at_rest
+	var delta: float = abs(rest.r - white.r) + abs(rest.g - white.g) + abs(rest.b - white.b)
+	assert_gt(delta, 0.20,
+		"Sprite rest color must differ from white target by >= 0.20 (Bug C — no-op flash)")
+
+
+func test_charger_hit_flash_target_differs_from_rest() -> void:
+	var c: Charger = _make_charger_with_sprite()
+	c.take_damage(5, Vector2.ZERO, null)
+	assert_true(c._hit_flash_uses_sprite)
+	var white: Color = Color(1, 1, 1, 1)
+	var rest: Color = c._sprite_color_at_rest
+	var delta: float = abs(rest.r - white.r) + abs(rest.g - white.g) + abs(rest.b - white.b)
+	assert_gt(delta, 0.20, "Charger Sprite rest != white target (Bug C)")
+
+
+func test_shooter_hit_flash_target_differs_from_rest() -> void:
+	var s: Shooter = _make_shooter_with_sprite()
+	s.take_damage(5, Vector2.ZERO, null)
+	assert_true(s._hit_flash_uses_sprite)
+	var white: Color = Color(1, 1, 1, 1)
+	var rest: Color = s._sprite_color_at_rest
+	var delta: float = abs(rest.r - white.r) + abs(rest.g - white.g) + abs(rest.b - white.b)
+	assert_gt(delta, 0.20, "Shooter Sprite rest != white target (Bug C)")
+
+
+func test_boss_hit_flash_target_differs_from_rest() -> void:
+	var b: Stratum1Boss = _make_boss_with_sprite()
+	b.take_damage(5, Vector2.ZERO, null)
+	assert_true(b._hit_flash_uses_sprite)
+	var white: Color = Color(1, 1, 1, 1)
+	var rest: Color = b._sprite_color_at_rest
+	var delta: float = abs(rest.r - white.r) + abs(rest.g - white.g) + abs(rest.b - white.b)
+	assert_gt(delta, 0.20, "Boss Sprite rest != white target (Bug C)")
+
+
+## All four mob types must use the *same* hit-flash mechanism (sprite-path
+## when Sprite child exists). Asserts the cross-mob consistency rule per
+## Uma's spec §6.
+func test_all_mobs_use_sprite_path_when_sprite_child_exists() -> void:
+	var g: Grunt = _make_grunt_with_sprite()
+	g.take_damage(3, Vector2.ZERO, null)
+	var c: Charger = _make_charger_with_sprite()
+	c.take_damage(3, Vector2.ZERO, null)
+	var s: Shooter = _make_shooter_with_sprite()
+	s.take_damage(3, Vector2.ZERO, null)
+	var b: Stratum1Boss = _make_boss_with_sprite()
+	b.take_damage(3, Vector2.ZERO, null)
+	assert_true(g._hit_flash_uses_sprite, "Grunt sprite-path")
+	assert_true(c._hit_flash_uses_sprite, "Charger sprite-path")
+	assert_true(s._hit_flash_uses_sprite, "Shooter sprite-path")
+	assert_true(b._hit_flash_uses_sprite, "Boss sprite-path")
+
+
+## Bare-instanced mobs (no Sprite child) fall back to the legacy modulate
+## path. Preserves the existing test_combat_visuals tween-shape contract
+## for `_make_grunt()` (no sprite) — the flash IS still a no-op visually
+## in that case, but the production code path is sprite-driven so this
+## fallback is test-only and doesn't ship.
+func test_grunt_without_sprite_uses_modulate_fallback() -> void:
+	var g: Grunt = _make_grunt()  # bare — no Sprite child
+	g.take_damage(5, Vector2.ZERO, null)
+	assert_false(g._hit_flash_uses_sprite,
+		"bare-instanced Grunt (no Sprite child) falls back to modulate path")
+	assert_eq(g._hit_flash_target, g, "fallback target is self")
+
+
 # ---- Death tween: 200ms scale + fade ------------------------------
 
 func test_grunt_death_tween_constants_match_spec() -> void:
