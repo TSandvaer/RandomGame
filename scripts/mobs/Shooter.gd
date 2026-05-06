@@ -130,6 +130,11 @@ var _death_tween: Tween = null
 var _modulate_at_rest: Color = Color(1, 1, 1, 1)
 var _captured_modulate_at_rest: bool = false
 
+# Hit-flash target — Sprite child (Bug C fix). See Grunt.gd for full rationale.
+var _hit_flash_target: CanvasItem = null
+var _hit_flash_uses_sprite: bool = false
+var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
+
 
 func _ready() -> void:
 	_apply_mob_def()
@@ -390,9 +395,20 @@ func _die() -> void:
 
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
 
+## §2 hit-flash. Bug C fix: tween Sprite child's `color` so the flash is
+## actually visible. See Grunt._play_hit_flash for full rationale.
 func _play_hit_flash() -> void:
 	if _is_dead:
 		return
+	if _hit_flash_target == null:
+		var sprite: Node = get_node_or_null("Sprite")
+		if sprite is ColorRect:
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_sprite_color_at_rest = (sprite as ColorRect).color
+		else:
+			_hit_flash_target = self
+			_hit_flash_uses_sprite = false
 	if not _captured_modulate_at_rest:
 		_modulate_at_rest = modulate
 		_captured_modulate_at_rest = true
@@ -402,9 +418,15 @@ func _play_hit_flash() -> void:
 		modulate = _modulate_at_rest
 		return
 	_hit_flash_tween = create_tween()
-	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
-	_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
-	_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
+	if _hit_flash_uses_sprite:
+		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
+		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, HIT_FLASH_OUT)
+	else:
+		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
 
 
 ## **HTML5 safety-net** (Sponsor soak `embergrave-html5-0e77a92`): see Grunt
