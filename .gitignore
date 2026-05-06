@@ -52,5 +52,8 @@ venv/
 # Logs
 *.log
 
-# Claude Code session state
-.claude/
+# Claude Code — versioned project config + skills + docs + hooks live in .claude/
+# Per-user / per-machine state is excluded individually below.
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
