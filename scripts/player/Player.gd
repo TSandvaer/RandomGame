@@ -118,15 +118,26 @@ const SWING_WEDGE_ALPHA_LIGHT: float = 0.55
 const SWING_WEDGE_ALPHA_HEAVY: float = 0.70
 
 # Player ember-flash modulate — 60ms total: 30ms toward ember, 30ms back to
-# white. Ember-tint per spec: Color(1.4, 1.0, 0.7, 1) (slight luminance boost).
-# Both attack types use the same flash duration.
-const SWING_FLASH_TINT: Color = Color(1.4, 1.0, 0.7, 1.0)
+# white. Sub-1.0 warm-yellow tint per HTML5-safe values: GLES2/3 web canvas
+# in `gl_compatibility` clamps modulate to [0,1] (HDR overbright is unavailable
+# on the web target), so the previous `Color(1.4, 1.0, 0.7, 1)` clamped to
+# `(1.0, 1.0, 0.7, 1)` and the flash was barely visible. Sub-1.0 values give
+# a guaranteed-visible warm darkening on every renderer. Both attack types
+# use the same flash duration.
+# Bug B reference: Sponsor soak `embergrave-html5-f62991f` — `[combat-trace]
+# Player.swing_flash | tint=(1.40,1.00,0.70)` HDR-clamped to no-op on HTML5.
+const SWING_FLASH_TINT: Color = Color(1.0, 0.85, 0.6, 1.0)
 const SWING_FLASH_HALF_DURATION: float = 0.030  # 30ms each way → 60ms total
 
-# Z-index per spec: above floor, below player body. The wedge is parented to
-# the Player so it follows position; setting z_index to -1 puts it behind the
-# Player's own children (Sprite ColorRect at z=0).
-const SWING_WEDGE_Z_INDEX: int = -1
+# Z-index per spec: above floor, but ALSO above the player body so HTML5
+# `gl_compatibility` reliably renders the wedge — under that renderer
+# negative-relative z-index draw ordering has been observed to drop the
+# wedge below the room background (Bug A reference: Sponsor soak
+# `embergrave-html5-f62991f` — `[combat-trace] Player.swing_wedge | spawned
+# kind=light lifetime=0.100 tween_valid=true alpha=0.55` fired but no visual).
+# Stamping the wedge slightly *above* the player ColorRect still reads as a
+# flash extending from the player at M1 placeholder fidelity.
+const SWING_WEDGE_Z_INDEX: int = 1
 
 # ---- Runtime state ------------------------------------------------------
 
@@ -147,7 +158,13 @@ var _attack_recovery_left: float = 0.0
 # attack fired during the previous attack's recovery replaces the old cue
 # rather than stacking. Both fields are weakly-referenced (we null them on
 # tween_finished) so we don't keep stale Node/Tween references alive.
-var _active_swing_wedge: Polygon2D = null
+#
+# Wedge is a ColorRect (rotated rectangle) — Uma's spec lets us pick ColorRect
+# OR Polygon2D; the original implementation went with Polygon2D, but Sponsor's
+# HTML5 soak (Bug A) indicated Polygon2D wasn't rendering reliably under
+# `gl_compatibility`. ColorRect is the simplest, most-tested 2D primitive in
+# every Godot 4 renderer mode, so it's the HTML5-safe baseline.
+var _active_swing_wedge: ColorRect = null
 var _active_flash_tween: Tween = null
 
 # Collision layer to restore after dodge i-frames clear it.
@@ -735,13 +752,25 @@ func _exit_iframes() -> void:
 # ---- Visual feedback ---------------------------------------------------
 
 ## Spawn the ember directional wedge (§1a in `combat-visual-feedback.md`).
-## Polygon2D triangle parented to Player, oriented along `dir`, length =
-## `reach`, half-width = `radius`. Fade-out over `lifetime` then queue_free.
+## ColorRect parented to Player, oriented along `dir`, length = `reach`,
+## width = `radius * 2` (full half-width on each side of the swing axis).
+## Fade-out over `lifetime` then queue_free.
 ##
 ## Kill-and-restart: if a previous wedge from an earlier attack is still
 ## fading, free it before spawning the new one so the cues don't stack —
 ## matches Uma's hit-flash pattern in §2.
-func _spawn_swing_wedge(kind: StringName, dir: Vector2, reach: float, radius: float, lifetime: float) -> Polygon2D:
+##
+## **HTML5 fix (Bug A — Sponsor soak `embergrave-html5-f62991f`):** the
+## original implementation used Polygon2D (3-vertex triangle) which spawned
+## correctly (`tween_valid=true alpha=0.55` in the trace) but rendered
+## invisible under `gl_compatibility` on the web canvas. ColorRect is the
+## simplest, most-tested 2D primitive across every Godot 4 renderer mode and
+## the spec explicitly allows either shape. Geometry shifted from triangle
+## (single tip at +reach, base at radius half-width) to rectangle (full
+## reach × full diameter). The wedge still reads as a directional sweep at
+## M1 placeholder fidelity — the ColorRect mounts at the player center,
+## extends `reach` px along the facing direction, and is `radius*2` px wide.
+func _spawn_swing_wedge(kind: StringName, dir: Vector2, reach: float, radius: float, lifetime: float) -> ColorRect:
 	# Drop any in-flight wedge so the new attack's cue is the only one
 	# visible. is_instance_valid covers the case where _on_wedge_finished
 	# already nulled the ref but the queue_free hasn't been processed yet.
@@ -749,36 +778,43 @@ func _spawn_swing_wedge(kind: StringName, dir: Vector2, reach: float, radius: fl
 		_active_swing_wedge.queue_free()
 	_active_swing_wedge = null
 
-	var wedge: Polygon2D = Polygon2D.new()
-	# Three-vertex triangle: tip at (reach, 0), back-corners at (0, ±radius).
-	# Local space; we rotate the whole polygon to match `dir` below.
-	wedge.polygon = PackedVector2Array([
-		Vector2(reach, 0.0),
-		Vector2(0.0, -radius),
-		Vector2(0.0, radius),
-	])
+	var wedge: ColorRect = ColorRect.new()
+	# Layout: pivot at the player's local origin (0,0), the rectangle spans
+	# from x=0 to x=reach along the facing axis, and y=-radius to y=+radius
+	# perpendicular. Rotation pivots around (0,0) — the player center — so
+	# the wedge always extends "out from the player" along `dir`.
+	wedge.size = Vector2(reach, radius * 2.0)
+	wedge.position = Vector2(0.0, -radius)
+	wedge.pivot_offset = Vector2(0.0, radius)  # pivot at player local origin
 	var alpha: float = SWING_WEDGE_ALPHA_HEAVY if kind == ATTACK_HEAVY else SWING_WEDGE_ALPHA_LIGHT
 	var rgba: Color = SWING_WEDGE_COLOR_RGB
 	rgba.a = alpha
 	wedge.color = rgba
-	# Rotate so the tip points along `dir`. atan2(y, x) gives the radian
-	# angle of the vector measured from +X — matches the wedge's local +X tip.
+	# Rotate so the rectangle extends along `dir`. atan2(y, x) gives the
+	# radian angle of the vector measured from +X.
 	wedge.rotation = dir.angle()
-	# Z-index per spec: above floor, below player body. Wedge sits behind
-	# the Player's Sprite ColorRect (z=0) so it reads as a flash extending
-	# from the player rather than stamped over them.
+	# Z-index per HTML5-safe contract (Bug A — see SWING_WEDGE_Z_INDEX
+	# comment). +1 keeps the wedge in front of the player ColorRect so it's
+	# always visible regardless of HTML5 z-stacking quirks.
 	wedge.z_index = SWING_WEDGE_Z_INDEX
+	# Don't intercept mouse clicks — this is a paint-only cue, not a UI element.
+	wedge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Set lifetime as metadata so tests can read it back without inspecting
 	# tween internals (Tween has no public elapsed-duration getter).
 	wedge.set_meta("lifetime", lifetime)
 	wedge.set_meta("kind", kind)
+	# Geometry metadata so tests assert reach/radius like they did against
+	# the old Polygon2D's `polygon` array.
+	wedge.set_meta("reach", reach)
+	wedge.set_meta("radius", radius)
 	add_child(wedge)
 	_active_swing_wedge = wedge
 	swing_wedge_spawned.emit(kind, wedge)
 
 	# Fade alpha to 0 over the hitbox-lifetime window, then queue_free. We
-	# tween modulate.a (not the polygon's color.a directly) so the spec's
-	# "tween modulate:a, 0.0, LIFETIME" line is honored verbatim.
+	# tween modulate.a (not color.a directly) so a parallel kill-and-restart
+	# tween from a chained attack can swap colors mid-fade without resetting
+	# the alpha-decay clock.
 	var tween: Tween = create_tween()
 	tween.tween_property(wedge, "modulate:a", 0.0, lifetime)
 	tween.tween_callback(Callable(self, "_on_wedge_finished").bind(wedge))
@@ -810,7 +846,7 @@ func _play_swing_flash() -> void:
 ## Internal: tween-finished callback for the swing wedge. Frees the node and
 ## clears the active reference (only if this exact wedge is still the
 ## active one — a newer attack may have already replaced it).
-func _on_wedge_finished(wedge: Polygon2D) -> void:
+func _on_wedge_finished(wedge: ColorRect) -> void:
 	if not is_instance_valid(wedge):
 		return
 	if _active_swing_wedge == wedge:
