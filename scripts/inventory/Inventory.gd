@@ -94,9 +94,55 @@ var _items: Array[ItemInstance] = []
 var _equipped: Dictionary = {}  # StringName slot -> ItemInstance
 
 
+## Path to the T1 iron sword resource that seeds the player's starting
+## inventory. Verified present in the project at M1 RC.
+const IRON_SWORD_PATH: String = "res://resources/items/weapons/iron_sword.tres"
+
 func _ready() -> void:
 	# Smoke line so Tess can grep boot output.
 	print("[Inventory] autoload ready (capacity=%d)" % CAPACITY)
+	_seed_starting_inventory()
+
+
+## Seed a single iron_sword into the inventory on a fresh game-start (both
+## _items and _equipped empty). Only-if-empty rule: existing save files that
+## already have inventory/equipped state are untouched — no dupe on reload.
+## Called from _ready() so the sword is present before any scene boots.
+func _seed_starting_inventory() -> void:
+	if not _items.is_empty() or not _equipped.is_empty():
+		# An existing save was already restored — respect it.
+		return
+	var def: ItemDef = load(IRON_SWORD_PATH) as ItemDef
+	if def == null:
+		push_warning("[Inventory] _seed_starting_inventory: iron_sword.tres not found at %s" % IRON_SWORD_PATH)
+		return
+	var inst: ItemInstance = ItemInstance.new(def, ItemDef.Tier.T1)
+	# Bypass the public add() to avoid spurious inventory_changed before the
+	# Player node is in the tree; the internal append is identical.
+	_items.append(inst)
+	print("[Inventory] starting iron_sword seeded (id=%s damage=%d)" % [def.id, def.base_stats.damage if def.base_stats != null else -1])
+
+
+## Auto-equip the first iron_sword in the inventory into the weapon slot —
+## called from Player._ready() after the Player joins the "player" group
+## (so _find_player() can resolve it). Only runs if the weapon slot is empty,
+## so an existing save's equipped weapon is never overwritten.
+func equip_starter_weapon_if_needed() -> void:
+	if _equipped.has(SLOT_WEAPON) and _equipped[SLOT_WEAPON] != null:
+		# Weapon already equipped (restored save or prior equip). No-op.
+		return
+	# Find the first iron_sword in inventory and equip it.
+	for it_v: ItemInstance in _items:
+		if it_v == null or it_v.def == null:
+			continue
+		if it_v.def.id == &"iron_sword":
+			equip(it_v, SLOT_WEAPON)
+			print("[Inventory] starter iron_sword auto-equipped (weapon slot)")
+			return
+	# No iron_sword in inventory — defensive (seed may have failed or been
+	# consumed by a prior save's state). No-op; player ships fistless which
+	# was the original M1 RC state.
+	push_warning("[Inventory] equip_starter_weapon_if_needed: no iron_sword in inventory to auto-equip")
 
 
 # ---- Public API -------------------------------------------------------
