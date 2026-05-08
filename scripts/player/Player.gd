@@ -221,14 +221,11 @@ func _ready() -> void:
 	# `_resolve_player`, InventoryPanel `_player_node`) find this node via
 	# group lookup. Idempotent: add_to_group is a no-op if already in the group.
 	add_to_group("player")
-	# Auto-equip the starting iron_sword — must run AFTER add_to_group so the
-	# Inventory autoload's _find_player() can resolve this node and wire the
-	# equip call through Player.equip_item (affix-aware path). Only fires if
-	# weapon slot is empty (save-compat: existing saves with a weapon equipped
-	# are left untouched by Inventory.equip_starter_weapon_if_needed).
-	var inv: Node = _find_inventory_autoload()
-	if inv != null and inv.has_method("equip_starter_weapon_if_needed"):
-		inv.equip_starter_weapon_if_needed()
+	# NOTE: equip_starter_weapon_if_needed() is intentionally NOT called here.
+	# It must fire AFTER Main._load_save_or_defaults() so a save-restore
+	# (which resets Inventory + re-applies saved equipped state) cannot clobber
+	# the starter equip. Main._ready() calls it after _load_save_or_defaults().
+	# See: fix(combat|inventory) PR — iron_sword integration-surface fix.
 
 
 func _physics_process(delta: float) -> void:
