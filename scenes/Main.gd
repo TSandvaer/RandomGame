@@ -142,6 +142,16 @@ func _ready() -> void:
 	# Load save (or defaults) BEFORE loading the first room so the player's
 	# HP / XP / level / equipped state is correct when the room spawns mobs.
 	_load_save_or_defaults()
+	# Auto-equip the starter iron_sword AFTER save-restore so the save can't
+	# clobber it. equip_starter_weapon_if_needed is a no-op when the weapon
+	# slot is already filled (either by the save-restore above, or by a prior
+	# equip call on this boot). Calling it here guarantees fresh starts AND
+	# pre-PR-145 saves (equipped:{} = empty) all get the starter sword.
+	# DO NOT call this in Player._ready() — that fires before _load_save_or_defaults,
+	# so Inventory.restore_from_save would immediately clobber the equip result.
+	var starter_inv: Node = _inventory()
+	if starter_inv != null and starter_inv.has_method("equip_starter_weapon_if_needed"):
+		starter_inv.equip_starter_weapon_if_needed()
 	_load_room_at_index(0)
 	_refresh_hud_full()
 	print("[Main] M1 play-loop ready — Room 01 loaded, autoloads wired")

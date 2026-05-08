@@ -160,30 +160,44 @@ func test_iron_sword_tres_loads_directly() -> void:
 
 func test_equip_starter_sets_weapon_slot() -> void:
 	_reset_and_reseed()
-	# Directly invoke the equip helper (simulating Player._ready() sequence).
-	# We can't add a real Player to the tree here without a physics-flush risk,
-	# but we can verify Inventory's side of the contract: after equip_starter,
-	# weapon slot is filled with the iron_sword instance.
-	# Plant the Player in the group manually via a stub node so _find_player()
-	# resolves (Inventory.equip() calls _apply_equip_to_player which is
-	# defensive on null).
-	var stub: Node = Node.new()
-	add_child_autofree(stub)
-	stub.add_to_group("player")
+	# Verify Inventory's side of the equip contract: after equip_starter,
+	# Inventory.get_equipped("weapon") returns the iron_sword instance.
+	# We use a real Player node (not a stub) so _apply_equip_to_player can call
+	# Player.equip_item and wire Player._equipped_weapon correctly.
+	# A stub Node (non-Player) was used in the original PR #145 test — but
+	# because stub.has_method("equip_item") is false, _apply_equip_to_player
+	# silently fell back to set_equipped_weapon which is also absent on a stub,
+	# meaning Player._equipped_weapon was NEVER set. The test passed on
+	# Inventory state alone; the player-side surface was untested. This is the
+	# product-vs-component miss class (memory: product-vs-component-completeness).
+	# Use a real Player so equip_item wires through.
+	var PlayerScript: Script = preload("res://scripts/player/Player.gd")
+	var player: Player = PlayerScript.new()
+	add_child_autofree(player)
+	# Player._ready runs, adds to "player" group. Now equip_starter can find it.
 	_inv().call("equip_starter_weapon_if_needed")
 	var equipped: ItemInstance = _inv().get_equipped(&"weapon") as ItemInstance
 	assert_not_null(equipped, "weapon slot must be filled after equip_starter")
 	assert_eq(equipped.def.id, &"iron_sword", "equipped item is the iron_sword")
+	# Also assert the Player-side surface: Player._equipped_weapon must be set.
+	var weapon_on_player: ItemDef = player.get_equipped_weapon() as ItemDef
+	assert_not_null(weapon_on_player,
+		"Player.get_equipped_weapon() must be non-null — stub-Node gap (PR #145 miss): " +
+		"Inventory._apply_equip_to_player calls equip_item; if player is a stub Node " +
+		"equip_item is absent and Player._equipped_weapon stays null (silent miss)")
+	assert_eq(weapon_on_player.id, &"iron_sword",
+		"Player._equipped_weapon must be the iron_sword")
 
 
 func test_equip_starter_noop_when_weapon_already_equipped() -> void:
 	_inv().reset()
-	# Manually add and equip a different weapon first.
+	# Manually add and equip a different weapon first. Use a real Player node
+	# so the equip path (equip_item) actually wires Player._equipped_weapon.
 	var other: ItemInstance = _make_weapon_instance(10)
 	_inv().add(other)
-	var stub: Node = Node.new()
-	add_child_autofree(stub)
-	stub.add_to_group("player")
+	var PlayerScript: Script = preload("res://scripts/player/Player.gd")
+	var player: Player = PlayerScript.new()
+	add_child_autofree(player)
 	_inv().equip(other, &"weapon")
 	# Now seed and re-invoke equip_starter.
 	_inv().call("_seed_starting_inventory")  # will no-op (equipped non-empty)
