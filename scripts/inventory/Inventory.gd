@@ -124,13 +124,27 @@ func _seed_starting_inventory() -> void:
 
 
 ## Auto-equip the first iron_sword in the inventory into the weapon slot —
-## called from Player._ready() after the Player joins the "player" group
-## (so _find_player() can resolve it). Only runs if the weapon slot is empty,
-## so an existing save's equipped weapon is never overwritten.
+## called from Main._ready() AFTER _load_save_or_defaults() so a save-restore
+## cannot clobber the result. Only runs if the weapon slot is empty, so an
+## existing save's equipped weapon is never overwritten.
+##
+## **Re-seed if needed:** `Inventory.restore_from_save` calls `_items.clear()`
+## as part of its reset loop, which wipes the iron_sword that
+## `_seed_starting_inventory` placed in `_items` at autoload `_ready`. If a
+## pre-PR-145 save loads with `equipped: {}` AND `stash: []`, both `_items`
+## and `_equipped` are empty after restore — and we need the starter sword in
+## the weapon slot. Re-running `_seed_starting_inventory` here is the
+## idempotent path: it's only-if-empty internally, so it's a no-op when the
+## inventory has any item (e.g. a stash item the save brought back).
 func equip_starter_weapon_if_needed() -> void:
 	if _equipped.has(SLOT_WEAPON) and _equipped[SLOT_WEAPON] != null:
 		# Weapon already equipped (restored save or prior equip). No-op.
 		return
+	# If the inventory is empty (fresh start OR pre-PR-145 save just cleared
+	# _items via restore_from_save), re-seed so we have an iron_sword to equip.
+	# _seed_starting_inventory is itself only-if-empty, so this is safe to call
+	# unconditionally — it won't dupe.
+	_seed_starting_inventory()
 	# Find the first iron_sword in inventory and equip it.
 	for it_v: ItemInstance in _items:
 		if it_v == null or it_v.def == null:
