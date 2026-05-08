@@ -38,15 +38,18 @@ const PHYS_DELTA: float = 1.0 / 60.0
 
 # ---- Helpers ----------------------------------------------------------
 
-func _instantiate_main() -> Node:
+func _instantiate_main(preserve_save: bool = false) -> Node:
 	var packed: PackedScene = load("res://scenes/Main.tscn")
 	assert_not_null(packed, "Main.tscn must load")
 	var main: Node = packed.instantiate()
 	_reset_autoloads()
-	# Ensure no save on disk so _load_save_or_defaults is a fresh-start path.
-	var save_node: Node = _save()
-	if save_node != null and save_node.has_method("has_save") and save_node.has_save(0):
-		save_node.delete_save(0)
+	# By default, ensure no save on disk so _load_save_or_defaults is a
+	# fresh-start path. AC-D passes preserve_save=true so its crafted
+	# pre-PR-145-shaped save survives to be loaded by Main._ready().
+	if not preserve_save:
+		var save_node: Node = _save()
+		if save_node != null and save_node.has_method("has_save") and save_node.has_save(0):
+			save_node.delete_save(0)
 	add_child_autofree(main)
 	return main
 
@@ -55,6 +58,14 @@ func _reset_autoloads() -> void:
 	var inv: Node = _inventory()
 	if inv != null:
 		inv.reset()
+		# Re-seed the iron_sword so the test exercises the same fresh-game-start
+		# state production sees: Inventory autoload's _ready() seeded the sword
+		# at process start, but inv.reset() above wiped that. Without re-seeding,
+		# Main._ready()'s post-save-restore equip_starter_weapon_if_needed() finds
+		# an empty inventory and warns "no iron_sword to auto-equip" — which would
+		# defeat the integration these tests assert. The seed is idempotent
+		# (only-if-empty rule) so calling it on a freshly-reset inventory is safe.
+		inv.call("_seed_starting_inventory")
 	var levels: Node = _levels()
 	if levels != null:
 		levels.reset()
@@ -248,7 +259,8 @@ func test_old_save_with_empty_equipped_does_not_clobber_starter_sword() -> void:
 
 	# Now boot Main — it should load the fake save, get equipped:{},
 	# and STILL call equip_starter_weapon_if_needed after restore.
-	var main: Node = _instantiate_main()
+	# preserve_save=true so _instantiate_main does NOT delete our crafted save.
+	var main: Node = _instantiate_main(true)
 	await get_tree().process_frame
 
 	var player: Player = (main as Main).get_player() as Player
