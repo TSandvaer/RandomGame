@@ -381,3 +381,104 @@ func test_negative_damage_does_not_heal() -> void:
 	g.take_damage(-100, Vector2.ZERO, null)
 	assert_eq(g.get_hp(), 50, "negative dmg clamps to 0 — no incidental healing")
 	assert_false(g.is_dead())
+
+
+# ---- 17 — M2 W1 P1 polish: recovery-velocity decays to zero -------------
+# Ticket: 86c9q804q (Grunt recovery-velocity audit).
+# Symptom from M1 RC re-soak: after a Grunt takes damage and enters its
+# _play_hit_flash + recovery state, its velocity sometimes leaves it floating
+# or sliding. Pre-fix, _process_recover did not zero velocity each tick —
+# any residual vector (knockback impulse, post-contact pushback) persisted
+# for the whole recovery window and visibly drifted the grunt.
+# Post-fix, _process_recover sets `velocity = Vector2.ZERO` every tick.
+
+func test_grunt_recovery_velocity_decays_to_zero_within_two_ticks() -> void:
+	# Drive grunt into STATE_ATTACKING (the recovery state) by firing a swing
+	# at a player in melee range. The swing-fire tick now applies a one-tick
+	# pushback velocity (the mob-stick fix), so velocity is non-zero on entry
+	# to recovery. We assert that on the NEXT physics tick, _process_recover
+	# zeroes it back to Vector2.ZERO — proving the recovery-velocity audit
+	# fix lands on every tick, not just on swing-fire.
+	var g: Grunt = _make_grunt()
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(Grunt.ATTACK_RANGE - 4.0, 0.0)
+	g.set_player(p)
+	# Tick 1: chase → telegraph.
+	g._physics_process(0.016)
+	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_LIGHT)
+	# Tick 2: telegraph completes → swing fires → recovery state with
+	# pushback velocity applied.
+	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.01)
+	assert_eq(g.get_state(), Grunt.STATE_ATTACKING)
+	assert_gt(g.velocity.length(), 0.0,
+		"swing-fire applies non-zero pushback (sets up the recovery-decay test)")
+	# Tick 3: _process_recover runs and zeroes velocity.
+	g._physics_process(0.016)
+	assert_eq(g.velocity, Vector2.ZERO,
+		"recovery handler zeros velocity on first post-pushback tick (no float / drift)")
+
+
+func test_grunt_recovery_velocity_stays_zero_across_full_window() -> void:
+	# Walk through every tick of the recovery window and assert velocity
+	# never drifts away from ZERO. Pre-fix, knockback or pushback residuals
+	# could persist across all recovery ticks; post-fix, every tick re-zeroes
+	# the velocity field deterministically.
+	var g: Grunt = _make_grunt()
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(Grunt.ATTACK_RANGE - 4.0, 0.0)
+	g.set_player(p)
+	g._physics_process(0.016)
+	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.01)
+	assert_eq(g.get_state(), Grunt.STATE_ATTACKING)
+	# First tick of recovery — re-zeroes the swing-fire pushback.
+	g._physics_process(0.016)
+	# Walk the rest of the recovery window in 0.016s ticks. Each must keep
+	# velocity at ZERO. We move the player far away to verify the grunt
+	# does NOT drift toward them — recovery is rooted regardless.
+	p.global_position = Vector2(500.0, 0.0)
+	for _i in 10:
+		g._physics_process(0.016)
+		# The recovery timer may expire mid-loop and transition us to
+		# STATE_CHASING (which then sets non-zero velocity toward player).
+		# Bail early if that happens — the recovery-window assertion has
+		# already been validated.
+		if g.get_state() != Grunt.STATE_ATTACKING:
+			break
+		assert_eq(g.velocity, Vector2.ZERO,
+			"grunt velocity stays at ZERO every tick of recovery window")
+
+
+func test_grunt_knockback_does_not_persist_into_recovery() -> void:
+	# Edge case: Grunt takes damage (which writes velocity = knockback) WHILE
+	# in STATE_ATTACKING — the recovery handler must zero that knockback on
+	# the next tick rather than letting it slide for the rest of recovery.
+	# This was the original failure pattern: a hit during recovery → mob
+	# floats away.
+	var g: Grunt = _make_grunt()
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(Grunt.ATTACK_RANGE - 4.0, 0.0)
+	g.set_player(p)
+	# Drive into STATE_ATTACKING.
+	g._physics_process(0.016)
+	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.01)
+	assert_eq(g.get_state(), Grunt.STATE_ATTACKING)
+	# First recovery tick zeroes the swing-fire pushback.
+	g._physics_process(0.016)
+	assert_eq(g.velocity, Vector2.ZERO)
+	# Now slam a knockback impulse onto the grunt while it's in recovery.
+	# take_damage sets velocity = knockback unconditionally (when nonzero).
+	g.take_damage(1, Vector2(150.0, 0.0), null)
+	assert_almost_eq(g.velocity.x, 150.0, 0.001,
+		"take_damage writes knockback velocity even while recovering")
+	# Next physics tick — _process_recover must wipe that knockback away
+	# (rooted-during-recovery contract). Without the zero-each-tick guard,
+	# the grunt would drift at +150 px/s for the rest of ATTACK_RECOVERY.
+	g._physics_process(0.016)
+	assert_eq(g.velocity, Vector2.ZERO,
+		"recovery handler zeros knockback velocity that lands during recovery")

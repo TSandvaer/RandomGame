@@ -92,6 +92,17 @@ const HEAVY_DAMAGE_MULTIPLIER: float = 1.8
 ## Matches Beat 6 spec (~0.4 s). Grunt is rooted during this window.
 const LIGHT_TELEGRAPH_DURATION: float = 0.40
 
+## Speed (px/s) of the one-tick push-back velocity applied when the grunt fires
+## a swing while at melee range. Gives move_and_slide() a non-zero vector to
+## eject the grunt out of an overlap condition — without this the two
+## CharacterBody2Ds sit at zero velocity in STATE_ATTACKING and no separation
+## is generated, causing the "mob sticks to player" symptom across the general
+## mob population (M1 RC re-soak 5, ticket 86c9q96kk). Mirrors
+## Charger.POST_CONTACT_PUSHBACK_SPEED + Stratum1Boss.POST_CONTACT_PUSHBACK_SPEED;
+## the recovery handler then re-zeroes velocity each tick so the grunt stays
+## rooted for the rest of ATTACK_RECOVERY (vulnerability window).
+const POST_CONTACT_PUSHBACK_SPEED: float = 60.0
+
 ## Attack-telegraph red tint for the Sprite child. All channels sub-1.0 so
 ## WebGL2/sRGB (HTML5 gl_compatibility) never clamps them — same rule as
 ## the player swing-flash (PR #137 lesson). Rest color is restored when the
@@ -316,7 +327,15 @@ func _process_light_telegraph(_delta: float) -> void:
 
 
 func _process_recover(_delta: float) -> void:
-	# Held in place while recovering, but knockback can still slide us.
+	# Grunt is rooted during attack recovery. Zero velocity each tick so any
+	# residual velocity from the post-contact pushback (applied at swing-fire
+	# time to break overlap), the swing-tick knockback, or an in-flight
+	# physics impulse cannot persist and slide the grunt away for the whole
+	# recovery window. Without this zero-each-tick guard the grunt was
+	# observed floating / drifting after a swing — the recovery-velocity bug
+	# from M1 RC re-soak (ticket 86c9q804q). Mirrors
+	# Stratum1Boss._process_attack_recovery + Charger._process_recover.
+	velocity = Vector2.ZERO
 	if _attack_recovery_left <= 0.0:
 		_set_state(STATE_CHASING)
 
@@ -424,6 +443,7 @@ func _swing_light(dir: Vector2) -> void:
 	_attack_recovery_left = ATTACK_RECOVERY
 	_set_state(STATE_ATTACKING)
 	swing_spawned.emit(SWING_KIND_LIGHT, hb)
+	_apply_post_contact_pushback(dir)
 
 
 func _swing_heavy(dir: Vector2) -> void:
@@ -444,6 +464,34 @@ func _swing_heavy(dir: Vector2) -> void:
 	_attack_recovery_left = ATTACK_RECOVERY
 	_set_state(STATE_ATTACKING)
 	swing_spawned.emit(SWING_KIND_HEAVY, hb)
+	_apply_post_contact_pushback(dir)
+
+
+## Apply a one-tick push-back velocity directed away from the player on the
+## frame that a swing fires. This gives `move_and_slide()` (called at the end
+## of `_physics_process`) a non-zero velocity vector to eject the grunt out
+## of a player-overlap condition — the root cause of the "mob sticks to
+## player" symptom (M1 RC re-soak 5, ticket 86c9q96kk). Mirrors the
+## Stratum1Boss melee-swing-time pushback that already validates against
+## `tests/integration/test_boss_does_not_stick_after_contact.gd`.
+##
+## Direction priority:
+##   1. Vector from player to grunt (canonical "away from player").
+##   2. Negation of the swing direction `dir` if the player ref is unset
+##      (test-bare grunt) or grunt+player are at exactly the same point —
+##      ensures we never produce a zero-vector pushback when overlap is
+##      possible.
+##
+## On subsequent ticks, `_process_recover` re-zeroes velocity so the
+## one-tick push-back is exactly that — one tick — and the grunt remains
+## rooted for the rest of the ATTACK_RECOVERY window.
+func _apply_post_contact_pushback(dir: Vector2) -> void:
+	var pushback_dir: Vector2 = -dir if dir.length_squared() > 0.0 else Vector2.LEFT
+	if _player != null:
+		var away: Vector2 = global_position - _player.global_position
+		if away.length_squared() > 0.0:
+			pushback_dir = away.normalized()
+	velocity = pushback_dir * POST_CONTACT_PUSHBACK_SPEED
 
 
 func _spawn_hitbox(

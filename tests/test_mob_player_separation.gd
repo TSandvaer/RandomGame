@@ -31,9 +31,17 @@ extends GutTest
 ##      (player far away, velocity remains zero on recovery entry).
 ##   6. EDGE — both mobs: pushback is directionally away from player (dot
 ##      product of pushback dir and away-from-player dir is positive).
+##
+## --- M2 W1 P1 polish (ticket 86c9q96kk) ---
+##   7. Grunt — push-back velocity is non-zero on the light-swing fire tick.
+##   8. Grunt — push-back velocity points away from player on light swing.
+##   9. Grunt — push-back velocity is non-zero on the heavy-swing fire tick.
+##  10. Grunt — recovery handler zeros velocity on SUBSEQUENT tick (rooted).
+##  11. EDGE — Grunt does NOT chase player during recovery — stays rooted.
 
 const ChargerScript: Script = preload("res://scripts/mobs/Charger.gd")
 const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
+const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
 const PHYS_DELTA: float = 1.0 / 60.0
@@ -46,6 +54,13 @@ func _make_charger() -> Charger:
 	add_child_autofree(c)
 	c.set_physics_process(false)  # drive manually for determinism
 	return c
+
+
+func _make_grunt() -> Grunt:
+	var g: Grunt = GruntScript.new()
+	add_child_autofree(g)
+	g.set_physics_process(false)
+	return g
 
 
 func _make_boss() -> Stratum1Boss:
@@ -258,3 +273,156 @@ func test_boss_recovery_handler_zeros_velocity_on_subsequent_tick() -> void:
 	b._physics_process(PHYS_DELTA)
 	assert_eq(b.velocity, Vector2.ZERO,
 		"boss velocity zeroed on tick after pushback (rooted during attack recovery)")
+
+
+# ---- M2 W1 P1 polish: Grunt mob-stick fix (ticket 86c9q96kk) -------------
+
+## Drive a Grunt from IDLE through the light-attack telegraph into the swing.
+## Mirrors `_drive_charger_to_charging` but for the Grunt's IDLE → CHASE →
+## TELEGRAPHING_LIGHT → ATTACKING pipeline.
+func _drive_grunt_to_swing_fire(g: Grunt) -> void:
+	# Tick 1: chase handler sees player in melee range → enters telegraph.
+	g._physics_process(PHYS_DELTA)
+	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_LIGHT,
+		"precondition: grunt enters light telegraph when player in melee range")
+	# Tick 2: tick past the telegraph window → swing fires → STATE_ATTACKING.
+	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.001)
+	assert_eq(g.get_state(), Grunt.STATE_ATTACKING,
+		"precondition: grunt enters attack-recovery after light swing fires")
+
+
+# ---- 7: Grunt has nonzero pushback velocity after light-swing fires ------
+
+func test_grunt_has_nonzero_pushback_velocity_after_light_swing() -> void:
+	# Sponsor symptom (M1 RC re-soak attempt 5): when player moves through a
+	# Grunt, the Grunt sticks to the player's edge instead of separating.
+	# Pre-fix root cause: _swing_light only set _attack_recovery_left then
+	# emitted swing_spawned, leaving velocity at whatever it had been when
+	# entering the telegraph (zero, per _process_light_telegraph). With
+	# velocity = ZERO, move_and_slide() generates no separation force on the
+	# overlap and the two CharacterBody2Ds remain stuck.
+	#
+	# Post-fix: _apply_post_contact_pushback writes a non-zero velocity
+	# directed away from the player on the swing-fire tick.
+	var p: Player = _make_player()
+	var g: Grunt = _make_grunt()
+	# Place grunt just inside ATTACK_RANGE so the chase handler enters the
+	# telegraph immediately on the first tick.
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(Grunt.ATTACK_RANGE - 4.0, 0.0)
+	g.set_player(p)
+
+	_drive_grunt_to_swing_fire(g)
+
+	# PRE-FIX: velocity was Vector2.ZERO — no separation, mob sticks.
+	# POST-FIX: velocity is non-zero (pushback applied at swing-fire time).
+	assert_gt(g.velocity.length(), 0.0,
+		"grunt has non-zero pushback velocity on light-swing fire tick")
+
+
+# ---- 8: Grunt pushback velocity points away from player ------------------
+
+func test_grunt_pushback_velocity_points_away_from_player_after_light_swing() -> void:
+	# The pushback must be DIRECTIONALLY away from the player, not just any
+	# non-zero vector — this is the observable surface that prevents the
+	# "sticking" on subsequent frames. Headless GUT skips the physics-server
+	# step so move_and_slide() does not physically translate the node, but
+	# the velocity direction IS the definitive pre/post-fix discriminant.
+	var p: Player = _make_player()
+	var g: Grunt = _make_grunt()
+	# Place grunt to the left of player so the away-from-player direction
+	# is unambiguously -x.
+	g.global_position = Vector2(0.0, 0.0)
+	p.global_position = Vector2(Grunt.ATTACK_RANGE - 4.0, 0.0)
+	g.set_player(p)
+
+	_drive_grunt_to_swing_fire(g)
+
+	var pushback_dir: Vector2 = g.velocity.normalized()
+	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
+	var dot: float = pushback_dir.dot(away_dir)
+	assert_gt(dot, 0.0,
+		"grunt pushback must point away from player (dot=%.3f)" % dot)
+
+
+# ---- 9: Grunt heavy-swing also applies pushback --------------------------
+
+func test_grunt_has_nonzero_pushback_velocity_after_heavy_swing() -> void:
+	# Heavy swing fires from STATE_TELEGRAPHING_HEAVY (low-HP one-shot).
+	# Same fix path: _swing_heavy → _apply_post_contact_pushback. Mirror of
+	# the light-swing test for completeness — both swing kinds must apply
+	# the pushback.
+	var p: Player = _make_player()
+	var g: Grunt = _make_grunt()
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(Grunt.ATTACK_RANGE - 4.0, 0.0)
+	g.set_player(p)
+
+	# Drop HP to <30% so heavy telegraph fires on next take_damage.
+	# Default hp_max = 50, so 30% threshold = ceil(15) = 15. Hitting for 35
+	# leaves 15, which is at the threshold (heavy fires).
+	g.take_damage(35, Vector2.ZERO, null)
+	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_HEAVY,
+		"precondition: grunt in heavy telegraph after low-HP hit")
+
+	# Tick past heavy telegraph window — heavy swing fires.
+	g._physics_process(Grunt.HEAVY_TELEGRAPH_DURATION + 0.001)
+	assert_eq(g.get_state(), Grunt.STATE_ATTACKING,
+		"precondition: grunt enters attack recovery after heavy swing")
+
+	assert_gt(g.velocity.length(), 0.0,
+		"grunt has non-zero pushback velocity on heavy-swing fire tick")
+
+
+# ---- 10: Grunt recovery handler zeros velocity on SUBSEQUENT tick --------
+
+func test_grunt_recovery_handler_zeros_velocity_on_subsequent_tick() -> void:
+	# After the swing-fire pushback tick, _process_recover must zero velocity
+	# so the grunt stays rooted during the ATTACK_RECOVERY vulnerability
+	# window — pre-fix, velocity persisted (no zero-each-tick guard) and the
+	# grunt could float / drift away (ticket 86c9q804q recovery-velocity
+	# audit). Mirrors the boss/charger pattern.
+	var p: Player = _make_player()
+	var g: Grunt = _make_grunt()
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(Grunt.ATTACK_RANGE - 4.0, 0.0)
+	g.set_player(p)
+
+	_drive_grunt_to_swing_fire(g)
+	# Pushback was non-zero on this tick (asserted in test 7).
+	assert_gt(g.velocity.length(), 0.0)
+
+	# SUBSEQUENT tick — _process_recover must zero velocity.
+	g._physics_process(PHYS_DELTA)
+	assert_eq(g.velocity, Vector2.ZERO,
+		"grunt velocity zeroed on tick after pushback (rooted during recovery)")
+
+
+# ---- 11: EDGE — Grunt stays rooted while player escapes during recovery --
+
+func test_grunt_does_not_chase_player_during_recovery() -> void:
+	# Sponsor's exact scenario reframed for Grunt: player moves AWAY from
+	# Grunt during the recovery window. The Grunt must remain stationary
+	# (velocity = ZERO across multiple recovery ticks) — it must NOT
+	# re-chase, re-glue, or drift. This validates the recovery-velocity
+	# audit (ticket 86c9q804q): post-fix, _process_recover zeros velocity
+	# every tick regardless of where the player has moved.
+	var p: Player = _make_player()
+	var g: Grunt = _make_grunt()
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(Grunt.ATTACK_RANGE - 4.0, 0.0)
+	g.set_player(p)
+
+	_drive_grunt_to_swing_fire(g)
+	# Player escapes during recovery.
+	p.global_position = Vector2(200.0, 0.0)
+
+	# Multiple mid-recovery ticks. Recovery duration is ATTACK_RECOVERY (0.55s);
+	# at PHYS_DELTA = 1/60 s ≈ 0.0167s per tick, 5 ticks = ~0.083s — well
+	# inside the recovery window so we stay in STATE_ATTACKING throughout.
+	for _i: int in range(5):
+		g._physics_process(PHYS_DELTA)
+		assert_eq(g.velocity, Vector2.ZERO,
+			"grunt stays rooted (no chase) while player escapes during recovery")
+		assert_eq(g.get_state(), Grunt.STATE_ATTACKING,
+			"grunt remains in STATE_ATTACKING while recovery timer counts down")
