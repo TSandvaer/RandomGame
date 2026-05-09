@@ -309,6 +309,9 @@ func _on_mob_died(_mob: Variant, _pos: Variant = null, _def: Variant = null) -> 
 	# Signal signature varies (Grunt/Charger/Shooter all take 3 args), but
 	# we don't need any of them — we just count.
 	_mobs_alive = max(0, _mobs_alive - 1)
+	# DIAGNOSTIC (ticket 86c9qbhm5)
+	print("[RoomGate-diag] _on_mob_died | mobs_alive=%d state=%s death_wait_in_flight=%s" % [_mobs_alive, _state, _death_wait_in_flight])
+	_combat_trace("RoomGate._on_mob_died", "mobs_alive=%d state=%s death_wait_in_flight=%s" % [_mobs_alive, _state, _death_wait_in_flight])
 	if _mobs_alive == 0 and _state == STATE_LOCKED and not _death_wait_in_flight:
 		_death_wait_in_flight = true
 		_start_death_wait()
@@ -329,6 +332,9 @@ func _on_mob_died(_mob: Variant, _pos: Variant = null, _def: Variant = null) -> 
 ## can run without a tree, and the bare-instance tests never asserted the
 ## delay anyway.
 func _start_death_wait() -> void:
+	# DIAGNOSTIC (ticket 86c9qbhm5)
+	print("[RoomGate-diag] _start_death_wait | test_skip=%s is_inside_tree=%s wait_time=%.3f" % [test_skip_death_wait, is_inside_tree(), DEATH_TWEEN_WAIT_SECS])
+	_combat_trace("RoomGate._start_death_wait", "test_skip=%s is_inside_tree=%s wait_time=%.3f" % [test_skip_death_wait, is_inside_tree(), DEATH_TWEEN_WAIT_SECS])
 	if test_skip_death_wait or not is_inside_tree():
 		_unlock()
 		return
@@ -338,6 +344,7 @@ func _start_death_wait() -> void:
 	_death_wait_timer.timeout.connect(_unlock)
 	add_child(_death_wait_timer)
 	_death_wait_timer.start()
+	print("[RoomGate-diag] _start_death_wait | timer started, paused=%s time_left=%.3f" % [_death_wait_timer.paused, _death_wait_timer.time_left])
 
 
 ## Test helper: simulate the death-tween wait elapsing without driving the

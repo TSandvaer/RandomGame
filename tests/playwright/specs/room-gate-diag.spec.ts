@@ -3,38 +3,19 @@
  *
  * DIAGNOSTIC spec for ticket 86c9qbhm5 — RoomGate body_entered investigation.
  *
- * NOT a permanent test. Drops in alongside the diag/ instrumentation in
- * scripts/levels/RoomGate.gd. Captures every [RoomGate-diag] and
+ * NOT a permanent test. Captures every [RoomGate-diag] and
  * [combat-trace] RoomGate.* line during a Room02 traversal attempt and
  * reports observed behavior.
  *
- * Goal: discriminate Case A (body_entered fires, downstream issue) vs
- * Case B (body_entered does NOT fire) per dispatch brief.
- *
- * Test flow:
- *   1. Boot. Wait for Main + iron_sword auto-equip.
- *   2. Kill both Room01 grunts (auto-advance to Room02).
- *   3. Confirm Room02 loaded (RoomGate._ready diag log appears).
- *   4. Walk WEST (a) for 2.0s — should land X≈40 (inside trigger X-band [24,72]).
- *      Player Y stays at 200, OUTSIDE trigger Y-band [104,184] — body_entered
- *      should NOT fire here. Diag confirms walk completed.
- *   5. Walk NORTH (w) for 1.0s — should land Y≈140 (inside trigger Y-band).
- *      Body crosses trigger south edge at Y=184 → body_entered SHOULD fire if
- *      physics is working. Capture every RoomGate-diag line.
- *   6. Continue walking N for another 0.5s to ensure overlap window.
- *   7. Stop. Wait. Walk back SE briefly. Walk back NW.
- *   8. Report all RoomGate-diag lines + post-test analysis.
- *
- * Even if AC4 is test.fail() because body_entered doesn't fire, this spec
- * is allowed to PASS regardless — the value is the captured trace data,
- * not a green/red signal. We just report findings.
+ * Refined v2: minimize player wandering during combat (set NE facing once,
+ * click only). Then explicitly drive in→out→in walk.
  */
 
 import { test, expect } from "@playwright/test";
 import { ConsoleCapture } from "../fixtures/console-capture";
 
 const BOOT_TIMEOUT_MS = 30_000;
-const ROOM01_KILL_TIMEOUT_MS = 90_000;
+const ROOM_KILL_TIMEOUT_MS = 90_000;
 const ATTACK_INTERVAL_MS = 220;
 
 test.describe("RoomGate body_entered diagnostic (ticket 86c9qbhm5)", () => {
@@ -66,165 +47,149 @@ test.describe("RoomGate body_entered diagnostic (ticket 86c9qbhm5)", () => {
     const clickX = (canvasBB?.x ?? 0) + (canvasBB?.width ?? 1280) / 2;
     const clickY = (canvasBB?.y ?? 0) + (canvasBB?.height ?? 720) / 2;
 
-    // ---- Phase 2: Kill Room01 grunts to auto-advance to Room02 ----
-    console.log("[gate-diag] Phase 2: kill Room01 grunts to auto-advance.");
+    // ---- Helper: kill N mobs without wandering (NE facing, click only) ----
+    const killMobs = async (label: string, expected: number) => {
+      console.log(`[gate-diag] ${label}: kill ${expected} mobs (NE facing, click only)`);
+      // Set NE facing
+      await page.keyboard.down("w");
+      await page.keyboard.down("d");
+      await page.waitForTimeout(100);
+      await page.keyboard.up("w");
+      await page.keyboard.up("d");
+      await page.waitForTimeout(400);
 
-    // Set facing NE (mobs are NE of player).
-    await page.keyboard.down("w");
-    await page.keyboard.down("d");
-    await page.waitForTimeout(100);
-    await page.keyboard.up("w");
-    await page.keyboard.up("d");
-    await page.waitForTimeout(600);
-
-    const room1Start = Date.now();
-    let killsRoom1 = 0;
-    while (
-      Date.now() - room1Start < ROOM01_KILL_TIMEOUT_MS &&
-      killsRoom1 < 2
-    ) {
-      await canvas.click({ position: { x: clickX, y: clickY } });
-      await page.waitForTimeout(ATTACK_INTERVAL_MS);
-      killsRoom1 = capture
+      const preDeaths = capture
         .getLines()
-        .filter((l) => /\[combat-trace\] Grunt\._die/.test(l.text)).length;
-    }
-    console.log(
-      `[gate-diag] Phase 2 done: ${killsRoom1}/2 grunts killed at t=${Date.now() - room1Start}ms`
-    );
-    expect(killsRoom1).toBeGreaterThanOrEqual(2);
+        .filter((l) => /\[combat-trace\] (Grunt|Charger|Shooter)\._die/.test(l.text))
+        .length;
+      const t0 = Date.now();
+      let kills = 0;
+      while (Date.now() - t0 < ROOM_KILL_TIMEOUT_MS && kills < expected) {
+        await canvas.click({ position: { x: clickX, y: clickY } });
+        await page.waitForTimeout(ATTACK_INTERVAL_MS);
+        kills =
+          capture
+            .getLines()
+            .filter((l) => /\[combat-trace\] (Grunt|Charger|Shooter)\._die/.test(l.text))
+            .length - preDeaths;
+        // Re-aim NE every 20 attacks (knockback may rotate _facing)
+        if (kills < expected && Math.floor((Date.now() - t0) / 4400) > Math.floor((Date.now() - t0 - ATTACK_INTERVAL_MS) / 4400)) {
+          await page.keyboard.down("w");
+          await page.keyboard.down("d");
+          await page.waitForTimeout(50);
+          await page.keyboard.up("w");
+          await page.keyboard.up("d");
+        }
+      }
+      console.log(`[gate-diag] ${label}: ${kills}/${expected} killed at t=${Date.now() - t0}ms`);
+      return kills;
+    };
 
-    // ---- Phase 3: Wait for Room02 load ----
-    // RoomGate._ready diag log emits on Room02 load.
-    console.log("[gate-diag] Phase 3: wait for Room02 RoomGate._ready diag.");
-    await capture.waitForLine(
-      /\[RoomGate-diag\] _ready \|/,
-      10_000
-    );
-    const roomGateReadyLine = capture
+    // ---- Room01 → Room02 ----
+    const r1Kills = await killMobs("Room01", 2);
+    expect(r1Kills).toBeGreaterThanOrEqual(2);
+
+    await capture.waitForLine(/\[RoomGate-diag\] _ready \|/, 10_000);
+    const room02ReadyLine = capture
       .getLines()
       .find((l) => /\[RoomGate-diag\] _ready \|/.test(l.text));
-    console.log(`[gate-diag] RoomGate._ready: ${roomGateReadyLine?.text}`);
+    console.log(`[gate-diag] Room02 RoomGate: ${room02ReadyLine?.text}`);
 
-    // Settle for Room02 player respawn at DEFAULT_PLAYER_SPAWN.
+    // Settle for player respawn at (240, 200).
     await page.waitForTimeout(1500);
 
-    // Snapshot trace count BEFORE walking — so we can see what fires from the walk.
     const preWalkLineCount = capture.getLines().length;
 
-    // ---- Phase 4: kill Room02 grunts so gate_unlocked path fires when body_entered fires ----
-    // Room02 grunts at NE same as Room01.
-    console.log("[gate-diag] Phase 4: kill Room02 grunts.");
-    const r2Start = Date.now();
-    const r2PreKills = capture
-      .getLines()
-      .filter((l) => /\[combat-trace\] Grunt\._die/.test(l.text)).length;
-    let killsRoom2 = 0;
-    let aimCycle = 0;
-    const aimSeq: string[][] = [["w", "d"], ["w"], ["w", "a"], ["d"]];
-    while (Date.now() - r2Start < 90_000 && killsRoom2 < 2) {
-      if (aimCycle % 8 === 0) {
-        const dirs = aimSeq[(aimCycle / 8) % aimSeq.length];
-        for (const k of dirs) await page.keyboard.down(k);
-        await page.waitForTimeout(40);
-        for (const k of dirs) await page.keyboard.up(k);
-        await page.waitForTimeout(20);
-      }
-      aimCycle++;
-      await canvas.click({ position: { x: clickX, y: clickY } });
-      await page.waitForTimeout(ATTACK_INTERVAL_MS);
-      killsRoom2 =
-        capture
-          .getLines()
-          .filter((l) => /\[combat-trace\] Grunt\._die/.test(l.text)).length -
-        r2PreKills;
-    }
-    console.log(
-      `[gate-diag] Phase 4 done: ${killsRoom2}/2 Room02 grunts killed at t=${Date.now() - r2Start}ms`
-    );
+    // ---- Room02: kill mobs WITHOUT wandering ----
+    const r2Kills = await killMobs("Room02", 2);
+    console.log(`[gate-diag] Room02 kills: ${r2Kills}/2`);
 
-    // ---- Phase 5: Walk WEST for 2.0s, then NORTH for 1.0s ----
-    // Goal: cross the trigger south edge at Y=184. body_entered SHOULD fire.
-    await page.waitForTimeout(500);
-    console.log("[gate-diag] Phase 5a: walk WEST for 2000ms (X-axis align).");
+    // Wait for any pending death-tween + unlock timer (0.65s + slack)
+    await page.waitForTimeout(1500);
+
+    // Snapshot what fired during Room02 combat (BEFORE we walk).
+    const duringCombatLines = capture
+      .getLines()
+      .slice(preWalkLineCount)
+      .filter((l) => /\[RoomGate-diag\]|\[combat-trace\] RoomGate\./.test(l.text));
+    console.log("");
+    console.log("=".repeat(80));
+    console.log("[gate-diag] === DURING-COMBAT RoomGate observations (Room02) ===");
+    for (const l of duringCombatLines) {
+      console.log(`  ${l.text}`);
+    }
+    console.log("=".repeat(80));
+
+    const preTraversalLineCount = capture.getLines().length;
+
+    // ---- Phase 5: Two-part walk pattern ----
+    // After mobs die, gate should be UNLOCKED (or LOCKED waiting for traversal).
+    // Walk in, exit, walk back in to fire body_entered #2 → gate_traversed.
+    console.log("[gate-diag] Phase 5a: walk WEST for 2000ms");
     await page.keyboard.down("a");
     await page.waitForTimeout(2000);
     await page.keyboard.up("a");
     await page.waitForTimeout(300);
 
-    console.log("[gate-diag] Phase 5b: walk NORTH for 1500ms (descend into trigger Y-band).");
+    console.log("[gate-diag] Phase 5b: walk NORTH for 1500ms");
     await page.keyboard.down("w");
     await page.waitForTimeout(1500);
     await page.keyboard.up("w");
     await page.waitForTimeout(500);
 
-    // ---- Phase 6: Walk back SE briefly (exit trigger), then NW (re-enter) ----
-    console.log("[gate-diag] Phase 6a: walk EAST for 800ms (exit trigger east edge).");
+    console.log("[gate-diag] Phase 6a: walk EAST for 800ms");
     await page.keyboard.down("d");
     await page.waitForTimeout(800);
     await page.keyboard.up("d");
     await page.waitForTimeout(300);
 
-    console.log("[gate-diag] Phase 6b: walk WEST for 1100ms (re-enter from east).");
+    console.log("[gate-diag] Phase 6b: walk WEST for 1100ms");
     await page.keyboard.down("a");
     await page.waitForTimeout(1100);
     await page.keyboard.up("a");
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
 
-    // ---- Phase 7: Report all RoomGate-diag and combat-trace RoomGate lines ----
+    // ---- Phase 7: Final report ----
     const allLines = capture.getLines();
-    const postWalkLines = allLines.slice(preWalkLineCount);
-    const gateDiagLines = allLines.filter((l) =>
-      /\[RoomGate-diag\]/.test(l.text)
-    );
-    const gateCombatTraceLines = allLines.filter((l) =>
-      /\[combat-trace\] RoomGate\./.test(l.text)
-    );
+    const traversalLines = allLines
+      .slice(preTraversalLineCount)
+      .filter((l) => /\[RoomGate-diag\]|\[combat-trace\] RoomGate\./.test(l.text));
 
     console.log("");
     console.log("=".repeat(80));
-    console.log("[gate-diag] === DIAGNOSTIC REPORT ===");
+    console.log("[gate-diag] === DURING-TRAVERSAL RoomGate observations ===");
+    for (const l of traversalLines) {
+      console.log(`  ${l.text}`);
+    }
     console.log("=".repeat(80));
-    console.log(`[gate-diag] Total console lines: ${allLines.length}`);
-    console.log(`[gate-diag] [RoomGate-diag] lines: ${gateDiagLines.length}`);
-    console.log(`[gate-diag] [combat-trace] RoomGate lines: ${gateCombatTraceLines.length}`);
-    console.log("");
-    console.log("[gate-diag] All [RoomGate-diag] lines:");
-    for (const l of gateDiagLines) {
-      console.log(`  ${l.text}`);
-    }
-    console.log("");
-    console.log("[gate-diag] All [combat-trace] RoomGate lines:");
-    for (const l of gateCombatTraceLines) {
-      console.log(`  ${l.text}`);
-    }
     console.log("");
 
-    // Check for body_entered ENTRY trace (the discriminator).
-    const entryLines = gateDiagLines.filter((l) =>
-      /_on_body_entered ENTRY/.test(l.text)
+    // ---- Aggregate stats ----
+    const allRoomGate = allLines.filter((l) =>
+      /\[RoomGate-diag\]|\[combat-trace\] RoomGate\./.test(l.text)
     );
-    console.log(
-      `[gate-diag] _on_body_entered ENTRY count: ${entryLines.length}`
-    );
+    const entryLines = allRoomGate.filter((l) => /_on_body_entered ENTRY/.test(l.text));
+    const mobDiedLines = allRoomGate.filter((l) => /_on_mob_died/.test(l.text));
+    const startWaitLines = allRoomGate.filter((l) => /_start_death_wait/.test(l.text));
+    const unlockLines = allRoomGate.filter((l) => /_unlock|gate_unlocked emitting/.test(l.text));
+    const traversedLines = allRoomGate.filter((l) => /gate_traversed/.test(l.text));
+
+    console.log("[gate-diag] === STATS ===");
+    console.log(`  body_entered ENTRY: ${entryLines.length}`);
+    console.log(`  _on_mob_died:       ${mobDiedLines.length}`);
+    console.log(`  _start_death_wait:  ${startWaitLines.length}`);
+    console.log(`  _unlock:            ${unlockLines.length}`);
+    console.log(`  gate_traversed:     ${traversedLines.length}`);
+    console.log("");
+
     if (entryLines.length === 0) {
-      console.log(
-        "[gate-diag] *** CASE B CONFIRMED: body_entered did NOT fire under Playwright ***"
-      );
+      console.log("[gate-diag] *** CASE B: body_entered did NOT fire under Playwright ***");
     } else {
-      console.log(
-        "[gate-diag] *** CASE A: body_entered DID fire — investigate downstream ***"
-      );
-      for (const l of entryLines) {
-        console.log(`  ${l.text}`);
-      }
+      console.log(`[gate-diag] *** CASE A: body_entered fired ${entryLines.length}× — investigate downstream ***`);
     }
     console.log("=".repeat(80));
 
-    // We do not assert pass/fail on body_entered firing — the value is the trace data.
-    // We only assert that boot + Room01->Room02 transition happened (sanity check).
-    expect(roomGateReadyLine).toBeDefined();
-
+    expect(room02ReadyLine).toBeDefined();
     capture.detach();
   });
 });
