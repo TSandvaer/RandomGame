@@ -231,6 +231,14 @@ func trigger_for_test(_body: Node = null) -> void:
 # ---- Internal -------------------------------------------------------
 
 func _on_body_entered(body: Node) -> void:
+	# Investigation 86c9qbhm5 (Devon, 2026-05) confirmed body_entered fires
+	# reliably under Playwright when player walks from a known position.
+	# Lightweight trace at entry helps Playwright specs distinguish "gate
+	# never reached" from "gate reached but state-machine wrong" failures.
+	# Combat-trace shim: HTML5-only, no overhead in headless GUT.
+	_combat_trace("RoomGate._on_body_entered", "body=%s state=%s mobs_alive=%d" % [
+		body.get_class() if body != null else "<null>", _state, _mobs_alive
+	])
 	# Bug 1 fix (ticket 86c9q7xgx): only a CharacterBody2D on the player
 	# physics layer should advance this gate. Area2D-derived nodes (Hitbox,
 	# Projectile) cannot trigger body_entered per Godot 4 physics semantics —

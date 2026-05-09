@@ -238,6 +238,18 @@ A naïve "walk through the gate once" pattern produces only `body_entered #1` (l
 
 **Sibling lesson:** the Sponsor-soak path traverses these gates via natural emergent movement — kill mobs (wandering naturally produces body_exited/body_entered cycles), then walk to the door. Headless GUT tests bypass the issue by calling `RoomGate.trigger_for_test()` / `RoomGate.traverse_for_test()` (`scripts/levels/RoomGate.gd` lines 224, 328). Only the browser-driven Playwright harness — which simulates real input on a single deliberate path — needs to encode the discipline explicitly.
 
+**Investigation conclusion (ticket 86c9qbhm5, Devon, 2026-05):** the suspected "body_entered does not fire under Playwright headless cadence" hypothesis was DISPROVEN. With instrumented release builds, an unconditional entry trace at the top of `_on_body_entered` (before the `is CharacterBody2D` filter) fired reliably 5/5 runs when the player walked from `DEFAULT_PLAYER_SPAWN = (240, 200)` into the Room02 gate via the documented two-segment `W 2000ms then N 1500ms` walk. The state-machine + mob_died-propagation chain also worked end-to-end (gate locked, mobs died, gate unlocked, gate_traversed emitted) when the player executed the walk **without prior combat drift**.
+
+The PR #170 AC4 spec saw zero `RoomGate.*` traces because **the player drifted during long Room02 combat** (knockback + the spec's 8-direction aim sweep accumulated >100px of westward+northward displacement). The post-combat W+N walk pattern then started from a position FAR from spawn and never intersected the trigger. There was no Godot/Playwright signal-emission bug; the harness simply wasn't reaching the trigger geometry.
+
+**Codified harness rules (lessons for future spec authors):**
+
+1. **Don't aim-sweep during combat** if the spec needs to walk a precise post-combat path. Use NE-facing-only (or whatever single direction matches mob spawn geometry — Room01..Room08 grunts spawn NE/N of player) and click-spam without re-aiming. The player stays near spawn; subsequent walk geometry is reliable.
+2. **The `gate-traversal.ts` helper assumes player at `DEFAULT_PLAYER_SPAWN`** — explicitly noted in its header. Specs that use the helper must keep combat tight (~6-15s) so the player is still near spawn when the helper runs.
+3. **`tests/playwright/specs/room-gate-body-entered-regression.spec.ts`** is the permanent canary: it skips Room02 combat entirely (gate stays OPEN), walks from spawn, asserts body_entered fires. If this spec ever fails, the signal IS regressing — investigate Godot 4.x version bumps, gl_compatibility physics-server changes, or service-worker timing interference.
+
+**Lightweight ongoing trace:** `_on_body_entered` keeps a small `_combat_trace("RoomGate._on_body_entered", "body=... state=... mobs_alive=...")` line at function entry — HTML5-only via the existing `combat_trace` shim. This survives the diagnostic strip-down because it costs nothing in headless GUT and gives Playwright specs a "did the gate ever see a body?" datapoint when traversal fails. Use it to tell "gate never reached" (no trace) from "gate reached but state wrong" (trace fires, state machine diverges) — the same Case A vs Case B distinction the investigation used.
+
 ## Cross-references
 
 - HTML5-renderer-specific quirks (HDR clamp, Polygon2D, service worker cache): `.claude/docs/html5-export.md`
