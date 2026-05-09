@@ -197,7 +197,15 @@ func register_mob(mob: Node) -> void:
 	_mobs_alive += 1
 	# Connect with deferred so a synchronous mob_died emission inside
 	# register_mob (rare, but possible in tests) doesn't underflow the count.
-	mob.mob_died.connect(_on_mob_died)
+	var err: int = mob.mob_died.connect(_on_mob_died)
+	# Investigation 86c9qcf9z: instrument both registrations and decrements so
+	# the AC4 boss-clear spec's trace pair pinpoints any signal-emission
+	# desync between the spawned grunt set and the gate's _mobs_alive count.
+	# Logged unconditionally (combat_trace gates on web feature internally).
+	_combat_trace("RoomGate.register_mob",
+		"mob=%s id=%d mobs_alive=%d connect_err=%d" % [
+			mob.name, mob.get_instance_id(), _mobs_alive, err
+		])
 
 
 ## Force-lock the gate from script. Production uses `body_entered`; tests
@@ -279,13 +287,37 @@ func _on_area_entered_ignored(_area: Area2D) -> void:
 	pass  # Gate never responds to Area2D entry — CharacterBody2D only.
 
 
-func _on_mob_died(_mob: Variant, _pos: Variant = null, _def: Variant = null) -> void:
+func _on_mob_died(mob: Variant, _pos: Variant = null, _def: Variant = null) -> void:
 	# Signal signature varies (Grunt/Charger/Shooter all take 3 args), but
 	# we don't need any of them — we just count.
 	_mobs_alive = max(0, _mobs_alive - 1)
+	# Investigation 86c9qcf9z: trace the decrement so we can pair register vs.
+	# decrement counts when AC4 hits the desync class. mob may be null/freed
+	# in some test contexts; guard the name/id lookup.
+	var mob_name: String = "<null>"
+	var mob_id: int = 0
+	if mob != null and is_instance_valid(mob):
+		mob_name = str(mob.name) if "name" in mob else "<unnamed>"
+		mob_id = mob.get_instance_id() if mob.has_method("get_instance_id") else 0
+	_combat_trace("RoomGate._on_mob_died",
+		"mob=%s id=%d mobs_alive=%d state=%s" % [
+			mob_name, mob_id, _mobs_alive, _state_name()
+		])
 	if _mobs_alive == 0 and _state == STATE_LOCKED and not _death_wait_in_flight:
 		_death_wait_in_flight = true
 		_start_death_wait()
+
+
+## Trace-helper: render the current state as a stable label for trace pairs.
+## Mirrors RoomGate._state's StringName values for grep simplicity.
+func _state_name() -> String:
+	if _state == STATE_OPEN:
+		return "open"
+	if _state == STATE_LOCKED:
+		return "locked"
+	if _state == STATE_UNLOCKED:
+		return "unlocked"
+	return str(_state)
 
 
 ## Start (or skip) the DEATH_TWEEN_WAIT_SECS delay before unlocking.
