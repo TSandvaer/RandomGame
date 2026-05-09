@@ -99,6 +99,38 @@ func _ready() -> void:
 	_build_door_trigger()
 	_spawn_boss()
 	_spawn_stratum_exit()
+	# M2 W1 P0 fix (`86c9q96fv` + `86c9q96ht`): the boss starts STATE_DORMANT
+	# and only wakes via `trigger_entry_sequence()` → 1.8 s timer → `wake()`.
+	# The original wake-gate was the door-trigger Area2D at (240, 250) — but
+	# in production the player enters the boss room via `Main._load_room_at_index`,
+	# which TELEPORTS the player to (240, 200) without any physics overlap event.
+	# Player Y=200 sits ABOVE the trigger Y=250, so `body_entered` never fires.
+	# Result: boss stays dormant indefinitely → `take_damage` is rejected during
+	# DORMANT (Stratum1Boss.gd:332-333) AND `_physics_process` skips all AI
+	# (Stratum1Boss.gd:361-365). Both Sponsor-reported P0s ("boss does not take
+	# damage" + "boss does not attack") collapse to this single root cause.
+	#
+	# Fix: schedule a deferred entry-sequence trigger from `_ready`. The deferred
+	# call lands AFTER `Main._load_room_at_index` re-parents the player into the
+	# room, so by the time the 1.8 s timer fires the player is correctly placed.
+	# `trigger_entry_sequence` is idempotent (guards on `_entry_sequence_active`
+	# / `_entry_sequence_completed`), so the door-trigger fallback path remains
+	# safe — if a future code path teleports the player onto the trigger, the
+	# `body_entered` handler is a no-op rather than re-firing the sequence.
+	#
+	# The 1.8 s narrative beat (Uma boss-intro.md Beats 1-4) is preserved: the
+	# entry sequence still runs end-to-end. Tests still call
+	# `trigger_entry_sequence()` + `complete_entry_sequence_for_test()` directly;
+	# their idempotent-guard chain makes the deferred auto-fire harmless in tests.
+	#
+	# Gated on `_boss != null`: tests that construct the room with empty
+	# `boss_scene_path` (e.g. `test_room_advance_only_on_door_walk.gd` — door-
+	# trigger isolation tests) should NOT auto-fire the entry sequence — they
+	# build the room only to inspect the trigger Area2D's properties. The
+	# production scene always has `boss_scene_path` set, so production gets the
+	# auto-fire as designed.
+	if _boss != null:
+		call_deferred("trigger_entry_sequence")
 
 
 # ---- Public API -------------------------------------------------------

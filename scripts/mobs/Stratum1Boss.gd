@@ -328,13 +328,25 @@ func wake() -> void:
 ##   - mob_died emits exactly once on the death-transition.
 func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	if _is_dead:
+		_combat_trace("Stratum1Boss.take_damage", "IGNORED already_dead amount=%d" % amount)
 		return
 	if _state == STATE_DORMANT:
-		return  # intro fairness — no damage during entry sequence
+		# Intro fairness — no damage during entry sequence.
+		# Trace this case explicitly so soak-debugging can distinguish "hit didn't
+		# register" (Hitbox layer/mask issue) from "hit was rejected" (boss still
+		# dormant — the M2 W1 P0 root cause). Wired against `86c9q96fv`.
+		_combat_trace("Stratum1Boss.take_damage",
+			"IGNORED dormant amount=%d hp=%d (boss still in entry sequence)" % [amount, hp_current])
+		return
 	if _state == STATE_PHASE_TRANSITION:
+		_combat_trace("Stratum1Boss.take_damage",
+			"IGNORED phase_transition amount=%d hp=%d (stagger-immune window)" % [amount, hp_current])
 		return  # stagger-immune during the 0.6 s phase break (Uma)
 	var clean_amount: int = max(0, amount)
+	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - clean_amount)
+	_combat_trace("Stratum1Boss.take_damage",
+		"amount=%d hp=%d->%d phase=%d" % [clean_amount, hp_before, hp_current, phase])
 	damaged.emit(clean_amount, hp_current, source)
 	# Visual: white hit-flash on every actual-damage take_damage (Uma §2 —
 	# same rule across all mob types).
@@ -621,6 +633,7 @@ func _die() -> void:
 	if _is_dead:
 		return
 	_is_dead = true
+	_combat_trace("Stratum1Boss._die", "starting death sequence at hp=%d phase=%d" % [hp_current, phase])
 	# Cancel every pending action so a death-mid-attack doesn't fire from
 	# the corpse. Same defensive pattern as Grunt/Charger.
 	_melee_telegraph_left = 0.0

@@ -8,13 +8,38 @@
  * (Room 8 in the BOSS_ROOM_INDEX layout per scenes/Main.gd:60), waits for
  * the 1.8 s entry sequence, then attacks the boss until boss_died emits.
  *
- * **Status: test.fail() — two open P0 bugs against the boss as of 2026-05-09:**
- *   - 86c9q96fv (boss damage broken)
- *   - 86c9q96ht (boss attack broken)
+ * **Status: test.fail() — but the two underlying P0s are FIXED in PR
+ * `drew/m2-w1-boss-damage-attack-p0`:**
+ *   - 86c9q96fv (boss damage broken)        — FIXED via Stratum1BossRoom auto-trigger
+ *   - 86c9q96ht (boss attack broken)        — FIXED via same root cause
  *
- * The spec is written to assert the CORRECT end state. When the Devon/Drew
- * fixes for the two P0s land, this spec flips from RED to GREEN and the
- * `test.fail()` annotation must be removed (or replaced with `test()`).
+ * Root cause of the original P0s (single, both bugs collapsed): boss spawned
+ * in STATE_DORMANT and only woke when the player crossed the boss-room door-
+ * trigger Area2D at (240, 250). But `Main._load_room_at_index` teleports the
+ * player to (240, 200) — ABOVE the trigger — and never fires `body_entered`.
+ * With the boss stuck dormant, `take_damage` was rejected (Stratum1Boss.gd:332)
+ * AND `_physics_process` skipped all AI (Stratum1Boss.gd:361-365).
+ *
+ * Fix: `Stratum1BossRoom._ready` now `call_deferred("trigger_entry_sequence")`,
+ * so the entry sequence auto-fires on room load. The 1.8 s narrative beat
+ * + door-trigger fallback are preserved (idempotent guards).
+ *
+ * **Why this spec is still `test.fail()` after the P0 fix:** the original AC4
+ * spec authored in PR #156 has separate, pre-existing room-traversal bugs
+ * unrelated to the boss P0s — specifically, the gate trigger Area2D at
+ * y=[104,184] doesn't intersect the player's spawn Y=200, and the
+ * RoomGate.gd state machine requires two distinct body_entered events
+ * (lock → unlock → traverse) which the spec's keyboard-driven walk pattern
+ * doesn't reliably produce. These bugs were masked by `test.fail()` since
+ * the spec was always failing on either the room-traversal step or the
+ * boss-broken step.
+ *
+ * Verification of the P0 fix is via the new GUT integration tests in
+ * `tests/integration/test_boss_wakes_and_engages.gd` (real Hitbox spawn +
+ * real CharacterBody2D Player). The end-to-end browser-soak verification
+ * is gated on a follow-up Tess dispatch to fix the spec's gate-traversal
+ * mechanics. Sponsor's manual M1 RC re-soak 6 will validate the boss
+ * fix in the actual play loop independently of this spec.
  *
  * Diagnostic-build env-var hook (proposed, NOT yet implemented):
  *   The boss has 600 HP. iron_sword does 6 damage/swing → 100 swings ≈ 22 s
@@ -103,12 +128,17 @@ const ROOM_MOB_COUNTS = [
 const TOTAL_PRE_BOSS_MOBS = ROOM_MOB_COUNTS.reduce((a, b) => a + b, 0);
 
 test.describe("AC4 — Stratum-1 boss reach + clear", () => {
-  // The two open P0s mean the boss is currently un-killable. test.fail()
-  // expects the test to fail; when Devon/Drew fix the boss, this should be
-  // changed to test() (the .fail flips green = "actually passed"; CI surfaces
-  // that as a "passed but expected to fail" warning, prompting the rename).
+  // The two boss P0s (damage + attack) are FIXED in PR
+  // drew/m2-w1-boss-damage-attack-p0 — Stratum1BossRoom._ready auto-fires
+  // the entry sequence so the boss reliably wakes regardless of how the
+  // player arrived. However, this spec still has separate pre-existing
+  // room-traversal bugs (gate Y-band miss, single-vs-double body_entered)
+  // that prevent it from running green end-to-end. Those need a follow-up
+  // Tess dispatch to fix; this spec stays `test.fail()` for now. The
+  // boss-fix verification is the new GUT integration tests +
+  // Sponsor's manual M1 RC re-soak 6.
   test.fail(
-    "AC4 — Stratum-1 boss reach + clear (P0 86c9q96fv + 86c9q96ht open)",
+    "AC4 — Stratum-1 boss reach + clear (boss P0s FIXED; gate-traversal bugs remain)",
     async ({ page, context }) => {
       test.setTimeout(900_000); // 15 minutes — generous for full traversal + boss
       await context.route("**/*", (route) => route.continue());
@@ -142,6 +172,7 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         console.log(
           `[ac4-boss] Room ${roomIdx + 1}: clearing ${expectedMobs} mobs...`
         );
+
 
         // Set facing NE for first attack (Room 01 grunt geometry); other rooms
         // we'll spam in 4 directions so something connects.
@@ -287,6 +318,10 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       // Actually: Boss Room replaces the room; player is placed at
       // DEFAULT_PLAYER_SPAWN=(240,200). Door trigger is at (240,250) — which
       // is SOUTH. Walking south for 800ms crosses it.
+      //
+      // POST-FIX (PR drew/m2-w1-boss-damage-attack-p0): Stratum1BossRoom._ready
+      // now auto-fires the entry sequence on room load, so this walk is
+      // belt-and-suspenders only.
       await page.keyboard.down("s");
       await page.waitForTimeout(800);
       await page.keyboard.up("s");
@@ -299,8 +334,10 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       await page.waitForTimeout(600);
       await page.keyboard.up("w");
 
-      // Spam attacks to kill boss. Per the open P0 bugs, this is currently
-      // expected to FAIL — boss damage / boss attack are broken.
+      // Spam attacks to kill boss. Boss P0s fixed in
+      // PR drew/m2-w1-boss-damage-attack-p0; this should run green once
+      // the spec's room-traversal mechanics are fixed in a follow-up Tess
+      // dispatch (currently still test.fail()).
       const bossStart = Date.now();
       let bossDied = false;
 
@@ -325,14 +362,15 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       }
 
       // ---- Final assertions ----
-      // The MAIN ASSERTION: the boss died. Currently fails per open P0s.
+      // The MAIN ASSERTION: the boss died. Currently fails per pre-existing
+      // gate-traversal bugs in this spec. Boss P0s themselves are fixed in
+      // PR drew/m2-w1-boss-damage-attack-p0 (verified by GUT integration
+      // tests in tests/integration/test_boss_wakes_and_engages.gd).
       expect(
         bossDied,
-        `Boss did not die within ${BOSS_CLEAR_TIMEOUT_MS}ms. Open P0 bugs:\n` +
-          ` - 86c9q96fv (boss damage broken)\n` +
-          ` - 86c9q96ht (boss attack broken)\n` +
-          `When these fixes land, this spec should flip green and test.fail() ` +
-          `should be removed.`
+        `Boss did not die within ${BOSS_CLEAR_TIMEOUT_MS}ms. Open follow-up:\n` +
+          ` - this spec needs Tess to fix room-traversal mechanics (gate Y-band miss + lock/traverse double-crossing)\n` +
+          ` - the boss P0s themselves are fixed (see GUT test_boss_wakes_and_engages.gd)`
       ).toBe(true);
 
       // Negative assertion: zero physics-flush panics during the entire
