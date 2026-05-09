@@ -142,17 +142,18 @@ RELEASE_BUILD_ARTIFACT_PATH=./html5-build npm run test:ui
 
 ---
 
-### `ac4-boss-clear.spec.ts` (M2 W1 expansion — currently `test.fail()`)
+### `ac4-boss-clear.spec.ts` (M2 W1 expansion — green)
 
-**Test name:** `AC4 — Stratum-1 boss reach + clear (P0 86c9q96fv + 86c9q96ht open)`
+**Test name:** `AC4 — Stratum-1 boss reach + clear (boss P0s + spec gate-traversal mechanics fixed)`
 
-**Status:** `test.fail()` — annotated to expect failure because two open P0 bugs (`86c9q96fv` boss damage, `86c9q96ht` boss attack) make the boss currently un-killable. When the Devon/Drew fixes land, this spec flips green and the `test.fail()` annotation should be replaced with `test()`.
+**Status:** Green (`test`). Previously `test.fail()` for two reasons: (a) the boss P0s 86c9q96fv (damage) + 86c9q96ht (attack) — fixed in PR drew/m2-w1-boss-damage-attack-p0; (b) two pre-existing spec-mechanics bugs in the gate-traversal walk (Y-band miss + single-vs-double body_entered) — fixed by introducing the `gateTraversalWalk` helper in `fixtures/gate-traversal.ts`. See the spec header for full rationale.
 
-**What it checks (when fixed):**
-- Drive Rooms 1-7, killing all mobs and walking through each gate
+**What it checks:**
+- Drive Rooms 1-7, killing all mobs and walking through each RoomGate via the two-part walk pattern (NW-in → SE-out → NW-in)
 - Enter Boss Room (Room 8 in BOSS_ROOM_INDEX), wait 1.8s entry sequence
 - Attack boss until `[combat-trace] Stratum1Boss._force_queue_free | freeing now`
-- Per-room negative-assertion: `gate_traversed` does NOT fire within 100ms of `gate_unlocked` (PR #155 regression guard)
+- Per-room negative-assertion: gate_traversed count increases by exactly 1 per gate (idempotency invariant — `_traversed_emitted` guard)
+- Final causality sweep: every `gate_traversed` timestamp must come AFTER its matching `gate_unlocked` (PR #155 regression guard)
 - Total 21 pre-boss mob deaths + 1 boss death
 
 **Diagnostic-build env-var hook (proposed; NOT implemented in this PR):**
@@ -229,6 +230,16 @@ Key mitigations:
 2. `--disable-cache` — disables HTTP disk cache
 3. `--disable-application-cache` — disables legacy AppCache
 
+### `gate-traversal.ts`
+
+`gateTraversalWalk(page, canvas, capture, roomLabel)` — drives a player CharacterBody2D through a `RoomGate` (Rooms 02-08) via the two-part walk pattern needed by Godot 4's `body_entered` semantics.
+
+Encodes two non-obvious mechanics:
+1. **Diagonal NW walk required.** The trigger rect occupies world-coords X∈[24,72], Y∈[104,184]; player spawns at (240, 200) — outside both axes. A pure-west walk never enters the trigger. The helper drives a NW diagonal walk so both axes resolve.
+2. **Two body_entered events required.** In Godot 4, `body_entered` is a non-overlap → overlap transition event, fired ONCE per continuous walk. The state machine needs two distinct events (lock → unlock → traverse). The helper drives walk-in (NW) → walk-out (SE) → walk-in (NW), producing two separate body_entered events. With mobs killed beforehand, the first body_entered short-circuits OPEN→LOCKED→UNLOCKED in one tick (lock() detects mobs_alive==0 and immediately calls _unlock()), and the second body_entered fires `gate_traversed`.
+
+See the helper's header comment for full geometry, timing rationale, and state-machine walkthrough.
+
 ---
 
 ## CI integration
@@ -246,7 +257,7 @@ The harness runs via `.github/workflows/playwright-e2e.yml`:
 |---|---|
 | AC2 cold first-kill in 60s | **Landed (M2 W1)** — `ac2-first-kill.spec.ts` |
 | AC3 death preservation | **Landed (M2 W1)** — `ac3-death-persistence.spec.ts` |
-| AC4 boss clear | **Landed as `test.fail()` (M2 W1)** — `ac4-boss-clear.spec.ts`. Flips green when P0 86c9q96fv + 86c9q96ht close |
+| AC4 boss clear | **Landed green (M2 W1)** — `ac4-boss-clear.spec.ts`. Boss P0s fixed in PR drew/m2-w1-boss-damage-attack-p0; spec gate-traversal mechanics fixed via `fixtures/gate-traversal.ts` two-part walk helper |
 | Equip flow (save-survival) | **Landed (M2 W1)** — `equip-flow.spec.ts` |
 | Negative-assertion sweep | **Landed (M2 W1)** — `negative-assertion-sweep.spec.ts` |
 | AC5 full 30-min console silence | Follow-up |

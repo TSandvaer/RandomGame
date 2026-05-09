@@ -202,6 +202,40 @@ Two reasons `call_deferred` rather than synchronous: (a) `Main._load_room_at_ind
 
 **Future bugs in this family:** any room with a wake/start trigger gated on physics overlap (boss rooms, ambush rooms, lock-then-unlock state machines). Pattern check: does the room have an entry-trigger Area2D whose `body_entered` handler is the ONLY production wake path? If yes, audit it against teleport-style player-entry. Memory rule candidate: `room-load-vs-body-entered-trigger.md`.
 
+## body_entered semantics — single-event continuous-walk (load-bearing for harness specs)
+
+A separate class of bug — surfaced when the Playwright harness tried to drive `RoomGate` traversal in `ac4-boss-clear.spec.ts` — is the **single-event continuous-walk** semantics of Godot 4's `Area2D.body_entered` signal.
+
+**The mechanic:** `body_entered` fires on the **non-overlap → overlap transition**, not on every physics tick the body remains inside the trigger rect. A Player CharacterBody2D walking continuously through an Area2D fires `body_entered` exactly **once**, regardless of how long they remain inside or how slowly they cross. To re-fire it, the body must `body_exited` first (transition back to non-overlap), then re-enter (transition to overlap again).
+
+**Why this bites state machines that need >1 entry event:** `RoomGate` (`scripts/levels/RoomGate.gd`) implements a three-state progression that requires two distinct `body_entered` events on the SAME gate node:
+
+```
+   OPEN
+    │  body_entered #1 (CharacterBody2D enters trigger rect)
+    ▼
+   LOCKED  ── all mobs dead → DEATH_TWEEN_WAIT_SECS (0.65s) ──┐
+                                                              │
+                                                              ▼
+                                                          UNLOCKED
+                                                              │
+                                                              │  body_entered #2
+                                                              ▼
+                                                         gate_traversed
+```
+
+A naïve "walk through the gate once" pattern produces only `body_entered #1` (lock event); the gate never reaches `gate_traversed`. The body must exit and re-enter for the second event.
+
+**Production code path that works:** in real gameplay this is invisible because the player walks INTO the room (event #1: lock), then walks AROUND killing mobs (multiple body_exited / body_entered cycles as the player wanders the room — but those happen incidentally, not as a designed test sequence), then walks toward the exit door (event #N: traverse). The "two distinct events" requirement is satisfied by emergent gameplay movement.
+
+**Harness code path that fails:** Playwright spec drives precise keyboard inputs that may produce a single continuous walk through the trigger; this only fires `body_entered` once and the gate sticks at LOCKED forever (or, if mobs are killed first while gate is OPEN, sticks at UNLOCKED — the lock-and-immediate-unlock condenses into one body_entered event). Either way the spec hangs waiting for `gate_traversed`.
+
+**Canonical harness fix shape — two-part walk pattern:** the spec must drive the player IN → OUT → IN to produce two distinct `body_entered` events. See `tests/playwright/fixtures/gate-traversal.ts` (`gateTraversalWalk` helper) for the encoded pattern with full geometric and timing rationale. The helper combines this `body_entered` mechanic with another non-obvious harness gotcha — the trigger rect's geometric position relative to `DEFAULT_PLAYER_SPAWN` requires a **diagonal NW** walk (both X and Y must satisfy the rect bounds simultaneously; pure-west or pure-north walks both miss).
+
+**Future bugs in this family:** any specs that need a state machine to advance through more than one `body_entered`-driven step on the same Area2D. Pattern check: does the spec drive the player into a trigger and assert state advances on a SECOND entry? If yes, the spec must explicitly walk the body out and back in. Memory rule candidate: `body-entered-single-event-rule.md`.
+
+**Sibling lesson:** the Sponsor-soak path traverses these gates via natural emergent movement — kill mobs (wandering naturally produces body_exited/body_entered cycles), then walk to the door. Headless GUT tests bypass the issue by calling `RoomGate.trigger_for_test()` / `RoomGate.traverse_for_test()` (`scripts/levels/RoomGate.gd` lines 224, 328). Only the browser-driven Playwright harness — which simulates real input on a single deliberate path — needs to encode the discipline explicitly.
+
 ## Cross-references
 
 - HTML5-renderer-specific quirks (HDR clamp, Polygon2D, service worker cache): `.claude/docs/html5-export.md`
