@@ -84,12 +84,12 @@ func test_make_mob_def_with_loot_table() -> void:
 
 func test_authored_grunt_tres_loads() -> void:
 	# Per sign-off checklist: load the authored grunt.tres, assert types
-	# resolve, fields match the spec.
+	# resolve, fields match the spec. Damage rebalanced 5→3 in M1 RC soak-4.
 	var def: MobDef = load("res://resources/mobs/grunt.tres") as MobDef
 	assert_not_null(def, "grunt.tres loads as MobDef")
 	assert_eq(def.id, &"grunt")
 	assert_eq(def.hp_base, 50)
-	assert_eq(def.damage_base, 5)
+	assert_eq(def.damage_base, 3)
 	assert_eq(def.ai_behavior_tag, &"melee_chaser")
 	assert_not_null(def.loot_table, "grunt has a loot table")
 

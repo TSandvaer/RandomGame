@@ -11,7 +11,19 @@ extends Area2D
 ##   2. Player crosses the gate's Area2D — `body_entered` fires, the gate
 ##      flips to LOCKED and emits `gate_locked`.
 ##   3. Each `mob_died` decrements the alive count. When the last registered
-##      mob dies, the gate flips to UNLOCKED and emits `gate_unlocked`.
+##      mob dies, the gate starts DEATH_TWEEN_WAIT_SECS delay (so the mob
+##      death animation plays visibly before the door opens), then flips to
+##      UNLOCKED and emits `gate_unlocked`.
+##
+## Position B contract (M1 RC Sponsor soak attempt 4 — ticket 86c9q8052):
+##   - "Room cleared" = all mob `mob_died` signals have fired AND the
+##     death-tween wait has elapsed, door becomes walkable, player gets a
+##     visual cue that the door opened.
+##   - "Room counter advances" = player walks through the now-open door
+##     (body_entered on the *exit* gate / StratumExit — NOT on this
+##     entry-lock gate).
+##   - The DEATH_TWEEN_WAIT_SECS delay decouples the visual tween from the
+##     gate-open so Sponsor always sees the mob die before the door opens.
 ##
 ## Edge cases handled (paired tests in `tests/test_room_gate.gd`):
 ##   - Zero mobs registered → gate is UNLOCKED on lock-trigger (room is
@@ -45,6 +57,19 @@ const STATE_OPEN: StringName = &"open"        # initial state, before lock-trigg
 const STATE_LOCKED: StringName = &"locked"    # player crossed, mobs alive
 const STATE_UNLOCKED: StringName = &"unlocked"  # all mobs dead
 
+# ---- Timing ----------------------------------------------------------
+
+## How long to wait after the last mob_died fires before emitting
+## gate_unlocked. Sized for the WORST-case mob death visual: Stratum1Boss
+## holds for 400ms (BOSS_DEATH_HOLD) before its 200ms scale/alpha tween fires =
+## 600ms total death visual; we add 50ms of slack = 650ms. Regular mobs
+## (Grunt/Charger/Shooter) only have a 200ms tween, so 650ms covers them with
+## significant slack. This ensures the mob's death animation plays visibly
+## before the door opens — fixing the Sponsor soak-4 "I don't see it dying"
+## report (Tess bounce: original 0.4s would have regressed for Boss).
+## Zero mobs (trivially-clear room) skips the wait and unlocks immediately.
+const DEATH_TWEEN_WAIT_SECS: float = 0.650
+
 # ---- Layer bits (mirror project.godot) -------------------------------
 
 const LAYER_PLAYER: int = 1 << 1  # bit 2 ("player")
@@ -62,6 +87,23 @@ var _mobs_alive: int = 0
 var _registered_mobs: Array[Node] = []
 # Idempotency: ensure unlocked emits exactly once.
 var _unlocked_emitted: bool = false
+# Set true when the last mob has died and we're waiting for DEATH_TWEEN_WAIT_SECS
+# before emitting gate_unlocked. Guards against _on_mob_died being re-entered
+# (e.g. late-registered mob dying while the timer is in flight).
+var _death_wait_in_flight: bool = false
+# Timer node for the death-tween wait. Created lazily in _start_death_wait.
+# Using a Timer node (NOT SceneTreeTimer) so synchronous test contexts can
+# either advance physics ticks OR set `test_skip_death_wait = true` to bypass.
+# (Tess bounce on PR #153: SceneTreeTimer.timeout never fires in GUT
+# synchronous test context — broke 8 pre-existing test_room_gate.gd tests.)
+var _death_wait_timer: Timer = null
+
+# Test-only escape hatch: when true, _on_mob_died unlocks SYNCHRONOUSLY without
+# waiting for the death-tween timer. Production path leaves this false; the
+# original test fixtures and all the "mob dies → gate unlocks" assertions stay
+# green by flipping this on. New tests that specifically want to verify the
+# wait-then-unlock sequence leave it false and advance the timer manually.
+@export var test_skip_death_wait: bool = false
 
 
 func _ready() -> void:
@@ -162,8 +204,12 @@ func lock() -> void:
 ## overlap. Bypasses the CharacterBody2D type-check in _on_body_entered so
 ## headless tests can use bare FakePlayer nodes without a full CharacterBody2D
 ## scene tree. Calls lock() directly — same effect as _on_body_entered for a
-## validated body.
+## validated body. Also flips `test_skip_death_wait` so the existing
+## "kill mob → gate unlocks" tests stay synchronous (no Timer pump needed).
+## Tests that specifically need to assert the wait sequence should construct
+## the gate without going through this helper.
 func trigger_for_test(_body: Node = null) -> void:
+	test_skip_death_wait = true
 	if _state != STATE_OPEN:
 		return
 	lock()
@@ -204,8 +250,49 @@ func _on_mob_died(_mob: Variant, _pos: Variant = null, _def: Variant = null) -> 
 	# Signal signature varies (Grunt/Charger/Shooter all take 3 args), but
 	# we don't need any of them — we just count.
 	_mobs_alive = max(0, _mobs_alive - 1)
-	if _mobs_alive == 0 and _state == STATE_LOCKED:
+	if _mobs_alive == 0 and _state == STATE_LOCKED and not _death_wait_in_flight:
+		_death_wait_in_flight = true
+		_start_death_wait()
+
+
+## Start (or skip) the DEATH_TWEEN_WAIT_SECS delay before unlocking.
+##
+## Production path: spawn a one-shot Timer node, start it, and connect its
+## `timeout` signal to `_unlock`. When the timer fires (after Engine ticks
+## the physics frame in real game), `_unlock` emits gate_unlocked.
+##
+## Test path: tests can either (a) set `test_skip_death_wait = true` for
+## immediate unlock (matches all pre-existing test_room_gate.gd assertions),
+## or (b) leave it false and call `advance_death_wait()` to simulate the
+## elapsed timer for tests that specifically verify the wait sequence.
+##
+## Bare-instantiated (no scene tree) path: unlock immediately — no Timer node
+## can run without a tree, and the bare-instance tests never asserted the
+## delay anyway.
+func _start_death_wait() -> void:
+	if test_skip_death_wait or not is_inside_tree():
 		_unlock()
+		return
+	_death_wait_timer = Timer.new()
+	_death_wait_timer.one_shot = true
+	_death_wait_timer.wait_time = DEATH_TWEEN_WAIT_SECS
+	_death_wait_timer.timeout.connect(_unlock)
+	add_child(_death_wait_timer)
+	_death_wait_timer.start()
+
+
+## Test helper: simulate the death-tween wait elapsing without driving the
+## engine for DEATH_TWEEN_WAIT_SECS. Tests that want to assert the
+## "gate_unlocked emits AFTER the wait" sequence call this to advance the
+## state machine. Idempotent.
+func advance_death_wait_for_test() -> void:
+	if not _death_wait_in_flight:
+		return
+	if _unlocked_emitted:
+		return
+	if _death_wait_timer != null:
+		_death_wait_timer.stop()
+	_unlock()
 
 
 func _unlock() -> void:

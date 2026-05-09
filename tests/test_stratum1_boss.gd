@@ -82,10 +82,10 @@ func test_spawns_with_full_hp_from_mobdef() -> void:
 
 func test_default_hp_when_no_mobdef() -> void:
 	var b: Stratum1Boss = _make_boss()
-	# Per spec defaults: 600 HP, 15 damage.
+	# Per spec defaults: 600 HP, 12 damage (rebalanced M1 RC soak-4 — was 15).
 	assert_eq(b.get_hp(), 600)
 	assert_eq(b.get_max_hp(), 600)
-	assert_eq(b.damage_base, 15)
+	assert_eq(b.damage_base, 12)
 
 
 # ---- 2: phase-1 melee attack telegraphs + lands damage --------------

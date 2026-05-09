@@ -66,10 +66,10 @@ func test_spawns_with_full_hp_from_mobdef() -> void:
 
 func test_default_hp_when_no_mobdef_assigned() -> void:
 	var g: Grunt = _make_grunt()
-	# Per spec: 50 HP, 5 base damage if no def.
+	# Per spec: 50 HP, 3 base damage if no def (rebalanced M1 RC soak-4 — was 5).
 	assert_eq(g.get_hp(), 50)
 	assert_eq(g.get_max_hp(), 50)
-	assert_eq(g.damage_base, 5)
+	assert_eq(g.damage_base, 3)
 
 
 # ---- 2: takes damage via Hitbox layer-3 -------------------------------
@@ -153,6 +153,13 @@ func test_state_swings_when_in_attack_range() -> void:
 	g.set_player(p)
 	watch_signals(g)
 	g._physics_process(0.016)
+	# M1 RC soak-4 fix: grunt now enters STATE_TELEGRAPHING_LIGHT first
+	# (rooted, 0.4 s windup) before the swing fires. Swing fires when the
+	# telegraph window expires.
+	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_LIGHT,
+		"grunt enters telegraph state on first tick in melee range")
+	# Tick past the telegraph window — swing fires and state advances to ATTACKING.
+	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.01)
 	assert_eq(g.get_state(), Grunt.STATE_ATTACKING)
 	assert_signal_emitted(g, "swing_spawned")
 
@@ -165,6 +172,10 @@ func test_state_recovers_then_returns_to_chasing() -> void:
 	p.global_position = Vector2(20.0, 0.0)
 	g.set_player(p)
 	g._physics_process(0.016)
+	# M1 RC soak-4 fix: grunt enters telegraph BEFORE swing/attacking now.
+	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_LIGHT)
+	# Tick past telegraph — swing fires and we enter ATTACKING (recovery).
+	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.01)
 	assert_eq(g.get_state(), Grunt.STATE_ATTACKING)
 	# Move player away so chase resumes after recovery.
 	p.global_position = Vector2(200.0, 0.0)
@@ -332,8 +343,10 @@ func test_spawned_hitbox_is_enemy_team() -> void:
 	g.swing_spawned.connect(func(_kind: StringName, hb: Node) -> void:
 		captured_hb[0] = hb
 	)
+	# M1 RC soak-4 fix: enter telegraph first, then tick past it so swing fires.
 	g._physics_process(0.016)
-	assert_not_null(captured_hb[0], "swing fired in attack range")
+	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.01)
+	assert_not_null(captured_hb[0], "swing fired in attack range after telegraph window")
 	var hb: Hitbox = captured_hb[0]
 	assert_eq(hb.team, Hitbox.TEAM_ENEMY, "grunt swings on enemy team")
 	assert_eq(hb.collision_layer, Hitbox.LAYER_ENEMY_HITBOX, "enemy_hitbox layer (bit 5)")

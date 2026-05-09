@@ -88,10 +88,10 @@ func test_spawns_with_full_hp_from_mobdef() -> void:
 
 func test_default_stats_when_no_mobdef() -> void:
 	var c: Charger = _make_charger()
-	# Spec: 70 HP, 8 base damage, 1.5x player walk speed (120 * 1.5 = 180).
+	# Spec: 70 HP, 5 base damage (rebalanced M1 RC soak-4 — was 8), 1.5x player walk speed (120 * 1.5 = 180).
 	assert_eq(c.get_hp(), 70)
 	assert_eq(c.get_max_hp(), 70)
-	assert_eq(c.damage_base, 8)
+	assert_eq(c.damage_base, 5)
 	assert_eq(c.charge_speed, 180.0)
 
 

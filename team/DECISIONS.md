@@ -399,3 +399,12 @@ Format:
 - Reversibility: reversible — all three constants are exported tunables; balance-pass tweaks are one-line. Mechanism shape is sticky.
 - Affects: Devon (impl — `Player.gd` regen tick + HP bar shimmer tween on foreground ColorRect), Tess (paired tests + integration — 7 ACs in spec), Drew (potential balance ripple — if regen makes Room 1-7 encounters trivial, boss damage scaling may need tuning; flag for M2 balance pass), Priya (M2 backlog impact — regen mechanic is now in M1, not M2)
 - Detail: `team/uma-ux/hp-regen-design.md`, ClickUp `86c9q7pgc`
+
+## 2026-05-09 — Mob damage_base values rebalanced for M1 RC playability
+
+- Decided by: Drew (per dispatch authority — mob AI/balance internals, M1 RC soak attempt 4 fix wave per ClickUp `86c9q81bc` + `86c9q81br`)
+- Decision: All four M1 mob damage_base values **cut** to ease the difficulty curve for Sponsor's RC soak: **Grunt 5→3** (40% reduction), **Charger 8→5** (~38%), **Shooter 6→5** (~17%), **Stratum1Boss 15→12** (20%). Changes land in both the script defaults (`var damage_base: int = N`) and the TRES resources (`resources/mobs/{grunt,charger,shooter,stratum1_boss}.tres`).
+- Why: Sponsor's soak-attempt-4 report — "The mobs do way too much damage, the game is very hard." Existing Damage formula constants (`FIST_DAMAGE`, `EDGE_PER_POINT`, `HEAVY_MULT`, `VIGOR_PER_POINT`, `VIGOR_CAP`) are locked per 2026-05-02 entry and must not be touched; the only tunable lever is `damage_base` on each mob's TRES. 40% Grunt cut brings a no-gear L1 player's per-grunt hit budget from ~20 hits to tolerable for a fresh session. Boss cut from 15→12 is intentionally smaller (20%) so the boss fight retains the climax pressure Uma's phase-design needs.
+- Reversibility: reversible — `damage_base` is a one-line TRES edit. Sticky once Tess writes AC4/AC7 acceptance tests against specific combat-time totals for the new values.
+- Affects: Drew (test files — existing `test_grunt/charger/shooter/stratum1_boss.gd` default-stat assertions updated; new `test_mob_attack_telegraph.gd` covers Item 2 telegraph visual); Tess (re-soak on updated RC — verify each mob type feels hittable; AC4 boss-combat-time budget re-calibrated to new 12 base); Devon (no code change — Damage.gd formula unchanged); Priya (`affix-balance-pin.md` §4 player-feel targets now need re-calibration against 3/5/5/12 bases in M2 balance pass).
+- Detail: `resources/mobs/{grunt,charger,shooter,stratum1_boss}.tres`, `scripts/mobs/{Grunt,Charger,Shooter,Stratum1Boss}.gd`, ClickUp `86c9q81bc` (Item 3), `86c9q81br` (Item 2 telegraph visual).

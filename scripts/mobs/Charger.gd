@@ -164,7 +164,7 @@ const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
 var hp_max: int = 70
 var hp_current: int = 70
-var damage_base: int = 8
+var damage_base: int = 5  # rebalanced M1 RC soak-4: was 8, now 5 (~38% reduction)
 var charge_speed: float = 180.0  # 1.5x player WALK_SPEED (120) per spec
 
 var _state: StringName = STATE_IDLE
@@ -182,6 +182,16 @@ var _player: Node2D = null
 ## the epsilon. When it reaches WALL_STOP_FRAMES_REQUIRED, _end_charge_into_wall
 ## fires.
 var _wall_stop_frames: int = 0
+
+# Attack-telegraph tween — ref kept so a death-during-telegraph can cancel it.
+# Charger already has TELEGRAPHING state (0.55 s), this adds the red-glow visual.
+var _attack_telegraph_tween: Tween = null
+
+## Red tint for the charge telegraph (player-journey.md Beat 6). All channels
+## sub-1.0 so WebGL2/sRGB (HTML5 gl_compatibility) never clamps — same rule as
+## player swing-flash (PR #137). Targets Sprite child, not parent modulate.
+const ATTACK_TELEGRAPH_TINT: Color = Color(1.0, 0.30, 0.30, 1.0)  # vivid red, HTML5 safe
+const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.080
 
 # Tracks which targets the current charge has already body-hit so a single
 # charge can't multi-tick the player. Reset at the start of each charge.
@@ -393,6 +403,9 @@ func _enter_telegraph() -> void:
 	_telegraph_left = TELEGRAPH_DURATION
 	_set_state(STATE_TELEGRAPHING)
 	charge_telegraph_started.emit(_charge_dir)
+	# Attack-telegraph visual: red-glow on Sprite child for the windup window
+	# (player-journey.md Beat 6, M1 RC soak-4 fix). Targets visible-draw node.
+	_play_attack_telegraph()
 
 
 func _begin_charge() -> void:
@@ -484,6 +497,7 @@ func _die() -> void:
 	_recovery_left = 0.0
 	_spotted_hold_left = 0.0
 	velocity = Vector2.ZERO
+	_cancel_attack_telegraph_tween()
 	_set_state(STATE_DEAD)
 	# CRITICAL CONTRACT (Uma `combat-visual-feedback.md` §3a): mob_died fires
 	# at the START of the death sequence, not after the visual tween. Loot +
@@ -495,6 +509,46 @@ func _die() -> void:
 
 
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
+
+## Attack-telegraph visual (player-journey.md Beat 6 + M1 RC soak-4):
+## tween the Sprite child's color from rest → red for the charge telegraph
+## window, then back to rest when the charge fires. All channels sub-1.0
+## for HTML5 gl_compatibility safety (PR #137 lesson).
+## Targets Sprite child (visible-draw node) not parent modulate (PR #115 lesson).
+func _play_attack_telegraph() -> void:
+	if not is_inside_tree():
+		return
+	var target: CanvasItem = null
+	var uses_sprite: bool = false
+	var color_at_rest: Color = Color(1, 1, 1, 1)
+	var sprite: Node = get_node_or_null("Sprite")
+	if sprite is ColorRect:
+		target = sprite as ColorRect
+		uses_sprite = true
+		color_at_rest = (sprite as ColorRect).color
+	else:
+		target = self
+		color_at_rest = modulate
+	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
+		_attack_telegraph_tween.kill()
+	_attack_telegraph_tween = create_tween()
+	var prop: String = "color" if uses_sprite else "modulate"
+	var hold_dur: float = max(0.0, TELEGRAPH_DURATION - ATTACK_TELEGRAPH_TWEEN_IN * 2.0)
+	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, hold_dur)
+	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
+	_combat_trace("Charger._play_attack_telegraph",
+		"tween_valid=%s tint=(%.2f,%.2f,%.2f)" % [
+			_attack_telegraph_tween.is_valid(),
+			ATTACK_TELEGRAPH_TINT.r, ATTACK_TELEGRAPH_TINT.g, ATTACK_TELEGRAPH_TINT.b
+		])
+
+
+func _cancel_attack_telegraph_tween() -> void:
+	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
+		_attack_telegraph_tween.kill()
+		_attack_telegraph_tween = null
+
 
 ## §2 hit-flash. Bug C fix: tween Sprite child's `color` so the flash is
 ## actually visible. See Grunt._play_hit_flash for full rationale.
@@ -625,9 +679,10 @@ func _set_state(new_state: StringName) -> void:
 func _apply_mob_def() -> void:
 	if mob_def == null:
 		# Bare-instantiated charger (tests). Use spec defaults.
+		# damage_base = 5 (rebalanced M1 RC soak-4, was 8).
 		hp_max = 70
 		hp_current = 70
-		damage_base = 8
+		damage_base = 5
 		charge_speed = 180.0
 		return
 	hp_max = mob_def.hp_base
