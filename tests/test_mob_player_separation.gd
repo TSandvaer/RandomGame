@@ -426,3 +426,214 @@ func test_grunt_does_not_chase_player_during_recovery() -> void:
 			"grunt stays rooted (no chase) while player escapes during recovery")
 		assert_eq(g.get_state(), Grunt.STATE_ATTACKING,
 			"grunt remains in STATE_ATTACKING while recovery timer counts down")
+
+
+# ---- M2 W1 universal-bug-class generalization: motion_mode = FLOATING ----
+#
+# Ticket: 86c9qanu1 (M2 W1).
+# Drew's PR #163 fixed Stratum1Boss south-approach stick by setting
+# `motion_mode = MOTION_MODE_FLOATING`. Per Drew's diagnosis (validated by
+# Tess Lane 4 review of PR #163), the same MOTION_MODE_GROUNDED bug is
+# universal — Grunt + Charger have the same latent bug below the
+# observability threshold (smaller collision radius). This wave applies the
+# FLOATING fix to Grunt and Charger for consistency.
+#
+# Root cause (full rationale in `.claude/docs/combat-architecture.md`
+# § "CharacterBody2D motion_mode rule"): Godot 4 CharacterBody2D defaults
+# to MOTION_MODE_GROUNDED with up_direction = (0, -1). move_and_slide() in
+# GROUNDED mode treats collisions whose normal aligns with up_direction as
+# floor and applies floor-snap/floor-stop semantics — including suppressing
+# post-collision velocity along the +up axis. Player-from-south approaches
+# align the collision normal with up_direction, so the GROUNDED-mode floor
+# branch silently drops north-axis pushback velocity.
+#
+# Verification surface (headless): velocity-direction dot-product test on
+# the swing-fire / contact tick — same shape as the boss tests in
+# `tests/integration/test_boss_does_not_stick_after_contact.gd`. The
+# motion_mode fix specifically affects the move_and_slide() resolution that
+# follows; the velocity vector itself is set identically in all four cases.
+# We additionally assert `motion_mode == FLOATING` directly so the
+# regression is caught even if a future scene file overrides the property.
+
+# ---- 12: Grunt motion_mode is FLOATING after _ready (regression guard) ---
+
+func test_grunt_motion_mode_is_floating_after_ready() -> void:
+	## Direct property assertion: the canonical Godot 4 top-down 2D
+	## CharacterBody2D motion_mode is FLOATING. GROUNDED is the engine
+	## default and would re-introduce the south-approach floor-snap bug.
+	var g: Grunt = _make_grunt()
+	assert_eq(g.motion_mode, CharacterBody2D.MOTION_MODE_FLOATING,
+		"grunt motion_mode must be FLOATING after _ready() so move_and_slide treats every axis equally")
+
+
+# ---- 13: Grunt separates from player on south approach (the latent bug) ---
+
+func test_grunt_separates_from_player_approached_from_south() -> void:
+	## The previously-latent bug: player below grunt → collision normal aligns
+	## with up_direction → GROUNDED-mode floor branch suppresses north-axis
+	## pushback. Post-fix (FLOATING), pushback velocity points NORTH and
+	## move_and_slide() resolves the separation cleanly.
+	##
+	## Player south of grunt → player_pos.y > grunt_pos.y → away.y < 0 →
+	## pushback.y < 0 (NORTH). We assert dot-product against the away-axis,
+	## same shape as the existing east-approach test (#7 + #8 above).
+	var p: Player = _make_player()
+	var g: Grunt = _make_grunt()
+	# Player below grunt, just inside ATTACK_RANGE so chase commits to a swing.
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(0.0, Grunt.ATTACK_RANGE - 4.0)
+	g.set_player(p)
+
+	_drive_grunt_to_swing_fire(g)
+
+	assert_gt(g.velocity.length(), 0.0,
+		"south-approach: grunt velocity must be non-zero after swing-fire (separation from player)")
+	# Pushback must point NORTH (away from player below). i.e. velocity.y < 0.
+	assert_lt(g.velocity.y, 0.0,
+		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)" % [g.velocity.x, g.velocity.y])
+
+	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
+	var pushback_dir: Vector2 = g.velocity.normalized()
+	var dot: float = pushback_dir.dot(away_dir)
+	assert_gt(dot, 0.0,
+		"south-approach: pushback aligned with away-from-player vector (dot=%.3f)" % dot)
+
+
+# ---- 14: Grunt north-approach baseline (was always working) -------------
+
+func test_grunt_separates_from_player_approached_from_north() -> void:
+	## Baseline regression test: north approach was reported working pre-fix.
+	## Post-fix must still work — assert pushback points SOUTH (positive Y).
+	## Adding this so any future approach-direction asymmetry surfaces
+	## immediately rather than waiting for Sponsor soak.
+	var p: Player = _make_player()
+	var g: Grunt = _make_grunt()
+	# Player above grunt.
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(0.0, -(Grunt.ATTACK_RANGE - 4.0))
+	g.set_player(p)
+
+	_drive_grunt_to_swing_fire(g)
+
+	assert_gt(g.velocity.length(), 0.0,
+		"north-approach: grunt velocity must be non-zero after swing-fire")
+	assert_gt(g.velocity.y, 0.0,
+		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)" % [g.velocity.x, g.velocity.y])
+
+	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
+	var dot: float = g.velocity.normalized().dot(away_dir)
+	assert_gt(dot, 0.0, "north-approach: pushback aligned with away-axis (dot=%.3f)" % dot)
+
+
+# ---- 15: Grunt west-approach baseline ------------------------------------
+
+func test_grunt_separates_from_player_approached_from_west() -> void:
+	## Baseline regression: west approach. Post-fix pushback points EAST (+X).
+	var p: Player = _make_player()
+	var g: Grunt = _make_grunt()
+	# Player west of grunt.
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(-(Grunt.ATTACK_RANGE - 4.0), 0.0)
+	g.set_player(p)
+
+	_drive_grunt_to_swing_fire(g)
+
+	assert_gt(g.velocity.length(), 0.0,
+		"west-approach: grunt velocity must be non-zero after swing-fire")
+	assert_gt(g.velocity.x, 0.0,
+		"west-approach: pushback must point EAST (positive X) — got velocity=(%.2f,%.2f)" % [g.velocity.x, g.velocity.y])
+
+	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
+	var dot: float = g.velocity.normalized().dot(away_dir)
+	assert_gt(dot, 0.0, "west-approach: pushback aligned with away-axis (dot=%.3f)" % dot)
+
+
+# Note: existing tests #7 + #8 already cover the EAST approach (player at +X
+# relative to grunt at origin). Together with #13 / #14 / #15, all four
+# cardinal approach angles are now covered.
+
+
+# ---- 16: Charger motion_mode is FLOATING after _ready (regression guard) -
+
+func test_charger_motion_mode_is_floating_after_ready() -> void:
+	## Direct property assertion. Same rationale as the grunt + boss tests.
+	var c: Charger = _make_charger()
+	assert_eq(c.motion_mode, CharacterBody2D.MOTION_MODE_FLOATING,
+		"charger motion_mode must be FLOATING after _ready() so move_and_slide treats every axis equally")
+
+
+# ---- 17: Charger separates from player on south approach ----------------
+
+func test_charger_separates_from_player_approached_from_south() -> void:
+	## Player below charger → collision normal aligns with up_direction →
+	## pre-fix GROUNDED mode would suppress north-axis pushback. Post-fix
+	## (FLOATING), pushback velocity points NORTH and move_and_slide()
+	## resolves the separation.
+	##
+	## Mirrors the boss south-approach test in
+	## `tests/integration/test_boss_does_not_stick_after_contact.gd`.
+	var p: Player = _make_player()
+	var c: Charger = _make_charger()
+	# Charger above, player below — charger needs to be in CHARGING with
+	# direction toward the player so contact triggers _enter_recovery.
+	c.global_position = Vector2(0.0, -200.0)
+	p.global_position = Vector2.ZERO
+	c.set_player(p)
+
+	_drive_charger_to_charging(c)
+	assert_eq(c.get_state(), Charger.STATE_CHARGING)
+
+	# Place charger at contact distance directly north of player.
+	c.global_position = Vector2(0.0, -28.0)
+	p.global_position = Vector2.ZERO
+
+	c._physics_process(PHYS_DELTA)
+	assert_eq(c.get_state(), Charger.STATE_RECOVERING,
+		"charger enters recovery on south-approach contact (no direction-asymmetry in trigger logic)")
+
+	assert_gt(c.velocity.length(), 0.0,
+		"south-approach: charger velocity must be non-zero on contact tick")
+	# Pushback must point NORTH (away from player below). i.e. velocity.y < 0.
+	assert_lt(c.velocity.y, 0.0,
+		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)" % [c.velocity.x, c.velocity.y])
+
+	var away_dir: Vector2 = (c.global_position - p.global_position).normalized()
+	var pushback_dir: Vector2 = c.velocity.normalized()
+	var dot: float = pushback_dir.dot(away_dir)
+	assert_gt(dot, 0.0,
+		"south-approach: charger pushback aligned with away-from-player vector (dot=%.3f)" % dot)
+
+
+# ---- 18: Charger north-approach baseline --------------------------------
+
+func test_charger_separates_from_player_approached_from_north() -> void:
+	## Baseline regression: north approach. Post-fix pushback points SOUTH (+Y).
+	var p: Player = _make_player()
+	var c: Charger = _make_charger()
+	# Charger below, player above.
+	c.global_position = Vector2(0.0, 200.0)
+	p.global_position = Vector2.ZERO
+	c.set_player(p)
+
+	_drive_charger_to_charging(c)
+	c.global_position = Vector2(0.0, 28.0)
+	p.global_position = Vector2.ZERO
+
+	c._physics_process(PHYS_DELTA)
+	assert_eq(c.get_state(), Charger.STATE_RECOVERING)
+
+	assert_gt(c.velocity.length(), 0.0,
+		"north-approach: charger velocity must be non-zero on contact tick")
+	assert_gt(c.velocity.y, 0.0,
+		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)" % [c.velocity.x, c.velocity.y])
+
+	var away_dir: Vector2 = (c.global_position - p.global_position).normalized()
+	var dot: float = c.velocity.normalized().dot(away_dir)
+	assert_gt(dot, 0.0, "north-approach: charger pushback aligned with away-axis (dot=%.3f)" % dot)
+
+
+# Note: existing tests #1 / #2 / #6 cover the WEST approach (charger at -X
+# of player). The boss test file covers all four cardinal directions for
+# Stratum1Boss directly. Together with #17 / #18 / the existing west tests,
+# the charger has N / S / W coverage and the load-bearing south case (the
+# axis the GROUNDED-mode floor branch dropped) is explicitly asserted.

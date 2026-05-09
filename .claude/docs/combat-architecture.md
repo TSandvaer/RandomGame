@@ -111,6 +111,8 @@ Godot 4 `CharacterBody2D` defaults to `motion_mode = MOTION_MODE_GROUNDED` with 
 
 **Generalization:** any new CharacterBody2D added to the project (mob, NPC, breakable, projectile-as-body) MUST set `motion_mode = MOTION_MODE_FLOATING` either in its scene file or via a `_apply_motion_mode()` helper called from `_ready()`. **Pattern check:** if you ever observe direction-asymmetric collision separation (works on three axes, fails on one — typically the +up or -up axis), suspect this rule first.
 
+**M2 W1 generalization closure (ticket `86c9qanu1`):** the FLOATING fix shipped to all melee-engaging mob types — Stratum1Boss (PR #163), then Grunt + Charger (this PR). Shooter is exempt by design: it has no rooted-recovery state and no POST_CONTACT_PUSHBACK, its KITING / AIMING handlers reset velocity each tick, so the GROUNDED-mode floor branch has nothing to suppress. The `_apply_motion_mode()` helper is the canonical implementation surface; new CharacterBody2Ds added in M2+ should mirror it.
+
 **Test bar consequence:** any "mob does not stick to player" regression test must cover **all four cardinal approach directions** (N / E / S / W). Single-axis tests miss the GROUNDED-mode floor-asymmetry surface. See `tests/integration/test_boss_does_not_stick_after_contact.gd::test_boss_separates_from_player_approached_from_*`.
 
 ## Equipped-weapon dual-surface rule (load-bearing)

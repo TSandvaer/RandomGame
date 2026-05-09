@@ -212,6 +212,7 @@ var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
 func _ready() -> void:
 	_apply_mob_def()
 	_apply_layers()
+	_apply_motion_mode()
 	_resolve_player()
 	_last_position = global_position
 
@@ -700,6 +701,28 @@ func _apply_layers() -> void:
 		collision_layer = LAYER_ENEMY
 	if collision_mask == 0 or collision_mask == BARE_DEFAULT_LAYER:
 		collision_mask = LAYER_WORLD | LAYER_PLAYER
+
+
+## Force `motion_mode = MOTION_MODE_FLOATING` so `move_and_slide()` treats
+## every axis equally during collision resolution. Without this, the engine
+## defaults to `MOTION_MODE_GROUNDED` with `up_direction = (0, -1)`, and
+## collisions whose normal aligns with up_direction (player-from-south
+## approach) engage floor-snap / floor-stop behavior that suppresses the
+## charger's POST_CONTACT_PUSHBACK velocity along the +up axis.
+##
+## Universal-bug-class generalization (M2 W1, ticket 86c9qanu1): Stratum1Boss
+## surfaced this first because its larger collision radius made the south-
+## approach asymmetry observable as visible "sticking" (PR #163). The same
+## bug class is latent on every CharacterBody2D in the project — Charger
+## (CHARGE_HITBOX_RADIUS 20 px envelope) keeps it below the observability
+## threshold but the floor-snap on +up-axis pushback still happens. Per
+## the canonical Godot 4 top-down 2D pattern, every CharacterBody2D in
+## this project adopts FLOATING.
+##
+## Documented in `.claude/docs/combat-architecture.md` § "CharacterBody2D
+## motion_mode rule".
+func _apply_motion_mode() -> void:
+	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 
 
 ## Read the player's Vigor stat for the damage formula. Returns 0 if the
