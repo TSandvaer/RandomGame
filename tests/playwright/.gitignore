@@ -1,5 +1,7 @@
 # Local build artifacts (downloaded HTML5 zips for local test runs)
 .local-builds/
+.artifact-tmp/
+html5-build/
 
 # Playwright runtime artifacts
 test-results/

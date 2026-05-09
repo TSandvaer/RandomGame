@@ -142,17 +142,28 @@ RELEASE_BUILD_ARTIFACT_PATH=./html5-build npm run test:ui
 
 ---
 
-### `ac4-boss-clear.spec.ts` (M2 W1 expansion — `test.fail()` pending body_entered investigation)
+### `ac4-boss-clear.spec.ts` (M2 W1 expansion — `test.fail()` pending a NEW game-side blocker)
 
-**Test name:** `AC4 — Stratum-1 boss reach + clear (gate body_entered detection issue blocks flip-to-green)`
+**Test name:** `AC4 — Stratum-1 boss reach + clear in ≤10min from cold start`
 
-**Status:** `test.fail()`. The boss P0s themselves are FIXED (PR drew/m2-w1-boss-damage-attack-p0 + GUT integration tests). The two-part walk pattern (Y-band miss + single-vs-double body_entered) is correctly IMPLEMENTED in `fixtures/gate-traversal.ts`. However, when the helper drives the walk under Playwright + Chromium HTML5, the gate's `body_entered` signal does NOT fire even though screenshots confirm the player CharacterBody2D is geometrically inside the trigger rect. Same null result reproduces against both m1-rc-1 (53a3412) and post-#166 origin/main, so it's not a recent regression. See the spec header for full rationale and root-cause hypotheses (sub_resource shape resize race, gl_compatibility Area2D quirk under headless Chromium, or PackedScene.instantiate + pre-`add_child` mutation race).
+**Status:** **`test.fail()`** — kept regressing on a NEW finding that surfaced post-PR-#171.
 
-**What it checks (when body_entered detection is restored):**
+PR `tess/m2-w1-ac4-drift-fix` landed all the harness-drift fixes Devon's PR #171 investigation prescribed:
+1. `clearRoomMobs` rewritten to use tight N+E facing alternation (no 8-direction aim sweep, minimal direction-key holds) so the player stays near `DEFAULT_PLAYER_SPAWN`.
+2. `gateTraversalWalk` accepts an optional `expectedSpawn` parameter that propagates into failure messages so drift-related failures self-document.
+3. Per-room assertion that `[combat-trace] RoomGate._on_body_entered` (added by Devon PR #171 at function entry) fires before `gate_unlocked`/`gate_traversed` are checked — distinguishes "gate never reached" (drift) from "gate reached but state-machine wrong" (regression).
+4. New Room01 phase to handle PR #169's tutorial practice_dummy at world (368, 144) — walks NE then E then sweeps to kill the dummy.
+
+Empirical run on origin/main 1c2438e (post-PR-#171) confirms the harness-drift fix works: Room01 dummy dies in ~12s, Room02 grunts die (cleared 2/2), and `RoomGate._on_body_entered` fires reliably when the player walks from drift-near-spawn into the trigger rect.
+
+**NEW blocker (out of scope for this PR; needs game-side dispatch):** after clearing Room02, the gate's `_mobs_alive` counter shows 1 instead of 0 (`[combat-trace] RoomGate._on_body_entered | body=CharacterBody2D state=open mobs_alive=1`). Both grunts emitted `Grunt._die` and clearRoomMobs's count was 2/2, but the gate's signal-decremented counter is desync'd. Possible causes: late grunt registration race, knockback-into-wall corner causing `mob_died.emit` to drop, or LevelAssembler's `result.mobs.append` ordering vs `add_child`. Devon investigation recommended.
+
+**What it checks:**
 - Drive Rooms 1-7, killing all mobs and walking through each RoomGate via the two-part walk pattern (W-into-X-band → N-into-Y-band → E-out → W-back)
 - Enter Boss Room (Room 8 in BOSS_ROOM_INDEX), wait 1.8s entry sequence
 - Attack boss until `[combat-trace] Stratum1Boss._force_queue_free | freeing now`
-- Per-room negative-assertion: gate_traversed count increases by exactly 1 per gate (idempotency invariant — `_traversed_emitted` guard)
+- Per-room positive assertion: `_on_body_entered` fires at least twice per gate (phase 3 #1 + phase 5 #2)
+- Per-room negative-assertion: `gate_traversed` count increases by exactly 1 per gate (idempotency invariant — `_traversed_emitted` guard)
 - Final causality sweep: every `gate_traversed` timestamp must come AFTER its matching `gate_unlocked` (PR #155 regression guard)
 - Total 21 pre-boss mob deaths + 1 boss death
 
@@ -232,11 +243,15 @@ Key mitigations:
 
 ### `gate-traversal.ts`
 
-`gateTraversalWalk(page, canvas, capture, roomLabel)` — drives a player CharacterBody2D through a `RoomGate` (Rooms 02-08) via the two-part walk pattern needed by Godot 4's `body_entered` semantics.
+`gateTraversalWalk(page, canvas, capture, roomLabel, options?)` — drives a player CharacterBody2D through a `RoomGate` (Rooms 02-08) via the two-part walk pattern needed by Godot 4's `body_entered` semantics.
 
 Encodes two non-obvious mechanics:
-1. **Diagonal NW walk required.** The trigger rect occupies world-coords X∈[24,72], Y∈[104,184]; player spawns at (240, 200) — outside both axes. A pure-west walk never enters the trigger. The helper drives a NW diagonal walk so both axes resolve.
-2. **Two body_entered events required.** In Godot 4, `body_entered` is a non-overlap → overlap transition event, fired ONCE per continuous walk. The state machine needs two distinct events (lock → unlock → traverse). The helper drives walk-in (NW) → walk-out (SE) → walk-in (NW), producing two separate body_entered events. With mobs killed beforehand, the first body_entered short-circuits OPEN→LOCKED→UNLOCKED in one tick (lock() detects mobs_alive==0 and immediately calls _unlock()), and the second body_entered fires `gate_traversed`.
+1. **Two-segment W-then-N walk required.** The trigger rect occupies world-coords X∈[24,72], Y∈[104,184]; player spawns at (240, 200) — outside both axes. A pure-west walk never enters the trigger. The helper drives W-only first (to align X), then N-only (to descend into Y-band), so both axes resolve sequentially.
+2. **Two body_entered events required.** In Godot 4, `body_entered` is a non-overlap → overlap transition event, fired ONCE per continuous walk. The state machine needs two distinct events (lock → unlock → traverse). The helper drives walk-in (W → N) → walk-out (E) → walk-in (W), producing two separate body_entered events. With mobs killed beforehand, the first body_entered short-circuits OPEN→LOCKED→UNLOCKED in one tick (lock() detects mobs_alive==0 and immediately calls _unlock()), and the second body_entered fires `gate_traversed`.
+
+**Calling discipline (Devon PR #171 finding 3):** combat that precedes a `gateTraversalWalk` MUST stay tight (NE-facing only, no aim-sweep, no repositioning) so the player remains within ~50px of `DEFAULT_PLAYER_SPAWN`. Aim-sweep + knockback over 21s+ accumulates 100+px drift and the W→N walk lands outside the trigger rect. Pass `options.expectedSpawn = [240, 200]` to make drift-related failure messages self-explanatory.
+
+The helper now asserts on `[combat-trace] RoomGate._on_body_entered` (added by Devon PR #171 at function entry) as the load-bearing positive signal that the trigger was reached at all — distinguishes "gate never reached" (drift) from "gate reached but state-machine wrong" (regression).
 
 See the helper's header comment for full geometry, timing rationale, and state-machine walkthrough.
 
@@ -257,7 +272,7 @@ The harness runs via `.github/workflows/playwright-e2e.yml`:
 |---|---|
 | AC2 cold first-kill in 60s | **Landed (M2 W1)** — `ac2-first-kill.spec.ts` |
 | AC3 death preservation | **Landed (M2 W1)** — `ac3-death-persistence.spec.ts` |
-| AC4 boss clear | **`test.fail()` — gate body_entered detection blocks flip-to-green** — `ac4-boss-clear.spec.ts`. Boss P0s fixed (PR drew/m2-w1-boss-damage-attack-p0 + GUT integration tests). Two-part walk pattern implemented in `fixtures/gate-traversal.ts`. Open issue: `body_entered` not firing under Playwright + Chromium HTML5 even with player geometrically inside trigger. Investigation needed (sub_resource shape resize race? gl_compatibility quirk? scene-instantiate race?) |
+| AC4 boss clear | **Harness fix landed but spec stays `test.fail()` (M2 W1 — PR `tess/m2-w1-ac4-drift-fix`)** — `ac4-boss-clear.spec.ts`. Drift fix verified working (clearRoomMobs tight + `expectedSpawn` parameter + `_on_body_entered` assertion + Room01 PR #169 dummy support). NEW blocker surfaced empirically: gate's `_mobs_alive=1` after clearRoomMobs reports 2/2 deaths. Needs game-side investigation (likely MultiMobRoom `_register_mobs_with_gate` race vs LevelAssembler ordering, or knockback-induced `mob_died.emit` drop). |
 | Equip flow (save-survival) | **Landed (M2 W1)** — `equip-flow.spec.ts` |
 | Negative-assertion sweep | **Landed (M2 W1)** — `negative-assertion-sweep.spec.ts` |
 | AC5 full 30-min console silence | Follow-up |
