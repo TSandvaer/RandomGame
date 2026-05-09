@@ -8,13 +8,20 @@
  * (Room 8 in the BOSS_ROOM_INDEX layout per scenes/Main.gd:60), waits for
  * the 1.8 s entry sequence, then attacks the boss until boss_died emits.
  *
- * **Status: test.fail() — two open P0 bugs against the boss as of 2026-05-09:**
- *   - 86c9q96fv (boss damage broken)
- *   - 86c9q96ht (boss attack broken)
+ * **Status: test() — two P0 bugs fixed in PR `drew/m2-w1-boss-damage-attack-p0`:**
+ *   - 86c9q96fv (boss damage broken)        — FIXED
+ *   - 86c9q96ht (boss attack broken)        — FIXED
  *
- * The spec is written to assert the CORRECT end state. When the Devon/Drew
- * fixes for the two P0s land, this spec flips from RED to GREEN and the
- * `test.fail()` annotation must be removed (or replaced with `test()`).
+ * Root cause (single, both bugs collapsed): boss spawned in STATE_DORMANT and
+ * only woke when the player crossed the boss-room door-trigger Area2D at
+ * (240, 250). But `Main._load_room_at_index` teleports the player to (240, 200)
+ * — ABOVE the trigger — and never fires `body_entered`. With the boss stuck
+ * dormant, `take_damage` was rejected (Stratum1Boss.gd:332) AND
+ * `_physics_process` skipped all AI (Stratum1Boss.gd:361-365).
+ *
+ * Fix: `Stratum1BossRoom._ready` now `call_deferred("trigger_entry_sequence")`,
+ * so the entry sequence auto-fires on room load. The 1.8 s narrative beat
+ * + door-trigger fallback are preserved (idempotent guards).
  *
  * Diagnostic-build env-var hook (proposed, NOT yet implemented):
  *   The boss has 600 HP. iron_sword does 6 damage/swing → 100 swings ≈ 22 s
@@ -103,12 +110,13 @@ const ROOM_MOB_COUNTS = [
 const TOTAL_PRE_BOSS_MOBS = ROOM_MOB_COUNTS.reduce((a, b) => a + b, 0);
 
 test.describe("AC4 — Stratum-1 boss reach + clear", () => {
-  // The two open P0s mean the boss is currently un-killable. test.fail()
-  // expects the test to fail; when Devon/Drew fix the boss, this should be
-  // changed to test() (the .fail flips green = "actually passed"; CI surfaces
-  // that as a "passed but expected to fail" warning, prompting the rename).
-  test.fail(
-    "AC4 — Stratum-1 boss reach + clear (P0 86c9q96fv + 86c9q96ht open)",
+  // Both P0s (boss damage + boss attack) were a single root cause: boss
+  // stayed STATE_DORMANT because `Main._load_room_at_index` teleports the
+  // player above the door-trigger Area2D rather than sliding them through.
+  // `Stratum1BossRoom._ready` now `call_deferred`s the entry sequence so the
+  // boss reliably wakes ~1.8 s after room load.
+  test(
+    "AC4 — Stratum-1 boss reach + clear",
     async ({ page, context }) => {
       test.setTimeout(900_000); // 15 minutes — generous for full traversal + boss
       await context.route("**/*", (route) => route.continue());
@@ -280,18 +288,17 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       // ---- Boss Room: entry sequence + boss kill ----
       console.log("[ac4-boss] Entered Boss Room. Waiting for 1.8s entry sequence + boss wake...");
 
-      // Walk north a bit to ensure we cross the boss room door-trigger
-      // (player respawns at (240,200), trigger at (240,250) is SOUTH so we
-      // need to walk south briefly OR just wait — the player path through
-      // Room 08's gate puts us in the boss room near the entry point).
-      // Actually: Boss Room replaces the room; player is placed at
-      // DEFAULT_PLAYER_SPAWN=(240,200). Door trigger is at (240,250) — which
-      // is SOUTH. Walking south for 800ms crosses it.
+      // Post-fix (PR drew/m2-w1-boss-damage-attack-p0): the boss-room
+      // `_ready` auto-fires the entry sequence via `call_deferred`, so we
+      // don't need to walk anywhere to trigger it. We retain the brief
+      // south-walk as belt-and-suspenders — it crosses the door trigger
+      // Area2D as a defensive fallback. The trigger is idempotent so this
+      // is harmless even with auto-fire active.
       await page.keyboard.down("s");
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(400);
       await page.keyboard.up("s");
 
-      // Now wait the 1.8s entry sequence + grace
+      // Wait the 1.8s entry sequence + grace
       await page.waitForTimeout(BOSS_WAKE_GRACE_MS);
 
       // Move toward boss (boss at (240,135), player at (240,200) → walk N)
@@ -325,14 +332,15 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       }
 
       // ---- Final assertions ----
-      // The MAIN ASSERTION: the boss died. Currently fails per open P0s.
+      // The MAIN ASSERTION: the boss died. Both P0s fixed in PR
+      // drew/m2-w1-boss-damage-attack-p0 — boss now wakes via auto-fired
+      // entry sequence and the damage + attack paths run end-to-end.
       expect(
         bossDied,
-        `Boss did not die within ${BOSS_CLEAR_TIMEOUT_MS}ms. Open P0 bugs:\n` +
-          ` - 86c9q96fv (boss damage broken)\n` +
-          ` - 86c9q96ht (boss attack broken)\n` +
-          `When these fixes land, this spec should flip green and test.fail() ` +
-          `should be removed.`
+        `Boss did not die within ${BOSS_CLEAR_TIMEOUT_MS}ms. Possible regressions:\n` +
+          ` - boss never woke (check [combat-trace] Stratum1Boss.take_damage lines for "IGNORED dormant")\n` +
+          ` - hit-path broken (check [combat-trace] Hitbox.hit team=player target=Stratum1Boss lines)\n` +
+          ` - spawn never reached the boss room (check Room 08 -> Boss Room transition)`
       ).toBe(true);
 
       // Negative assertion: zero physics-flush panics during the entire

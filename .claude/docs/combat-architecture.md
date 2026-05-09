@@ -75,6 +75,8 @@ Tier 1 invariant from `team/TESTING_BAR.md`: visual-primitive tests must assert 
 - Per-mob `take_damage`, `_play_hit_flash`, `_die`, `_play_death_tween`, `_on_death_tween_finished`, `_force_queue_free`
 - `Inventory.equip` (P0 86c9q96m8) — `[combat-trace] Inventory.equip | item=<id> slot=<weapon|armor> source=lmb_click damage_after=<N>` fires only on the user-driven LMB-click path; `restore_from_save` bypasses `equip()` so save-restore does NOT fire this line. The `damage_after` field reads from `Damage.compute_player_damage(Player.get_equipped_weapon(), Player.get_edge(), &"light")` — proves both Inventory and Player surfaces stayed in lockstep at the moment of equip.
 
+`Stratum1Boss.take_damage` distinguishes the three rejection cases explicitly (M2 W1 P0 fix `86c9q96fv`): `IGNORED already_dead`, `IGNORED dormant ... (boss still in entry sequence)`, `IGNORED phase_transition ... (stagger-immune window)`. The `dormant` case is the load-bearing diagnostic — it's how Sponsor-soak debugging tells "hit didn't register at the physics layer" (Hitbox layer/mask issue) apart from "hit was rejected at the controller" (boss never woke up). Format on a successful hit: `Stratum1Boss.take_damage | amount=6 hp=600->594 phase=1`.
+
 Sponsor's HTML5 soak surfaces these lines in DevTools console (F12 → Console). Trace-driven debugging is the load-bearing surface for combat regressions because most physics-flush bugs don't raise GDScript exceptions — Godot's `USER ERROR` macros log + return-early in C++. Tier 2 testing bar consequence (per PR #138 + `team/TESTING_BAR.md`): tests must assert downstream consequences (HP changes, queue_free reached, monitoring state per swing), not just method-was-called.
 
 ## Physics-flush rule (load-bearing)
@@ -138,6 +140,30 @@ Future state-change/action-event pairs (aggro/attack, pickup/equip, dialog/advan
 - The signal fires unconditionally at every `save_game()` exit — listeners must handle the `ok=false` branch defensively (return early, do not assume `true`).
 
 **Naming + scope discipline:** `save_completed` is past-participle, fires once per save attempt, carries `(slot, ok)` payload. Don't add a `save_started` event unless a use case appears that needs the "save in flight" interval (no current need; saves are single-frame). Keep the signal narrow.
+
+## Room-load triggers vs. body_entered triggers
+
+A related class of bug, surfaced by M2 W1 P0 `86c9q96fv` + `86c9q96ht`: the boss spawned `STATE_DORMANT` and only woke when the player crossed an `Area2D` door-trigger via `body_entered`. But `Main._load_room_at_index` **teleports** the player to `DEFAULT_PLAYER_SPAWN = (240, 200)` rather than sliding them through the room boundary — no physics overlap event ever fires. Result: boss stayed dormant forever, rejecting damage AND skipping AI in `_physics_process`. Both Sponsor-reported P0s collapsed to one root cause.
+
+**The general pattern:** an entry-trigger `Area2D` whose `body_entered` is the only wake/start hook is fragile against any code path that places a body in the room without traversal — room-load teleport, save/load restore, debug-tool warp, future fast-travel. If the room is the unit of "player is now here," the room itself should fire the trigger from `_ready`.
+
+**Fix shape (`Stratum1BossRoom._ready`):**
+
+```gdscript
+func _ready() -> void:
+    _build_door_trigger()
+    _spawn_boss()
+    _spawn_stratum_exit()
+    # Auto-fire entry sequence on room load — no body_entered required.
+    # The door trigger remains as a defensive fallback (idempotent guard).
+    call_deferred("trigger_entry_sequence")
+```
+
+Two reasons `call_deferred` rather than synchronous: (a) `Main._load_room_at_index` re-parents the player into the room AFTER the room's `_ready` returns, so a deferred call lands in a tree where the player is correctly placed; (b) any `Area2D` mutations downstream of the trigger are physics-flush-safe (see "Physics-flush rule" above).
+
+**The door-trigger fallback is preserved for two cases:** (a) future code that drags the player through a real boss-room doorway (corridor designs in M2+); (b) belt-and-suspenders against future regressions in the auto-fire path. Both fire `trigger_entry_sequence`, which is idempotent.
+
+**Future bugs in this family:** any room with a wake/start trigger gated on physics overlap (boss rooms, ambush rooms, lock-then-unlock state machines). Pattern check: does the room have an entry-trigger Area2D whose `body_entered` handler is the ONLY production wake path? If yes, audit it against teleport-style player-entry. Memory rule candidate: `room-load-vs-body-entered-trigger.md`.
 
 ## Cross-references
 
