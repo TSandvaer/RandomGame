@@ -208,6 +208,137 @@ func test_charger_does_not_follow_player_during_recovery() -> void:
 			"charger remains in RECOVERING state while timer counts down")
 
 
+# ---- AC: Boss separation symmetric across all four approach directions ---
+#
+# Ticket: 86c9q96jv (M1 RC re-soak 5: "boss sticks from bottom edge only").
+# Sponsor symptom: when the player approached Stratum1Boss from the south
+# (below), the boss stuck to the player and resisted separation. Other
+# approach angles (north / east / west) worked — the existing post-contact
+# pushback in `_fire_melee_swing` separated bodies cleanly.
+#
+# Root cause: CharacterBody2D defaults to MOTION_MODE_GROUNDED with
+# `up_direction = (0, -1)`. When the player approaches from south, the
+# collision normal between player and boss aligns with up_direction, which
+# engages GROUNDED mode's floor-detection branch and suppresses the boss's
+# pushback velocity along the +up axis. North / east / west approaches
+# don't align the collision normal with up_direction, so the floor branch
+# never engages and the bug never manifests.
+#
+# Fix: `_apply_motion_mode()` sets `motion_mode = MOTION_MODE_FLOATING` in
+# `_ready()` so every axis is treated equally. The boss has no floor /
+# gravity / jump concept (top-down 2D), making FLOATING the canonical
+# motion mode regardless.
+#
+# Verification surface (headless): velocity-direction dot-product test on
+# the swing-fire tick — same shape as the existing east-approach test but
+# parameterised over all four approach angles. The motion_mode fix
+# specifically affects the move_and_slide() resolution that follows; the
+# velocity vector itself is set identically in all four cases. We
+# additionally assert `motion_mode == FLOATING` directly so the regression
+# is caught even if a future scene file overrides the property.
+
+func test_boss_motion_mode_is_floating_after_ready() -> void:
+	## Direct property assertion: the canonical Godot 4 top-down 2D
+	## CharacterBody2D motion_mode is FLOATING. GROUNDED is the engine
+	## default and would re-introduce the south-approach floor-snap bug.
+	var b: Stratum1Boss = _make_boss_at(Vector2.ZERO)
+	assert_eq(b.motion_mode, CharacterBody2D.MOTION_MODE_FLOATING,
+		"boss motion_mode must be FLOATING after _ready() so move_and_slide treats every axis equally")
+
+
+func test_boss_separates_from_player_approached_from_south() -> void:
+	## Sponsor's exact M1 RC re-soak 5 scenario: player walks north into
+	## boss from below. Pre-fix (M1 RC re-soak 5): boss stuck to player —
+	## the GROUNDED-mode floor-snap suppressed the north-axis pushback.
+	## Post-fix: pushback velocity is non-zero AND directed away from
+	## player (i.e. NORTH = negative Y), and motion_mode = FLOATING ensures
+	## move_and_slide actually applies it.
+	##
+	## Player south of boss → player_pos.y > boss_pos.y → away.y < 0 →
+	## pushback.y < 0 (NORTH). We assert dot-product against the away-axis,
+	## same shape as the east-approach test.
+	var b: Stratum1Boss = _make_boss_at(Vector2.ZERO)
+	# Player below boss, just inside MELEE_RANGE so the chase-tick commits to a melee swing.
+	var p: Player = _make_player_at(Vector2(0.0, Stratum1Boss.MELEE_RANGE - 2.0))
+	b.set_player(p)
+
+	# Tick 1: chase → telegraph.
+	b._physics_process(PHYS_DELTA)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
+		"precondition: south-approach also triggers melee telegraph (no direction-asymmetry in trigger logic)")
+
+	# Tick 2: telegraph expires → swing fires → pushback applied.
+	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.001)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING)
+
+	assert_gt(b.velocity.length(), 0.0,
+		"south-approach: boss velocity must be non-zero after swing-fire (separation from player)")
+
+	# Pushback must point NORTH (away from player below). i.e. velocity.y < 0.
+	assert_lt(b.velocity.y, 0.0,
+		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)" % [b.velocity.x, b.velocity.y])
+
+	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
+	var pushback_dir: Vector2 = b.velocity.normalized()
+	var dot: float = pushback_dir.dot(away_dir)
+	assert_gt(dot, 0.0,
+		"south-approach: pushback aligned with away-from-player vector (dot=%.3f)" % dot)
+
+
+func test_boss_separates_from_player_approached_from_north() -> void:
+	## Baseline regression test: north approach was reported working pre-fix.
+	## Post-fix must still work — assert pushback points SOUTH (positive Y).
+	## Adding this so any future approach-direction asymmetry surfaces
+	## immediately rather than waiting for Sponsor soak (lesson from this
+	## bug: the test suite had only one approach-direction case).
+	var b: Stratum1Boss = _make_boss_at(Vector2.ZERO)
+	# Player above boss.
+	var p: Player = _make_player_at(Vector2(0.0, -(Stratum1Boss.MELEE_RANGE - 2.0)))
+	b.set_player(p)
+
+	b._physics_process(PHYS_DELTA)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE)
+	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.001)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING)
+
+	assert_gt(b.velocity.length(), 0.0,
+		"north-approach: boss velocity must be non-zero after swing-fire")
+	assert_gt(b.velocity.y, 0.0,
+		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)" % [b.velocity.x, b.velocity.y])
+
+	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
+	var dot: float = b.velocity.normalized().dot(away_dir)
+	assert_gt(dot, 0.0, "north-approach: pushback aligned with away-axis (dot=%.3f)" % dot)
+
+
+func test_boss_separates_from_player_approached_from_west() -> void:
+	## Baseline regression: west approach. Post-fix pushback points EAST (+X).
+	var b: Stratum1Boss = _make_boss_at(Vector2.ZERO)
+	# Player west of boss.
+	var p: Player = _make_player_at(Vector2(-(Stratum1Boss.MELEE_RANGE - 2.0), 0.0))
+	b.set_player(p)
+
+	b._physics_process(PHYS_DELTA)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE)
+	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.001)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING)
+
+	assert_gt(b.velocity.length(), 0.0,
+		"west-approach: boss velocity must be non-zero after swing-fire")
+	assert_gt(b.velocity.x, 0.0,
+		"west-approach: pushback must point EAST (positive X) — got velocity=(%.2f,%.2f)" % [b.velocity.x, b.velocity.y])
+
+	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
+	var dot: float = b.velocity.normalized().dot(away_dir)
+	assert_gt(dot, 0.0, "west-approach: pushback aligned with away-axis (dot=%.3f)" % dot)
+
+
+# Note: the existing `test_boss_separates_from_player_after_melee_swing` covers
+# the east approach (player at +X). Together with the three above, all four
+# cardinal approach angles are covered by paired tests so any future
+# direction-asymmetry surfaces immediately.
+
+
 # ---- AC: Slam recovery is rooted (boss Phase 2+) ---------------------
 
 func test_boss_slam_recovery_velocity_is_zero() -> void:
