@@ -36,6 +36,10 @@ extends GutTest
 
 const PHYS_DELTA: float = 1.0 / 60.0
 
+# Stage 2b: Room01 spawns a PracticeDummy (not Grunt). Preload the script so
+# the AC1 spawn-roster assertion can `m is PracticeDummy`.
+const PracticeDummyScript: Script = preload("res://scripts/mobs/PracticeDummy.gd")
+
 const TEST_SLOT: int = 994
 
 # How many ticks we'll let the boss-fight kill loop run before declaring the
@@ -157,9 +161,15 @@ func _await_frames(count: int) -> void:
 		await get_tree().process_frame
 
 
-# ---- AC1: Room01 loads with Player + grunts -------------------------
+# ---- AC1: Room01 loads with Player + tutorial entity ----------------
 
 func test_main_scene_boots_room01_with_player_and_grunts() -> void:
+	# AC1 invariant: Main boots into Room01 with the Player parented under
+	# the room and at least one mob spawned from the chunk_def. Stage 2b
+	# (ticket `86c9qaj3u`) flipped Room01's roster from 2 grunts to 1
+	# PracticeDummy per Uma's player-journey Beats 4-5 — AC1's load-bearing
+	# integration check is "the Player + a tutorial entity arrive together,"
+	# not "specifically a Grunt." Grunts arrive in Room02 onward.
 	var main: Main = _instantiate_main() as Main
 	assert_not_null(main, "Main.tscn instantiates as Main")
 	# Allow _ready to finish.
@@ -171,16 +181,19 @@ func test_main_scene_boots_room01_with_player_and_grunts() -> void:
 	var player: Player = main.get_player()
 	assert_not_null(player, "AC1: Player is instantiated")
 	assert_true(player.is_in_group("player"), "AC1: Player is in the 'player' group")
-	# Grunts present per s1_room01.tres.
+	# Tutorial entity present per Stage 2b s1_room01.tres.
 	assert_true(room.has_method("get_spawned_mobs"), "Room exposes get_spawned_mobs")
 	var mobs: Array[Node] = room.get_spawned_mobs()
 	assert_gt(mobs.size(), 0, "AC1: room spawns mobs from chunk_def")
-	var found_grunt: bool = false
+	# Stage 2b: at least one PracticeDummy. Test stays robust to future
+	# tutorial-entity additions (e.g. a second decorative dummy) by checking
+	# "any tutorial entity," not "exactly one."
+	var found_dummy: bool = false
 	for m: Node in mobs:
-		if m is Grunt:
-			found_grunt = true
+		if m is PracticeDummy:
+			found_dummy = true
 			break
-	assert_true(found_grunt, "AC1: at least one Grunt instance spawned")
+	assert_true(found_dummy, "AC1 (Stage 2b): at least one PracticeDummy spawned")
 
 
 # ---- AC2: HUD CanvasLayer mounts with vitals + build SHA -------------
@@ -223,11 +236,18 @@ func test_inventory_panel_mounts_hidden_and_toggles_with_time_slow() -> void:
 # ---- AC4: kill grunt -> XP gain + loot pickup -> Inventory ----------
 
 func test_first_kill_grants_xp_and_loot_into_inventory() -> void:
+	# Stage 2b: Room01 spawns a PracticeDummy now (no XP, no loot table —
+	# tutorial entity). The AC4 grunt-XP+loot integration moves to Room02,
+	# which has grunts as before. We advance into Room02 via Main's public
+	# `load_room_index(1)` to exercise the same Levels.subscribe_to_mob +
+	# MobLootSpawner pipelines this test was originally written to assert.
 	var main: Main = _instantiate_main() as Main
+	await get_tree().process_frame
+	main.load_room_index(1)
 	await get_tree().process_frame
 	var room: Node = main.get_current_room()
 	var grunt: Grunt = _first_grunt(room)
-	assert_not_null(grunt, "grunt to kill")
+	assert_not_null(grunt, "grunt to kill (Room02 — Stage 2b shifted grunts out of Room01)")
 	var xp_before: int = int(_levels().current_xp())
 	var level_before: int = int(_levels().current_level())
 	# Drive the kill via direct take_damage (skip the walk-in/swing loop —
@@ -273,9 +293,12 @@ func test_attack_while_overlapping_grunt_damages_grunt_via_signal_flow() -> void
 	# decreased via the actual integration. NO `_try_apply_hit` call.
 	var main: Main = _instantiate_main() as Main
 	await get_tree().process_frame
+	# Stage 2b: advance to Room02 to find a grunt — Room01 is tutorial dummy.
+	main.load_room_index(1)
+	await get_tree().process_frame
 	var room: Node = main.get_current_room()
 	var grunt: Grunt = _first_grunt(room)
-	assert_not_null(grunt, "AC4b: grunt to attack")
+	assert_not_null(grunt, "AC4b: grunt to attack (Room02 — Stage 2b)")
 	var p: Player = main.get_player()
 	# Stand the player ON TOP of the grunt — Sponsor's "grunts touching me"
 	# repro shape. With the player + grunt at the same position, any hitbox

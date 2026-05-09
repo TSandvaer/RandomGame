@@ -223,7 +223,8 @@ func test_authored_s1_room01_chunk_loads() -> void:
 	# Must validate cleanly per testing bar.
 	var errors: Array[String] = c.validate()
 	assert_eq(errors.size(), 0, "s1_room01 must validate: %s" % str(errors))
-	# Must have at least one mob spawn (the M1 first room is a grunt fight).
+	# Must have at least one mob spawn (Stage 2b: a single PracticeDummy
+	# tutorial entity per Uma's player-journey Beats 4-5).
 	assert_gt(c.mob_spawns.size(), 0, "s1_room01 has at least one mob")
 	# Must have an entry port.
 	assert_not_null(c.get_entry_port(), "s1_room01 has an entry port")
@@ -240,9 +241,12 @@ func test_authored_s1_room01_uses_uma_canvas_constraints() -> void:
 	assert_lte(size_px.y, 270, "chunk height fits the 270 px logical canvas")
 
 
-func test_authored_s1_room01_spawns_grunts_only() -> void:
-	# M1 ships only the grunt archetype. Any other mob_id in this chunk is
-	# a content bug.
+func test_authored_s1_room01_spawns_practice_dummy_only() -> void:
+	# Stage 2b (ticket `86c9qaj3u`): Room01 ships a single PracticeDummy
+	# tutorial entity per Uma's player-journey Beats 4-5. The grunt fight
+	# moved to Room02 onward. Any other mob_id in this chunk is a content
+	# regression — practice_dummy is the only valid Room01 entity at M2 W1.
 	var c: LevelChunkDef = load("res://resources/level_chunks/s1_room01.tres") as LevelChunkDef
 	for ms: MobSpawnPoint in c.mob_spawns:
-		assert_eq(ms.mob_id, &"grunt", "M1 chunk uses only grunt archetype")
+		assert_eq(ms.mob_id, &"practice_dummy",
+			"Stage 2b: Room01 spawns only practice_dummy (was: grunt)")

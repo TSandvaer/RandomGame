@@ -33,8 +33,19 @@ extends Control
 ## **Anchor positions (per Uma's player-journey Beat 4 = bottom-center "ghost
 ## text," Beat 6 = mob nameplate at center):** the overlay supports three
 ## anchored positions so future beats can re-use the same widget without
-## proliferating per-beat overlays. Drew's Stage 2b uses CENTER_TOP for the
-## WASD/dodge/strike beats per Uma's "centered low" spec.
+## proliferating per-beat overlays. Drew's Stage 2b uses BOTTOM for the
+## WASD/dodge/strike beats per Uma's "centered low" spec — reconciled per
+## Tess's PR #164 review note (default was CENTER_TOP, now BOTTOM).
+##
+## **Plate visibility reconciliation (Tess PR #164 note):** Uma's spec calls
+## for "white text at 60% opacity, no panel background." Pre-Stage-2b the
+## overlay shipped a 75%-alpha plate-background to read as a "system
+## widget"; that diverged from Uma's "ambient guidance, not status" intent.
+## `COLOR_PLATE.a = 0.0` (fully transparent) restores the no-panel
+## appearance; `COLOR_TEXT.a = 0.6` matches the 60% opacity ghost-text
+## phrasing exactly. Reconciled in Drew's Stage 2b PR rather than a
+## separate UX cleanup ticket — overlay is shipping content for the first
+## time, so design/default-alignment is part of that landing.
 
 # ---- Signals ----------------------------------------------------------
 
@@ -72,16 +83,22 @@ const ANCHOR_BOTTOM_OFFSET_Y: float = 200.0
 
 # ---- Visual constants (sub-1.0 channels per HTML5 HDR-clamp rule) ----
 
-## Plate is dim panel-bg color at 75% alpha — visible-but-non-blocking.
-## Slightly more transparent than SaveToast (85%) so it reads as "ambient
-## guidance" not "system status."
-const COLOR_PLATE: Color = Color(0.10588235, 0.10196078, 0.12156863, 0.75)  # #1B1A1F @75%
+## Plate alpha = 0 per Uma Beat 4 "no panel background" (Tess PR #164 note
+## reconciliation, Drew Stage 2b). The plate node is preserved in the tree
+## (rather than removed) so future beats can opt back into a backdrop via
+## a dedicated anchor or `set_plate_alpha()` extension; the BBCode-style
+## guidance text is the load-bearing visual for Beats 4-5. Channels stay
+## sub-1.0 per HTML5 HDR-clamp rule — the alpha=0 keeps the plate invisible
+## even if a future tweak bumps the RGB.
+const COLOR_PLATE: Color = Color(0.10588235, 0.10196078, 0.12156863, 0.0)  # #1B1A1F @0% (invisible)
 
-## HUD body color at full alpha. Same hex as InventoryPanel COLOR_BODY.
-## Per Uma Beat 4: "white text with 60% opacity" — we approximate via this
-## body color (parchment-tinted-white) at full alpha; the modulate-tween
-## drives the breathing fade.
-const COLOR_TEXT: Color = Color(0.9098, 0.8941, 0.8392, 1.0)  # #E8E4D6
+## HUD body color at 60% alpha per Uma Beat 4 "white text with 60% opacity"
+## (Tess PR #164 note reconciliation, Drew Stage 2b — was 1.0). The 60%
+## opacity is the load-bearing "ghost text" feel; full alpha read as a
+## hard system label. The `modulate.a` tween (FADE_IN / FADE_OUT) multiplies
+## with this base alpha, so peak visibility is 60% × modulate.a (peak 100%
+## modulate × 60% color alpha = 60% effective text opacity, as spec'd).
+const COLOR_TEXT: Color = Color(0.9098, 0.8941, 0.8392, 0.6)  # #E8E4D6 @60%
 
 # ---- Timing constants -----------------------------------------------
 
@@ -111,8 +128,12 @@ var _label: Label = null
 ## delta on the public API surface (vs. reaching into the Label).
 var _current_text: String = ""
 
-## Currently-active anchor — drives the layout in `_apply_anchor`.
-var _current_anchor: AnchorPos = AnchorPos.CENTER_TOP
+## Currently-active anchor — drives the layout in `_apply_anchor`. Default
+## BOTTOM per Uma Beat 4 "centered low" (Tess PR #164 note reconciliation,
+## Drew Stage 2b — was CENTER_TOP). Drew's room script passes BOTTOM=2
+## explicitly when emitting via the bus, so the default only matters for
+## the rare ad-hoc `show_prompt` callers that omit the anchor argument.
+var _current_anchor: AnchorPos = AnchorPos.BOTTOM
 
 
 func _ready() -> void:
@@ -141,7 +162,7 @@ func _ready() -> void:
 ##   3.0; pass 0 for "fade-in then immediately fade-out" (no hold).
 ## - `anchor` — which screen edge to anchor against. Default CENTER_TOP per
 ##   Uma's first-input-prompt placement.
-func show_prompt(text: String, duration: float = DEFAULT_DURATION, anchor: AnchorPos = AnchorPos.CENTER_TOP) -> void:
+func show_prompt(text: String, duration: float = DEFAULT_DURATION, anchor: AnchorPos = AnchorPos.BOTTOM) -> void:
 	# Replace-on-new-show: kill in-flight tween, restart from current alpha.
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
@@ -238,8 +259,8 @@ func _build_ui() -> void:
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_plate.add_child(_label)
 
-	# Initial anchor — CENTER_TOP. Updated per show_prompt call.
-	_apply_anchor(AnchorPos.CENTER_TOP)
+	# Initial anchor — BOTTOM per Uma Beat 4. Updated per show_prompt call.
+	_apply_anchor(AnchorPos.BOTTOM)
 
 
 ## Position the overlay's plate against the screen edge per `anchor`. The
