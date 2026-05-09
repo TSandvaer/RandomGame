@@ -56,17 +56,18 @@ func before_each() -> void:
 	# discipline.
 	if s != null and s.has_save(0):
 		s.delete_save(0)
-	# Empty the Inventory autoload so a previous test's iron_sword equip
-	# doesn't leak into the cold-open state. Inventory.clear_unequipped only
-	# touches stash; we need a full reset of equipped too. Use the existing
-	# autoload helper if available.
+	# Reset the Inventory autoload's equipped map AND items list so a previous
+	# test's iron_sword equip doesn't leak into the cold-open state. We must
+	# use `reset()` (not `clear_unequipped`) — clear_unequipped only touches
+	# the stash, leaving `_equipped` populated from a prior test. With
+	# `_equipped[weapon]` non-null, `equip_starter_weapon_if_needed` no-ops
+	# in Main._ready and the new Player instance never gets the iron_sword
+	# applied to ITS `_equipped_weapon` surface (the dual-surface drift this
+	# test exists to catch). `reset()` also calls `_apply_unequip_to_player`
+	# on the OLD player — which is fine because that player is mid-free.
 	var inv: Node = _inventory()
-	if inv != null:
-		# Production reset path runs through Save's reset_inventory; we mimic
-		# what fresh boot would see by calling _ready() (autoload _ready
-		# clears state per the Inventory class docstring).
-		if inv.has_method("clear_unequipped"):
-			inv.clear_unequipped()
+	if inv != null and inv.has_method("reset"):
+		inv.reset()
 
 
 func _instantiate_main() -> Main:
