@@ -74,6 +74,12 @@ signal hp_changed(hp_current: int, hp_max: int)
 ## removed from the tree by the controller.
 signal player_died(death_position: Vector2)
 
+## Emitted when the out-of-combat regen state transitions (false -> true or
+## true -> false). HUD listens to start/stop the HP-bar shimmer tween.
+## M2 audio hook: a heartbeat-recovery hum can wire here without touching
+## Player.gd logic — the signal fires even though no audio bus listens in M1.
+signal regen_active_changed(active: bool)
+
 # ---- Tuning constants ---------------------------------------------------
 
 const STATE_IDLE: StringName = &"idle"
@@ -107,6 +113,14 @@ const HEAVY_RECOVERY: float = 0.40
 
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
+
+# ---- Out-of-combat HP regen tunables (exported for balance-pass tweaks) --
+# Both cooldowns must BOTH be exceeded before regen activates — spec §"Activation rule".
+# Named per Uma's spec: REGEN_DAMAGE_COOLDOWN_SECS / REGEN_ATTACK_COOLDOWN_SECS.
+# REGEN_RATE_HP_PER_SEC: 2.0 HP/s — Uma's trade-math rationale in hp-regen-design.md §"Regen rate".
+@export var REGEN_DAMAGE_COOLDOWN_SECS: float = 3.0
+@export var REGEN_ATTACK_COOLDOWN_SECS: float = 3.0
+@export var REGEN_RATE_HP_PER_SEC: float = 2.0
 
 # ---- Visual-feedback constants (per team/uma-ux/combat-visual-feedback.md §1)
 # Ember-color directional wedge spawned during the hitbox-lifetime window.
@@ -208,6 +222,22 @@ var hp_max: int = DEFAULT_HP_MAX
 # One-shot death latch — `player_died` fires exactly once per Player
 # lifetime. Subsequent take_damage calls during the death frame are no-ops.
 var _is_dead: bool = false
+
+# ---- Out-of-combat regen state ------------------------------------------
+# Both timers count UP from 0 on each reset event and are incremented by
+# delta each physics frame. Regen activates when BOTH exceed their threshold.
+# Reset semantics:
+#   _time_since_last_damage_taken: reset to 0 in take_damage()
+#   _time_since_last_hit_landed:   reset to 0 in _on_hitbox_hit_target()
+var _time_since_last_damage_taken: float = 0.0
+var _time_since_last_hit_landed: float = 0.0
+
+## Public read-only regen state — tests and HUD read this. True when BOTH
+## out-of-combat timers have exceeded their thresholds AND hp_current < hp_max.
+var is_regenerating: bool = false
+# Fractional HP accumulator so 2.0 HP/s doesn't drift to 1 HP/s under integer
+# rounding across frames with variable delta.
+var _regen_carry: float = 0.0
 
 
 func _ready() -> void:
@@ -486,6 +516,10 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	var clean_amount: int = max(0, amount)
 	if clean_amount == 0:
 		return
+	# Regen interrupt: any damage resets the damage-quiet timer immediately.
+	# This must happen BEFORE hp_current changes so the regen tick this frame
+	# uses the updated timer and correctly deactivates regen (AC-2 contract).
+	_time_since_last_damage_taken = 0.0
 	hp_current = max(0, hp_current - clean_amount)
 	damaged.emit(clean_amount, hp_current, source)
 	hp_changed.emit(hp_current, hp_max)
@@ -523,6 +557,12 @@ func set_hp(value: int) -> void:
 ## NOT fire `player_died`; emits `hp_changed` for HUD listeners.
 func revive_full_hp() -> void:
 	_is_dead = false
+	# Reset regen timers on respawn — a dead player's timers should not carry
+	# into the next life and give instant free regen. The timers restart from 0.
+	_time_since_last_damage_taken = 0.0
+	_time_since_last_hit_landed = 0.0
+	_regen_carry = 0.0
+	_set_regenerating(false)
 	hp_current = hp_max
 	hp_changed.emit(hp_current, hp_max)
 
@@ -745,6 +785,58 @@ func _tick_timers(delta: float) -> void:
 		_dodge_cooldown_left = max(0.0, _dodge_cooldown_left - delta)
 	if _attack_recovery_left > 0.0:
 		_attack_recovery_left = max(0.0, _attack_recovery_left - delta)
+	# Regen timers always increment while alive (reset events drive them back
+	# to 0 on damage-taken / hit-landed). No upper clamp needed — any value
+	# above the threshold is equivalent.
+	if not _is_dead:
+		_time_since_last_damage_taken += delta
+		_time_since_last_hit_landed += delta
+	_tick_regen(delta)
+
+
+## Regen tick — called from _tick_timers every physics frame.
+## Activation: BOTH timers must exceed their thresholds AND hp < hp_max.
+## Emits regen_active_changed on transitions (false→true, true→false).
+func _tick_regen(delta: float) -> void:
+	if _is_dead:
+		_set_regenerating(false)
+		return
+	var should_regen: bool = (
+		_time_since_last_damage_taken > REGEN_DAMAGE_COOLDOWN_SECS
+		and _time_since_last_hit_landed > REGEN_ATTACK_COOLDOWN_SECS
+		and hp_current < hp_max
+	)
+	if should_regen:
+		_set_regenerating(true)
+		var gained: float = REGEN_RATE_HP_PER_SEC * delta
+		var new_hp: int = min(hp_max, hp_current + int(gained))
+		# Use float accumulator to avoid losing fractional HP per frame.
+		# Store the fractional carry so 2.0 HP/s isn't rounded to 1 HP/s.
+		_regen_carry += gained - float(int(gained))
+		if _regen_carry >= 1.0:
+			new_hp = min(hp_max, new_hp + 1)
+			_regen_carry -= 1.0
+		if new_hp != hp_current:
+			hp_current = new_hp
+			hp_changed.emit(hp_current, hp_max)
+			_combat_trace("Player", "regen tick (HP %d/%d)" % [hp_current, hp_max])
+		# If we just hit cap, flip state off.
+		if hp_current >= hp_max:
+			_combat_trace("Player", "regen capped (HP %d/%d)" % [hp_current, hp_max])
+			_set_regenerating(false)
+	else:
+		_set_regenerating(false)
+
+
+func _set_regenerating(active: bool) -> void:
+	if is_regenerating == active:
+		return
+	is_regenerating = active
+	regen_active_changed.emit(active)
+	if active:
+		_combat_trace("Player", "regen activated (HP %d/%d)" % [hp_current, hp_max])
+	else:
+		_combat_trace("Player", "regen deactivated (HP %d/%d)" % [hp_current, hp_max])
 
 
 func _exit_dodge() -> void:
@@ -886,7 +978,22 @@ func _spawn_hitbox(dir: Vector2, damage: int, knockback: Vector2, reach: float, 
 	shape.shape = circle
 	hitbox.add_child(shape)
 	add_child(hitbox)
+	# Wire hit-landed interrupt for the regen system: any successful hit by the
+	# player resets the attack-quiet timer to 0. `hit_target` fires from
+	# Hitbox._try_apply_hit when a hit resolves — exactly the "hit landed"
+	# moment Uma's spec defines. Per AC-3: regen cannot resume until
+	# REGEN_ATTACK_COOLDOWN_SECS have passed with no successful hits.
+	if not hitbox.hit_target.is_connected(_on_hitbox_hit_target):
+		hitbox.hit_target.connect(_on_hitbox_hit_target)
 	return hitbox
+
+
+## Callback: a player-team hitbox landed a hit. Resets the attack-quiet timer
+## so out-of-combat regen cannot activate while the player is still attacking.
+## Per Uma's spec §"Activation rule" — "hit_landed > 3.0s means one attack burst
+## is safe to finish before the regen timer starts ticking."
+func _on_hitbox_hit_target(_target: Node, _damage: int, _source: Node) -> void:
+	_time_since_last_hit_landed = 0.0
 
 
 # ---- Input --------------------------------------------------------------

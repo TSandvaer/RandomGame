@@ -100,6 +100,12 @@ var _loot_spawner: MobLootSpawner = null
 # HUD widgets (built by _build_hud).
 var _hp_label: Label = null
 var _hp_bar: ProgressBar = null
+## ColorRect shimmer overlay for the out-of-combat HP regen cue (Uma's spec
+## hp-regen-design.md §"Visual cue"). Parented at the same position and size as
+## _hp_bar; drawn on top with MOUSE_FILTER_IGNORE. modulate is tweened between
+## rest (Color.WHITE / alpha=0 pass-through) and shimmer peak when regen is active.
+var _hp_bar_shimmer: ColorRect = null
+var _hp_shimmer_tween: Tween = null
 var _xp_label: Label = null
 var _xp_bar: ProgressBar = null
 var _level_label: Label = null
@@ -202,6 +208,13 @@ func get_descend_screen() -> CanvasLayer:
 
 func get_hud() -> CanvasLayer:
 	return _hud
+
+
+## Returns the HP bar shimmer ColorRect node. Used by the paired regen shimmer
+## test (AC-7 visual-primitive invariant) to assert modulate delta without
+## poking internals via find_child traversal.
+func get_hp_bar_shimmer() -> ColorRect:
+	return _hp_bar_shimmer
 
 
 ## Returns the boot-banner Label that lists all 7 player input actions
@@ -316,6 +329,9 @@ func _spawn_player() -> void:
 		_player.player_died.connect(_on_player_died)
 	if not _player.hp_changed.is_connected(_on_player_hp_changed):
 		_player.hp_changed.connect(_on_player_hp_changed)
+	# Wire the regen shimmer: regen_active_changed drives the HpBarShimmer tween.
+	if not _player.regen_active_changed.is_connected(_on_player_regen_active_changed):
+		_player.regen_active_changed.connect(_on_player_regen_active_changed)
 
 
 # ---- Room loading ----------------------------------------------------
@@ -495,6 +511,28 @@ func _build_hud() -> void:
 	_hp_bar.max_value = 100
 	_hp_bar.value = 100
 	vitals.add_child(_hp_bar)
+
+	# HP bar regen shimmer overlay — a ColorRect drawn on top of the HP bar at
+	# the exact same position/size. At rest its modulate is Color.WHITE (no
+	# tinting). When regen is active, a looping SINE tween oscillates the
+	# modulate between rest (Color.WHITE) and shimmer peak (warm amber per Uma's
+	# spec §"Visual cue"). Using a separate ColorRect node:
+	#   (a) avoids tweening the ProgressBar itself (whose fill stylebox is
+	#       managed by the theme engine and not tween-friendly);
+	#   (b) follows the combat-architecture.md "tween the visible-draw node
+	#       directly" rule — NOT the parent vitals Control.
+	# MOUSE_FILTER_IGNORE prevents the overlay from eating pointer events.
+	_hp_bar_shimmer = ColorRect.new()
+	_hp_bar_shimmer.name = "HpBarShimmer"
+	_hp_bar_shimmer.position = Vector2(0, 24)
+	_hp_bar_shimmer.size = Vector2(220, 14)
+	# Start fully transparent so it is invisible at rest. The shimmer is driven
+	# via modulate (not color.a) so it composes correctly with the ColorRect's
+	# own color — Color.WHITE at alpha=0 means "draw nothing", not "draw white".
+	_hp_bar_shimmer.color = Color(1.0, 0.85, 0.55, 0.35)  # warm amber, partial opacity
+	_hp_bar_shimmer.modulate = Color(1.0, 1.0, 1.0, 0.0)  # fully transparent at rest
+	_hp_bar_shimmer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vitals.add_child(_hp_bar_shimmer)
 
 	_hp_label = Label.new()
 	_hp_label.name = "HpLabel"
@@ -834,6 +872,46 @@ func _on_player_died(_death_position: Vector2) -> void:
 
 func _on_player_hp_changed(_hp_current: int, _hp_max: int) -> void:
 	_refresh_hp_widget()
+
+
+## HP regen shimmer — drives the HpBarShimmer ColorRect tween.
+## Per Uma's spec §"Visual cue": warm-amber oscillation (0.8s SINE loop) when
+## regen is active; kill + reset to transparent when regen deactivates.
+##
+## Shimmer design (ColorRect over the ProgressBar):
+##   - Rest (regen inactive):    modulate alpha = 0.0 (fully transparent)
+##   - Active peak:              modulate = Color(1.0, 1.0, 1.0, 1.0) (full opacity,
+##                               colour comes from ColorRect.color = warm amber)
+##   - Active trough:            modulate alpha ≈ 0.25 (dim, "breathing" oscillation)
+## This is a Tier 1 visual-primitive-test invariant: target modulate != rest modulate.
+func _on_player_regen_active_changed(active: bool) -> void:
+	if _hp_bar_shimmer == null:
+		return
+	# Kill any in-flight tween before starting a new one.
+	if _hp_shimmer_tween != null and _hp_shimmer_tween.is_valid():
+		_hp_shimmer_tween.kill()
+	_hp_shimmer_tween = null
+	if active:
+		# Shimmer on: oscillate modulate alpha between dim and bright with SINE
+		# easing to produce a smooth "breathing" light effect. 0.8 s per cycle.
+		_hp_shimmer_tween = create_tween()
+		_hp_shimmer_tween.set_loops()
+		_hp_shimmer_tween.set_trans(Tween.TRANS_SINE)
+		_hp_shimmer_tween.set_ease(Tween.EASE_IN_OUT)
+		_hp_shimmer_tween.tween_property(
+			_hp_bar_shimmer, "modulate",
+			Color(1.0, 1.0, 1.0, 1.0),   # peak: full opacity → warm amber shows through
+			0.4
+		)
+		_hp_shimmer_tween.tween_property(
+			_hp_bar_shimmer, "modulate",
+			Color(1.0, 1.0, 1.0, 0.25),  # trough: dim, "breathing" dip
+			0.4
+		)
+	else:
+		# Shimmer off: immediately snap to transparent so the shimmer doesn't
+		# linger after regen deactivates (e.g. on damage taken mid-shimmer).
+		_hp_bar_shimmer.modulate = Color(1.0, 1.0, 1.0, 0.0)
 
 
 func _on_xp_gained(_amount: int) -> void:
