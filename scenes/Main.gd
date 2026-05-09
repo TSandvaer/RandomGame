@@ -113,6 +113,10 @@ var _room_label: Label = null
 var _build_label: Label = null
 var _stat_pip_label: Label = null
 var _boot_banner_label: Label = null
+## Save-confirmation toast (Ticket 2 — `86c9q7p38`). Bottom-right widget that
+## fades in/out on every successful `Save.save_completed`. Connects on its
+## own `_ready` — Main only needs to add it to the HUD CanvasLayer.
+var _save_toast: SaveToast = null
 
 # Save-on-quit guard so we don't double-write when both NOTIFICATION_WM_CLOSE_REQUEST
 # and `_exit_tree` fire on shutdown.
@@ -215,6 +219,12 @@ func get_hud() -> CanvasLayer:
 ## poking internals via find_child traversal.
 func get_hp_bar_shimmer() -> ColorRect:
 	return _hp_bar_shimmer
+
+
+## Returns the SaveToast widget. Used by paired tests (Ticket 2 AC2.x) to
+## assert the toast actually mounts in the HUD without find_child traversal.
+func get_save_toast() -> SaveToast:
+	return _save_toast
 
 
 ## Returns the boot-banner Label that lists all 7 player input actions
@@ -646,6 +656,16 @@ func _build_hud() -> void:
 	_boot_banner_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_boot_banner_label.text = "\n".join(banner_lines)
 	_hud.add_child(_boot_banner_label)
+
+	# Save-confirmation toast (Ticket 2 — `86c9q7p38`). Bottom-right widget
+	# that connects to `Save.save_completed` on its own `_ready`. Per Uma's
+	# design, it sits at offset (-260, -64) from BOTTOM_RIGHT — clear of the
+	# build-SHA footer (bottom-left) and the [+1 STAT] pip (offset_left=-160
+	# bottom-right). The bottom-center BootBanner stops 32 px from the bottom
+	# edge so there is no collision with the toast plate at -64 either.
+	_save_toast = SaveToast.new()
+	_save_toast.name = "SaveToast"
+	_hud.add_child(_save_toast)
 
 
 func _build_inventory_panel() -> void:

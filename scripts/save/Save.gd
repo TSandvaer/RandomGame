@@ -31,6 +31,20 @@ const README_PATH: String = SAVE_DIR + README_FILENAME
 
 const SCHEMA_VERSION: int = 3
 
+# ---- Signals ----------------------------------------------------------
+
+## Emitted at the end of every `save_game(slot, data)` call — once per save
+## attempt — with `ok=true` when the JSON write completed successfully and
+## `ok=false` when `atomic_write` failed. UI surfaces (the SaveToast widget)
+## connect from boot. Past-tense `_completed` matches `Inventory.item_equipped`
+## naming. Per `team/uma-ux/m2-w1-ux-polish-design.md` § Ticket 2:
+##   - M1 toast reacts to `ok=true` only; failure surface remains the
+##     existing `push_error` console line (no recovery action UI in M1).
+##   - The signal is the canonical save-event for all callers — autosave
+##     hooks (room_cleared, stratum_exit, quit) AND interactive saves
+##     (StatAllocationPanel allocation) all flow through here.
+signal save_completed(slot: int, ok: bool)
+
 # Curve mirror used only by the v1 -> v2 migration (xp_to_next backfill).
 # MUST match `scripts/progression/Levels.gd` constants of the same names.
 # When Levels' curve changes, mirror it here AND bump SCHEMA_VERSION so
@@ -118,10 +132,18 @@ func save_game(slot: int = 0, data: Variant = null) -> bool:
 	var ok: bool = atomic_write(save_path(slot), json_str)
 	if not ok:
 		push_error("[Save] save_game(%d) failed at atomic_write" % slot)
+		# Emit failure on the same signal so listeners can paint a "save
+		# failed" surface in M2+. M1 toast ignores ok=false (failure surface
+		# is the existing push_error console line per design doc).
+		save_completed.emit(slot, false)
 		return false
 	# Hook 3 — drop the testability README next to the save file. Idempotent;
 	# overwrites a stale README on every save (cheap, single short string).
 	_write_readme()
+	# Emit success — drives `SaveToast` in `scenes/Main.gd` HUD layer (and any
+	# future audio/indicator hook). Past-participle naming matches Inventory's
+	# `item_equipped` / `item_unequipped`.
+	save_completed.emit(slot, true)
 	return true
 
 

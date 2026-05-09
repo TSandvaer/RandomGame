@@ -99,7 +99,7 @@ Future bugs in this family: check the `_die` chain (death-path adds), all per-ti
 
 Equipped weapon state lives on **two surfaces** that must stay in lockstep:
 
-- `Inventory._equipped["weapon"]` — autoload-side; truth surface for the Tab UI (`InventoryPanel._refresh_equipped_row` reads it)
+- `Inventory._equipped["weapon"]` — autoload-side; truth surface for the Tab UI (`InventoryPanel._refresh_equipped_row` reads it). The Stats panel BBCode (`InventoryPanel._refresh_stats` Damage / Defense lines, codified in M2 W1 polish) ALSO reads this surface via `_build_damage_line` / `_build_defense_line` — `Inventory.get_equipped(&"weapon").def.base_stats.damage`. **Panel-reads-Inventory** is the contract; combat-reads-Player is the other half. Don't conflate them — a panel that read `Player._equipped_weapon` would mask exactly the dual-surface drift that this rule exists to surface.
 - `Player._equipped_weapon` — per-instance; truth surface for combat (`Player.try_attack` reads it; passed to `Damage.compute_player_damage`)
 
 Linking is normally automatic: `Inventory.equip()` → `_apply_equip_to_player()` → `Player.equip_item()`. Any code path that bypasses `Inventory.equip` and mutates one surface without the other will produce a silent divergence — boot prints lie ("auto-equipped" fires), one surface is correct, the other is null. Symptom: combat reads `damage = 1` (FIST_DAMAGE) while Tab UI also reads empty (or vice versa).
@@ -127,6 +127,17 @@ The combat / level pattern surfaced by PR #155: a signal named `<noun>_<state-ve
 **Open follow-up:** the Shooter `STATE_POST_FIRE_RECOVERY` state has no explicit ledger trace today (only `_process_post_fire | closing gap` recurrence). Adding `[combat-trace] Shooter.set_state | post_fire_recovery (entered)` is the prerequisite for adding a fourth negative-assertion test that asserts the recovery-state trace fires when expected (not "absence of state X means Y" — the anti-pattern this rule targets).
 
 Future state-change/action-event pairs (aggro/attack, pickup/equip, dialog/advance, save/load) should land their `[combat-trace]` lines AND their negative-assertion test simultaneously. When introducing any `<noun>_<state-verb>` signal, ask: "is there a separate `<noun>_<action-verb>` event that commits to the next thing?" If yes, add both traces and an assertion for both.
+
+## Save autoload signal contract (added M2 W1)
+
+`Save.save_completed(slot: int, ok: bool)` (declared at `scripts/save/Save.gd`) is the project's first **global save-event signal** — emitted from every successful AND failed `save_game()` call on every entry point (autosave: `room_cleared`, `stratum_exit_unlocked`, quit; interactive: `StatAllocationPanel` allocation). Past-participle naming matches Inventory's `item_equipped` / `item_unequipped`.
+
+**Subscriber contract:**
+- M1 visible-state UI (e.g. `SaveToast` in `scripts/ui/SaveToast.gd`) connects from boot. The toast widget reacts to `ok=true` only; M1 surfaces failure via the existing `push_error` console line (no recovery-action UI for failure yet).
+- Future M2+ patterns this opens: audio cue on save (one-shot SFX hook), persistent "saved 3s ago" indicator (poll `save_completed` timestamp), failure-recovery toast variant (`ok=false` branch).
+- The signal fires unconditionally at every `save_game()` exit — listeners must handle the `ok=false` branch defensively (return early, do not assume `true`).
+
+**Naming + scope discipline:** `save_completed` is past-participle, fires once per save attempt, carries `(slot, ok)` payload. Don't add a `save_started` event unless a use case appears that needs the "save in flight" interval (no current need; saves are single-frame). Keep the signal narrow.
 
 ## Cross-references
 
