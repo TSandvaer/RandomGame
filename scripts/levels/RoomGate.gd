@@ -135,6 +135,26 @@ func _ready() -> void:
 	# The RoomGate ONLY advances on CharacterBody2D (Player) entry; Area2D
 	# neighbors are always no-ops.
 	area_entered.connect(_on_area_entered_ignored)
+	# DIAGNOSTIC (ticket 86c9qbhm5 — Devon investigation): Log gate's runtime
+	# config so we can verify shape size, layer/mask, monitoring at boot.
+	var shape_info: String = "<no shape>"
+	for child in get_children():
+		if child is CollisionShape2D:
+			var cs: CollisionShape2D = child as CollisionShape2D
+			if cs.shape is RectangleShape2D:
+				var rs: RectangleShape2D = cs.shape as RectangleShape2D
+				shape_info = "RectangleShape2D size=(%.1f,%.1f) disabled=%s" % [rs.size.x, rs.size.y, cs.disabled]
+			else:
+				shape_info = "%s disabled=%s" % [cs.shape.get_class() if cs.shape else "<null shape>", cs.disabled]
+			break
+	print("[RoomGate-diag] _ready | pos=(%.1f,%.1f) trigger_size=(%.1f,%.1f) layer=%d mask=%d monitoring=%s shape=%s" % [
+		global_position.x, global_position.y, trigger_size.x, trigger_size.y,
+		collision_layer, collision_mask, monitoring, shape_info
+	])
+	_combat_trace("RoomGate._ready", "pos=(%.1f,%.1f) trigger_size=(%.1f,%.1f) layer=%d mask=%d monitoring=%s shape=%s" % [
+		global_position.x, global_position.y, trigger_size.x, trigger_size.y,
+		collision_layer, collision_mask, monitoring, shape_info
+	])
 
 
 # Ensure a CollisionShape2D child exists with a RectangleShape2D matching
@@ -231,6 +251,19 @@ func trigger_for_test(_body: Node = null) -> void:
 # ---- Internal -------------------------------------------------------
 
 func _on_body_entered(body: Node) -> void:
+	# DIAGNOSTIC (ticket 86c9qbhm5 — Devon investigation): Unconditional entry
+	# trace BEFORE any type-check or state-check. If this line does NOT appear in
+	# the Playwright console capture during a gate-walk, body_entered is not firing
+	# at all (Case B — Godot/Playwright signal-emission issue). If it DOES appear
+	# but downstream traces don't, the issue is downstream of body_entered (Case A).
+	var body_cls: String = body.get_class() if body != null else "<null>"
+	var body_name: String = body.name if body != null else "<null>"
+	var body_pos: Vector2 = body.global_position if body != null and "global_position" in body else Vector2.ZERO
+	var gate_pos: Vector2 = global_position
+	print("[RoomGate-diag] _on_body_entered ENTRY | body=%s name=%s body_pos=(%.1f,%.1f) gate_pos=(%.1f,%.1f) state=%s mobs_alive=%d" % [
+		body_cls, body_name, body_pos.x, body_pos.y, gate_pos.x, gate_pos.y, _state, _mobs_alive
+	])
+	_combat_trace("RoomGate._on_body_entered", "ENTRY body=%s name=%s state=%s mobs_alive=%d" % [body_cls, body_name, _state, _mobs_alive])
 	# Bug 1 fix (ticket 86c9q7xgx): only a CharacterBody2D on the player
 	# physics layer should advance this gate. Area2D-derived nodes (Hitbox,
 	# Projectile) cannot trigger body_entered per Godot 4 physics semantics —
@@ -240,6 +273,7 @@ func _on_body_entered(body: Node) -> void:
 	# This explicit CharacterBody2D check is a belt-and-suspenders defence
 	# so a bare Node or a future refactor can never gate-trip by accident.
 	if not body is CharacterBody2D:
+		print("[RoomGate-diag] _on_body_entered REJECTED non-CharacterBody2D body=%s" % body_cls)
 		return
 	# Position B contract (ticket 86c9q94fg):
 	#   OPEN → lock (player enters room, mobs still alive).
