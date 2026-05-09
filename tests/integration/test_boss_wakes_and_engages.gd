@@ -218,6 +218,10 @@ func test_boss_swing_hitbox_carries_damage_payload_against_real_player() -> void
 
 	var b: Stratum1Boss = BossScript.new()
 	b.skip_intro_for_tests = true
+	# Apply a real MobDef so `compute_mob_damage` returns non-zero. The
+	# damage formula short-circuits to 0 when mob_def is null (defensive
+	# guard against bare-instantiated mobs in malformed tests).
+	b.mob_def = ContentFactory.make_mob_def({"hp_base": 600, "damage_base": 12, "move_speed": 80.0})
 	# Place boss within MELEE_RANGE (36.0) so the first chase tick begins a
 	# melee telegraph.
 	b.global_position = Vector2(30.0, 0.0)
