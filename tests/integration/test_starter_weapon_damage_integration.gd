@@ -277,6 +277,110 @@ func test_old_save_with_empty_equipped_does_not_clobber_starter_sword() -> void:
 		save_node.delete_save(0)
 
 
+# ==========================================================================
+# AC E — LMB-click equip-swap drives the FULL integration surface (P0 86c9q96m8)
+# ==========================================================================
+
+func test_lmb_click_equip_swap_real_main_drives_dual_surfaces() -> void:
+	## Sponsor M1 RC re-soak attempt 5 P0 86c9q96m8 — pick up a sword in
+	## Room 02, click to equip via LMB on inventory grid → "item disappears
+	## from grid but is NOT actually equipped (subsequent swings still
+	## register the previous weapon's damage)."
+	##
+	## This integration AC drives the full real-Main path (autoloads,
+	## Player, InventoryPanel, the Tab UI's `_handle_inventory_click`)
+	## through an equip-swap and confirms BOTH the Inventory surface AND
+	## the Player surface (dual-surface rule) end up pointing at the new
+	## sword. A swing on a fresh grunt confirms the damage value updated
+	## (Tier 3 of the combat-architecture.md §"Equipped-weapon dual-surface
+	## rule" test bar — actual damage delta on a real Grunt, NOT just the
+	## formula in isolation).
+	var main: Node = _instantiate_main()
+	await get_tree().process_frame
+
+	var player: Player = (main as Main).get_player() as Player
+	assert_not_null(player, "AC-E: Player spawned")
+
+	# Confirm starter sword is the iron_sword (damage=6) so the post-swap
+	# delta is observable.
+	var pre_weapon: ItemDef = player.get_equipped_weapon() as ItemDef
+	assert_not_null(pre_weapon, "AC-E: precondition — starter weapon equipped")
+	assert_eq(pre_weapon.id, &"iron_sword", "AC-E: starter is iron_sword")
+	var pre_damage: int = DamageScript.compute_player_damage(pre_weapon, 0, &"light")
+
+	# Build a higher-damage replacement weapon (a "Room 02 pickup").
+	var ContentFactoryScript: Script = preload("res://tests/factories/content_factory.gd")
+	var swap_def: ItemDef = ContentFactoryScript.make_item_def({
+		"id": &"swap_sword_e2e",
+		"slot": ItemDef.Slot.WEAPON,
+		"base_stats": ContentFactoryScript.make_item_base_stats({"damage": 12}),
+	})
+	var swap_sword: ItemInstance = ItemInstance.new(swap_def, ItemDef.Tier.T1)
+	var inv: Node = _inventory()
+	assert_true(inv.add(swap_sword),
+		"AC-E: Room 02 pickup lands in grid via Inventory.add")
+
+	# Drive the LMB click via the InventoryPanel test helper (mirrors the
+	# production click path — `_handle_inventory_click(0, MOUSE_BUTTON_LEFT)`).
+	var panel: InventoryPanel = (main as Main).get_inventory_panel() as InventoryPanel
+	assert_not_null(panel, "AC-E: InventoryPanel mounted")
+	panel.open()
+	# Find the index of the swap_sword in the grid (it was just added; index 0
+	# since auto-equip already moved iron_sword out of _items).
+	var items: Array = inv.get_items()
+	var swap_idx: int = items.find(swap_sword)
+	assert_gte(swap_idx, 0, "AC-E: swap_sword is in the grid pre-click")
+	panel.force_click_inventory_index_for_test(swap_idx, MOUSE_BUTTON_LEFT)
+
+	# DUAL-SURFACE ASSERTIONS — both must point to the swap sword post-click.
+	var post_inv_eq: ItemInstance = inv.get_equipped(&"weapon") as ItemInstance
+	assert_not_null(post_inv_eq, "AC-E: Inventory surface — weapon slot occupied")
+	assert_eq(post_inv_eq.def.id, &"swap_sword_e2e",
+		"AC-E: Inventory.get_equipped('weapon') points to the new sword")
+	var post_player_weapon: ItemDef = player.get_equipped_weapon() as ItemDef
+	assert_not_null(post_player_weapon,
+		"AC-E: Player surface — _equipped_weapon non-null")
+	assert_eq(post_player_weapon.id, &"swap_sword_e2e",
+		"AC-E: Player._equipped_weapon points to the new sword — " +
+		"if this fails, the LMB-click path updated Inventory but didn't " +
+		"propagate to Player (dual-surface mismatch). Sponsor's exact symptom: " +
+		"grid shows new sword equipped but combat damage uses the OLD weapon.")
+
+	# Iron_sword (the previously-equipped weapon) must be BACK IN THE GRID,
+	# NOT silently lost to the equip-swap leak.
+	var preserved_in_grid: bool = false
+	for it_v in inv.get_items():
+		var it_inst: ItemInstance = it_v as ItemInstance
+		if it_inst != null and it_inst.def != null and it_inst.def.id == &"iron_sword":
+			preserved_in_grid = true
+			break
+	assert_true(preserved_in_grid,
+		"AC-E: previously-equipped iron_sword must land back in the grid on swap " +
+		"(equip-swap data-loss guard — pre-fix this was lost to the floor)")
+
+	# Tier 3 — damage delta on a real Grunt confirms the swap took effect
+	# at the combat surface, not just the autoload state.
+	var GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
+	var grunt: Grunt = GruntScript.new()
+	var def_overrides: Dictionary = {"hp_base": 100, "damage_base": 5, "move_speed": 60.0}
+	grunt.mob_def = ContentFactoryScript.make_mob_def(def_overrides)
+	add_child_autofree(grunt)
+	await get_tree().process_frame
+
+	var hp_before: int = grunt.get_hp()
+	var hb: Hitbox = player.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT) as Hitbox
+	assert_not_null(hb, "AC-E: try_attack returned a Hitbox post-swap")
+	# Hitbox damage MUST equal the new sword's formula output, NOT the old.
+	var expected_post: int = DamageScript.compute_player_damage(swap_def, 0, &"light")
+	assert_eq(hb.damage, expected_post,
+		"AC-E: hitbox.damage uses NEW weapon (%d), not old iron_sword (%d) — " %
+		[expected_post, pre_damage] +
+		"the load-bearing combat surface confirms the swap propagated.")
+	hb._try_apply_hit(grunt)
+	assert_eq(grunt.get_hp(), hp_before - expected_post,
+		"AC-E: grunt HP drops by NEW weapon damage, not by iron_sword's")
+
+
 func before_each() -> void:
 	_reset_autoloads()
 	# Clean any leftover test save.
