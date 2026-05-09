@@ -117,6 +117,13 @@ var _boot_banner_label: Label = null
 ## fades in/out on every successful `Save.save_completed`. Connects on its
 ## own `_ready` — Main only needs to add it to the HUD CanvasLayer.
 var _save_toast: SaveToast = null
+## Tutorial-prompt overlay (ticket `86c9qajcf` — Drew Stage 2b prereq scaffold).
+## Center-anchored non-modal prompt that fades in / holds / fades out on every
+## `TutorialEventBus.tutorial_beat_requested` emission. Connects on its own
+## `_ready` — Main only needs to add it to the HUD CanvasLayer. NO content
+## triggers are wired here at scaffold time; Drew's Stage 2b PR fires beats
+## from Room01.
+var _tutorial_overlay: TutorialPromptOverlay = null
 
 # Save-on-quit guard so we don't double-write when both NOTIFICATION_WM_CLOSE_REQUEST
 # and `_exit_tree` fire on shutdown.
@@ -225,6 +232,14 @@ func get_hp_bar_shimmer() -> ColorRect:
 ## assert the toast actually mounts in the HUD without find_child traversal.
 func get_save_toast() -> SaveToast:
 	return _save_toast
+
+
+## Returns the TutorialPromptOverlay widget. Used by paired tests (ticket
+## `86c9qajcf` Tier 2 bus integration) to assert the overlay mounts in the
+## HUD without find_child traversal. Drew's Stage 2b tests use the same
+## accessor to assert the overlay surfaces the resolved text on bus emit.
+func get_tutorial_overlay() -> TutorialPromptOverlay:
+	return _tutorial_overlay
 
 
 ## Returns the boot-banner Label that lists all 7 player input actions
@@ -666,6 +681,15 @@ func _build_hud() -> void:
 	_save_toast = SaveToast.new()
 	_save_toast.name = "SaveToast"
 	_hud.add_child(_save_toast)
+
+	# Tutorial-prompt overlay (ticket `86c9qajcf` — Drew Stage 2b prereq
+	# scaffold). Mounted on the HUD CanvasLayer (layer 10) so it sits above
+	# the world but below InventoryPanel (80) and DescendScreen (100).
+	# Connects to `TutorialEventBus.tutorial_beat_requested` from its own
+	# `_ready`. Drew's Stage 2b PR drives content from Room01.
+	_tutorial_overlay = TutorialPromptOverlay.new()
+	_tutorial_overlay.name = "TutorialPromptOverlay"
+	_hud.add_child(_tutorial_overlay)
 
 
 func _build_inventory_panel() -> void:

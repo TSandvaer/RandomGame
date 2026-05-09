@@ -26,6 +26,7 @@ Levels="*res://scripts/progression/Levels.gd"
 PlayerStats="*res://scripts/progression/PlayerStats.gd"
 StratumProgression="*res://scripts/progression/StratumProgression.gd"
 Inventory="*res://scripts/inventory/Inventory.gd"
+TutorialEventBus="*res://scripts/ui/TutorialEventBus.gd"
 
 [debug]
 
