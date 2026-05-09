@@ -524,24 +524,34 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
         `early-return guard in equip_starter_weapon_if_needed regressed.`
     ).toBe(0);
 
-    // Filter out a known m1-rc-1 push_warning from save-restore: when the
-    // ContentRegistry resolver-Callable hasn't yet registered iron_sword by
-    // the time `Inventory.restore_from_save` deserializes the saved equipped
-    // map, `ItemInstance.from_save_dict` emits:
-    //   "USER WARNING: ItemInstance.from_save_dict: unknown item id 'iron_sword'"
+    // Ticket 86c9qah1f fix verification: the save-restore push_warning for
+    // `unknown item id 'iron_sword'` MUST be absent after F5 reload. Pre-fix,
+    // the ContentRegistry recursive DirAccess scan over the .pck-packed
+    // `res://resources/items` did not enumerate `weapons/` reliably in
+    // HTML5, so `from_save_dict` push_warning'd on every save-restore.
+    // Post-fix (STARTER_ITEM_PATHS direct-load fallback in
+    // `ContentRegistry.load_all`), iron_sword resolves silently on every
+    // platform.
     //
-    // The warning is benign for THIS spec — `equip_starter_weapon_if_needed`
-    // still runs after save-restore (Main._ready ordering, PR #146) and
-    // re-equips iron_sword. Post-reload damage=6 (the load-bearing assertion
-    // above) confirms the player surface ends up correct.
-    //
-    // This warning is itself a real bug worth tracking (the save-restore
-    // round-trip should not fire this warning on the bandaid iron_sword)
-    // but is OUT OF SCOPE for the equip-flow spec. Filing a sibling ticket
-    // is the right move; for now, the harness skips it explicitly so the
-    // spec assertion stays focused on the survives-reload property.
-    const ignoredWarningPattern =
-      /ItemInstance\.from_save_dict: unknown item id 'iron_sword'/;
+    // This is a positive console-silence assertion — the AC5 dependency
+    // unlock the ticket exists to enable. Going forward, every console
+    // warning produced by save-restore is a real regression.
+    const ironSwordResolverWarning = capture
+      .getLines()
+      .find((l) =>
+        /ItemInstance\.from_save_dict: unknown item id 'iron_sword'/.test(
+          l.text
+        )
+      );
+    expect(
+      ironSwordResolverWarning,
+      "Ticket 86c9qah1f regression: 'unknown item id iron_sword' push_warning " +
+        "fired during F5-reload save-restore. Either ContentRegistry's " +
+        "STARTER_ITEM_PATHS preload regressed (check scripts/content/ContentRegistry.gd) " +
+        "or a new content-resolution code path was added that doesn't " +
+        "consult the registry."
+    ).toBeUndefined();
+
     const errorLines = capture
       .getLines()
       .filter((l) => l.type === "error")
@@ -550,16 +560,11 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
           !l.text.includes("requestAnimationFrame") &&
           !l.text.includes("favicon.ico") &&
           !l.text.includes("Content-Security-Policy") &&
-          !l.text.startsWith("Failed to load resource") &&
-          // m1-rc-1 push_warning chain (USER WARNING + at: push_warning ...)
-          !ignoredWarningPattern.test(l.text) &&
-          !/at: push_warning \(core\/variant\/variant_utility\.cpp/.test(
-            l.text
-          )
+          !l.text.startsWith("Failed to load resource")
       );
     if (errorLines.length > 0) {
       console.log(
-        "[equip-flow] UNEXPECTED ERROR LINES (after filtering known m1-rc-1 warnings):\n" +
+        "[equip-flow] UNEXPECTED ERROR LINES:\n" +
           errorLines.map((l) => `  ${l.text}`).join("\n") +
           "\n\nFull console dump:\n" +
           capture.dump()
