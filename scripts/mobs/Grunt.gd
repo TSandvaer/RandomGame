@@ -564,11 +564,6 @@ func _die() -> void:
 	# 200ms decay animation. The death tween + ember-burst run *after* this
 	# emit; queue_free is called on tween_finished, replacing the old
 	# call_deferred("queue_free") that fired instantly.
-	# DIAGNOSTIC (ticket 86c9qbhm5): log mob_died connections RIGHT BEFORE emit.
-	# If a grunt's mob_died has 0 connections, the gate's register_mob signal
-	# was severed somehow.
-	var mob_died_conns: int = mob_died.get_connections().size()
-	print("[Grunt-diag] _die | name=%s id=%d connections_to_mob_died=%d" % [name, get_instance_id(), mob_died_conns])
 	mob_died.emit(self, global_position, mob_def)
 	# Spawn the ember-burst particles, parented to the room (NOT self) so
 	# the burst persists past queue_free.

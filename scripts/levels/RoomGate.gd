@@ -135,26 +135,6 @@ func _ready() -> void:
 	# The RoomGate ONLY advances on CharacterBody2D (Player) entry; Area2D
 	# neighbors are always no-ops.
 	area_entered.connect(_on_area_entered_ignored)
-	# DIAGNOSTIC (ticket 86c9qbhm5 — Devon investigation): Log gate's runtime
-	# config so we can verify shape size, layer/mask, monitoring at boot.
-	var shape_info: String = "<no shape>"
-	for child in get_children():
-		if child is CollisionShape2D:
-			var cs: CollisionShape2D = child as CollisionShape2D
-			if cs.shape is RectangleShape2D:
-				var rs: RectangleShape2D = cs.shape as RectangleShape2D
-				shape_info = "RectangleShape2D size=(%.1f,%.1f) disabled=%s" % [rs.size.x, rs.size.y, cs.disabled]
-			else:
-				shape_info = "%s disabled=%s" % [cs.shape.get_class() if cs.shape else "<null shape>", cs.disabled]
-			break
-	print("[RoomGate-diag] _ready | pos=(%.1f,%.1f) trigger_size=(%.1f,%.1f) layer=%d mask=%d monitoring=%s shape=%s" % [
-		global_position.x, global_position.y, trigger_size.x, trigger_size.y,
-		collision_layer, collision_mask, monitoring, shape_info
-	])
-	_combat_trace("RoomGate._ready", "pos=(%.1f,%.1f) trigger_size=(%.1f,%.1f) layer=%d mask=%d monitoring=%s shape=%s" % [
-		global_position.x, global_position.y, trigger_size.x, trigger_size.y,
-		collision_layer, collision_mask, monitoring, shape_info
-	])
 
 
 # Ensure a CollisionShape2D child exists with a RectangleShape2D matching
@@ -207,23 +187,17 @@ func mobs_alive() -> int:
 ## Idempotent: re-registering the same mob is a no-op.
 func register_mob(mob: Node) -> void:
 	if mob == null:
-		print("[RoomGate-diag] register_mob | SKIP null")
 		return
 	if mob in _registered_mobs:
-		print("[RoomGate-diag] register_mob | SKIP already-registered %s" % mob.name)
 		return
 	if not mob.has_signal("mob_died"):
-		print("[RoomGate-diag] register_mob | SKIP no mob_died signal: %s (class=%s)" % [mob.name, mob.get_class()])
 		push_warning("RoomGate.register_mob: '%s' has no mob_died signal — skipped" % str(mob))
 		return
 	_registered_mobs.append(mob)
 	_mobs_alive += 1
 	# Connect with deferred so a synchronous mob_died emission inside
 	# register_mob (rare, but possible in tests) doesn't underflow the count.
-	var err: int = mob.mob_died.connect(_on_mob_died)
-	# DIAGNOSTIC (ticket 86c9qbhm5)
-	print("[RoomGate-diag] register_mob | OK %s id=%d class=%s mobs_alive=%d connect_err=%d" % [mob.name, mob.get_instance_id(), mob.get_class(), _mobs_alive, err])
-	_combat_trace("RoomGate.register_mob", "OK %s id=%d class=%s mobs_alive=%d connect_err=%d" % [mob.name, mob.get_instance_id(), mob.get_class(), _mobs_alive, err])
+	mob.mob_died.connect(_on_mob_died)
 
 
 ## Force-lock the gate from script. Production uses `body_entered`; tests
@@ -257,19 +231,14 @@ func trigger_for_test(_body: Node = null) -> void:
 # ---- Internal -------------------------------------------------------
 
 func _on_body_entered(body: Node) -> void:
-	# DIAGNOSTIC (ticket 86c9qbhm5 — Devon investigation): Unconditional entry
-	# trace BEFORE any type-check or state-check. If this line does NOT appear in
-	# the Playwright console capture during a gate-walk, body_entered is not firing
-	# at all (Case B — Godot/Playwright signal-emission issue). If it DOES appear
-	# but downstream traces don't, the issue is downstream of body_entered (Case A).
-	var body_cls: String = body.get_class() if body != null else "<null>"
-	var body_name: String = body.name if body != null else "<null>"
-	var body_pos: Vector2 = body.global_position if body != null and "global_position" in body else Vector2.ZERO
-	var gate_pos: Vector2 = global_position
-	print("[RoomGate-diag] _on_body_entered ENTRY | body=%s name=%s body_pos=(%.1f,%.1f) gate_pos=(%.1f,%.1f) state=%s mobs_alive=%d" % [
-		body_cls, body_name, body_pos.x, body_pos.y, gate_pos.x, gate_pos.y, _state, _mobs_alive
+	# Investigation 86c9qbhm5 (Devon, 2026-05) confirmed body_entered fires
+	# reliably under Playwright when player walks from a known position.
+	# Lightweight trace at entry helps Playwright specs distinguish "gate
+	# never reached" from "gate reached but state-machine wrong" failures.
+	# Combat-trace shim: HTML5-only, no overhead in headless GUT.
+	_combat_trace("RoomGate._on_body_entered", "body=%s state=%s mobs_alive=%d" % [
+		body.get_class() if body != null else "<null>", _state, _mobs_alive
 	])
-	_combat_trace("RoomGate._on_body_entered", "ENTRY body=%s name=%s state=%s mobs_alive=%d" % [body_cls, body_name, _state, _mobs_alive])
 	# Bug 1 fix (ticket 86c9q7xgx): only a CharacterBody2D on the player
 	# physics layer should advance this gate. Area2D-derived nodes (Hitbox,
 	# Projectile) cannot trigger body_entered per Godot 4 physics semantics —
@@ -279,7 +248,6 @@ func _on_body_entered(body: Node) -> void:
 	# This explicit CharacterBody2D check is a belt-and-suspenders defence
 	# so a bare Node or a future refactor can never gate-trip by accident.
 	if not body is CharacterBody2D:
-		print("[RoomGate-diag] _on_body_entered REJECTED non-CharacterBody2D body=%s" % body_cls)
 		return
 	# Position B contract (ticket 86c9q94fg):
 	#   OPEN → lock (player enters room, mobs still alive).
@@ -315,11 +283,6 @@ func _on_mob_died(_mob: Variant, _pos: Variant = null, _def: Variant = null) -> 
 	# Signal signature varies (Grunt/Charger/Shooter all take 3 args), but
 	# we don't need any of them — we just count.
 	_mobs_alive = max(0, _mobs_alive - 1)
-	# DIAGNOSTIC (ticket 86c9qbhm5)
-	var mid: int = _mob.get_instance_id() if _mob != null and _mob.has_method("get_instance_id") else -1
-	var mname: String = _mob.name if _mob != null and "name" in _mob else "<null>"
-	print("[RoomGate-diag] _on_mob_died | mob=%s id=%d mobs_alive=%d state=%s death_wait_in_flight=%s" % [mname, mid, _mobs_alive, _state, _death_wait_in_flight])
-	_combat_trace("RoomGate._on_mob_died", "mob=%s id=%d mobs_alive=%d state=%s death_wait_in_flight=%s" % [mname, mid, _mobs_alive, _state, _death_wait_in_flight])
 	if _mobs_alive == 0 and _state == STATE_LOCKED and not _death_wait_in_flight:
 		_death_wait_in_flight = true
 		_start_death_wait()
@@ -340,9 +303,6 @@ func _on_mob_died(_mob: Variant, _pos: Variant = null, _def: Variant = null) -> 
 ## can run without a tree, and the bare-instance tests never asserted the
 ## delay anyway.
 func _start_death_wait() -> void:
-	# DIAGNOSTIC (ticket 86c9qbhm5)
-	print("[RoomGate-diag] _start_death_wait | test_skip=%s is_inside_tree=%s wait_time=%.3f" % [test_skip_death_wait, is_inside_tree(), DEATH_TWEEN_WAIT_SECS])
-	_combat_trace("RoomGate._start_death_wait", "test_skip=%s is_inside_tree=%s wait_time=%.3f" % [test_skip_death_wait, is_inside_tree(), DEATH_TWEEN_WAIT_SECS])
 	if test_skip_death_wait or not is_inside_tree():
 		_unlock()
 		return
@@ -352,7 +312,6 @@ func _start_death_wait() -> void:
 	_death_wait_timer.timeout.connect(_unlock)
 	add_child(_death_wait_timer)
 	_death_wait_timer.start()
-	print("[RoomGate-diag] _start_death_wait | timer started, paused=%s time_left=%.3f" % [_death_wait_timer.paused, _death_wait_timer.time_left])
 
 
 ## Test helper: simulate the death-tween wait elapsing without driving the
