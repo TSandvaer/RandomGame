@@ -94,6 +94,16 @@ The fix patterns:
 
 Future bugs in this family: check the `_die` chain (death-path adds), all per-tick spawn sites (spawn-path adds), and any new Area2D class that's instantiated outside `_ready` of the parent scene. Memory rule: `godot-physics-flush-area2d-rule.md`.
 
+## State-change signals vs. progression triggers — harness enforcement
+
+The combat / level pattern surfaced by PR #155: a signal named `<noun>_<state-verb>` (e.g. `gate_unlocked`, `door_opened`) DOCUMENTS a state change. It MUST NOT be wired directly to a progression trigger (room counter advance, level transition). Progression must be gated on an explicit player-action event (CharacterBody2D `body_entered` on a trigger Area2D, an interact-press, etc.).
+
+**The Playwright harness enforces this discipline at HTML5-build sign-off.** See `tests/playwright/specs/negative-assertion-sweep.spec.ts` (Test 3 — `gate_traversed never precedes gate_unlocked (causality invariant)` + same-tick auto-emission threshold check) and `tests/playwright/specs/ac4-boss-clear.spec.ts` (per-room gate-traversal negative assertions across all 7 multi-mob rooms). The static causality invariant — every `gate_traversed` line in the `[combat-trace]` stream must have a preceding `gate_unlocked emitting` line, with > 200 ms between them — catches PR #155-class regressions automatically.
+
+**Open follow-up:** the Shooter `STATE_POST_FIRE_RECOVERY` state has no explicit ledger trace today (only `_process_post_fire | closing gap` recurrence). Adding `[combat-trace] Shooter.set_state | post_fire_recovery (entered)` is the prerequisite for adding a fourth negative-assertion test that asserts the recovery-state trace fires when expected (not "absence of state X means Y" — the anti-pattern this rule targets).
+
+Future state-change/action-event pairs (aggro/attack, pickup/equip, dialog/advance, save/load) should land their `[combat-trace]` lines AND their negative-assertion test simultaneously. When introducing any `<noun>_<state-verb>` signal, ask: "is there a separate `<noun>_<action-verb>` event that commits to the next thing?" If yes, add both traces and an assertion for both.
+
 ## Cross-references
 
 - HTML5-renderer-specific quirks (HDR clamp, Polygon2D, service worker cache): `.claude/docs/html5-export.md`
@@ -101,3 +111,4 @@ Future bugs in this family: check the `_die` chain (death-path adds), all per-ti
 - Test bar codification: `team/TESTING_BAR.md`
 - Wave post-mortem: `team/log/2026-05-html5-visual-feedback-no-op-postmortem.md`
 - Damage formula decision: `team/decisions/DECISIONS.md` `2026-05-02 — Damage formula constants locked`
+- Playwright harness: `tests/playwright/` + design at `team/tess-qa/playwright-harness-design.md`

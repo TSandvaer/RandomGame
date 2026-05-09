@@ -452,3 +452,35 @@ All decisions grounded in this-session live reads (per `agent-verify-evidence.md
 - **PR 1:** AC2 (cold first-kill ≤60s) + AC3 (death preservation)
 - **PR 2:** AC5 (120s console silence) + AC6 (quit-relaunch)
 - **Separate tickets:** AC4 boss clear (diagnostic-build); AC7 gear drops (RNG-seed injection design)
+
+---
+
+## 11. M2 W1 expansion landed — 2026-05-09 (ticket `86c9q9de8`)
+
+**Status:** Expanded harness shipped. Single PR delivers AC2 + AC3 + AC4 (`test.fail()`) + equip-flow + negative-assertion sweep. The follow-up plan in §6 is reorganized: PR 1's AC2+AC3 are collapsed into this PR; AC4 lands now as a `test.fail()` placeholder rather than waiting on diagnostic-build. PR 2 (AC5 + AC6) and AC7 remain on the schedule.
+
+### Specs added
+
+| Spec | Status against m1-rc-1 | Notes |
+|---|---|---|
+| `ac2-first-kill.spec.ts` | green | Asserts ≤60s first-kill + weapon-scaled damage; runs death-pipeline assertion via `_force_queue_free` (the universal completion line — works for both tween-finished and safety-net-timer paths) |
+| `ac3-death-persistence.spec.ts` | green | 35 grunt hits → death → respawn → post-respawn damage=6 (proves equipped iron_sword survives `apply_death_rule`) |
+| `ac4-boss-clear.spec.ts` | `test.fail()` (failing as expected) | Drives Rooms 1-7 + boss room. Two open P0s (86c9q96fv boss damage, 86c9q96ht boss attack) make boss currently un-killable. When fixed, removes `.fail()` annotation. |
+| `equip-flow.spec.ts` | green | F5-reload survival via damage=6 round-trip. Filters known m1-rc-1 push_warning `ItemInstance.from_save_dict: unknown item id 'iron_sword'` (separate ticket-worthy, not equip-flow's concern) |
+| `negative-assertion-sweep.spec.ts` | green (3 tests) | Boot uniqueness + Room 01 no-gate + gate causality invariant |
+
+Total: 10 tests across 8 spec files (3 skeleton + 5 expansion). Two consecutive green local runs against `embergrave-html5-53a3412-m1-rc-1.zip`.
+
+### Coverage gaps documented (deferred to follow-ups)
+
+- **Equip-via-LMB-click** (P0 86c9q96m8 — "equipping an item makes equipped slot disappear"): Tab inventory panel renders on Godot CanvasLayer, not DOM-addressable from Playwright. Needs either a Godot JS bridge or a `[combat-trace] Inventory.equip` console line addition.
+- **Shooter STATE_POST_FIRE_RECOVERY ledger trace**: per dispatch §5, the negative-assertion sweep was supposed to assert this exists. Current code does NOT emit a per-state-entry ledger trace — only a `_process_post_fire | closing gap` recurrence trace. Adding the explicit `[combat-trace] Shooter.set_state | post_fire_recovery (entered)` trace is a recommended follow-up for Drew/Devon; a fourth negative-assertion test can land as a follow-up.
+- **AC4 boss-HP diagnostic env-var hook** (`EMBERGRAVE_DIAG_BOSS_HP=N`): proposed but NOT implemented. Requires orchestrator approval for game-script change before landing. Documented in `ac4-boss-clear.spec.ts` header + `tests/playwright/README.md` env vars table.
+
+### Engineering notes from the run
+
+1. **Death-pipeline tween non-determinism on Playwright cadence.** When AC2's combat loop stops attacking after the first kill, the Godot engine in Chromium can throttle frame-rate, stalling the death tween AND the safety-net SceneTreeTimer. Fix: keep firing canvas clicks during the wait window so frame ticks continue advancing. This pattern (continued-input-while-polling) is a useful primitive — likely belongs in `helpers/` for future specs that need to observe deferred trace lines after a one-shot event.
+
+2. **RoomGate state machine + player respawn point.** Player spawns at `DEFAULT_PLAYER_SPAWN=(240,200)` on every room load, BUT the gate at `(48, 144)` is to the WEST. Gate stays in `STATE_OPEN` unless the player CharacterBody2D crosses the gate trigger area first. Without that, mob deaths never trigger `_unlock` (which only fires when `_state == STATE_LOCKED`). This invariant is significant for any spec wanting to assert gate behaviour — naive "kill mobs and expect gate trace" patterns silently fail. Documented in `negative-assertion-sweep.spec.ts` Test 3 comment block.
+
+3. **Equip-flow's m1-rc-1 push_warning filter.** Save-restore in m1-rc-1 emits `USER WARNING: ItemInstance.from_save_dict: unknown item id 'iron_sword'`. The warning maps to `console.error` in HTML5 (Godot push_warning → console.error). This is an actual bug in the save-restore round-trip path — the ContentRegistry resolver isn't yet ready by the time `Inventory.restore_from_save` runs. Side-effect-free for equip flow because `equip_starter_weapon_if_needed` re-equips post-restore, but the warning is independently ticket-worthy.

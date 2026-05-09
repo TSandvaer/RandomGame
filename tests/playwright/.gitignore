@@ -1,0 +1,10 @@
+# Local build artifacts (downloaded HTML5 zips for local test runs)
+.local-builds/
+
+# Playwright runtime artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Node
+node_modules/
