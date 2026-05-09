@@ -295,7 +295,30 @@ func test_death_wait_secs_constant_sized_for_boss() -> void:
 # room_cleared directly, bypassing the door-walk requirement.
 # The missing assertion class pre-fix: "gate_unlocked does NOT fire gate_traversed
 # and does NOT directly advance the room counter."
+#
+# Test infrastructure note (Tess bounce #1): GDScript 2.0 lambda capture of
+# local-int across signal-emit boundary is unreliable. Use a RefCounted
+# Counter helper that the lambda mutates via method-call. Same pattern as the
+# pre-existing FakeExitGate above.
 # ===========================================================================
+
+## RefCounted counter helper — lambdas mutate via method call rather than
+## binding a local int (which doesn't capture-by-ref reliably across the
+## signal-emit boundary in GDScript 2.0).
+class Counter:
+	extends RefCounted
+	var n: int = 0
+	func bump() -> void:
+		n += 1
+
+
+## RefCounted ordered-event recorder — same rationale as Counter.
+class EventLog:
+	extends RefCounted
+	var events: Array[String] = []
+	func record(e: String) -> void:
+		events.append(e)
+
 
 ## P0 #1 core invariant: gate_unlocked does NOT emit gate_traversed.
 ## This is the assertion that was missing pre-fix and allowed the regression to ship.
@@ -316,15 +339,19 @@ func test_p0_gate_unlocked_does_not_fire_gate_traversed() -> void:
 ## fire when gate_unlocked fires. This directly tests the MultiMobRoom wiring fix.
 func test_p0_room_cleared_not_emitted_on_gate_unlocked() -> void:
 	var g: RoomGate = _make_gate()
+	# Tess bounce #1 fix: watch_signals must be called BEFORE any operation
+	# that could emit (mob death, traversal). Move it up.
+	watch_signals(g)
 	var m: FakeMob = _make_fake_mob()
 	g.register_mob(m)
-	# Correct wiring: room_cleared listens to gate_traversed (fixed pattern)
-	var room_cleared_count: int = 0
-	g.gate_traversed.connect(func() -> void: room_cleared_count += 1)
+	# Correct wiring: room_cleared listens to gate_traversed (fixed pattern).
+	# Counter via RefCounted helper so the lambda mutates via method call.
+	var counter: Counter = Counter.new()
+	g.gate_traversed.connect(counter.bump)
 	g.trigger_for_test(null)
 	m.die()
 	assert_signal_not_emitted(g, "gate_traversed")
-	assert_eq(room_cleared_count, 0,
+	assert_eq(counter.n, 0,
 		"REGRESSION CHECK: room_cleared count must be 0 after gate_unlocked — player has not walked through the door")
 
 
@@ -333,22 +360,23 @@ func test_p0_full_position_b_flow() -> void:
 	var g: RoomGate = _make_gate()
 	var m: FakeMob = _make_fake_mob()
 	g.register_mob(m)
-	var events: Array[String] = []
-	g.gate_unlocked.connect(func() -> void: events.append("gate_unlocked"))
-	g.gate_traversed.connect(func() -> void: events.append("gate_traversed"))
-	var room_cleared_count: int = 0
-	g.gate_traversed.connect(func() -> void: room_cleared_count += 1)
+	# RefCounted helpers — lambda capture of local Array/int unreliable in GDScript 2.0.
+	var log: EventLog = EventLog.new()
+	g.gate_unlocked.connect(func() -> void: log.record("gate_unlocked"))
+	g.gate_traversed.connect(func() -> void: log.record("gate_traversed"))
+	var counter: Counter = Counter.new()
+	g.gate_traversed.connect(counter.bump)
 	# Step 1: lock the gate (player enters room).
 	g.trigger_for_test(null)  # also sets test_skip_death_wait=true for synchronous unlock
 	# Step 2: kill last mob → gate_unlocked fires (door visual opens).
 	m.die()
-	assert_eq(events, ["gate_unlocked"], "only gate_unlocked fired so far")
-	assert_eq(room_cleared_count, 0, "room counter unchanged after gate_unlocked")
+	assert_eq(log.events, ["gate_unlocked"], "only gate_unlocked fired so far")
+	assert_eq(counter.n, 0, "room counter unchanged after gate_unlocked")
 	# Step 3: player walks through the open door → gate_traversed fires → room_cleared.
 	g.traverse_for_test()
-	assert_eq(events, ["gate_unlocked", "gate_traversed"],
+	assert_eq(log.events, ["gate_unlocked", "gate_traversed"],
 		"gate_traversed fires after door-walk, gate_unlocked fires before it")
-	assert_eq(room_cleared_count, 1,
+	assert_eq(counter.n, 1,
 		"room_cleared fires exactly once after player door-walk")
 
 
@@ -360,25 +388,25 @@ func test_p0_death_tween_wait_then_door_walk_sequence() -> void:
 	add_child_autofree(g)
 	var m: FakeMob = _make_fake_mob()
 	g.register_mob(m)
-	var room_cleared_count: int = 0
-	g.gate_traversed.connect(func() -> void: room_cleared_count += 1)
+	var counter: Counter = Counter.new()
+	g.gate_traversed.connect(counter.bump)
 	g.lock()  # lock without going through trigger_for_test (which sets skip_wait=true)
 	watch_signals(g)
 	m.die()
 	# Timer in-flight: gate still LOCKED, gate_unlocked NOT fired.
 	assert_true(g.is_locked(), "gate still LOCKED while death-tween wait pending")
 	assert_signal_not_emitted(g, "gate_unlocked", "gate_unlocked not fired yet — timer pending")
-	assert_eq(room_cleared_count, 0, "room counter = 0 during wait")
+	assert_eq(counter.n, 0, "room counter = 0 during wait")
 	# Advance timer — gate_unlocked fires (door visual opens).
 	g.advance_death_wait_for_test()
 	assert_true(g.is_unlocked(), "gate UNLOCKED after timer elapses")
 	assert_signal_emitted(g, "gate_unlocked", "gate_unlocked fired after wait")
 	assert_signal_not_emitted(g, "gate_traversed", "gate_traversed still not fired — player must walk")
-	assert_eq(room_cleared_count, 0,
+	assert_eq(counter.n, 0,
 		"REGRESSION CHECK: room counter still 0 after gate_unlocked — death-tween wait + gate_unlocked are NOT sufficient; door-walk required")
 	# Player walks through.
 	g.traverse_for_test()
-	assert_eq(room_cleared_count, 1, "room counter = 1 after door-walk")
+	assert_eq(counter.n, 1, "room counter = 1 after door-walk")
 
 
 ## P0 #1 gate_traversed is idempotent — re-entries never double-advance.
@@ -386,12 +414,12 @@ func test_p0_gate_traversed_idempotent_no_double_advance() -> void:
 	var g: RoomGate = _make_gate()
 	var m: FakeMob = _make_fake_mob()
 	g.register_mob(m)
-	var room_cleared_count: int = 0
-	g.gate_traversed.connect(func() -> void: room_cleared_count += 1)
+	var counter: Counter = Counter.new()
+	g.gate_traversed.connect(counter.bump)
 	g.trigger_for_test(null)
 	m.die()
 	g.traverse_for_test()
 	g.traverse_for_test()
 	g.traverse_for_test()
-	assert_eq(room_cleared_count, 1,
+	assert_eq(counter.n, 1,
 		"gate_traversed idempotent — room_cleared fires exactly once regardless of re-entries")

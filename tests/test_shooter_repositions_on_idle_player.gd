@@ -317,6 +317,13 @@ func test_p0_post_fire_recovery_holds_position_in_sweet_spot() -> void:
 ## recovery held velocity=ZERO; effective approach was ~27px/s.
 ## Post-fix: both AIMING and POST_FIRE_RECOVERY close the gap; approach
 ## is move_speed (60px/s) throughout. At 60px/s × 1.2s = 72px/cycle.
+##
+## Tess bounce #1 fix: enabled test_skip_projectile_spawn so the FIRING tick
+## doesn't side-effect-add a Projectile node into the test tree (which can
+## stall the simulation in headless GUT context — gap_closed observed as ~36px,
+## the AIMING-only baseline, before this skip flag landed). Manually drive
+## the state-machine entry past SPOTTED to STATE_AIMING with timer primed so
+## we measure exactly the close-the-gap behavior of AIMING + POST_FIRE_RECOVERY.
 func test_p0_room4_scenario_shooter_closes_gap_over_full_cycle() -> void:
 	# Room 4: shooter at tile (12,3) = 12*32=384px. Player at x=48 (entry area).
 	var shooter: Shooter = _make_shooter(Vector2(384.0, 96.0))
@@ -324,12 +331,19 @@ func test_p0_room4_scenario_shooter_closes_gap_over_full_cycle() -> void:
 	# Initial distance: 384-48 = 336px >> AIM_RANGE (300).
 	shooter.set_player(player)
 	shooter._is_dead = false
-	shooter._spotted_hold_left = 0.0
-	shooter._set_state(Shooter.STATE_SPOTTED)
+	# Skip the real Projectile spawn — state machine still advances FIRING →
+	# POST_FIRE_RECOVERY via the caller, but no scene-tree side effects.
+	shooter.test_skip_projectile_spawn = true
+	# Skip SPOTTED entirely: drop straight into AIMING with the timer primed.
+	# This isolates the test to the post-spotted aim+recovery cycle, removing
+	# the 0.15s SPOTTED_HOLD from the budget so all 72 ticks measure close-gap.
+	shooter._aim_left = Shooter.AIM_DURATION
+	shooter._last_aim_dir = (player.global_position - shooter.global_position).normalized()
+	shooter._set_state(Shooter.STATE_AIMING)
 
 	var start_x: float = shooter.global_position.x
 	var delta: float = 1.0 / 60.0
-	# 72 ticks = 1.2s = one full aim+recovery cycle.
+	# 72 ticks = 1.2s = one full aim+recovery cycle (0.55s AIMING + 0.65s recovery).
 	for _i: int in range(72):
 		shooter._tick_timers(delta)
 		match shooter.get_state():
