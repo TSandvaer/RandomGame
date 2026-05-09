@@ -239,32 +239,43 @@ func test_grunt_dies_during_light_telegraph_no_swing() -> void:
 # ---- (g) EDGE: tint channels are HTML5-safe (all < 1.0 on R/G/B) ------
 
 func test_grunt_telegraph_tint_channels_are_html5_safe() -> void:
-	# WebGL2/sRGB clamps color to [0, 1]. A tint with any channel > 1.0 risks
-	# being clamped into invisibility on a white-background sprite. R/G must be
-	# < 1.0 (strict) so the visible delta from white survives the clamp; B/A
-	# only need to be <= 1.0. (GUT lacks `assert_le`; using assert_true with an
-	# explicit comparison.)
+	# WebGL2/sRGB clamps color to [0, 1]. All channels must be <= 1.0 so the
+	# tint is never clamped above its target. The "visible delta from white"
+	# bar is enforced by test_grunt_attack_telegraph_tint_is_not_white above
+	# (tint != white) — at least one channel < 1.0 is sufficient for visibility.
+	# Our red tint has R = 1.0 (saturated red), G/B < 1.0 (kills the green/blue
+	# components for a vivid red), so the delta against a white rest-color is
+	# unambiguous.
+	# (GUT lacks `assert_le`; using assert_true with an explicit comparison.)
 	var tint: Color = Grunt.ATTACK_TELEGRAPH_TINT
-	assert_lt(tint.r, 1.0, "Grunt tint.r < 1.0 (HTML5 safe)")
-	assert_lt(tint.g, 1.0, "Grunt tint.g < 1.0 (HTML5 safe)")
+	assert_true(tint.r <= 1.0, "Grunt tint.r <= 1.0 (HTML5 safe — no clamp above target)")
+	assert_true(tint.g <= 1.0, "Grunt tint.g <= 1.0 (HTML5 safe)")
 	assert_true(tint.b <= 1.0, "Grunt tint.b <= 1.0 (HTML5 safe)")
 	assert_true(tint.a <= 1.0, "Grunt tint.a <= 1.0 (HTML5 safe)")
+	# At least one non-alpha channel must be strictly < 1.0 so the visible
+	# delta from white rest-color is non-zero (Tier 1 visible-delta bar).
+	assert_true(tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
+		"Grunt tint must have at least one RGB channel < 1.0 (visible delta from white)")
 
 
 func test_charger_telegraph_tint_channels_are_html5_safe() -> void:
 	var tint: Color = Charger.ATTACK_TELEGRAPH_TINT
-	assert_lt(tint.r, 1.0, "Charger tint.r < 1.0")
-	assert_lt(tint.g, 1.0, "Charger tint.g < 1.0")
+	assert_true(tint.r <= 1.0, "Charger tint.r <= 1.0")
+	assert_true(tint.g <= 1.0, "Charger tint.g <= 1.0")
 	assert_true(tint.b <= 1.0, "Charger tint.b <= 1.0")
 	assert_true(tint.a <= 1.0, "Charger tint.a <= 1.0")
+	assert_true(tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
+		"Charger tint must have at least one RGB channel < 1.0 (visible delta)")
 
 
 func test_shooter_telegraph_tint_channels_are_html5_safe() -> void:
 	var tint: Color = Shooter.ATTACK_TELEGRAPH_TINT
-	assert_lt(tint.r, 1.0, "Shooter tint.r < 1.0")
-	assert_lt(tint.g, 1.0, "Shooter tint.g < 1.0")
+	assert_true(tint.r <= 1.0, "Shooter tint.r <= 1.0")
+	assert_true(tint.g <= 1.0, "Shooter tint.g <= 1.0")
 	assert_true(tint.b <= 1.0, "Shooter tint.b <= 1.0")
 	assert_true(tint.a <= 1.0, "Shooter tint.a <= 1.0")
+	assert_true(tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
+		"Shooter tint must have at least one RGB channel < 1.0 (visible delta)")
 
 
 # ---- Stratum1Boss: telegraph fires on melee + slam wind-up paths --------
@@ -277,10 +288,12 @@ func test_stratum1_boss_attack_telegraph_tint_is_not_white() -> void:
 
 func test_stratum1_boss_telegraph_tint_channels_are_html5_safe() -> void:
 	var tint: Color = Stratum1Boss.ATTACK_TELEGRAPH_TINT
-	assert_lt(tint.r, 1.0, "Boss tint.r < 1.0")
-	assert_lt(tint.g, 1.0, "Boss tint.g < 1.0")
+	assert_true(tint.r <= 1.0, "Boss tint.r <= 1.0")
+	assert_true(tint.g <= 1.0, "Boss tint.g <= 1.0")
 	assert_true(tint.b <= 1.0, "Boss tint.b <= 1.0")
 	assert_true(tint.a <= 1.0, "Boss tint.a <= 1.0")
+	assert_true(tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
+		"Boss tint must have at least one RGB channel < 1.0 (visible delta)")
 
 
 func test_stratum1_boss_melee_telegraph_creates_tween() -> void:

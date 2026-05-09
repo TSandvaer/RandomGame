@@ -62,13 +62,13 @@ const STATE_UNLOCKED: StringName = &"unlocked"  # all mobs dead
 ## How long to wait after the last mob_died fires before emitting
 ## gate_unlocked. Sized for the WORST-case mob death visual: Stratum1Boss
 ## holds for 400ms (BOSS_DEATH_HOLD) before its 200ms scale/alpha tween fires =
-## 600ms total death visual. Regular mobs (Grunt/Charger/Shooter) only have a
-## 200ms tween, so 600ms covers them with extra slack. This ensures the mob's
-## death animation plays visibly before the door opens — fixing the Sponsor
-## soak-4 "I don't see it dying" report (Tess bounce: original 0.4s would have
-## regressed for Boss).
+## 600ms total death visual; we add 50ms of slack = 650ms. Regular mobs
+## (Grunt/Charger/Shooter) only have a 200ms tween, so 650ms covers them with
+## significant slack. This ensures the mob's death animation plays visibly
+## before the door opens — fixing the Sponsor soak-4 "I don't see it dying"
+## report (Tess bounce: original 0.4s would have regressed for Boss).
 ## Zero mobs (trivially-clear room) skips the wait and unlocks immediately.
-const DEATH_TWEEN_WAIT_SECS: float = 0.600
+const DEATH_TWEEN_WAIT_SECS: float = 0.650
 
 # ---- Layer bits (mirror project.godot) -------------------------------
 

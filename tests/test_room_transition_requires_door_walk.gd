@@ -276,12 +276,14 @@ func test_second_mob_death_during_wait_does_not_double_unlock() -> void:
 func test_death_wait_secs_constant_sized_for_boss() -> void:
 	# Bug 1.1 (Tess re-bounce): DEATH_TWEEN_WAIT_SECS must cover the boss's
 	# worst-case death visual (BOSS_DEATH_HOLD 0.400s + DEATH_TWEEN_DURATION
-	# 0.200s = 0.600s). At 0.400 the door opened 200ms before the boss
-	# finished dissolving — regression of the original "I don't see it dying"
-	# Sponsor complaint.
+	# 0.200s = 0.600s) plus a slack margin for IEEE-754 float precision drift.
+	# At 0.400 the door opened 200ms before the boss finished dissolving —
+	# regression of the original "I don't see it dying" Sponsor complaint.
 	const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 	var boss_total: float = BossScript.BOSS_DEATH_HOLD + BossScript.DEATH_TWEEN_DURATION
-	assert_true(RoomGate.DEATH_TWEEN_WAIT_SECS >= boss_total,
-		"DEATH_TWEEN_WAIT_SECS (%.3f) must cover boss total death visual (%.3f)" % [
+	# Strict >: wait must EXCEED boss total so the door open lands cleanly
+	# AFTER the death animation finishes (not at the same instant).
+	assert_gt(RoomGate.DEATH_TWEEN_WAIT_SECS, boss_total,
+		"DEATH_TWEEN_WAIT_SECS (%.3f) must exceed boss total death visual (%.3f) with slack" % [
 			RoomGate.DEATH_TWEEN_WAIT_SECS, boss_total
 		])
