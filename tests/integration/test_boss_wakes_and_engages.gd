@@ -53,6 +53,14 @@ func _make_room() -> Stratum1BossRoom:
 
 func _make_player_at(pos: Vector2) -> Player:
 	var p: Player = PlayerScript.new()
+	# Bare-construct needs a CollisionShape2D so physics overlap queries find
+	# the player. Authored Player.tscn ships radius=10 — mirror it here so the
+	# test hits the same physics surface as production.
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	var circle: CircleShape2D = CircleShape2D.new()
+	circle.radius = 10.0
+	shape.shape = circle
+	p.add_child(shape)
 	p.global_position = pos
 	add_child_autofree(p)
 	p.set_physics_process(false)
@@ -206,19 +214,22 @@ func test_boss_swing_hitbox_damages_real_player() -> void:
 
 	var b: Stratum1Boss = BossScript.new()
 	b.skip_intro_for_tests = true
-	# Position boss directly on top of the player so the spawned hitbox at
-	# `dir * MELEE_HITBOX_REACH` (44 px) overlaps the player's body. With a
-	# radius of 28 px and player at origin, even a 44-px-offset hitbox covers
-	# part of the player's body when boss is co-located. We position boss
-	# slightly to the right so dir is LEFT and hitbox lands at boss + (-44, 0)
-	# = origin (player position).
-	b.global_position = Vector2(44.0, 0.0)
+	# Place boss within MELEE_RANGE (36.0) of the player so the first chase
+	# tick begins a melee telegraph. Boss is positioned such that its swing
+	# hitbox at `dir * MELEE_HITBOX_REACH` (44 px) lands on top of the player
+	# (dir = LEFT toward player at origin → hitbox lands at boss.x - 44).
+	# Boss at x=30 → hitbox at x=30-44=-14, radius 28 → covers player at 0.
+	b.global_position = Vector2(30.0, 0.0)
 	add_child_autofree(b)
 	b.set_physics_process(false)
 	b.set_player(p)
 
-	# Tick chase → melee telegraph → swing fire.
+	# Tick 1: chase → telegraph (player at dist=30 < MELEE_RANGE=36).
 	b._physics_process(PHYS_DELTA)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
+		"precondition: boss enters melee telegraph (dist %.1f < MELEE_RANGE %.1f)"
+		% [(p.global_position - b.global_position).length(), Stratum1Boss.MELEE_RANGE])
+	# Tick 2: telegraph expires → swing fires.
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.01)
 	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING,
 		"precondition: boss has fired its swing")
