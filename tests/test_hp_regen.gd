@@ -54,8 +54,13 @@ func test_regen_activates_after_3s_of_no_damage_no_hit() -> void:
 	assert_false(p.is_regenerating,
 		"AC-1: regen must NOT activate before 3.0 s threshold")
 
-	# One more tick to cross both thresholds.
-	_tick_idle(p, PHYS_DELTA, int(0.3 / PHYS_DELTA))
+	# Cross thresholds + run long enough for the carry accumulator to credit
+	# at least one HP tick. At 2.0 HP/s with PHYS_DELTA = 1/60, the integer
+	# part of `gained = REGEN_RATE_HP_PER_SEC * delta` is 0 every frame, so the
+	# carry accumulator must accumulate >= 1.0 before HP rises. That takes
+	# ~30 ticks (0.5 s). Use 0.7 s to give headroom for the assertion (Tess CR
+	# feedback bug 2 — original 0.3 s window was below the 0.5 s carry threshold).
+	_tick_idle(p, PHYS_DELTA, int(0.7 / PHYS_DELTA))
 	assert_true(p.is_regenerating,
 		"AC-1: regen must activate after both timers exceed 3.0 s")
 	assert_gt(p.hp_current, 50,
