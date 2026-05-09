@@ -519,7 +519,11 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	# Regen interrupt: any damage resets the damage-quiet timer immediately.
 	# This must happen BEFORE hp_current changes so the regen tick this frame
 	# uses the updated timer and correctly deactivates regen (AC-2 contract).
+	# Synchronously flip is_regenerating off — waiting for the next _tick_regen
+	# call would leave a one-frame "shimmer visible after damage taken" gap that
+	# Sponsor would notice as a visual artifact (Tess CR feedback bug 1).
 	_time_since_last_damage_taken = 0.0
+	_set_regenerating(false)
 	hp_current = max(0, hp_current - clean_amount)
 	damaged.emit(clean_amount, hp_current, source)
 	hp_changed.emit(hp_current, hp_max)
@@ -992,8 +996,13 @@ func _spawn_hitbox(dir: Vector2, damage: int, knockback: Vector2, reach: float, 
 ## so out-of-combat regen cannot activate while the player is still attacking.
 ## Per Uma's spec §"Activation rule" — "hit_landed > 3.0s means one attack burst
 ## is safe to finish before the regen timer starts ticking."
+##
+## Synchronously flips is_regenerating off — same rationale as take_damage: a
+## one-frame "shimmer-after-hit" gap would be a Sponsor-visible artifact
+## (Tess CR feedback bug 1).
 func _on_hitbox_hit_target(_target: Node, _damage: int, _source: Node) -> void:
 	_time_since_last_hit_landed = 0.0
+	_set_regenerating(false)
 
 
 # ---- Input --------------------------------------------------------------
