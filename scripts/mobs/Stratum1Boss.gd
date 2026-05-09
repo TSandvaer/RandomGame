@@ -146,6 +146,14 @@ const SLAM_COOLDOWN: float = 4.0
 ## Wraps the world-time-slow that Devon's cinematic layer applies.
 const PHASE_TRANSITION_DURATION: float = 0.60
 
+## Speed (px/s) of the one-tick push-back velocity applied immediately after a
+## melee swing fires. Gives move_and_slide() a non-zero vector to eject the
+## boss from a player-overlap condition — the root cause of Bug 2 ("mob sticks
+## to player after contact-attack", M1 RC re-soak 3). The velocity is applied
+## at swing-fire time and decays naturally on the next physics tick when
+## _process_attack_recovery returns without setting velocity.
+const POST_CONTACT_PUSHBACK_SPEED: float = 60.0
+
 ## Phase 3 enrage modifiers — applied multiplicatively on top of MobDef base.
 const ENRAGE_SPEED_MULT: float = 1.5
 const ENRAGE_RECOVERY_MULT: float = 0.7  # 30% shorter recoveries
@@ -408,6 +416,10 @@ func _process_melee_telegraph(_delta: float) -> void:
 
 
 func _process_attack_recovery(_delta: float) -> void:
+	# Boss is rooted during melee recovery. Zero velocity each tick so the
+	# post-contact pushback (applied at swing-fire time to break overlap) does
+	# not persist and slide the boss away for the whole recovery window.
+	velocity = Vector2.ZERO
 	if _melee_recovery_left <= 0.0:
 		_set_state(STATE_CHASING)
 
@@ -460,6 +472,17 @@ func _fire_melee_swing() -> void:
 	_melee_recovery_left = MELEE_RECOVERY * rec_mult
 	_set_state(STATE_ATTACKING)
 	swing_spawned.emit(SWING_KIND_MELEE, hb)
+	# Apply a brief push-back velocity away from the player on swing-fire.
+	# This gives move_and_slide() the non-zero vector it needs to eject the
+	# boss from a player-overlap condition — the root cause of Bug 2
+	# ("mob sticks to player after contact-attack", M1 RC re-soak 3).
+	# _process_attack_recovery does NOT override velocity, so this survives
+	# to the move_and_slide() call at the bottom of _physics_process.
+	if _player != null:
+		var away: Vector2 = global_position - _player.global_position
+		velocity = (away.normalized() if away.length_squared() > 0.0 else -dir) * POST_CONTACT_PUSHBACK_SPEED
+	else:
+		velocity = -dir * POST_CONTACT_PUSHBACK_SPEED
 
 
 # ---- Slam attack ------------------------------------------------------

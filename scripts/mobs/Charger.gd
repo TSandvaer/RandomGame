@@ -106,6 +106,13 @@ const CHARGE_KNOCKBACK: float = 280.0
 ## on the player. Just enough to register the overlap.
 const CHARGE_HITBOX_REACH: float = 12.0
 
+## Speed (px/s) of the one-tick push-back velocity applied when the charger
+## enters recovery after a contact-attack. Gives move_and_slide() a direction
+## to eject the mob out of player overlap — without this the two
+## CharacterBody2Ds sit at zero-velocity and no separation is generated,
+## causing the "mob sticks to player" symptom (Bug 2, M1 RC re-soak 3).
+const POST_CONTACT_PUSHBACK_SPEED: float = 60.0
+
 ## When charge motion is rejected this many frames in a row, treat it as a
 ## wall hit and stop. move_and_slide reports `get_real_velocity()` close to
 ## zero when stuck; we measure post-slide displacement instead.
@@ -400,7 +407,20 @@ func _begin_charge() -> void:
 
 
 func _enter_recovery() -> void:
-	velocity = Vector2.ZERO
+	# Apply a brief push-back velocity away from the player before zeroing out.
+	# This gives move_and_slide() the non-zero vector it needs to eject the
+	# charger from a player-overlap condition on the next physics step — the
+	# root cause of Bug 2 (mob "sticks" to player after contact-attack).
+	# Only applied when we have a player reference and are close enough that
+	# overlap is plausible (within the charge hitbox envelope).
+	if _player != null:
+		var away: Vector2 = global_position - _player.global_position
+		if away.length_squared() < (CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH) * (CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH) * 4.0:
+			velocity = (away.normalized() if away.length_squared() > 0.0 else -_charge_dir) * POST_CONTACT_PUSHBACK_SPEED
+		else:
+			velocity = Vector2.ZERO
+	else:
+		velocity = Vector2.ZERO
 	_recovery_left = RECOVERY_DURATION
 	_set_state(STATE_RECOVERING)
 
