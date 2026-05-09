@@ -1,8 +1,13 @@
 name: Release to GitHub (M1 RC build)
 
-# Secret-free release path. Produces an HTML5 build, zips it, and either
-# - uploads it as a workflow artifact (manual dispatch), or
-# - attaches it to a GitHub Release (tag push of v*-rc* / v*-m1-*).
+# Secret-free release path. Produces an HTML5 build and either
+# - uploads the build directory as a workflow artifact (manual dispatch), or
+# - attaches a zip to a GitHub Release (tag push of v*-rc* / v*-m1-*).
+#
+# Artifact delivery is single-unzip: actions/upload-artifact wraps the
+# directory in one zip; Sponsor downloads and unzips once to get the
+# runnable HTML5 directory (index.html, .js, .wasm, .pck, etc.).
+# A separate zip step runs only on tag pushes for the GitHub Release attach.
 #
 # This is the M1 sign-off path while itch.io secrets aren't configured.
 # Tess and the Sponsor download the artifact from the run / release page.
@@ -174,8 +179,22 @@ jobs:
           label="${label//\//-}"
           echo "label=${label}" >> "$GITHUB_OUTPUT"
 
-      - name: Zip HTML5 build
+      - name: Upload artifact (workflow run)
+        # Upload the build directory directly — actions/upload-artifact wraps
+        # it in one zip on delivery. Sponsor downloads and unzips once to get
+        # the runnable HTML5 directory. Artifact name convention unchanged.
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.EXPORT_NAME }}-html5-${{ steps.stamp.outputs.short_sha }}
+          path: build/web/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Zip HTML5 build (release attach only)
+        # Only needed for tag-push GitHub Release attachment.
+        # Manual workflow_dispatch skips this — artifact upload above suffices.
         id: zip
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           set -euo pipefail
           mkdir -p release
@@ -183,14 +202,6 @@ jobs:
           (cd build/web && zip -r "../../release/${zip_name}" .)
           ls -la release/
           echo "zip_name=${zip_name}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload artifact (workflow run)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.EXPORT_NAME }}-html5-${{ steps.stamp.outputs.short_sha }}
-          path: release/${{ steps.zip.outputs.zip_name }}
-          retention-days: 30
-          if-no-files-found: error
 
       - name: Stage zip for release job
         # Tag pushes also create a Release; persist the zip across jobs.
