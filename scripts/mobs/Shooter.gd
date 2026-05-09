@@ -109,7 +109,7 @@ const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
 var hp_max: int = 40
 var hp_current: int = 40
-var damage_base: int = 6
+var damage_base: int = 5  # rebalanced M1 RC soak-4: was 6, now 5 (~17% reduction)
 var move_speed: float = 60.0  # kite speed (also close-the-gap speed)
 
 var _state: StringName = STATE_IDLE
@@ -119,6 +119,14 @@ var _post_fire_recovery_left: float = 0.0
 var _is_dead: bool = false
 var _last_aim_dir: Vector2 = Vector2.RIGHT
 var _player: Node2D = null
+
+# Attack-telegraph tween for the aim-state red-glow visual.
+var _attack_telegraph_tween: Tween = null
+
+## Red tint for the aim telegraph (player-journey.md Beat 6). Sub-1.0 all
+## channels for HTML5 gl_compatibility safety (PR #137 lesson).
+const ATTACK_TELEGRAPH_TINT: Color = Color(1.0, 0.30, 0.30, 1.0)  # vivid red, HTML5 safe
+const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.080
 
 # Counter for projectiles fired this life — useful for tests + future
 # stratum scaling (boss Shooter = same script, +volley logic later).
@@ -300,6 +308,8 @@ func _process_kiting(_delta: float) -> void:
 		_last_aim_dir = _vec_to_player_dir()
 		_set_state(STATE_AIMING)
 		aim_started.emit(_last_aim_dir)
+		# Attack-telegraph visual: red glow on Sprite child for aim window.
+		_play_attack_telegraph()
 		return
 	if dist < 0.0001:
 		velocity = Vector2.ZERO
@@ -322,6 +332,9 @@ func _pick_post_spotted_state() -> void:
 		_last_aim_dir = _vec_to_player_dir()
 		_set_state(STATE_AIMING)
 		aim_started.emit(_last_aim_dir)
+		# Attack-telegraph visual: red glow on Sprite child for aim window
+		# (player-journey.md Beat 6, M1 RC soak-4 fix).
+		_play_attack_telegraph()
 
 
 func _pick_post_recovery_state() -> void:
@@ -339,6 +352,8 @@ func _pick_post_recovery_state() -> void:
 		_last_aim_dir = _vec_to_player_dir()
 		_set_state(STATE_AIMING)
 		aim_started.emit(_last_aim_dir)
+		# Attack-telegraph visual: red glow on Sprite child for aim window.
+		_play_attack_telegraph()
 
 
 func _enter_kite() -> void:
@@ -398,6 +413,7 @@ func _die() -> void:
 	_post_fire_recovery_left = 0.0
 	_spotted_hold_left = 0.0
 	velocity = Vector2.ZERO
+	_cancel_attack_telegraph_tween()
 	_set_state(STATE_DEAD)
 	# CRITICAL CONTRACT (Uma `combat-visual-feedback.md` §3a): mob_died fires
 	# at the START of the death sequence; the 200ms visual decay does not
@@ -408,6 +424,45 @@ func _die() -> void:
 
 
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
+
+## Attack-telegraph visual (player-journey.md Beat 6 + M1 RC soak-4):
+## tween the Sprite child's color to red for the aim window (AIM_DURATION).
+## Sub-1.0 all channels for HTML5 gl_compatibility safety (PR #137 lesson).
+## Targets Sprite child (visible-draw node) not parent modulate (PR #115 lesson).
+func _play_attack_telegraph() -> void:
+	if not is_inside_tree():
+		return
+	var target: CanvasItem = null
+	var uses_sprite: bool = false
+	var color_at_rest: Color = Color(1, 1, 1, 1)
+	var sprite: Node = get_node_or_null("Sprite")
+	if sprite is ColorRect:
+		target = sprite as ColorRect
+		uses_sprite = true
+		color_at_rest = (sprite as ColorRect).color
+	else:
+		target = self
+		color_at_rest = modulate
+	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
+		_attack_telegraph_tween.kill()
+	_attack_telegraph_tween = create_tween()
+	var prop: String = "color" if uses_sprite else "modulate"
+	var hold_dur: float = max(0.0, AIM_DURATION - ATTACK_TELEGRAPH_TWEEN_IN * 2.0)
+	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, hold_dur)
+	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
+	_combat_trace("Shooter._play_attack_telegraph",
+		"tween_valid=%s tint=(%.2f,%.2f,%.2f)" % [
+			_attack_telegraph_tween.is_valid(),
+			ATTACK_TELEGRAPH_TINT.r, ATTACK_TELEGRAPH_TINT.g, ATTACK_TELEGRAPH_TINT.b
+		])
+
+
+func _cancel_attack_telegraph_tween() -> void:
+	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
+		_attack_telegraph_tween.kill()
+		_attack_telegraph_tween = null
+
 
 ## §2 hit-flash. Bug C fix: tween Sprite child's `color` so the flash is
 ## actually visible. See Grunt._play_hit_flash for full rationale.
@@ -543,9 +598,10 @@ func _set_state(new_state: StringName) -> void:
 
 func _apply_mob_def() -> void:
 	if mob_def == null:
+		# damage_base = 5 (rebalanced M1 RC soak-4, was 6).
 		hp_max = 40
 		hp_current = 40
-		damage_base = 6
+		damage_base = 5
 		move_speed = 60.0
 		return
 	hp_max = mob_def.hp_base

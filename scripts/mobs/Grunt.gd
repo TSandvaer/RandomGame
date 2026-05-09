@@ -47,12 +47,17 @@ signal heavy_telegraph_started()
 ## audio hooks.
 signal swing_spawned(kind: StringName, hitbox: Node)
 
+## Light-attack telegraph started. Visual hooks listen for this to play the
+## red-glow attack-incoming signal per player-journey.md Beat 6.
+signal light_telegraph_started()
+
 # ---- States ------------------------------------------------------------
 
 const STATE_IDLE: StringName = &"idle"
 const STATE_CHASING: StringName = &"chasing"
+const STATE_TELEGRAPHING_LIGHT: StringName = &"telegraphing_light"   # pre-swing windup (NEW)
 const STATE_ATTACKING: StringName = &"attacking"          # mid-swing recovery
-const STATE_TELEGRAPHING_HEAVY: StringName = &"telegraphing_heavy"  # windup
+const STATE_TELEGRAPHING_HEAVY: StringName = &"telegraphing_heavy"  # low-HP windup
 const STATE_DEAD: StringName = &"dead"
 
 const SWING_KIND_LIGHT: StringName = &"light"
@@ -83,7 +88,19 @@ const HEAVY_HITBOX_LIFETIME: float = 0.18
 const HEAVY_KNOCKBACK: float = 240.0
 const HEAVY_DAMAGE_MULTIPLIER: float = 1.8
 
-## Telegraph windup duration. Player has this long to dodge / get clear.
+## Light-attack telegraph windup. Player has this long to dodge / get clear.
+## Matches Beat 6 spec (~0.4 s). Grunt is rooted during this window.
+const LIGHT_TELEGRAPH_DURATION: float = 0.40
+
+## Attack-telegraph red tint for the Sprite child. All channels sub-1.0 so
+## WebGL2/sRGB (HTML5 gl_compatibility) never clamps them — same rule as
+## the player swing-flash (PR #137 lesson). Rest color is restored when the
+## telegraph window ends or the grunt dies.
+const ATTACK_TELEGRAPH_TINT: Color = Color(1.0, 0.30, 0.30, 1.0)  # vivid red, HTML5 safe
+const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.060   # fast ramp to red
+const ATTACK_TELEGRAPH_TWEEN_OUT: float = 0.060  # fast fade back to rest on swing-fire
+
+## Heavy telegraph windup duration. Player has this long to dodge / get clear.
 const HEAVY_TELEGRAPH_DURATION: float = 0.65
 
 ## HP fraction at-or-below which the heavy telegraph fires (one-shot).
@@ -121,14 +138,19 @@ const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
 var hp_max: int = 50
 var hp_current: int = 50
-var damage_base: int = 5
+var damage_base: int = 3  # rebalanced M1 RC soak-4: was 5, now 3 (40% reduction)
 var move_speed: float = 60.0
 
 var _state: StringName = STATE_IDLE
 var _attack_recovery_left: float = 0.0
 var _telegraph_time_left: float = 0.0
+var _light_telegraph_left: float = 0.0    # timer for STATE_TELEGRAPHING_LIGHT
+var _light_telegraph_dir: Vector2 = Vector2.RIGHT  # direction locked at telegraph start
 var _heavy_telegraph_fired: bool = false  # one-shot guard
 var _is_dead: bool = false
+
+# Attack-telegraph tween — ref kept so a death-during-telegraph can cancel it.
+var _attack_telegraph_tween: Tween = null
 
 # VFX runtime — paired with the hit-flash + death-tween cues from
 # `team/uma-ux/combat-visual-feedback.md`. Tween refs are kept so a
@@ -247,6 +269,8 @@ func _physics_process(delta: float) -> void:
 	match _state:
 		STATE_IDLE, STATE_CHASING:
 			_process_chase(delta)
+		STATE_TELEGRAPHING_LIGHT:
+			_process_light_telegraph(delta)
 		STATE_ATTACKING:
 			_process_recover(delta)
 		STATE_TELEGRAPHING_HEAVY:
@@ -270,8 +294,10 @@ func _process_chase(_delta: float) -> void:
 		velocity = Vector2.ZERO
 		return
 	if dist <= ATTACK_RANGE:
-		# In melee range — swing.
-		_swing_light(to_player.normalized())
+		# In melee range — begin light-attack telegraph (M1 RC soak-4 fix).
+		# Lock attack direction and root the grunt for LIGHT_TELEGRAPH_DURATION
+		# so the player can see the red-glow windup and react.
+		_begin_light_telegraph(to_player.normalized())
 		return
 	if dist > AGGRO_RADIUS:
 		velocity = Vector2.ZERO
@@ -282,6 +308,13 @@ func _process_chase(_delta: float) -> void:
 	_set_state(STATE_CHASING)
 
 
+func _process_light_telegraph(_delta: float) -> void:
+	# Rooted during the light-attack telegraph window.
+	velocity = Vector2.ZERO
+	if _light_telegraph_left <= 0.0:
+		_finish_light_telegraph()
+
+
 func _process_recover(_delta: float) -> void:
 	# Held in place while recovering, but knockback can still slide us.
 	if _attack_recovery_left <= 0.0:
@@ -289,10 +322,87 @@ func _process_recover(_delta: float) -> void:
 
 
 func _process_telegraph(_delta: float) -> void:
-	# During telegraph the grunt is rooted (player can dodge / step out).
+	# During heavy telegraph the grunt is rooted (player can dodge / step out).
 	velocity = Vector2.ZERO
 	if _telegraph_time_left <= 0.0:
 		_finish_heavy_telegraph()
+
+
+# ---- Light-attack telegraph -------------------------------------------
+
+func _begin_light_telegraph(dir: Vector2) -> void:
+	# Skip if already telegraphing (re-entry from same or adjacent tick).
+	if _state == STATE_TELEGRAPHING_LIGHT:
+		return
+	_light_telegraph_dir = dir
+	_light_telegraph_left = LIGHT_TELEGRAPH_DURATION
+	_set_state(STATE_TELEGRAPHING_LIGHT)
+	_play_attack_telegraph()
+	light_telegraph_started.emit()
+	_combat_trace("Grunt._begin_light_telegraph",
+		"dir=(%.2f,%.2f) duration=%.2f" % [dir.x, dir.y, LIGHT_TELEGRAPH_DURATION])
+
+
+func _finish_light_telegraph() -> void:
+	# Direction may have drifted if the player moved during the 0.4 s window.
+	# Re-resolve toward the player so the swing hits where they are now — this
+	# matches the Charger/Shooter pattern (direction resolves at fire time).
+	var dir: Vector2 = _light_telegraph_dir
+	if _player != null:
+		var to_player: Vector2 = _player.global_position - global_position
+		if to_player.length_squared() > 0.0:
+			dir = to_player.normalized()
+	_cancel_attack_telegraph_tween()
+	_swing_light(dir)
+
+
+## Play the attack-incoming red-glow on the Sprite child for the telegraph
+## window (player-journey.md Beat 6). Sub-1.0 tint on all channels for HTML5
+## gl_compatibility safety (PR #137 lesson — channels clamped to [0,1] by
+## WebGL2/sRGB). Tween targets the Sprite ColorRect child (visible-draw node),
+## NOT the parent CharacterBody2D's modulate, to avoid cascade no-ops (PR
+## #115/#140 lesson). Falls back to self.modulate for bare-instanced test mobs
+## without a Sprite child.
+func _play_attack_telegraph() -> void:
+	if not is_inside_tree():
+		return
+	# Resolve the flash target (mirrors _play_hit_flash target resolution).
+	var target: CanvasItem = null
+	var uses_sprite: bool = false
+	var color_at_rest: Color = Color(1, 1, 1, 1)
+	var sprite: Node = get_node_or_null("Sprite")
+	if sprite is ColorRect:
+		target = sprite as ColorRect
+		uses_sprite = true
+		color_at_rest = (sprite as ColorRect).color
+	else:
+		target = self
+		color_at_rest = modulate
+	# Cancel any prior telegraph tween before starting a new one (re-entry guard).
+	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
+		_attack_telegraph_tween.kill()
+	_attack_telegraph_tween = create_tween()
+	var prop: String = "color" if uses_sprite else "modulate"
+	# Ramp to red, hold for the rest of the telegraph duration, then snap back
+	# at swing-fire time via _cancel_attack_telegraph_tween.
+	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(
+		target, prop, ATTACK_TELEGRAPH_TINT,
+		max(0.0, LIGHT_TELEGRAPH_DURATION - ATTACK_TELEGRAPH_TWEEN_IN - ATTACK_TELEGRAPH_TWEEN_OUT)
+	)
+	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_OUT)
+	_combat_trace("Grunt._play_attack_telegraph",
+		"tween_valid=%s tint=(%.2f,%.2f,%.2f)" % [
+			_attack_telegraph_tween.is_valid(),
+			ATTACK_TELEGRAPH_TINT.r, ATTACK_TELEGRAPH_TINT.g, ATTACK_TELEGRAPH_TINT.b
+		])
+
+
+func _cancel_attack_telegraph_tween() -> void:
+	# Kill the telegraph tween cleanly so color returns to rest.
+	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
+		_attack_telegraph_tween.kill()
+		_attack_telegraph_tween = null
 
 
 # ---- Swings -----------------------------------------------------------
@@ -393,9 +503,11 @@ func _die() -> void:
 	_is_dead = true
 	_combat_trace("Grunt._die", "starting death sequence")
 	# Cancel any pending action timers so a death-during-telegraph doesn't
-	# pop a heavy swing on a corpse.
+	# pop a heavy or light swing on a corpse.
 	_telegraph_time_left = 0.0
+	_light_telegraph_left = 0.0
 	_attack_recovery_left = 0.0
+	_cancel_attack_telegraph_tween()
 	velocity = Vector2.ZERO
 	_set_state(STATE_DEAD)
 	# CRITICAL CONTRACT (Uma `combat-visual-feedback.md` §3a): mob_died fires
@@ -582,6 +694,8 @@ func _tick_timers(delta: float) -> void:
 		_attack_recovery_left = max(0.0, _attack_recovery_left - delta)
 	if _telegraph_time_left > 0.0:
 		_telegraph_time_left = max(0.0, _telegraph_time_left - delta)
+	if _light_telegraph_left > 0.0:
+		_light_telegraph_left = max(0.0, _light_telegraph_left - delta)
 
 
 func _set_state(new_state: StringName) -> void:
@@ -595,10 +709,10 @@ func _set_state(new_state: StringName) -> void:
 func _apply_mob_def() -> void:
 	if mob_def == null:
 		# Bare-instantiated grunt (tests). Use schema defaults already on
-		# this node's vars.
+		# this node's vars. damage_base = 3 (rebalanced M1 RC soak-4).
 		hp_max = 50
 		hp_current = 50
-		damage_base = 5
+		damage_base = 3
 		move_speed = 60.0
 		return
 	hp_max = mob_def.hp_base

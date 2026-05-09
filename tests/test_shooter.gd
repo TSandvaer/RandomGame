@@ -68,10 +68,10 @@ func test_spawns_with_full_hp_from_mobdef() -> void:
 
 func test_default_stats_when_no_mobdef() -> void:
 	var s: Shooter = _make_shooter()
-	# Spec defaults: 40 HP, 6 damage.
+	# Spec defaults: 40 HP, 5 damage (rebalanced M1 RC soak-4 — was 6).
 	assert_eq(s.get_hp(), 40)
 	assert_eq(s.get_max_hp(), 40)
-	assert_eq(s.damage_base, 6)
+	assert_eq(s.damage_base, 5)
 
 
 # ---- 2: damage signal + death --------------------------------------

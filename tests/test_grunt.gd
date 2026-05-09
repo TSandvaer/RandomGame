@@ -66,10 +66,10 @@ func test_spawns_with_full_hp_from_mobdef() -> void:
 
 func test_default_hp_when_no_mobdef_assigned() -> void:
 	var g: Grunt = _make_grunt()
-	# Per spec: 50 HP, 5 base damage if no def.
+	# Per spec: 50 HP, 3 base damage if no def (rebalanced M1 RC soak-4 — was 5).
 	assert_eq(g.get_hp(), 50)
 	assert_eq(g.get_max_hp(), 50)
-	assert_eq(g.damage_base, 5)
+	assert_eq(g.damage_base, 3)
 
 
 # ---- 2: takes damage via Hitbox layer-3 -------------------------------

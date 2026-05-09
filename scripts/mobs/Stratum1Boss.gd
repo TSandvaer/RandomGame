@@ -202,7 +202,7 @@ const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
 var hp_max: int = 600
 var hp_current: int = 600
-var damage_base: int = 15
+var damage_base: int = 12  # rebalanced M1 RC soak-4: was 15, now 12 (20% reduction)
 var move_speed_base: float = 80.0
 var move_speed: float = 80.0  # may be enrage-multiplied in phase 3
 
@@ -241,6 +241,15 @@ var _captured_modulate_at_rest: bool = false
 var _hit_flash_target: CanvasItem = null
 var _hit_flash_uses_sprite: bool = false
 var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
+
+# Attack-telegraph tween — ref kept so death-during-telegraph can cancel it.
+var _attack_telegraph_tween: Tween = null
+
+## Red tint for melee/slam telegraph (player-journey.md Beat 6). Sub-1.0 all
+## channels for HTML5 gl_compatibility safety (PR #137 lesson). Brighter than
+## grunts to make the boss wind-up clearly readable.
+const ATTACK_TELEGRAPH_TINT: Color = Color(1.0, 0.25, 0.25, 1.0)  # vivid red, HTML5 safe
+const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.080
 
 
 func _ready() -> void:
@@ -444,6 +453,9 @@ func _begin_melee_telegraph(dir: Vector2) -> void:
 	_melee_telegraph_left = MELEE_TELEGRAPH_DURATION * t_mult
 	# Stash direction in velocity (zeroed in handler) — we re-resolve on fire.
 	_set_state(STATE_TELEGRAPHING_MELEE)
+	# Attack-telegraph visual: red-glow on Sprite child (player-journey.md Beat 6
+	# + M1 RC soak-4 fix). Telegraph duration for tween = actual armed duration.
+	_play_attack_telegraph(MELEE_TELEGRAPH_DURATION * t_mult)
 	# A telegraph "tell" hitbox would emit here; we only emit the actual
 	# hitbox on swing-fire so test assertions stay simple.
 
@@ -491,6 +503,8 @@ func _begin_slam_telegraph() -> void:
 	var t_mult: float = ENRAGE_RECOVERY_MULT if phase == PHASE_3 else 1.0
 	_slam_telegraph_left = SLAM_TELEGRAPH_DURATION * t_mult
 	_set_state(STATE_TELEGRAPHING_SLAM)
+	# Attack-telegraph visual: red-glow for slam wind-up.
+	_play_attack_telegraph(SLAM_TELEGRAPH_DURATION * t_mult)
 	# A "telegraph" marker hitbox — zero damage, big radius, short life —
 	# lets the player see the danger zone. We spawn it as a real Hitbox on
 	# enemy_hitbox layer with damage=0 so it doesn't actually hurt — purely
@@ -615,6 +629,7 @@ func _die() -> void:
 	_slam_recovery_left = 0.0
 	_phase_transition_left = 0.0
 	velocity = Vector2.ZERO
+	_cancel_attack_telegraph_tween()
 	_set_state(STATE_DEAD)
 	# CRITICAL CONTRACT (Uma `combat-visual-feedback.md` §3a): boss_died
 	# fires at the START of the death sequence (this frame), NOT after the
@@ -630,6 +645,46 @@ func _die() -> void:
 
 
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
+
+## Attack-telegraph visual (player-journey.md Beat 6 + M1 RC soak-4):
+## tween Sprite child's color to red for the melee/slam telegraph window.
+## `telegraph_duration` is the actual armed duration (varies with phase 3 enrage).
+## Sub-1.0 all channels for HTML5 gl_compatibility safety (PR #137 lesson).
+## Targets Sprite child (visible-draw node) not parent modulate (PR #115 lesson).
+func _play_attack_telegraph(telegraph_duration: float) -> void:
+	if not is_inside_tree():
+		return
+	var target: CanvasItem = null
+	var uses_sprite: bool = false
+	var color_at_rest: Color = Color(1, 1, 1, 1)
+	var sprite: Node = get_node_or_null("Sprite")
+	if sprite is ColorRect:
+		target = sprite as ColorRect
+		uses_sprite = true
+		color_at_rest = (sprite as ColorRect).color
+	else:
+		target = self
+		color_at_rest = modulate
+	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
+		_attack_telegraph_tween.kill()
+	_attack_telegraph_tween = create_tween()
+	var prop: String = "color" if uses_sprite else "modulate"
+	var hold_dur: float = max(0.0, telegraph_duration - ATTACK_TELEGRAPH_TWEEN_IN * 2.0)
+	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, hold_dur)
+	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
+	_combat_trace("Stratum1Boss._play_attack_telegraph",
+		"tween_valid=%s duration=%.2f tint=(%.2f,%.2f,%.2f)" % [
+			_attack_telegraph_tween.is_valid(), telegraph_duration,
+			ATTACK_TELEGRAPH_TINT.r, ATTACK_TELEGRAPH_TINT.g, ATTACK_TELEGRAPH_TINT.b
+		])
+
+
+func _cancel_attack_telegraph_tween() -> void:
+	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
+		_attack_telegraph_tween.kill()
+		_attack_telegraph_tween = null
+
 
 ## §2 hit-flash. Identical rule across all mob types.
 ## Bug C fix: tween Sprite child's `color` so the flash is actually visible.
@@ -801,11 +856,12 @@ func _set_state(new_state: StringName) -> void:
 
 func _apply_mob_def() -> void:
 	if mob_def == null:
-		# Bare-instantiated boss (tests). Use spec defaults — 600 HP, 15 dmg,
-		# 80 px/s. Phase-2 and phase-3 thresholds resolve to 396 and 198.
+		# Bare-instantiated boss (tests). Use spec defaults — 600 HP, 12 dmg
+		# (rebalanced M1 RC soak-4, was 15), 80 px/s.
+		# Phase-2 and phase-3 thresholds resolve to 396 and 198.
 		hp_max = 600
 		hp_current = 600
-		damage_base = 15
+		damage_base = 12
 		move_speed_base = 80.0
 		move_speed = move_speed_base
 		return

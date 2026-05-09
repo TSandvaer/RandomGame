@@ -11,7 +11,19 @@ extends Area2D
 ##   2. Player crosses the gate's Area2D — `body_entered` fires, the gate
 ##      flips to LOCKED and emits `gate_locked`.
 ##   3. Each `mob_died` decrements the alive count. When the last registered
-##      mob dies, the gate flips to UNLOCKED and emits `gate_unlocked`.
+##      mob dies, the gate starts DEATH_TWEEN_WAIT_SECS delay (so the mob
+##      death animation plays visibly before the door opens), then flips to
+##      UNLOCKED and emits `gate_unlocked`.
+##
+## Position B contract (M1 RC Sponsor soak attempt 4 — ticket 86c9q8052):
+##   - "Room cleared" = all mob `mob_died` signals have fired AND the
+##     death-tween wait has elapsed, door becomes walkable, player gets a
+##     visual cue that the door opened.
+##   - "Room counter advances" = player walks through the now-open door
+##     (body_entered on the *exit* gate / StratumExit — NOT on this
+##     entry-lock gate).
+##   - The DEATH_TWEEN_WAIT_SECS delay decouples the visual tween from the
+##     gate-open so Sponsor always sees the mob die before the door opens.
 ##
 ## Edge cases handled (paired tests in `tests/test_room_gate.gd`):
 ##   - Zero mobs registered → gate is UNLOCKED on lock-trigger (room is
@@ -45,6 +57,15 @@ const STATE_OPEN: StringName = &"open"        # initial state, before lock-trigg
 const STATE_LOCKED: StringName = &"locked"    # player crossed, mobs alive
 const STATE_UNLOCKED: StringName = &"unlocked"  # all mobs dead
 
+# ---- Timing ----------------------------------------------------------
+
+## How long to wait after the last mob_died fires before emitting
+## gate_unlocked. Matches mob DEATH_TWEEN_DURATION (0.200s) + 0.2s slack =
+## 0.400s total. This ensures the mob's scale/alpha tween plays visibly before
+## the door opens — fixing the Sponsor soak-4 "I don't see it dying" report.
+## Zero mobs (trivially-clear room) skips the wait and unlocks immediately.
+const DEATH_TWEEN_WAIT_SECS: float = 0.400
+
 # ---- Layer bits (mirror project.godot) -------------------------------
 
 const LAYER_PLAYER: int = 1 << 1  # bit 2 ("player")
@@ -62,6 +83,10 @@ var _mobs_alive: int = 0
 var _registered_mobs: Array[Node] = []
 # Idempotency: ensure unlocked emits exactly once.
 var _unlocked_emitted: bool = false
+# Set true when the last mob has died and we're waiting for DEATH_TWEEN_WAIT_SECS
+# before emitting gate_unlocked. Guards against _on_mob_died being re-entered
+# (e.g. late-registered mob dying while the timer is in flight).
+var _death_wait_in_flight: bool = false
 
 
 func _ready() -> void:
@@ -204,8 +229,19 @@ func _on_mob_died(_mob: Variant, _pos: Variant = null, _def: Variant = null) -> 
 	# Signal signature varies (Grunt/Charger/Shooter all take 3 args), but
 	# we don't need any of them — we just count.
 	_mobs_alive = max(0, _mobs_alive - 1)
-	if _mobs_alive == 0 and _state == STATE_LOCKED:
-		_unlock()
+	if _mobs_alive == 0 and _state == STATE_LOCKED and not _death_wait_in_flight:
+		_death_wait_in_flight = true
+		# Position B fix (M1 RC soak-4 ticket 86c9q8052): wait for the mob's
+		# death tween to play visually before opening the door. mob_died fires
+		# at the START of the death sequence (before the 0.2 s scale/fade tween).
+		# DEATH_TWEEN_WAIT_SECS = 0.4 s (tween duration 0.2 s + 0.2 s slack)
+		# so the door always opens AFTER the ember-burst and scale/fade complete.
+		# This means Sponsor sees the mob die before the gate opens.
+		if is_inside_tree():
+			get_tree().create_timer(DEATH_TWEEN_WAIT_SECS).timeout.connect(_unlock)
+		else:
+			# No scene-tree (headless / bare-instantiated test) — unlock immediately.
+			_unlock()
 
 
 func _unlock() -> void:
