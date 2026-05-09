@@ -417,17 +417,17 @@ This is intentional. **The Stats panel showing wrong damage when surfaces diverg
 
 ## Open questions for orchestrator / Sponsor
 
-1. **Devon-vs-Drew on the Damage display format.** Devon will be the implementer of all three tickets, but the `Damage    1  (fists)` fallback design touches the FIST_DAMAGE-vs-`--` semantic call. If Drew (balance-side) wants `(fists)` to be `(unarmed)` for parallel grammar with future `(unarmored)` defense fallback, Devon can swap one string. Open until Devon dispatch — defaulting to `(fists)` for now.
+1. **Devon-vs-Drew on the Damage display format.** ~~Open until Devon dispatch — defaulting to `(fists)` for now.~~ **RESOLVED (Devon impl PR M2 W1):** kept `(fists)` per Uma default. Ships with `Damage    1  (fists)` for fistless. If Drew wants symmetrical `(unarmed)` later, that's a one-string swap — Defense fallback intentionally has no parenthetical (per design § Ticket 1: "0 is unambiguously 'no armor' without help"), so symmetric grammar isn't load-bearing.
 
-2. **SaveToast on save-failure.** Spec says: M1 toast does NOT show on `ok=false` (failure surface is the existing `push_error` console line). Does Sponsor want a red-tinted "Save failed" variant in M1? **Recommendation: NO for M1.** M1 has no recovery action for a save failure; surfacing the failure to the player creates a "what do I do" prompt with no answer. Defer to M2 if it ever fires in real play.
+2. **SaveToast on save-failure.** **RESOLVED (Devon impl):** M1 toast ignores `ok=false`; the `Save.save_completed` signal still fires on the failure path so M2+ can wire a red-tinted variant without an API change. Existing `push_error` console line remains the M1 failure surface.
 
-3. **Single Palette namespace constant for `#7AC773`.** Currently each script that needs the green will declare its own `const COLOR_EQUIPPED_INDICATOR = Color(0.478, 0.780, 0.451, 1.0)`. As the wave introduces this color's first usage, **does it warrant a single `scripts/ui/Palette.gd` autoload-or-namespace constant?** **Recommendation: NO for M2 W1; YES if a third use site appears in M2 W2.** Single-source-of-truth refactor is tempting but premature at 2 use sites.
+3. **Single Palette namespace constant for `#7AC773`.** **RESOLVED per Uma's M2 W1 recommendation (NO):** `InventoryPanel.gd` declares `COLOR_EQUIPPED_INDICATOR` + `COLOR_EQUIPPED_BADGE_PLATE` + `COLOR_EQUIPPED_BADGE_TEXT`; `SaveToast.gd` declares `COLOR_PIP` (same hex, separate constant with cross-reference docstring). Two use sites, two declarations, no shared namespace yet. If a third use site appears in M2 W2, refactor into `scripts/ui/Palette.gd` namespace.
 
-4. **Toast "Saved" copy vs. "Game saved" / "Progress saved".** Single word "Saved" is the locked spec. Sponsor's HUD-copy taste leans terse (per BootBanner copy review — `Tab for inventory` won over `Tab to open inventory`). "Saved" matches that taste. If Sponsor or Tess prefers two-word copy, change is one string. **Status: locked unless Tess/Sponsor reverses.**
+4. **Toast "Saved" copy vs. "Game saved" / "Progress saved".** **RESOLVED (Devon impl):** locked to "Saved" per Uma's terse-HUD-copy precedent.
 
-5. **Indicator color-blind accessibility.** `#7AC773` green + `#1B1A1F` dark text on the badge has high luminance contrast (~7:1) so the badge text is readable for protanopia / deuteranopia. The outline-color alone (green on dark cell) has lower contrast (~3.5:1) but the EQUIPPED badge backstops it. **Status: accessible enough for M1; revisit if Sponsor flags color-blind feedback in M2 soak.**
+5. **Indicator color-blind accessibility.** Status unchanged — accessible-enough for M1; revisit if Sponsor flags it.
 
-6. **Toast position interaction with the BootBanner.** `team/uma-ux/sponsor-soak-checklist-v2.md` §0.3 places the BootBanner bottom-CENTER. The toast is bottom-RIGHT, ~260 px from edge. They should not overlap. Devon should confirm at dispatch time that the BootBanner's actual rendered width + the toast's `120 px` plate at offset `-260, -64` don't collide visually. **Recommendation: if collision, lower the toast to `-260, -32` (closer to bottom edge, below BootBanner).**
+6. **Toast position interaction with the BootBanner.** **RESOLVED (Devon impl):** BootBanner sits bottom-CENTER with `offset_top = -150` (Main.gd:639) and ends at `offset_bottom = -32`. Toast sits bottom-RIGHT at `(-260, -64)` — 260 px from the right edge, 64 px above the bottom. The two regions don't overlap (BootBanner is centered text spanning vertically from -150 to -32; toast plate is 120 × 28 starting at -260 from the right at y=-64 from the bottom). Visual confirmation in HTML5 release-build screenshot.
 
 ---
 

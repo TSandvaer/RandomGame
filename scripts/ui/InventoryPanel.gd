@@ -68,6 +68,15 @@ const COLOR_HINT: Color = Color(0.7215686275, 0.6745098039, 0.5568627451, 1.0) #
 const COLOR_DISABLED: Color = Color(0.3764705882, 0.3607843137, 0.3137254902, 1.0)  # #605C50
 const COLOR_CELL_EMPTY: Color = Color(0.2274509804, 0.2078431373, 0.2509803922, 0.4)  # #3A3540 @40%
 
+## Shared "positive-affirmation green" — first use site for the palette.md
+## "Heal popup (M2+)" reservation. Used for the equipped-row outline + the
+## EQUIPPED badge plate. Single source of truth so SaveToast can read the
+## same hex (see `team/uma-ux/m2-w1-ux-polish-design.md` § "Shared vocabulary").
+## All channels strictly sub-1.0 — HTML5 HDR-clamp safe.
+const COLOR_EQUIPPED_INDICATOR: Color = Color(0.478, 0.780, 0.451, 1.0)  # #7AC773
+const COLOR_EQUIPPED_BADGE_PLATE: Color = Color(0.478, 0.780, 0.451, 0.92)  # #7AC773 @92%
+const COLOR_EQUIPPED_BADGE_TEXT: Color = Color(0.10588235, 0.10196078, 0.12156863, 1.0)  # #1B1A1F
+
 # Tier colors (Uma palette.md).
 const TIER_COLORS: Dictionary = {
 	0: Color(0.788, 0.760, 0.698, 1.0),  # T1 #C9C2B2
@@ -249,9 +258,16 @@ func _refresh_stats() -> void:
 	bbc += "Edge       %d\n" % e
 	bbc += "\n"
 	bbc += "HP        %d / %d\n" % [hp_cur, hp_max]
-	bbc += "Damage    --\n"
-	bbc += "Defense   --\n"
-	bbc += "Crit      --\n"
+	# Damage / Defense lines read the equipped-Inventory surface — NOT the
+	# Player surface (per `.claude/docs/combat-architecture.md` §
+	# "Equipped-weapon dual-surface rule"). The panel is a faithful reporter
+	# of Inventory state; combat reads Player state. The two are kept in
+	# lockstep via `Inventory.equip()` → `_apply_equip_to_player()`.
+	bbc += _build_damage_line()
+	bbc += _build_defense_line()
+	# Crit is M2+ scope — `Damage.compute_player_damage` doesn't roll crit in
+	# M1. Forward-compat tag so the `--` is not ambiguous.
+	bbc += "Crit      --  [color=#B8AC8E](M2)[/color]\n"
 	bbc += "\n"
 	if unspent > 0:
 		bbc += "[color=#FF6A2A]STAT POINTS UNSPENT: %d[/color]\n" % unspent
@@ -262,6 +278,40 @@ func _refresh_stats() -> void:
 			_xp_label.text = "XP   %d / %d" % [xp, xp + xp_to_next]
 		else:
 			_xp_label.text = "XP   max"
+
+
+## Build the BBCode "Damage" line for `_refresh_stats`. Reads from
+## `Inventory.get_equipped(&"weapon")`. Fistless = `1` (FIST_DAMAGE) with a
+## muted-parchment `(fists)` tag so the `1` is unambiguous (per Uma's design
+## doc § Ticket 1 — `(fists)` clarifies that 1 is a real value, not a
+## placeholder). Reuses the constant from `scripts/combat/Damage.gd` so the
+## displayed value matches what the next swing actually deals (Inventory
+## surface only — combat-reads-Player; see combat-architecture.md §
+## "Equipped-weapon dual-surface rule").
+func _build_damage_line() -> String:
+	const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
+	var inv: Node = _inventory_node()
+	var weapon: ItemInstance = null
+	if inv != null and inv.has_method("get_equipped"):
+		weapon = inv.get_equipped(&"weapon") as ItemInstance
+	if weapon != null and weapon.def != null and weapon.def.base_stats != null:
+		return "Damage    %d\n" % int(weapon.def.base_stats.damage)
+	# Fistless fallback — FIST_DAMAGE is the constant the actual swing uses.
+	return "Damage    %d  [color=#B8AC8E](fists)[/color]\n" % int(DamageScript.FIST_DAMAGE)
+
+
+## Build the BBCode "Defense" line for `_refresh_stats`. Reads from
+## `Inventory.get_equipped(&"armor")`. No-armor fallback shows `0` without a
+## parenthetical — `0` is unambiguously "no reduction" (per Uma's design
+## doc § Ticket 1).
+func _build_defense_line() -> String:
+	var inv: Node = _inventory_node()
+	var armor: ItemInstance = null
+	if inv != null and inv.has_method("get_equipped"):
+		armor = inv.get_equipped(&"armor") as ItemInstance
+	if armor != null and armor.def != null and armor.def.base_stats != null:
+		return "Defense   %d\n" % int(armor.def.base_stats.armor)
+	return "Defense   0\n"
 
 
 func _refresh_equipped_row() -> void:
@@ -277,6 +327,12 @@ func _refresh_equipped_row() -> void:
 		if inv.has_method("get_equipped"):
 			item = inv.get_equipped(slot) as ItemInstance
 		_render_cell(btn, item, slot in [&"weapon", &"armor"])
+		# Equipped-state visual distinction (Ticket 3 — `86c9q7p48`). Show
+		# the green outline + EQUIPPED badge iff the slot has an item. The
+		# indicator nodes were built in `_build_equipped_row`; this just
+		# flips visibility — pure projection of `Inventory._equipped[slot]`,
+		# stateless across F5-reload.
+		_set_equipped_indicator(btn, item != null)
 
 
 func _refresh_grid() -> void:
@@ -503,6 +559,103 @@ func _build_equipped_row() -> void:
 		btn.gui_input.connect(_on_equipped_btn_gui_input.bind(slot))
 		hbox.add_child(btn)
 		_equipped_cells[slot] = btn
+		# Equipped-state indicators (Ticket 3 — `86c9q7p48`). 4 outline
+		# ColorRects + 1 EQUIPPED badge (ColorRect plate + Label text). All
+		# default-hidden; `_set_equipped_indicator` flips them on when the
+		# slot has an item. Per Uma's design § "Visual spec (locked)":
+		#   - 2 px green outline on all 4 sides, color #7AC773
+		#   - 60 × 12 px EQUIPPED badge at top-left, font color #1B1A1F on
+		#     #7AC773 plate (high-contrast for color-blind readers)
+		# All ColorRects + Label render identically in `gl_compatibility`
+		# (HTML5) and `forward_plus` (desktop) — zero Polygon2D, all colors
+		# strictly sub-1.0 per channel.
+		_build_equipped_indicators_for_slot(btn)
+
+
+## Builds the 4 outline ColorRects + 1 badge (ColorRect plate + Label) as
+## children of the equipped-slot Button. All start hidden — `_set_equipped_indicator`
+## flips them on when the slot has an item. Names are stable so tests can
+## look them up via `find_child` (or via the public `get_equipped_indicator_*`
+## accessors) and assert visibility / color.
+##
+## Layout (per Uma's `m2-w1-ux-polish-design.md` § Ticket 3 visual spec):
+##   - top    edge: ColorRect at (0, -2)   size (96, 2)
+##   - bottom edge: ColorRect at (0, 96)   size (96, 2)
+##   - left   edge: ColorRect at (-2, -2)  size (2, 100)
+##   - right  edge: ColorRect at (96, -2)  size (2, 100)
+##   - badge  plate: ColorRect at (2, 2)   size (60, 12)
+##   - badge  text:  Label  text="EQUIPPED" centered on plate
+##
+## All children have `mouse_filter = MOUSE_FILTER_IGNORE` so they don't
+## intercept clicks on the Button. Default `z_index = 0`; the Button paints
+## first, then children paint on top in tree order — outline + badge sit
+## visually above the button surface (which is what we want).
+func _build_equipped_indicators_for_slot(btn: Button) -> void:
+	if btn == null:
+		return
+	# Top edge
+	var top_edge: ColorRect = _make_outline_edge(Vector2(0, -2), Vector2(96, 2))
+	top_edge.name = "OutlineTop"
+	btn.add_child(top_edge)
+	# Bottom edge
+	var bottom_edge: ColorRect = _make_outline_edge(Vector2(0, 96), Vector2(96, 2))
+	bottom_edge.name = "OutlineBottom"
+	btn.add_child(bottom_edge)
+	# Left edge
+	var left_edge: ColorRect = _make_outline_edge(Vector2(-2, -2), Vector2(2, 100))
+	left_edge.name = "OutlineLeft"
+	btn.add_child(left_edge)
+	# Right edge
+	var right_edge: ColorRect = _make_outline_edge(Vector2(96, -2), Vector2(2, 100))
+	right_edge.name = "OutlineRight"
+	btn.add_child(right_edge)
+	# Badge plate
+	var plate: ColorRect = ColorRect.new()
+	plate.name = "BadgePlate"
+	plate.color = COLOR_EQUIPPED_BADGE_PLATE
+	plate.position = Vector2(2, 2)
+	plate.size = Vector2(60, 12)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.visible = false
+	btn.add_child(plate)
+	# Badge text — Label child of the plate so it scrolls with the plate if
+	# layout ever shifts.
+	var badge_label: Label = Label.new()
+	badge_label.name = "BadgeLabel"
+	badge_label.text = "EQUIPPED"
+	badge_label.add_theme_color_override("font_color", COLOR_EQUIPPED_BADGE_TEXT)
+	badge_label.add_theme_font_size_override("font_size", 9)
+	badge_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.add_child(badge_label)
+
+
+## Helper — build one outline-edge ColorRect at the given position/size with
+## the shared positive-green color, default-hidden. Mouse filter ignore so
+## the strip doesn't eat clicks on the Button.
+func _make_outline_edge(pos: Vector2, sz: Vector2) -> ColorRect:
+	var edge: ColorRect = ColorRect.new()
+	edge.color = COLOR_EQUIPPED_INDICATOR
+	edge.position = pos
+	edge.size = sz
+	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	edge.visible = false
+	return edge
+
+
+## Toggle visibility of the 4 outline ColorRects + badge plate on the given
+## equipped-slot Button. Invoked from `_refresh_equipped_row` whenever the
+## equipped-row signal fires (or on panel `open()`). Stateless projection of
+## `Inventory.get_equipped(slot) != null`.
+func _set_equipped_indicator(btn: Button, has_item: bool) -> void:
+	if btn == null:
+		return
+	for child_name in ["OutlineTop", "OutlineBottom", "OutlineLeft", "OutlineRight", "BadgePlate"]:
+		var node: Node = btn.get_node_or_null(child_name)
+		if node is CanvasItem:
+			(node as CanvasItem).visible = has_item
 
 
 func _build_inventory_grid() -> void:
