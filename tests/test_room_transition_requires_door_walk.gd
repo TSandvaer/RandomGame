@@ -287,3 +287,111 @@ func test_death_wait_secs_constant_sized_for_boss() -> void:
 		"DEATH_TWEEN_WAIT_SECS (%.3f) must exceed boss total death visual (%.3f) with slack" % [
 			RoomGate.DEATH_TWEEN_WAIT_SECS, boss_total
 		])
+
+
+# ===========================================================================
+# SHARPENED TESTS — P0 regression (ticket 86c9q94fg, build 356086a)
+# These tests specifically catch the regression where gate_unlocked fired
+# room_cleared directly, bypassing the door-walk requirement.
+# The missing assertion class pre-fix: "gate_unlocked does NOT fire gate_traversed
+# and does NOT directly advance the room counter."
+# ===========================================================================
+
+## P0 #1 core invariant: gate_unlocked does NOT emit gate_traversed.
+## This is the assertion that was missing pre-fix and allowed the regression to ship.
+func test_p0_gate_unlocked_does_not_fire_gate_traversed() -> void:
+	var g: RoomGate = _make_gate()
+	var m: FakeMob = _make_fake_mob()
+	g.register_mob(m)
+	watch_signals(g)
+	g.trigger_for_test(null)   # lock; test_skip_death_wait=true sets immediate unlock
+	m.die()                     # gate_unlocked fires
+	assert_signal_emitted(g, "gate_unlocked",
+		"gate_unlocked fires after all mobs die (sanity check)")
+	assert_signal_not_emitted(g, "gate_traversed",
+		"REGRESSION CHECK: gate_traversed must NOT fire on gate_unlocked — requires explicit door-walk")
+
+
+## P0 #1 wiring invariant: room_cleared (connected to gate_traversed) does NOT
+## fire when gate_unlocked fires. This directly tests the MultiMobRoom wiring fix.
+func test_p0_room_cleared_not_emitted_on_gate_unlocked() -> void:
+	var g: RoomGate = _make_gate()
+	var m: FakeMob = _make_fake_mob()
+	g.register_mob(m)
+	# Correct wiring: room_cleared listens to gate_traversed (fixed pattern)
+	var room_cleared_count: int = 0
+	g.gate_traversed.connect(func() -> void: room_cleared_count += 1)
+	g.trigger_for_test(null)
+	m.die()
+	assert_signal_not_emitted(g, "gate_traversed")
+	assert_eq(room_cleared_count, 0,
+		"REGRESSION CHECK: room_cleared count must be 0 after gate_unlocked — player has not walked through the door")
+
+
+## P0 #1 full flow: mob die → gate_unlocked → player walks → gate_traversed → room_cleared.
+func test_p0_full_position_b_flow() -> void:
+	var g: RoomGate = _make_gate()
+	var m: FakeMob = _make_fake_mob()
+	g.register_mob(m)
+	var events: Array[String] = []
+	g.gate_unlocked.connect(func() -> void: events.append("gate_unlocked"))
+	g.gate_traversed.connect(func() -> void: events.append("gate_traversed"))
+	var room_cleared_count: int = 0
+	g.gate_traversed.connect(func() -> void: room_cleared_count += 1)
+	# Step 1: lock the gate (player enters room).
+	g.trigger_for_test(null)  # also sets test_skip_death_wait=true for synchronous unlock
+	# Step 2: kill last mob → gate_unlocked fires (door visual opens).
+	m.die()
+	assert_eq(events, ["gate_unlocked"], "only gate_unlocked fired so far")
+	assert_eq(room_cleared_count, 0, "room counter unchanged after gate_unlocked")
+	# Step 3: player walks through the open door → gate_traversed fires → room_cleared.
+	g.traverse_for_test()
+	assert_eq(events, ["gate_unlocked", "gate_traversed"],
+		"gate_traversed fires after door-walk, gate_unlocked fires before it")
+	assert_eq(room_cleared_count, 1,
+		"room_cleared fires exactly once after player door-walk")
+
+
+## P0 #1 death-tween wait: with the timer active, gate_unlocked fires AFTER the
+## wait; room counter is 0 throughout until explicit door-walk.
+func test_p0_death_tween_wait_then_door_walk_sequence() -> void:
+	var g: RoomGate = RoomGateScript.new()
+	g.test_skip_death_wait = false  # keep the wait active
+	add_child_autofree(g)
+	var m: FakeMob = _make_fake_mob()
+	g.register_mob(m)
+	var room_cleared_count: int = 0
+	g.gate_traversed.connect(func() -> void: room_cleared_count += 1)
+	g.lock()  # lock without going through trigger_for_test (which sets skip_wait=true)
+	watch_signals(g)
+	m.die()
+	# Timer in-flight: gate still LOCKED, gate_unlocked NOT fired.
+	assert_true(g.is_locked(), "gate still LOCKED while death-tween wait pending")
+	assert_signal_not_emitted(g, "gate_unlocked", "gate_unlocked not fired yet — timer pending")
+	assert_eq(room_cleared_count, 0, "room counter = 0 during wait")
+	# Advance timer — gate_unlocked fires (door visual opens).
+	g.advance_death_wait_for_test()
+	assert_true(g.is_unlocked(), "gate UNLOCKED after timer elapses")
+	assert_signal_emitted(g, "gate_unlocked", "gate_unlocked fired after wait")
+	assert_signal_not_emitted(g, "gate_traversed", "gate_traversed still not fired — player must walk")
+	assert_eq(room_cleared_count, 0,
+		"REGRESSION CHECK: room counter still 0 after gate_unlocked — death-tween wait + gate_unlocked are NOT sufficient; door-walk required")
+	# Player walks through.
+	g.traverse_for_test()
+	assert_eq(room_cleared_count, 1, "room counter = 1 after door-walk")
+
+
+## P0 #1 gate_traversed is idempotent — re-entries never double-advance.
+func test_p0_gate_traversed_idempotent_no_double_advance() -> void:
+	var g: RoomGate = _make_gate()
+	var m: FakeMob = _make_fake_mob()
+	g.register_mob(m)
+	var room_cleared_count: int = 0
+	g.gate_traversed.connect(func() -> void: room_cleared_count += 1)
+	g.trigger_for_test(null)
+	m.die()
+	g.traverse_for_test()
+	g.traverse_for_test()
+	g.traverse_for_test()
+	assert_eq(room_cleared_count, 1,
+		"gate_traversed idempotent — room_cleared fires exactly once regardless of re-entries")

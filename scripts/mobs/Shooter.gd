@@ -268,6 +268,8 @@ func _process_aiming(_delta: float) -> void:
 			# if we reach AIM_RANGE before the timer expires, velocity drops to
 			# ZERO on the next tick and the remaining windup completes standing still.
 			velocity = _vec_to_player_dir() * move_speed
+			_combat_trace("Shooter._process_aiming",
+				"dist=%.0f > AIM_RANGE=%.0f, velocity=(%.0f,%.0f)" % [dist, AIM_RANGE, velocity.x, velocity.y])
 		else:
 			velocity = Vector2.ZERO
 	else:
@@ -287,7 +289,27 @@ func _process_firing(_delta: float) -> void:
 
 
 func _process_post_fire(_delta: float) -> void:
-	velocity = Vector2.ZERO
+	# P0 #2 fix (ticket 86c9q7p4j): during POST_FIRE_RECOVERY, continue walking
+	# toward the player if dist > AIM_RANGE. Previously velocity=ZERO here, so
+	# the Shooter only closed the gap during the 0.55s AIMING window (gaining
+	# ~33px/cycle at 60px/s). With a 0.65s recovery window also zeroed, the
+	# effective close-the-gap speed was only ~27px/s averaged over the full
+	# aim+recovery cycle, meaning a player standing idle at 384px (Room 4 initial
+	# distance) was never reliably reached before the Sponsor stopped waiting.
+	# Fix: mirror the AIMING close-the-gap logic here. The Shooter walks toward
+	# the player at full move_speed during recovery when out of the sweet spot,
+	# exactly as it does while aiming. Kite interrupts still apply from AIMING.
+	if _player != null:
+		var dist: float = (_player.global_position - global_position).length()
+		if dist > AIM_RANGE:
+			# Still out of sweet spot — keep closing the gap during recovery.
+			velocity = _vec_to_player_dir() * move_speed
+			_combat_trace("Shooter._process_post_fire",
+				"dist=%.0f > AIM_RANGE=%.0f, closing gap at move_speed=%.0f" % [dist, AIM_RANGE, move_speed])
+		else:
+			velocity = Vector2.ZERO
+	else:
+		velocity = Vector2.ZERO
 	if _post_fire_recovery_left <= 0.0:
 		_pick_post_recovery_state()
 

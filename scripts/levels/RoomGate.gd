@@ -51,6 +51,17 @@ signal gate_locked()
 ## next-room exit / marking the room cleared.
 signal gate_unlocked()
 
+## Player walked through the gate after it was unlocked (UNLOCKED state,
+## CharacterBody2D body_entered). This is the "door-walk" signal that drives
+## room-counter advancement (Position B contract). Emits exactly once per
+## gate lifetime — idempotent.
+##
+## Design: gate_unlocked purely signals the visual door-open; gate_traversed
+## signals that the player actually chose to walk through. MultiMobRoom
+## listens here (not gate_unlocked) to emit room_cleared, ensuring the room
+## counter only advances when the player walks through the open door.
+signal gate_traversed()
+
 # ---- States ----------------------------------------------------------
 
 const STATE_OPEN: StringName = &"open"        # initial state, before lock-trigger
@@ -87,6 +98,8 @@ var _mobs_alive: int = 0
 var _registered_mobs: Array[Node] = []
 # Idempotency: ensure unlocked emits exactly once.
 var _unlocked_emitted: bool = false
+# Idempotency guard for gate_traversed: emit once at most.
+var _traversed_emitted: bool = false
 # Set true when the last mob has died and we're waiting for DEATH_TWEEN_WAIT_SECS
 # before emitting gate_unlocked. Guards against _on_mob_died being re-entered
 # (e.g. late-registered mob dying while the timer is in flight).
@@ -218,9 +231,6 @@ func trigger_for_test(_body: Node = null) -> void:
 # ---- Internal -------------------------------------------------------
 
 func _on_body_entered(body: Node) -> void:
-	# Only first-cross matters; ignore re-entries.
-	if _state != STATE_OPEN:
-		return
 	# Bug 1 fix (ticket 86c9q7xgx): only a CharacterBody2D on the player
 	# physics layer should advance this gate. Area2D-derived nodes (Hitbox,
 	# Projectile) cannot trigger body_entered per Godot 4 physics semantics —
@@ -230,6 +240,21 @@ func _on_body_entered(body: Node) -> void:
 	# This explicit CharacterBody2D check is a belt-and-suspenders defence
 	# so a bare Node or a future refactor can never gate-trip by accident.
 	if not body is CharacterBody2D:
+		return
+	# Position B contract (ticket 86c9q94fg):
+	#   OPEN → lock (player enters room, mobs still alive).
+	#   UNLOCKED → gate_traversed (player walks through the already-open door).
+	# These are two distinct events. Room-counter advancement MUST be driven by
+	# the traversal (second case), NOT by gate_unlocked (which is purely visual).
+	# [combat-trace] ROOM_GATE_TRAVERSED fires here, before room_cleared.
+	if _state == STATE_UNLOCKED:
+		if not _traversed_emitted:
+			_traversed_emitted = true
+			_combat_trace("RoomGate.gate_traversed", "player walked through open door — emitting gate_traversed")
+			gate_traversed.emit()
+		return
+	# Only first-cross into a locked room matters; ignore re-entries in other states.
+	if _state != STATE_OPEN:
 		return
 	lock()
 
@@ -295,9 +320,36 @@ func advance_death_wait_for_test() -> void:
 	_unlock()
 
 
+## Test helper: simulate a CharacterBody2D player walking through the gate
+## while it is in UNLOCKED state. Emits gate_traversed exactly once (same
+## idempotency as the real path). Used by tests that assert the Position B
+## contract: gate_unlocked fires (door opens) → separate call to
+## traverse_for_test → gate_traversed fires → room_cleared fires.
+func traverse_for_test() -> void:
+	if _state != STATE_UNLOCKED:
+		return
+	if _traversed_emitted:
+		return
+	_traversed_emitted = true
+	gate_traversed.emit()
+
+
 func _unlock() -> void:
 	if _unlocked_emitted:
 		return
 	_unlocked_emitted = true
 	_state = STATE_UNLOCKED
+	_combat_trace("RoomGate._unlock", "gate_unlocked emitting — door visual opens; waiting for player door-walk to fire gate_traversed")
 	gate_unlocked.emit()
+
+
+## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
+## Same pattern as mob _combat_trace helpers; emits in HTML5 builds so
+## Sponsor's DevTools console can confirm the gate_unlocked → gate_traversed
+## ordering without a native build.
+func _combat_trace(tag: String, msg: String = "") -> void:
+	var df: Node = null
+	if is_inside_tree():
+		df = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(tag, msg)
