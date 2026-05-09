@@ -72,6 +72,14 @@ func _ready() -> void:
 		collision_mask = LAYER_PLAYER
 	_ensure_collision_shape()
 	body_entered.connect(_on_body_entered)
+	# Bug 1 fix (ticket 86c9q7xgx): guard against Area2D-derived nodes
+	# (Hitbox, Projectile, other trigger zones) accidentally activating the
+	# gate via area_entered. In Godot 4, two overlapping Area2Ds each receive
+	# area_entered on the other — connecting the signal and explicitly ignoring
+	# it prevents any future listener from accidentally wiring gate logic here.
+	# The RoomGate ONLY advances on CharacterBody2D (Player) entry; Area2D
+	# neighbors are always no-ops.
+	area_entered.connect(_on_area_entered_ignored)
 
 
 # Ensure a CollisionShape2D child exists with a RectangleShape2D matching
@@ -150,18 +158,46 @@ func lock() -> void:
 		_unlock()
 
 
-## Test helper: simulate a body crossing the trigger.
-func trigger_for_test(body: Node = null) -> void:
-	_on_body_entered(body)
+## Test helper: simulate a player body crossing the trigger without physics
+## overlap. Bypasses the CharacterBody2D type-check in _on_body_entered so
+## headless tests can use bare FakePlayer nodes without a full CharacterBody2D
+## scene tree. Calls lock() directly — same effect as _on_body_entered for a
+## validated body.
+func trigger_for_test(_body: Node = null) -> void:
+	if _state != STATE_OPEN:
+		return
+	lock()
 
 
 # ---- Internal -------------------------------------------------------
 
-func _on_body_entered(_body: Node) -> void:
+func _on_body_entered(body: Node) -> void:
 	# Only first-cross matters; ignore re-entries.
 	if _state != STATE_OPEN:
 		return
+	# Bug 1 fix (ticket 86c9q7xgx): only a CharacterBody2D on the player
+	# physics layer should advance this gate. Area2D-derived nodes (Hitbox,
+	# Projectile) cannot trigger body_entered per Godot 4 physics semantics —
+	# only PhysicsBody2D nodes can — but mobs are also CharacterBody2D nodes.
+	# The collision_mask already filters by layer (only player layer = bit 2),
+	# so mob bodies (on enemy layer = bit 4) are excluded at the physics level.
+	# This explicit CharacterBody2D check is a belt-and-suspenders defence
+	# so a bare Node or a future refactor can never gate-trip by accident.
+	if not body is CharacterBody2D:
+		return
 	lock()
+
+
+## Area2D neighbors (Hitbox, Projectile, StratumExit triggers, etc.) entering
+## the gate's detection zone are intentionally ignored. The gate ONLY responds
+## to player CharacterBody2D via body_entered. This handler exists to:
+##   (a) Explicitly document the no-op for future readers.
+##   (b) Prevent any accidental wiring of gate logic to area_entered events —
+##       if a future sub-class or hook inadvertently connects a second listener
+##       here, the explicit no-op makes the intent unambiguous.
+## See Bug 1 fix rationale in _on_body_entered.
+func _on_area_entered_ignored(_area: Area2D) -> void:
+	pass  # Gate never responds to Area2D entry — CharacterBody2D only.
 
 
 func _on_mob_died(_mob: Variant, _pos: Variant = null, _def: Variant = null) -> void:

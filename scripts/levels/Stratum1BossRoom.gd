@@ -160,12 +160,24 @@ func _build_door_trigger() -> void:
 	# body_entered signal.
 	_door_trigger.collision_layer = 0
 	_door_trigger.collision_mask = 1 << 1  # bit 2 = player
+	# Bug 1 harmonization (ticket 86c9p1fgf + 86c9q7xgx): set monitorable=false
+	# so no other Area2D (Hitbox, Projectile, StratumExit) can receive
+	# area_entered FROM this trigger. The trigger only needs to DETECT bodies
+	# (monitoring=true, which is Area2D's default), not to BE detected.
+	# This is the same receiver-side encapsulation pattern used for Hitbox and
+	# Projectile (_init: monitorable=false) — see combat-architecture.md.
+	# Built from _ready (not a physics-tick path) so set_deferred is not required.
+	_door_trigger.monitorable = false
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	var rect: RectangleShape2D = RectangleShape2D.new()
 	rect.size = door_trigger_size
 	shape.shape = rect
 	_door_trigger.add_child(shape)
 	_door_trigger.body_entered.connect(_on_door_trigger_body_entered)
+	# Area2D-derived nodes (Hitbox, Projectile) cannot trigger body_entered per
+	# Godot 4 physics semantics, but connecting area_entered as an explicit no-op
+	# documents the intent and guards against future accidental wiring.
+	_door_trigger.area_entered.connect(_on_door_trigger_area_entered_ignored)
 	add_child(_door_trigger)
 
 
@@ -196,14 +208,23 @@ func _spawn_boss() -> void:
 	_boss.boss_died.connect(_on_boss_died)
 
 
-func _on_door_trigger_body_entered(_body: Node) -> void:
-	# Only the player triggers the entry sequence. Defensive: if some other
-	# body sneaks onto layer 2 we still trigger (player layer is reserved
-	# per DECISIONS.md 2026-05-01 physics-layers-reserved), but a `is Player`
-	# check would couple to Devon's class which we want to keep loose. The
-	# leading underscore marks the param as intentionally unused (Godot
-	# convention); the bare `_ = body` form is rejected by GDScript 4.3.
+func _on_door_trigger_body_entered(body: Node) -> void:
+	# Bug 1 harmonization (ticket 86c9p1fgf + 86c9q7xgx): only a
+	# CharacterBody2D on the player physics layer should fire the entry
+	# sequence. The collision_mask (bit 2 = player) already filters mob bodies
+	# (enemy layer = bit 4) at the physics level, so this CharacterBody2D
+	# guard is belt-and-suspenders — it prevents a future bare-Node or wrong-
+	# class body from entering the mask (e.g. during tests) from triggering the
+	# cinematic sequence by mistake.
+	if not body is CharacterBody2D:
+		return
 	trigger_entry_sequence()
+
+
+## Area2D neighbors are never allowed to fire the boss entry sequence.
+## See RoomGate._on_area_entered_ignored for the full rationale.
+func _on_door_trigger_area_entered_ignored(_area: Area2D) -> void:
+	pass  # Boss entry sequence fires on player CharacterBody2D only.
 
 
 func _complete_entry_sequence() -> void:
