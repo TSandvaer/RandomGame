@@ -27,9 +27,13 @@ extends Node
 ##   Inventory.get_items()           -> Array[ItemInstance]   read-only snapshot
 ##   Inventory.get_capacity()        -> int    24
 ##   Inventory.is_full()             -> bool
-##   Inventory.equip(item, slot)     -> bool   item must be in inventory; on
+##   Inventory.equip(item, slot, source = &"lmb_click") -> bool
+##                                              item must be in inventory; on
 ##                                              success removes from inventory
-##                                              and applies via Player.equip_item
+##                                              and applies via Player.equip_item.
+##                                              `source` tags the combat-trace
+##                                              line (lmb_click vs auto_starter,
+##                                              ticket 86c9qah0v).
 ##   Inventory.unequip(slot)         -> ItemInstance   returns the unequipped
 ##                                              item back into inventory; null
 ##                                              if slot empty or full inventory
@@ -136,6 +140,15 @@ func _seed_starting_inventory() -> void:
 ## the weapon slot. Re-running `_seed_starting_inventory` here is the
 ## idempotent path: it's only-if-empty internally, so it's a no-op when the
 ## inventory has any item (e.g. a stash item the save brought back).
+##
+## **Combat-trace source tag (`auto_starter`):** this auto-equip path routes
+## through `equip()` like LMB-click, but tags the resulting trace line with
+## `source=auto_starter` rather than the default `lmb_click`. The negative-
+## assertion sweep at boot can then assert `source=lmb_click` is absent during
+## the boot/restore window (no user click happened) AND `source=auto_starter`
+## is present (positive proof the auto-equip fired). Pre-fix this path emitted
+## `source=lmb_click`, polluting the negative-assertion sweep — see ticket
+## `86c9qah0v` for the original bug.
 func equip_starter_weapon_if_needed() -> void:
 	if _equipped.has(SLOT_WEAPON) and _equipped[SLOT_WEAPON] != null:
 		# Weapon already equipped (restored save or prior equip). No-op.
@@ -150,7 +163,7 @@ func equip_starter_weapon_if_needed() -> void:
 		if it_v == null or it_v.def == null:
 			continue
 		if it_v.def.id == &"iron_sword":
-			equip(it_v, SLOT_WEAPON)
+			equip(it_v, SLOT_WEAPON, &"auto_starter")
 			print("[Inventory] starter iron_sword auto-equipped (weapon slot)")
 			return
 	# No iron_sword in inventory — defensive (seed may have failed or been
@@ -237,12 +250,22 @@ func get_equipped_map() -> Dictionary:
 ##
 ## **Combat-trace (P0 86c9q96m8 surface):** emits the
 ## `[combat-trace] Inventory.equip | item=<id> slot=<weapon|armor>
-## source=lmb_click damage_after=<N>` line only when this method is the
-## entry point (the LMB-click path from `InventoryPanel._handle_inventory_click`).
+## source=<source_tag> damage_after=<N>` line on every successful `equip()`.
 ## `restore_from_save` does NOT route through `equip()` — it directly mutates
 ## `_equipped` and calls `_apply_equip_to_player`, so the trace line is
-## scoped to the click path as required by the dispatch.
-func equip(item: ItemInstance, slot: StringName) -> bool:
+## scoped to user/system equip paths (never save-restore).
+##
+## **`source` parameter (`86c9qah0v` fix):** distinguishes user-driven equips
+## from system-driven equips so the boot/restore negative-assertion sweep can
+## tell them apart. Default `&"lmb_click"` preserves backwards-compat for all
+## existing callers (`InventoryPanel._handle_inventory_click`, GUT tests).
+## `equip_starter_weapon_if_needed` overrides to `&"auto_starter"` — the boot-
+## time auto-equip is system-driven, not user-driven, so it must NOT pollute
+## the `lmb_click` channel that Playwright greps for during the user-click
+## window. Future system-driven equip paths (e.g. fast-travel re-equip,
+## scripted scenes) should add their own `source` tag rather than reusing
+## `lmb_click`.
+func equip(item: ItemInstance, slot: StringName, source: StringName = &"lmb_click") -> bool:
 	if item == null:
 		return false
 	if not (slot in M1_INTERACTIVE_SLOTS):
@@ -274,7 +297,10 @@ func equip(item: ItemInstance, slot: StringName) -> bool:
 	# Combat-trace shim — surfaces the dual-surface state to Sponsor's HTML5
 	# DevTools console so equip-flow regressions are observable in soak. Pure
 	# instrumentation; no-op outside HTML5 (DebugFlags.combat_trace gate).
-	_emit_equip_trace(item, slot, &"lmb_click")
+	# `source` defaults to `lmb_click` so all existing user-click callers stay
+	# correctly tagged; `equip_starter_weapon_if_needed` overrides to
+	# `auto_starter` (ticket `86c9qah0v`).
+	_emit_equip_trace(item, slot, source)
 	return true
 
 
@@ -485,13 +511,22 @@ func _find_player() -> Node:
 ## Emit a `[combat-trace] Inventory.equip` line via DebugFlags.combat_trace.
 ## HTML5-only (the gate in `DebugFlags.combat_trace_enabled` returns false on
 ## desktop and headless GUT, so this is a silent no-op there). The line is
-## scoped to the user-driven LMB-click path; F5-reload restoration uses
+## scoped to `equip()` callers; F5-reload restoration uses
 ## `restore_from_save` which bypasses `equip()` entirely, so it does NOT fire
 ## this trace.
 ##
 ## Line shape (verbatim contract — Playwright spec greps this):
 ##   [combat-trace] Inventory.equip | item=<id> slot=<weapon|armor> \
 ##       source=<source_tag> damage_after=<N>
+##
+## `source_tag` enum (ticket `86c9qah0v`):
+##   - `lmb_click` — user-driven equip via `InventoryPanel._handle_inventory_click`.
+##     Default for `equip()` so existing callers don't need to pass a tag.
+##   - `auto_starter` — system-driven boot-time auto-equip via
+##     `equip_starter_weapon_if_needed`. Distinct so the negative-assertion
+##     sweep at boot can tell user-clicks from system-equips apart.
+##   - (future) — additional `source` tags should be added rather than
+##     overloading `lmb_click`.
 ##
 ## damage_after reads from `Damage.compute_player_damage` for weapon slots
 ## (the freshly-equipped weapon's light-attack damage at the player's current

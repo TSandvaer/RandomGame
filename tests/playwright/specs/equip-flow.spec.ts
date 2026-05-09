@@ -2,30 +2,40 @@
  * equip-flow.spec.ts
  *
  * Equip flow — equipped weapon survives F5 reload (save → restore round-trip)
- * AND equip-via-LMB-click drives BOTH dual-surface state in lockstep
+ * AND equip-via-LMB-click drives BOTH dual-surface state in lockstep, AND the
+ * combat-trace `source` enum cleanly distinguishes user clicks from system
+ * auto-equips (ticket 86c9qah0v).
  *
  * Verifies the equip-state persistence path AND the in-game LMB-click equip
  * path that PR #145 / #146 / closed P0 86c9q96m8 all hit in different ways:
  *
  *   1. Cold boot: iron_sword auto-equipped via the Inventory.gd seeding +
  *      Main._ready ordering (PR #146).
+ *   1.5. **NEW (ticket 86c9qah0v):** assert the boot-window auto-equip emits
+ *      `source=auto_starter` (positive) and ZERO `source=lmb_click` lines
+ *      fire during cold boot (negative — no user click happened yet).
  *   2. Player kills a grunt → Hitbox.hit registers damage=6.
- *   3. **NEW (P0 86c9q96m8 fix coverage):** open Tab inventory, click the
+ *   3. **(P0 86c9q96m8 fix coverage):** open Tab inventory, click the
  *      equipped slot to unequip (iron_sword → grid), then click the grid
- *      cell to re-equip via the LMB-click path. Asserts the new
+ *      cell to re-equip via the LMB-click path. Asserts the
  *      `[combat-trace] Inventory.equip | source=lmb_click damage_after=6`
  *      line fires AND post-equip swing damage matches.
  *   4. F5 reload → Save autoload restores equipped state from snapshot.
  *   5. Post-reload: a fresh swing in Room 01 still produces damage=6 hits
  *      (proves Inventory._equipped["weapon"] AND Player._equipped_weapon
  *      both restored to iron_sword — the dual-surface invariant).
+ *      Negative assertion: NEITHER `source=lmb_click` NOR `source=auto_starter`
+ *      lines fire post-reload (save-restore bypasses equip() entirely;
+ *      auto_starter early-returns because slot is already populated).
  *
- * **Status: green — P0 86c9q96m8 fix landed.**
+ * **Status: green — P0 86c9q96m8 fix landed; ticket 86c9qah0v fix in flight.**
  *
  * Coverage gap closed by this spec extension:
  *   - Tab → LMB-click equipped slot (unequip) → LMB-click grid cell (equip).
  *   - The `[combat-trace] Inventory.equip` shim now provides the
  *     observable signature for the LMB-click path.
+ *   - Source-enum disambiguation (lmb_click vs auto_starter vs no-trace-on-
+ *     save-restore) — ticket 86c9qah0v.
  *
  * Coverage still deferred (open follow-up):
  *   - True equip-swap (LMB on grid cell of a DIFFERENT weapon than what's
@@ -94,6 +104,48 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
       /\[Inventory\] starter iron_sword auto-equipped \(weapon slot\)/,
       5_000
     );
+
+    // ---- Phase 1.5: Boot-window source-enum assertions (ticket 86c9qah0v) ----
+    //
+    // The boot-time auto-equip routes through Inventory.equip() but tags its
+    // trace line with `source=auto_starter` rather than the default
+    // `lmb_click`. This lets the negative-assertion sweep distinguish system-
+    // driven equips from user-driven equips at the boot/restore window.
+    //
+    //   Positive: at least one `source=auto_starter` line during cold boot
+    //             (proves the auto-equip ran AND the source tag is correct).
+    //   Negative: ZERO `source=lmb_click` lines during cold boot (no click
+    //             has happened yet — pre-fix, this WOULD fire because the
+    //             auto-equip path emitted lmb_click instead of auto_starter).
+    //
+    // Settle briefly so the deferred boot frames flush.
+    await page.waitForTimeout(500);
+    const bootWindowLines = capture.getLines();
+    const bootAutoStarterLines = bootWindowLines.filter((l) =>
+      /\[combat-trace\] Inventory\.equip \| .*source=auto_starter/.test(l.text)
+    );
+    expect(
+      bootAutoStarterLines.length,
+      `Boot-window positive (86c9qah0v): expected at least one ` +
+        `[combat-trace] Inventory.equip | source=auto_starter line during ` +
+        `cold-boot auto-equip. Got ${bootAutoStarterLines.length}. Either ` +
+        `equip_starter_weapon_if_needed didn't run, or the trace shim ` +
+        `dropped the source override.`
+    ).toBeGreaterThanOrEqual(1);
+    const bootLmbClickLines = bootWindowLines.filter((l) =>
+      /\[combat-trace\] Inventory\.equip \| .*source=lmb_click/.test(l.text)
+    );
+    expect(
+      bootLmbClickLines.length,
+      `Boot-window negative (86c9qah0v): expected ZERO ` +
+        `[combat-trace] Inventory.equip | source=lmb_click lines during ` +
+        `cold-boot — no user click has happened yet. Got ` +
+        `${bootLmbClickLines.length}. This is the original bug shape: ` +
+        `equip_starter_weapon_if_needed routed through equip() with the ` +
+        `default source=lmb_click, polluting the user-click negative-` +
+        `assertion sweep.\n` +
+        bootLmbClickLines.map((l) => `  ${l.text}`).join("\n")
+    ).toBe(0);
 
     const canvas = page.locator("canvas").first();
     await canvas.click();
@@ -438,17 +490,38 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
     // We scope the search to AFTER `capture.clearLines()` (line 163-ish),
     // which fires immediately before the page.reload(). Anything in the
     // buffer AFTER that point is post-reload activity.
-    const postReloadTraceLines = capture
+    //
+    // Source-enum extension (ticket 86c9qah0v): post-reload, `restore_from_save`
+    // populates `_equipped[SLOT_WEAPON]` directly, so when Main._ready calls
+    // `equip_starter_weapon_if_needed` after restore, the early-return guard
+    // (`if _equipped.has(SLOT_WEAPON) ...`) fires — the auto_starter trace
+    // path is a no-op too. Thus BOTH source tags must be absent post-reload.
+    const postReloadLmbClickLines = capture
       .getLines()
       .filter((l) =>
         /\[combat-trace\] Inventory\.equip \| .*source=lmb_click/.test(l.text)
       );
     expect(
-      postReloadTraceLines.length,
-      `Negative assertion: [combat-trace] Inventory.equip line fired during ` +
-        `F5-reload save-restore — should ONLY fire on user-driven LMB-click. ` +
-        `Found ${postReloadTraceLines.length} post-reload trace line(s). ` +
-        `Re-check Inventory.restore_from_save: it must NOT route through equip().`
+      postReloadLmbClickLines.length,
+      `Negative assertion: [combat-trace] Inventory.equip | source=lmb_click ` +
+        `fired during F5-reload save-restore — should ONLY fire on user-driven ` +
+        `LMB-click. Found ${postReloadLmbClickLines.length} post-reload trace ` +
+        `line(s). Re-check Inventory.restore_from_save: it must NOT route ` +
+        `through equip().`
+    ).toBe(0);
+    const postReloadAutoStarterLines = capture
+      .getLines()
+      .filter((l) =>
+        /\[combat-trace\] Inventory\.equip \| .*source=auto_starter/.test(l.text)
+      );
+    expect(
+      postReloadAutoStarterLines.length,
+      `Negative assertion (86c9qah0v): [combat-trace] Inventory.equip | ` +
+        `source=auto_starter fired post-F5-reload — but save-restore already ` +
+        `populated the weapon slot, so equip_starter_weapon_if_needed should ` +
+        `be a no-op. Found ${postReloadAutoStarterLines.length} line(s). ` +
+        `Either restore_from_save failed to populate _equipped, or the ` +
+        `early-return guard in equip_starter_weapon_if_needed regressed.`
     ).toBe(0);
 
     // Filter out a known m1-rc-1 push_warning from save-restore: when the
