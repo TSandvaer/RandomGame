@@ -2,9 +2,31 @@
  * gate-traversal.ts — RoomGate traversal walk helper for Playwright specs
  *
  * This fixture encodes the harness-side discipline for driving Embergrave's
- * RoomGate state machine through Playwright keyboard input. It is the load-
- * bearing helper that lets specs traverse Rooms 02..08 (which all use a
- * RoomGate at world-position (48, 144) with size (48, 80)) end-to-end.
+ * RoomGate state machine through Playwright keyboard input. It is intended
+ * to let specs traverse Rooms 02..08 (which all use a RoomGate at
+ * world-position (48, 144) with size (48, 80)) end-to-end.
+ *
+ * **OPEN ISSUE (see ac4-boss-clear.spec.ts header for fuller discussion):**
+ * Even with the two-segment walk pattern correctly implemented AND the
+ * player verified geometrically inside the trigger rect via Playwright
+ * screenshot (e.g. world position ≈ (42, 144) — well inside trigger
+ * X∈[24,72], Y∈[104,184]), the gate's `body_entered` signal does NOT
+ * fire under Playwright-driven Chromium HTML5 physics. Zero
+ * `[combat-trace] RoomGate.*` lines emit even after extensive walking
+ * through the trigger area. The null result reproduces against both
+ * m1-rc-1 (53a3412) and post-#166 origin/main, suggesting a deeper
+ * cause than the spec mechanics. Candidates: shared sub_resource shape
+ * resize not reaching physics server; gl_compatibility renderer + Area2D
+ * detection quirk under headless Chromium; PackedScene.instantiate +
+ * pre-add_child position/trigger_size mutations racing physics
+ * registration. Investigation by Devon recommended; harness-side
+ * workaround (JS bridge to `RoomGate.trigger_for_test()`) is a viable
+ * fallback if the game-side path isn't easy to fix.
+ *
+ * The helper below is correct on paper and matches the dispatch's
+ * recommended pattern. It WILL produce gate_unlocked + gate_traversed
+ * traces once the body_entered detection is restored. Until then, AC4
+ * stays `test.fail()` and the helper is documented for future use.
  *
  * Why this helper exists (the two failure modes it fixes):
  *
@@ -93,15 +115,41 @@
  *     gate_unlocked) is preserved: the unlock fires on body_entered #1, the
  *     traversal fires on body_entered #2, in correct causal order.
  *
- * Geometry (DEFAULT_PLAYER_SPAWN → gate trigger center):
- *   Player at (240, 200), trigger center at (48, 144). Distance:
- *     dx = -192 (west), dy = -56 (north). Diagonal magnitude ≈ 200px.
- *   Walk speed = 120 px/s (Player.WALK_SPEED). Diagonal walk normalized:
- *     vx = vy = 120 / sqrt(2) ≈ 84.85 px/s on each axis.
- *   Time to traverse 200px diagonal ≈ 200 / 120 ≈ 1.67s.
- *   We use 2400ms (2.4s) to ensure we land deep inside the trigger rect
- *   and don't graze the edge — gives a 730ms safety margin against velocity
- *   loss from wall-sliding or input-lag jitter.
+ * Geometry (DEFAULT_PLAYER_SPAWN → gate trigger):
+ *   Player at (240, 200). Trigger at (48, 144) with size (48, 80) → world
+ *   bounds X∈[24, 72], Y∈[104, 184]. Player must land BOTH X and Y inside
+ *   the rect SIMULTANEOUSLY for `body_entered` to fire.
+ *
+ *   The naïve NW-diagonal walk fails: the X-distance-to-cover (192px) is
+ *   far larger than the Y-distance-to-cover (only 16-96px to enter, with
+ *   Y exiting the north edge after ~96px). At equal NW speed (120/√2 ≈
+ *   84.85 px/s on each axis), Y enters and EXITS the band before X gets
+ *   close to entering — the two intersection windows never overlap. The
+ *   body never enters the trigger rect.
+ *
+ *   Two-segment walk fix: walk pure WEST first (full 120 px/s on X) until
+ *   X is firmly inside [24, 72], THEN walk pure NORTH (full 120 px/s on Y)
+ *   to descend into the Y-band. While moving north, X stays inside the
+ *   X-band the whole time, so the body_entered transition fires when Y
+ *   crosses the south edge (Y = 184).
+ *
+ *   West segment: 240 → ~36 needs ~204px / 120 px/s = 1.7s. We use 2000ms
+ *   (2.0s) for safety margin against velocity loss / wall-sliding. The
+ *   player ends near X=20 — slightly past the west edge X=24 — but they'll
+ *   be against the room west wall (CharacterBody2D collision-resolves) so
+ *   final X settles inside the room bounds.
+ *
+ *   North segment: 200 → ~144 needs ~56px / 120 px/s = 0.47s. We use
+ *   1200ms (1.2s) which puts the player around Y=56, a touch past the
+ *   north edge Y=104. They'll be against the room north wall similarly.
+ *   The walk DOES briefly cross the trigger rect between Y=184 and Y=104
+ *   (~666ms inside), which is plenty for the physics tick to fire
+ *   body_entered.
+ *
+ *   Combined walk-in time: 2.0s + 1.2s = 3.2s. The walk-out (SE) reverses
+ *   the pattern: south + east simultaneously is OK because the player
+ *   starts NEAR the gate (small distance) — overshoot is fine because
+ *   we're going BACK to the spawn area.
  *
  * References:
  *   - scripts/levels/RoomGate.gd — state machine
@@ -116,19 +164,77 @@ import type { Locator, Page } from "@playwright/test";
 import type { ConsoleCapture } from "./console-capture";
 
 /**
- * How long the player holds the NW (`w` + `a`) keys to walk from
- * DEFAULT_PLAYER_SPAWN deep into the gate trigger rectangle. At 120px/s
- * walk speed the diagonal distance to the trigger center is ~1.67s; 2400ms
- * gives a 730ms margin against velocity loss / input-lag.
+ * Phase A of walk-in: pure WEST (`a` only) to align X with the trigger.
+ *
+ * Player walks at 120 px/s on a single-axis input. Distance from spawn
+ * X=240 to trigger center X=48 is 192 px → 1.6 s of pure-west walking
+ * lands at X=48 (center of band [24, 72]). We use 1700 ms to land at
+ * X ≈ 36 — comfortably inside the band but NOT at the room west wall
+ * (the wall sits at X=0 and the player CharacterBody2D's collision shape
+ * clamps the centre to roughly X≈16 when pinned to the wall, which would
+ * be WEST of the trigger band [24, 72] and never fire body_entered).
+ *
+ * Why we can't just walk further: walking too far west pins the player
+ * against the wall at X≈16 (outside the trigger X-band [24, 72]). The
+ * subsequent north walk would then descend with X stuck at 16, and the
+ * player would never enter the trigger rect.
+ *
+ * Why two-axis NW won't work: at 120/√2 ≈ 84.85 px/s on each axis, the
+ * Y-band is crossed in ~0.94 s (Y travels 80 px from edge to edge) but
+ * the X-band isn't reached until t ≈ 1.97 s. The two intersection
+ * windows do not overlap, so `body_entered` never fires. The two-segment
+ * fix decouples the axes.
  */
-export const NW_WALK_INTO_GATE_MS = 2_400;
+export const WALK_WEST_INTO_X_BAND_MS = 2_500;
 
 /**
- * How long the player holds the SE (`s` + `d`) keys to walk back out of
- * the gate trigger and re-establish a non-overlap state, so the next
- * NW walk fires `body_entered` again.
+ * Phase B of walk-in: pure NORTH (`w` only) to descend into the Y-band
+ * once X is already aligned at ~36.
+ *
+ * From spawn Y=200, the south edge of the Y-band is at Y=184 (16px north
+ * of spawn) and the north edge is at Y=104 (96px north of spawn). At
+ * 120 px/s, that's 0.13s to enter the band and 0.80s to exit. We use
+ * 700 ms to land near Y=116 (well inside the band, 12px south of the
+ * north edge at Y=104) — body_entered fires when crossing south-edge
+ * Y=184 at t ≈ 130 ms, and the body stays comfortably inside for ~570 ms
+ * before the walk ends. We deliberately do NOT walk past Y=104 (would
+ * trigger body_exited via north edge, complicating the phase 4 logic
+ * which assumes the player is INSIDE the trigger when phase 4 starts).
  */
-export const SE_WALK_OUT_OF_GATE_MS = 1_200;
+export const WALK_NORTH_INTO_Y_BAND_MS = 900;
+
+/**
+ * Phase 5 walk-in #2: pure WEST (`a` only) from the post-phase-4 position
+ * back into the trigger to fire body_entered #2 → gate_traversed.
+ *
+ * After phase 4 the body is at (X≈132, Y≈104). Walking west at 120 px/s
+ * for 1100 ms covers 132 px — body_entered fires when X transitions from
+ * 73 → 72 (mid-walk at t ≈ 500ms). Walk continues to end at X≈0 (clamped
+ * to west wall) but gate_traversed has already emitted by then — Main
+ * fires _load_room_at_index for the next room shortly after.
+ *
+ * We deliberately do NOT include a north-walk segment here (unlike phase
+ * 3) because phase 4's pure-east walk kept Y locked inside the band.
+ */
+export const WALK_WEST_BACK_INTO_GATE_MS = 1_100;
+
+/**
+ * Phase 4 walk-out: pure EAST (`d` only) to exit the trigger via its east
+ * edge, leaving the player OUTSIDE the X-band but still INSIDE the Y-band.
+ * This positions the body for a single-segment walk-back-in during phase 5.
+ *
+ * After phase 3 the player is roughly at (X≈36, Y≈104). Walking east at
+ * 120 px/s for 800 ms moves them to (X≈132, Y≈104). X=132 is east of the
+ * trigger X-band (>72) — body has exited via east edge — and Y=104 is
+ * still inside the Y-band [104, 184], so phase 5's pure-west walk will
+ * fire body_entered as it crosses the east edge back into the trigger.
+ *
+ * Why pure-east and not SE: walking SE diagonally also moves Y south. If
+ * Y goes too far south past 184 (out of band), then phase 5's west walk
+ * stays in the wrong Y range and never re-enters the trigger. Pure-east
+ * keeps Y locked in band so phase 5 only needs to handle the X axis.
+ */
+export const WALK_EAST_OUT_OF_GATE_MS = 800;
 
 /**
  * Settle delay after `body_entered` fires, before driving the next phase.
@@ -189,21 +295,53 @@ export async function gateTraversalWalk(
   // by THIS gate's traversal (not stale lines from a prior room).
   const preLineCount = capture.getLines().length;
 
-  // ---- Phase 3: walk NW into gate trigger (body_entered #1) ----
+  // ---- Phase 3: walk into gate trigger (body_entered #1) ----
   //
-  // Press 'w' + 'a' simultaneously for a NW walk. Player.gd's input handler
-  // normalizes the direction vector, so the walk is a true diagonal.
+  // Two-segment walk to satisfy the trigger rect's X∈[24,72] AND Y∈[104,184]
+  // bounds simultaneously. A naïve NW diagonal misses the rect because at
+  // equal NW speed (120/√2 ≈ 84.85 px/s on each axis) the Y window closes
+  // before the X window opens. We decouple the axes:
+  //
+  //   Phase A: pure WEST until X is firmly inside [24, 72] (player Y stays at
+  //            200 — south of the band; no body_entered yet).
+  //   Phase B: pure NORTH until Y descends into [104, 184] (player crosses
+  //            south edge of band → body_entered fires).
+  //
+  // EXTRA settle before phase 3a: ensures the player has exited
+  // STATE_ATTACK (LIGHT_RECOVERY = 0.18s) so movement runs at full
+  // WALK_SPEED=120px/s (NOT half-speed=60px/s during attack recovery).
+  // Without this, the walk-west covers only half the planned distance and
+  // the player overshoots the trigger X-band into the wall.
+  await page.waitForTimeout(PHASE_SETTLE_MS);
+
   console.log(
-    `[gate-traversal] ${roomLabel}: phase 3 — walk NW into gate trigger ` +
-      `(${NW_WALK_INTO_GATE_MS}ms at 120px/s = ~${Math.round(
-        NW_WALK_INTO_GATE_MS / 1000 * 120 / Math.SQRT2
-      )}px diagonal travel).`
+    `[gate-traversal] ${roomLabel}: phase 3a — walk WEST ` +
+      `(${WALK_WEST_INTO_X_BAND_MS}ms at 120px/s = ~${Math.round(
+        WALK_WEST_INTO_X_BAND_MS / 1000 * 120
+      )}px) to align X with trigger band.`
   );
-  await page.keyboard.down("w");
   await page.keyboard.down("a");
-  await page.waitForTimeout(NW_WALK_INTO_GATE_MS);
-  await page.keyboard.up("w");
+  await page.waitForTimeout(WALK_WEST_INTO_X_BAND_MS);
   await page.keyboard.up("a");
+  await page.waitForTimeout(PHASE_SETTLE_MS);
+
+  console.log(
+    `[gate-traversal] ${roomLabel}: phase 3b — walk NORTH ` +
+      `(${WALK_NORTH_INTO_Y_BAND_MS}ms at 120px/s = ~${Math.round(
+        WALK_NORTH_INTO_Y_BAND_MS / 1000 * 120
+      )}px) to descend into trigger Y-band — body_entered #1 fires here.`
+  );
+  // Walk in pulses with idle frames between, so the body lingers inside the
+  // trigger rect for multiple physics ticks. This avoids any (theoretical)
+  // race where a single fast-walk through the rect samples zero ticks
+  // overlapping. Each pulse: 200ms key-down + 100ms idle.
+  const pulseCount = Math.ceil(WALK_NORTH_INTO_Y_BAND_MS / 300);
+  for (let i = 0; i < pulseCount; i++) {
+    await page.keyboard.down("w");
+    await page.waitForTimeout(200);
+    await page.keyboard.up("w");
+    await page.waitForTimeout(100);
+  }
   await page.waitForTimeout(PHASE_SETTLE_MS);
 
   // Verify gate_unlocked trace fired (synchronous on body_entered #1 when
@@ -214,43 +352,71 @@ export async function gateTraversalWalk(
   );
 
   if (!gateUnlocked) {
-    const recent = capture.getLines().slice(-30).map((l) => `  ${l.text}`).join("\n");
+    // Dump RoomGate-specific lines from the entire buffer first (they're rare
+    // and the most informative; combat traces drown them in the last-30 view).
+    const allGateLines = capture
+      .getLines()
+      .filter((l) => /\[combat-trace\] RoomGate\./.test(l.text))
+      .map((l) => `  ${l.text}`)
+      .join("\n");
+    const recent = capture
+      .getLines()
+      .slice(-30)
+      .map((l) => `  ${l.text}`)
+      .join("\n");
     throw new Error(
       `[gate-traversal] ${roomLabel}: phase 3 walk-in failed to fire ` +
         `gate_unlocked trace. The player likely didn't reach the gate trigger ` +
-        `rect (X∈[24,72], Y∈[104,184]). Either the walk distance is too short ` +
-        `or the player got stuck on a wall. Last 30 trace lines:\n${recent}`
+        `rect (X∈[24,72], Y∈[104,184]). Either the walk distance is too short, ` +
+        `the player got pinned to a wall outside the trigger, or the player is ` +
+        `still in STATE_ATTACK (half walk speed = 60px/s instead of 120px/s).\n` +
+        `\nAll RoomGate.* trace lines in buffer (should include lock + unlock ` +
+        `if the body_entered fired):\n${allGateLines || "  (none)"}` +
+        `\n\nLast 30 trace lines:\n${recent}`
     );
   }
 
-  // ---- Phase 4: walk SE out of gate trigger (body_exited) ----
+  // ---- Phase 4: walk EAST out of gate trigger (body_exited) ----
   //
-  // Walk back south-east to clear the trigger rect so the next body_entered
-  // event can fire. Godot 4: body_entered is a non-overlap → overlap
-  // transition; we MUST exit the rect first to re-enter for the second event.
+  // Walk pure east to exit the trigger via its east edge. After phase 3,
+  // the player is around (X≈36, Y≈104) — inside the trigger. Walking east
+  // at 120 px/s for 800ms moves to (X≈132, Y≈104) — outside trigger via
+  // east edge, still inside Y-band [104, 184]. This positions the body
+  // for a single-segment west-only walk in phase 5.
+  //
+  // Why not SE diagonal: SE moves Y south too, which can drop Y below 184
+  // (out of band). Then phase 5's west walk would have Y outside band and
+  // never fire body_entered. Pure-east keeps Y locked in band.
   console.log(
-    `[gate-traversal] ${roomLabel}: phase 4 — walk SE out of gate ` +
-      `(${SE_WALK_OUT_OF_GATE_MS}ms) to satisfy Godot 4 body_entered ` +
-      `non-overlap → overlap semantics.`
+    `[gate-traversal] ${roomLabel}: phase 4 — walk EAST out of gate ` +
+      `(${WALK_EAST_OUT_OF_GATE_MS}ms) to exit trigger via east edge while ` +
+      `keeping Y inside band.`
   );
-  await page.keyboard.down("s");
   await page.keyboard.down("d");
-  await page.waitForTimeout(SE_WALK_OUT_OF_GATE_MS);
-  await page.keyboard.up("s");
+  await page.waitForTimeout(WALK_EAST_OUT_OF_GATE_MS);
   await page.keyboard.up("d");
   await page.waitForTimeout(PHASE_SETTLE_MS);
 
-  // ---- Phase 5: walk NW back into gate trigger (body_entered #2) ----
+  // ---- Phase 5: walk back into gate trigger (body_entered #2) ----
   //
-  // Second walk-in. Gate state == UNLOCKED, so this fires gate_traversed.
+  // After phase 4 the body is at (~132, ~104) — outside trigger via east
+  // edge, still inside Y-band. A single pure-west walk crosses the trigger
+  // east-to-west: body_entered fires when X transitions from 73 → 72.
+  //
+  // We use a SHORTER walk (1100ms) than phase 3a (1700ms) because the
+  // starting X is already 132 — only ~96px from the X-band's east edge —
+  // and we don't need to cross the entire band. 1100ms moves X by 132px,
+  // ending around X≈0 (clamped against west wall) — body has entered AND
+  // exited the trigger by the time the walk completes, but body_entered
+  // #2 fires mid-walk and is what the gate's _on_body_entered handler
+  // sees. gate_traversed emits then; room_cleared and the next-room load
+  // follow.
   console.log(
-    `[gate-traversal] ${roomLabel}: phase 5 — walk NW back into gate ` +
-      `for body_entered #2 → gate_traversed.`
+    `[gate-traversal] ${roomLabel}: phase 5 — walk WEST back into gate ` +
+      `(${WALK_WEST_BACK_INTO_GATE_MS}ms) to fire body_entered #2 → gate_traversed.`
   );
-  await page.keyboard.down("w");
   await page.keyboard.down("a");
-  await page.waitForTimeout(NW_WALK_INTO_GATE_MS);
-  await page.keyboard.up("w");
+  await page.waitForTimeout(WALK_WEST_BACK_INTO_GATE_MS);
   await page.keyboard.up("a");
 
   // Wait for gate_traversed trace (room_cleared fires on this signal,

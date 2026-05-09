@@ -142,14 +142,14 @@ RELEASE_BUILD_ARTIFACT_PATH=./html5-build npm run test:ui
 
 ---
 
-### `ac4-boss-clear.spec.ts` (M2 W1 expansion — green)
+### `ac4-boss-clear.spec.ts` (M2 W1 expansion — `test.fail()` pending body_entered investigation)
 
-**Test name:** `AC4 — Stratum-1 boss reach + clear (boss P0s + spec gate-traversal mechanics fixed)`
+**Test name:** `AC4 — Stratum-1 boss reach + clear (gate body_entered detection issue blocks flip-to-green)`
 
-**Status:** Green (`test`). Previously `test.fail()` for two reasons: (a) the boss P0s 86c9q96fv (damage) + 86c9q96ht (attack) — fixed in PR drew/m2-w1-boss-damage-attack-p0; (b) two pre-existing spec-mechanics bugs in the gate-traversal walk (Y-band miss + single-vs-double body_entered) — fixed by introducing the `gateTraversalWalk` helper in `fixtures/gate-traversal.ts`. See the spec header for full rationale.
+**Status:** `test.fail()`. The boss P0s themselves are FIXED (PR drew/m2-w1-boss-damage-attack-p0 + GUT integration tests). The two-part walk pattern (Y-band miss + single-vs-double body_entered) is correctly IMPLEMENTED in `fixtures/gate-traversal.ts`. However, when the helper drives the walk under Playwright + Chromium HTML5, the gate's `body_entered` signal does NOT fire even though screenshots confirm the player CharacterBody2D is geometrically inside the trigger rect. Same null result reproduces against both m1-rc-1 (53a3412) and post-#166 origin/main, so it's not a recent regression. See the spec header for full rationale and root-cause hypotheses (sub_resource shape resize race, gl_compatibility Area2D quirk under headless Chromium, or PackedScene.instantiate + pre-`add_child` mutation race).
 
-**What it checks:**
-- Drive Rooms 1-7, killing all mobs and walking through each RoomGate via the two-part walk pattern (NW-in → SE-out → NW-in)
+**What it checks (when body_entered detection is restored):**
+- Drive Rooms 1-7, killing all mobs and walking through each RoomGate via the two-part walk pattern (W-into-X-band → N-into-Y-band → E-out → W-back)
 - Enter Boss Room (Room 8 in BOSS_ROOM_INDEX), wait 1.8s entry sequence
 - Attack boss until `[combat-trace] Stratum1Boss._force_queue_free | freeing now`
 - Per-room negative-assertion: gate_traversed count increases by exactly 1 per gate (idempotency invariant — `_traversed_emitted` guard)
@@ -257,7 +257,7 @@ The harness runs via `.github/workflows/playwright-e2e.yml`:
 |---|---|
 | AC2 cold first-kill in 60s | **Landed (M2 W1)** — `ac2-first-kill.spec.ts` |
 | AC3 death preservation | **Landed (M2 W1)** — `ac3-death-persistence.spec.ts` |
-| AC4 boss clear | **Landed green (M2 W1)** — `ac4-boss-clear.spec.ts`. Boss P0s fixed in PR drew/m2-w1-boss-damage-attack-p0; spec gate-traversal mechanics fixed via `fixtures/gate-traversal.ts` two-part walk helper |
+| AC4 boss clear | **`test.fail()` — gate body_entered detection blocks flip-to-green** — `ac4-boss-clear.spec.ts`. Boss P0s fixed (PR drew/m2-w1-boss-damage-attack-p0 + GUT integration tests). Two-part walk pattern implemented in `fixtures/gate-traversal.ts`. Open issue: `body_entered` not firing under Playwright + Chromium HTML5 even with player geometrically inside trigger. Investigation needed (sub_resource shape resize race? gl_compatibility quirk? scene-instantiate race?) |
 | Equip flow (save-survival) | **Landed (M2 W1)** — `equip-flow.spec.ts` |
 | Negative-assertion sweep | **Landed (M2 W1)** — `negative-assertion-sweep.spec.ts` |
 | AC5 full 30-min console silence | Follow-up |

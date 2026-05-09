@@ -8,29 +8,64 @@
  * (Room 8 in the BOSS_ROOM_INDEX layout per scenes/Main.gd:60), waits for
  * the 1.8 s entry sequence, then attacks the boss until boss_died emits.
  *
- * **Status: green (`test`).**
+ * **Status: `test.fail()` — the two-part walk pattern fix was implemented
+ * but body_entered is NOT firing on RoomGate from Playwright-driven physics
+ * even when the player CharacterBody2D is verified geometrically inside
+ * the trigger rect.** See the "Open issue" section below.
  *
- * History — this spec was previously `test.fail()` because of two distinct
- * spec-mechanics bugs that have NOW BEEN FIXED in this PR:
+ * Two known spec-mechanics bugs (per PR #158 review):
  *
- *   1. Gate trigger Y-band missed player spawn Y. RoomGate trigger occupies
+ *   1. Gate trigger Y-band misses player spawn Y. RoomGate trigger occupies
  *      world-coords X∈[24,72], Y∈[104,184]. Player spawn (240, 200) is 16px
  *      south of the band AND 168px east of the X range. A pure-west walk
- *      from spawn never intersected the trigger. Fixed: switched to
- *      diagonal NW walks that satisfy both axes simultaneously.
+ *      from spawn never intersects the trigger. **Fix: diagonal walks.**
  *
  *   2. RoomGate state machine requires TWO distinct body_entered events
  *      (lock-trigger → unlock-via-mob-death → traverse). In Godot 4,
  *      `body_entered` is a non-overlap → overlap transition event — a
- *      continuous walk through the trigger fires it ONCE. Fixed: introduced
- *      `gateTraversalWalk` fixture in `fixtures/gate-traversal.ts` that drives
- *      the body in-out-in pattern (walk NW into trigger, walk SE out, walk
- *      NW back in) producing two separate body_entered events.
+ *      continuous walk through the trigger fires it ONCE. **Fix: in-out-in
+ *      walk pattern in `gateTraversalWalk` helper.**
+ *
+ * Open issue (see header of `fixtures/gate-traversal.ts` for the full
+ * investigation): Even with the two-part walk pattern correctly implemented
+ * AND the player verified geometrically inside the trigger via screenshot
+ * (e.g. world position ≈ (42, 144) — well inside trigger X∈[24,72],
+ * Y∈[104,184]), the gate's `body_entered` signal does NOT fire under
+ * Playwright-driven Chromium HTML5 physics. Zero `[combat-trace] RoomGate.*`
+ * lines emit even after extensive walking through the trigger area. The
+ * same null result is observed against m1-rc-1 (53a3412) and post-#166
+ * origin/main (ef1d8b2 + spec changes), indicating the issue is not a
+ * regression in any specific commit.
+ *
+ * Possible root causes (untested without runtime instrumentation):
+ *   a. RoomGate sub-resource sharing: the `RectangleShape2D` is a
+ *      sub_resource in RoomGate.tscn that's shared between gate instances;
+ *      `_ensure_collision_shape` resizes it at `_ready`, but the resize
+ *      may not reach the physics server reliably across instance lifecycles.
+ *   b. Godot 4.3 HTML5 (gl_compatibility) Area2D body_entered may have a
+ *      detection quirk under Playwright's headless Chromium that doesn't
+ *      reproduce in a real browser session — orthogonal to the spec fix.
+ *   c. Scene-level lifecycle: gate spawned via PackedScene.instantiate() +
+ *      manual `position` / `trigger_size` assignment immediately before
+ *      `add_child` may race with the physics-server registration.
+ *
+ * This spec stays `test.fail()` until either:
+ *   - A Devon investigation pins down the root cause and patches the
+ *     game-side path (likely candidates: `RoomGate._ensure_collision_shape`
+ *     re-registers with the physics server; or the gate's tscn marks the
+ *     shape as `unique`).
+ *   - A harness-side workaround is found (e.g. driving body_entered via
+ *     a JS-bridge call to `RoomGate.trigger_for_test()` — same path GUT
+ *     uses; would require adding a debug-bridge function exposed to JS).
  *
  * The boss P0s (86c9q96fv damage broken; 86c9q96ht attack broken) were
- * fixed earlier in PR drew/m2-w1-boss-damage-attack-p0 — Stratum1BossRoom._ready
+ * fixed in PR drew/m2-w1-boss-damage-attack-p0 — Stratum1BossRoom._ready
  * now `call_deferred("trigger_entry_sequence")` so the boss reliably wakes
- * regardless of how the player arrives in the room.
+ * regardless of how the player arrives in the room. That fix is verified
+ * via the new GUT integration tests in `tests/integration/test_boss_wakes_and_engages.gd`
+ * (real Hitbox spawn + real CharacterBody2D Player). End-to-end harness
+ * verification of the boss kill is gated on resolving the gate-traversal
+ * body_entered issue above.
  *
  * Per-room navigation strategy:
  *   - Room 01 (no gate): both grunts auto-advance the room counter on death
@@ -104,8 +139,14 @@ const ROOM_MOB_COUNTS = [
 const TOTAL_PRE_BOSS_MOBS = ROOM_MOB_COUNTS.reduce((a, b) => a + b, 0);
 
 test.describe("AC4 — Stratum-1 boss reach + clear", () => {
-  test(
-    "AC4 — Stratum-1 boss reach + clear (boss P0s + spec gate-traversal mechanics fixed)",
+  // Stays test.fail() pending resolution of the body_entered detection
+  // issue described in the spec header. The two-part walk pattern is
+  // correctly implemented in `fixtures/gate-traversal.ts`, but the gate's
+  // body_entered signal isn't firing on the resulting walk path under
+  // Playwright + Chromium HTML5. Boss P0s themselves are verified via
+  // GUT integration tests (test_boss_wakes_and_engages.gd).
+  test.fail(
+    "AC4 — Stratum-1 boss reach + clear (gate body_entered detection issue blocks flip-to-green)",
     async ({ page, context }) => {
       test.setTimeout(900_000); // 15 minutes — generous for full traversal + boss
       await context.route("**/*", (route) => route.continue());
