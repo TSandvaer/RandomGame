@@ -227,3 +227,148 @@ func test_off_hand_slot_rejected_in_m1() -> void:
 	# off_hand is locked in M1 — equip must reject.
 	assert_false(_inv().equip(item, &"off_hand"), "off-hand locked in M1")
 	assert_eq(_inv().get_items().size(), 1, "item still in inventory after rejection")
+
+
+# =======================================================================
+# Test 9 — Equip-swap preserves the previously-equipped item (P0 86c9q96m8)
+# =======================================================================
+#
+# Sponsor M1 RC re-soak attempt 5: pick up a sword in Room 02, click to
+# equip; new sword "disappears from grid but is NOT actually equipped"
+# (re-clicking does nothing). Root cause class: the swap path was passing
+# `push_back_to_inventory=false` to `_unequip_internal`, silently leaking
+# the previously-equipped item. Pre-fix: after a swap, both swords were
+# gone from the visible grid AND from `_equipped`. Post-fix: the old
+# weapon lands in the grid where the new weapon used to be.
+#
+# This test must pass with either order of operations as long as the
+# load-bearing invariant holds: NO item is silently lost on swap.
+
+func test_equip_swap_preserves_previously_equipped_item() -> void:
+	# Pre-equip sword A.
+	var sword_a: ItemInstance = _make_weapon_item(&"sword_a_swap")
+	_inv().add(sword_a)
+	assert_true(_inv().equip(sword_a, &"weapon"), "precondition: sword A equipped")
+	assert_eq(_inv().get_equipped(&"weapon"), sword_a)
+	assert_eq(_inv().get_items().size(), 0, "grid empty after first equip")
+
+	# Pick up sword B (loot from a kill, etc.).
+	var sword_b: ItemInstance = _make_weapon_item(&"sword_b_swap")
+	_inv().add(sword_b)
+	assert_eq(_inv().get_items().size(), 1, "grid has sword B after pickup")
+
+	# Now swap: equip sword B. Sword A must end up in the grid, NOT lost.
+	watch_signals(_inv())
+	assert_true(_inv().equip(sword_b, &"weapon"), "swap equip succeeds")
+	assert_eq(_inv().get_equipped(&"weapon"), sword_b,
+		"sword B is now equipped")
+	assert_eq(_inv().get_items().size(), 1,
+		"grid still has 1 item (sword A pushed back from equipped slot)")
+	assert_eq(_inv().get_items()[0], sword_a,
+		"the item in the grid is the previously-equipped sword A — equip-swap " +
+		"P0 86c9q96m8 fix: pre-fix this assertion failed because sword A " +
+		"was silently dropped on the floor by _unequip_internal(slot, false)")
+	# Both sides of the swap must be observable via signals.
+	assert_signal_emitted(_inv(), "item_unequipped")
+	assert_signal_emitted(_inv(), "item_equipped")
+
+
+func test_equip_swap_with_full_grid_preserves_item() -> void:
+	# Edge case: the grid is FULL (24 items including the new weapon).
+	# When the player swaps, the previously-equipped item must STILL land
+	# back in the grid because we erase the new item first (freeing a slot).
+	# Pre-fix this would fail because _unequip_internal(slot, true) would
+	# refuse the push_back when the grid was at capacity AT THE TIME of the
+	# unequip call. Post-fix: _items.erase(item) runs first, freeing 1 slot.
+	var equipped_weapon: ItemInstance = _make_weapon_item(&"equipped_full")
+	_inv().add(equipped_weapon)
+	assert_true(_inv().equip(equipped_weapon, &"weapon"))
+	# Fill grid to capacity (24 items).
+	for i in 24:
+		var it: ItemInstance = _make_weapon_item(StringName("filler_%d" % i))
+		assert_true(_inv().add(it), "grid fill slot %d" % i)
+	assert_true(_inv().is_full(), "grid is full at 24")
+	# Pick the last filler as the swap target.
+	var new_weapon: ItemInstance = _inv().get_items()[23] as ItemInstance
+	assert_true(_inv().equip(new_weapon, &"weapon"),
+		"swap equip from a full grid must succeed (new item erased first frees a slot)")
+	# Old weapon now in grid where the new weapon was.
+	assert_eq(_inv().get_equipped(&"weapon"), new_weapon,
+		"new_weapon now equipped")
+	assert_eq(_inv().get_items().size(), 24,
+		"grid still at 24 — new item slot is now occupied by previously-equipped weapon")
+	assert_true(_inv().get_items().has(equipped_weapon),
+		"previously-equipped weapon lands back in the grid even when full at swap time")
+	assert_false(_inv().get_items().has(new_weapon),
+		"new weapon no longer in grid (it's equipped)")
+
+
+# =======================================================================
+# Test 10 — Equip-swap drives BOTH surfaces of the dual-surface rule
+# (real Player instance — paired test per combat-architecture.md
+# §"Equipped-weapon dual-surface rule" Tier 1)
+# =======================================================================
+
+func test_equip_swap_updates_both_inventory_and_player_surfaces() -> void:
+	# Per combat-architecture.md "Equipped-weapon dual-surface rule":
+	# equipped state lives on Inventory._equipped["weapon"] AND
+	# Player._equipped_weapon. Both MUST stay in lockstep across an
+	# equip-swap, OR the symptom is "Tab UI shows weapon X but combat
+	# uses weapon Y" (Sponsor's M1 RC re-soak attempt 5 pattern).
+	#
+	# Tier 1 (mandatory) test bar: paired tests for equip / unequip /
+	# equip-swap MUST instantiate a real Player node (NOT a stub Node)
+	# because `_apply_equip_to_player(target)` checks
+	# `target.has_method("equip_item")` — a stub Node returns false and
+	# silently skips the Player surface. PR #145's stub-Node test was
+	# the original cautionary tale.
+	var PlayerScript: Script = preload("res://scripts/player/Player.gd")
+	var player: Player = PlayerScript.new()
+	add_child_autofree(player)
+	# Player._ready adds it to the "player" group; _find_player picks it up.
+
+	# Build sword A with a known damage stat via ContentFactory so we can
+	# distinguish it from sword B in the Player surface check.
+	var sword_a_def: ItemDef = ContentFactory.make_item_def({
+		"id": &"sword_a_dual",
+		"slot": ItemDef.Slot.WEAPON,
+		"base_stats": ContentFactory.make_item_base_stats({"damage": 4}),
+	})
+	var sword_a: ItemInstance = ItemInstance.new(sword_a_def, ItemDef.Tier.T1)
+	var sword_b_def: ItemDef = ContentFactory.make_item_def({
+		"id": &"sword_b_dual",
+		"slot": ItemDef.Slot.WEAPON,
+		"base_stats": ContentFactory.make_item_base_stats({"damage": 9}),
+	})
+	var sword_b: ItemInstance = ItemInstance.new(sword_b_def, ItemDef.Tier.T1)
+
+	# Equip sword A first.
+	_inv().add(sword_a)
+	assert_true(_inv().equip(sword_a, &"weapon"))
+	# BOTH surfaces post-equip-A:
+	assert_eq((_inv().get_equipped(&"weapon") as ItemInstance).def.id, &"sword_a_dual",
+		"Inventory surface: sword A in weapon slot")
+	assert_eq((player.get_equipped_weapon() as ItemDef).id, &"sword_a_dual",
+		"Player surface: _equipped_weapon points to sword A — dual-surface invariant")
+
+	# Now swap to sword B (the failure case from Sponsor soak attempt 5).
+	_inv().add(sword_b)
+	assert_true(_inv().equip(sword_b, &"weapon"), "swap equip succeeds")
+
+	# BOTH surfaces post-swap MUST point to sword B (NOT sword A) — this is
+	# the load-bearing dual-surface invariant. Pre-fix to P0 86c9q96m8: the
+	# equip-swap path could leak surfaces (one updated, one stale), producing
+	# Sponsor's "subsequent swings still register the previous weapon's
+	# damage" symptom.
+	assert_eq((_inv().get_equipped(&"weapon") as ItemInstance).def.id, &"sword_b_dual",
+		"Inventory surface: sword B in weapon slot post-swap")
+	assert_eq((player.get_equipped_weapon() as ItemDef).id, &"sword_b_dual",
+		"Player surface: _equipped_weapon points to sword B post-swap (the bug class — " +
+		"if this fails, Inventory updated but Player.equip_item didn't fire / Player " +
+		"didn't hear the swap; Sponsor would see: grid empties, but swing damage stays " +
+		"the OLD weapon's value)")
+
+	# Sword A must be back in the grid (not lost on swap — equip-swap leak fix).
+	assert_eq(_inv().get_items().size(), 1, "grid has 1 item post-swap")
+	assert_eq((_inv().get_items()[0] as ItemInstance).def.id, &"sword_a_dual",
+		"sword A pushed back to grid on swap (equip-swap leak fix — pre-fix this was lost)")

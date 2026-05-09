@@ -206,3 +206,73 @@ func test_armor_routes_to_armor_slot() -> void:
 	panel.force_click_inventory_index_for_test(0, MOUSE_BUTTON_LEFT)
 	assert_eq(_inv().get_equipped(&"armor"), armor, "armor routed to armor slot")
 	assert_null(_inv().get_equipped(&"weapon"), "weapon slot unchanged")
+
+
+# =======================================================================
+# Test 9 — LMB-click equip-swap drives BOTH surfaces (P0 86c9q96m8 paired test)
+# =======================================================================
+#
+# Sponsor M1 RC re-soak attempt 5 P0 86c9q96m8: pick up a sword in Room 02,
+# LMB-click in inventory grid → "item disappears from grid but is NOT
+# actually equipped (subsequent swings still register the previous weapon's
+# damage)." The bug class is the "equipped-weapon dual-surface rule" in
+# .claude/docs/combat-architecture.md — Inventory._equipped["weapon"] AND
+# Player._equipped_weapon must stay in lockstep across swap events.
+#
+# Tier 1 test bar (combat-architecture.md §"Equipped-weapon dual-surface rule"):
+# paired tests for equip / unequip / equip-swap MUST instantiate a real
+# Player node, NOT a stub Node. A stub returns false from
+# `has_method("equip_item")` and silently skips the Player surface, leaving
+# the integration silently broken.
+
+func test_lmb_click_equip_swap_drives_both_surfaces() -> void:
+	# Real Player so _apply_equip_to_player wires through equip_item(),
+	# which is the production code path we need to guard.
+	var PlayerScript: Script = preload("res://scripts/player/Player.gd")
+	var player: Player = PlayerScript.new()
+	add_child_autofree(player)
+	# Player._ready adds it to the "player" group.
+	var panel: InventoryPanel = _make_panel()
+
+	# Sword A: damage=4. Sword B: damage=9. The damage delta makes the
+	# Sponsor "subsequent swings still register the previous weapon's damage"
+	# symptom mechanically observable in test (NOT just visual).
+	var sword_a: ItemInstance = _make_weapon_item(&"panel_sword_a")
+	# Override damage to 4 for sword A (different from default 7 in helper).
+	sword_a.def.base_stats.damage = 4
+	var sword_b: ItemInstance = _make_weapon_item(&"panel_sword_b")
+	sword_b.def.base_stats.damage = 9
+
+	# Pre-equip sword A.
+	_inv().add(sword_a)
+	panel.open()
+	panel.force_click_inventory_index_for_test(0, MOUSE_BUTTON_LEFT)
+	# Assert pre-swap state on BOTH surfaces.
+	assert_eq((_inv().get_equipped(&"weapon") as ItemInstance).def.id, &"panel_sword_a",
+		"pre-swap: Inventory surface has sword A")
+	assert_eq((player.get_equipped_weapon() as ItemDef).id, &"panel_sword_a",
+		"pre-swap: Player surface has sword A — dual-surface invariant")
+
+	# Pickup sword B and click to equip — the exact P0 86c9q96m8 path.
+	_inv().add(sword_b)
+	panel.force_click_inventory_index_for_test(0, MOUSE_BUTTON_LEFT)
+
+	# Both surfaces MUST update to sword B. Pre-fix bug: Player surface
+	# could lag (the "subsequent swings still register the previous
+	# weapon's damage" symptom from Sponsor's report).
+	assert_eq((_inv().get_equipped(&"weapon") as ItemInstance).def.id, &"panel_sword_b",
+		"post-swap: Inventory surface has sword B")
+	assert_eq((player.get_equipped_weapon() as ItemDef).id, &"panel_sword_b",
+		"post-swap: Player surface has sword B — if this fails, the LMB-click " +
+		"path updated Inventory but didn't propagate to Player (dual-surface mismatch). " +
+		"Sponsor's symptom: grid shows new sword equipped but combat damage uses the " +
+		"OLD weapon. P0 86c9q96m8.")
+
+	# Sword A must be back in the grid, NOT lost on the swap (equip-swap
+	# leak guard from test_inventory.gd #9 — re-asserted here through the
+	# live UI click path).
+	assert_eq(_inv().get_items().size(), 1,
+		"grid has 1 item post-swap (sword A pushed back from equipped slot)")
+	assert_eq((_inv().get_items()[0] as ItemInstance).def.id, &"panel_sword_a",
+		"swap pushes the previously-equipped sword A back into the grid (was a " +
+		"data-loss bug pre-fix — _unequip_internal(slot, false) silently dropped it)")

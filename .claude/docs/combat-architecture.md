@@ -73,6 +73,7 @@ Tier 1 invariant from `team/TESTING_BAR.md`: visual-primitive tests must assert 
 - `Player.try_attack / swing_wedge / swing_flash`
 - `Hitbox.hit`
 - Per-mob `take_damage`, `_play_hit_flash`, `_die`, `_play_death_tween`, `_on_death_tween_finished`, `_force_queue_free`
+- `Inventory.equip` (P0 86c9q96m8) — `[combat-trace] Inventory.equip | item=<id> slot=<weapon|armor> source=lmb_click damage_after=<N>` fires only on the user-driven LMB-click path; `restore_from_save` bypasses `equip()` so save-restore does NOT fire this line. The `damage_after` field reads from `Damage.compute_player_damage(Player.get_equipped_weapon(), Player.get_edge(), &"light")` — proves both Inventory and Player surfaces stayed in lockstep at the moment of equip.
 
 Sponsor's HTML5 soak surfaces these lines in DevTools console (F12 → Console). Trace-driven debugging is the load-bearing surface for combat regressions because most physics-flush bugs don't raise GDScript exceptions — Godot's `USER ERROR` macros log + return-early in C++. Tier 2 testing bar consequence (per PR #138 + `team/TESTING_BAR.md`): tests must assert downstream consequences (HP changes, queue_free reached, monitoring state per swing), not just method-was-called.
 
@@ -93,6 +94,29 @@ The fix patterns:
 2. **Caller-side defer** — `parent.call_deferred("add_child", child)` at the spawn site. Use when you can't subclass the Area2D.
 
 Future bugs in this family: check the `_die` chain (death-path adds), all per-tick spawn sites (spawn-path adds), and any new Area2D class that's instantiated outside `_ready` of the parent scene. Memory rule: `godot-physics-flush-area2d-rule.md`.
+
+## Equipped-weapon dual-surface rule (load-bearing)
+
+Equipped weapon state lives on **two surfaces** that must stay in lockstep:
+
+- `Inventory._equipped["weapon"]` — autoload-side; truth surface for the Tab UI (`InventoryPanel._refresh_equipped_row` reads it)
+- `Player._equipped_weapon` — per-instance; truth surface for combat (`Player.try_attack` reads it; passed to `Damage.compute_player_damage`)
+
+Linking is normally automatic: `Inventory.equip()` → `_apply_equip_to_player()` → `Player.equip_item()`. Any code path that bypasses `Inventory.equip` and mutates one surface without the other will produce a silent divergence — boot prints lie ("auto-equipped" fires), one surface is correct, the other is null. Symptom: combat reads `damage = 1` (FIST_DAMAGE) while Tab UI also reads empty (or vice versa).
+
+**Three failure modes in this family bit M1 RC** (PR #145 → PR #146 → P0 86c9q96m8):
+
+1. **Boot-order clobber.** `Save` autoload's `restore_from_save()` reset loop unconditionally calls `_apply_unequip_to_player(slot)` for every key in the equipped map, even on an empty save. Any code that pre-populates equipment (like `equip_starter_weapon_if_needed`) MUST run AFTER `_load_save_or_defaults()` in `Main._ready()`. The `Inventory` autoload's `_ready()` print can fire before save-restore wipes it three lines later — boot prints are not proof of post-boot state.
+2. **Stub-Node test silently skips Player surface.** `_apply_equip_to_player(target)` checks `target.has_method("equip_item")` and silently skips when false. A stub `Node.new()` test target returns false — the Player-side wiring path is never exercised. Inventory state assertions pass; the integration is silently broken in production.
+3. **Equip-via-LMB-click swap leaks the previously-equipped item.** Pre-fix `Inventory.equip()` called `_unequip_internal(slot, push_back_to_inventory=false)` when a different item was already in the slot — silently discarding the previous weapon (Sponsor M1 RC re-soak attempt 5: pickup new sword + LMB-click → "item disappears, can't re-equip"). Fix: erase the new item from `_items` FIRST so the grid has a free slot, then call `_unequip_internal(slot, true)` to push the previously-equipped item back into the grid. Order matters because a 24/24 grid would otherwise refuse the push-back. **Combat-trace shim** (P0 86c9q96m8): `Inventory.equip()` emits `[combat-trace] Inventory.equip | item=<id> slot=<weapon|armor> source=lmb_click damage_after=<N>` on every successful equip via the LMB-click path. **Scoping rule:** the trace fires ONLY through `equip()`. The `restore_from_save` path (F5 reload, save-load) bypasses `equip()` and directly mutates `_equipped[slot] = inst` + calls `_apply_equip_to_player(inst)`, so the trace does NOT fire on save-restore. The Playwright `equip-flow.spec.ts` asserts both the positive (line fires on LMB-click) and the negative (line absent after F5 reload).
+
+**State-integration test bar** (analog of the visual-primitive test bar in `team/TESTING_BAR.md`):
+
+- Tier 1 (mandatory): paired tests for equip / unequip / equip-swap / starter-seed paths must instantiate a **real `Player`** node, not a stub `Node`. Assert `Player.get_equipped_weapon() != null` AND `Inventory.get_equipped("weapon") != null` — one surface passing is not proof the other is wired. See `tests/test_inventory.gd::test_equip_swap_*` and `tests/test_inventory_panel.gd::test_lmb_click_equip_swap_drives_both_surfaces`.
+- Tier 2 (mandatory for boot-order changes): integration test must drive the **actual `Main._ready` boot sequence** (or simulate the same `_spawn_player → _load_save_or_defaults → equip_starter_weapon_if_needed` ordering) and assert the post-boot state survives. Test that calls `Inventory.equip` directly bypasses the boot-order surface.
+- Tier 3 (mandatory for damage-affecting changes): integration test must drive the **actual `Player.try_attack`** code path and assert the **damage delta on a real Grunt** (`grunt.hp` drops by weapon-scaled amount, not by 1). Not `Damage.compute_player_damage()` in isolation. See `tests/integration/test_starter_weapon_damage_integration.gd::test_lmb_click_equip_swap_real_main_drives_dual_surfaces` for the equip-swap variant.
+
+This is the integration class of `team/TESTING_BAR.md` § "Product completeness ≠ component completeness." The Main.tscn-stub miss and PR #145's stub-Node miss are siblings.
 
 ## State-change signals vs. progression triggers — harness enforcement
 

@@ -226,6 +226,22 @@ func get_equipped_map() -> Dictionary:
 ## inventory; calls `Player.equip_item` (defensive — falls back to
 ## `set_equipped_weapon` for weapons if equip_item is unavailable). Returns
 ## true on success, false on no-op (already equipped) or rejection.
+##
+## **Equip-swap order (P0 86c9q96m8 fix):** when a different item is already
+## equipped, we MUST preserve it back into the inventory grid (Sponsor's M1
+## RC re-soak attempt 5 — picking up a second sword and equipping it dropped
+## the previously-equipped sword on the floor). We erase the new item from
+## `_items` BEFORE calling `_unequip_internal(..., true)` so the grid has a
+## free slot for the previously-equipped item to land in — even from a 24/24
+## inventory. This guarantees no item is silently lost on swap.
+##
+## **Combat-trace (P0 86c9q96m8 surface):** emits the
+## `[combat-trace] Inventory.equip | item=<id> slot=<weapon|armor>
+## source=lmb_click damage_after=<N>` line only when this method is the
+## entry point (the LMB-click path from `InventoryPanel._handle_inventory_click`).
+## `restore_from_save` does NOT route through `equip()` — it directly mutates
+## `_equipped` and calls `_apply_equip_to_player`, so the trace line is
+## scoped to the click path as required by the dispatch.
 func equip(item: ItemInstance, slot: StringName) -> bool:
 	if item == null:
 		return false
@@ -239,15 +255,26 @@ func equip(item: ItemInstance, slot: StringName) -> bool:
 	var current: ItemInstance = _equipped.get(slot, null) as ItemInstance
 	if current == item:
 		return false  # second equip = no-op per dispatch test 5
-	# Unequip the existing slot occupant first; push it back into inventory.
-	if current != null:
-		_unequip_internal(slot, false)
-	# Move the item from inventory into the equipped map.
+	# Erase the new item from `_items` FIRST so the grid has room for the
+	# previously-equipped item to land in (otherwise a 24/24 grid would
+	# refuse the unequip and silently leak the swap). Order matters:
+	#   1. erase new item -> grid free slot
+	#   2. unequip old (push_back=true) -> old item lands in grid
+	#   3. equip new -> _equipped[slot] = new
 	_items.erase(item)
+	# Unequip the existing slot occupant; push it back into inventory so it's
+	# preserved (P0 86c9q96m8 — pre-fix passed false here, leaking the old item).
+	if current != null:
+		_unequip_internal(slot, true)
+	# Move the item into the equipped map.
 	_equipped[slot] = item
 	_apply_equip_to_player(item)
 	item_equipped.emit(item, slot)
 	inventory_changed.emit(_items.duplicate())
+	# Combat-trace shim — surfaces the dual-surface state to Sponsor's HTML5
+	# DevTools console so equip-flow regressions are observable in soak. Pure
+	# instrumentation; no-op outside HTML5 (DebugFlags.combat_trace gate).
+	_emit_equip_trace(item, slot, &"lmb_click")
 	return true
 
 
@@ -451,3 +478,65 @@ func _find_player() -> Node:
 	if nodes.is_empty():
 		return null
 	return nodes[0] as Node
+
+
+# ---- Combat-trace (P0 86c9q96m8) -------------------------------------
+
+## Emit a `[combat-trace] Inventory.equip` line via DebugFlags.combat_trace.
+## HTML5-only (the gate in `DebugFlags.combat_trace_enabled` returns false on
+## desktop and headless GUT, so this is a silent no-op there). The line is
+## scoped to the user-driven LMB-click path; F5-reload restoration uses
+## `restore_from_save` which bypasses `equip()` entirely, so it does NOT fire
+## this trace.
+##
+## Line shape (verbatim contract — Playwright spec greps this):
+##   [combat-trace] Inventory.equip | item=<id> slot=<weapon|armor> \
+##       source=<source_tag> damage_after=<N>
+##
+## damage_after reads from `Damage.compute_player_damage` for weapon slots
+## (the freshly-equipped weapon's light-attack damage at the player's current
+## edge). Armor equips emit `damage_after=<player's existing weapon damage>`
+## so the trace is mechanically uniform — but since equipping armor doesn't
+## change weapon damage, the value is the same as before the equip; tests
+## should not assert delta on armor equips.
+##
+## Mirror format with Player.try_attack's "POST damage=N" line: same
+## `<tag> | <key>=<val>` style for grep parity.
+func _emit_equip_trace(item: ItemInstance, slot: StringName, source: StringName) -> void:
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return
+	var df: Node = loop.root.get_node_or_null("DebugFlags")
+	if df == null or not df.has_method("combat_trace"):
+		return
+	if item == null or item.def == null:
+		return
+	var item_id: String = String(item.def.id)
+	var slot_str: String = String(slot)
+	# Compute damage_after via the same formula Player.try_attack uses, so the
+	# trace value matches what the next swing will deal.
+	var damage_after: int = _compute_post_equip_damage()
+	var msg: String = "item=%s slot=%s source=%s damage_after=%d" % [
+		item_id, slot_str, String(source), damage_after,
+	]
+	df.combat_trace("Inventory.equip", msg)
+
+
+## Read the current player's expected light-attack damage. Used by the
+## Inventory.equip trace line so Sponsor / Playwright can assert "the
+## post-equip damage value matches the equipped weapon" without hitting a
+## grunt. Returns FIST_DAMAGE (1) if no Player or no weapon equipped — the
+## same fallback `Damage.compute_player_damage(null, _, _)` returns.
+func _compute_post_equip_damage() -> int:
+	const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
+	var player: Node = _find_player()
+	if player == null:
+		# No Player in tree — return FIST_DAMAGE as the conservative default.
+		return DamageScript.FIST_DAMAGE
+	var weapon: ItemDef = null
+	if player.has_method("get_equipped_weapon"):
+		weapon = player.get_equipped_weapon() as ItemDef
+	var edge: int = 0
+	if player.has_method("get_edge"):
+		edge = int(player.get_edge())
+	return DamageScript.compute_player_damage(weapon, edge, &"light")
