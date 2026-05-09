@@ -99,6 +99,20 @@ The fix patterns:
 
 Future bugs in this family: check the `_die` chain (death-path adds), all per-tick spawn sites (spawn-path adds), and any new Area2D class that's instantiated outside `_ready` of the parent scene. Memory rule: `godot-physics-flush-area2d-rule.md`.
 
+## CharacterBody2D motion_mode rule (load-bearing for top-down 2D)
+
+Godot 4 `CharacterBody2D` defaults to `motion_mode = MOTION_MODE_GROUNDED` with `up_direction = Vector2.UP = (0, -1)`. `move_and_slide()` in GROUNDED mode treats collisions whose normal aligns with `up_direction` as **floor** and applies floor-snap / floor-stop semantics — including suppressing post-collision velocity along the +up axis. **In a top-down 2D game with no floor / gravity / jump concept, this introduces a directional asymmetry that bites only along one axis.**
+
+**Symptom (M1 RC re-soak 5, ticket `86c9q96jv`):** Stratum1Boss separated cleanly from the player on north / east / west melee-contact approaches but stuck on south approaches. Pushback velocity computed identically in all four cases — north-axis pushback was being silently dropped by the GROUNDED-mode floor branch because the player-from-south collision normal aligned with `up_direction`.
+
+**Why the boss surfaced this and not Grunt:** the bug is universal to every CharacterBody2D in the project (no scene overrides motion_mode), but only manifests as visible "sticking" when the post-contact pushback can't out-run the player. Boss has CircleShape2D radius 24 px → player overlap depth up to 34 px from boss center, plenty of duration for the floor branch to suppress the 60 px/s pushback against the 120 px/s player walk. Grunt's radius is 12 px → 22 px overlap depth, smaller window for the asymmetry to show. PR #150's swing-fire pushback was correct on every axis; the bug was downstream in `move_and_slide()`'s axis-asymmetric resolution, not in the velocity computation.
+
+**The fix (`Stratum1Boss._apply_motion_mode`):** call `motion_mode = CharacterBody2D.MOTION_MODE_FLOATING` from `_ready()`. FLOATING resolves all axes equally — no floor concept, no `up_direction` privilege. This is the canonical Godot 4 top-down 2D pattern and should be the default for every CharacterBody2D in this project.
+
+**Generalization:** any new CharacterBody2D added to the project (mob, NPC, breakable, projectile-as-body) MUST set `motion_mode = MOTION_MODE_FLOATING` either in its scene file or via a `_apply_motion_mode()` helper called from `_ready()`. **Pattern check:** if you ever observe direction-asymmetric collision separation (works on three axes, fails on one — typically the +up or -up axis), suspect this rule first.
+
+**Test bar consequence:** any "mob does not stick to player" regression test must cover **all four cardinal approach directions** (N / E / S / W). Single-axis tests miss the GROUNDED-mode floor-asymmetry surface. See `tests/integration/test_boss_does_not_stick_after_contact.gd::test_boss_separates_from_player_approached_from_*`.
+
 ## Equipped-weapon dual-surface rule (load-bearing)
 
 Equipped weapon state lives on **two surfaces** that must stay in lockstep:

@@ -255,6 +255,7 @@ const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.080
 func _ready() -> void:
 	_apply_mob_def()
 	_apply_layers()
+	_apply_motion_mode()
 	_resolve_player()
 	if skip_intro_for_tests:
 		_state = STATE_IDLE
@@ -894,6 +895,29 @@ func _apply_layers() -> void:
 		collision_layer = LAYER_ENEMY
 	if collision_mask == 0 or collision_mask == BARE_DEFAULT_LAYER:
 		collision_mask = LAYER_WORLD | LAYER_PLAYER
+
+
+## Force `motion_mode = MOTION_MODE_FLOATING` so `move_and_slide()` treats
+## every axis equally during collision resolution. Without this, the engine
+## defaults to `MOTION_MODE_GROUNDED` with `up_direction = (0, -1)`, and
+## collisions whose normal aligns with up_direction (player-from-south
+## approach) engage floor-snap / floor-stop behavior that suppresses the
+## boss's POST_CONTACT_PUSHBACK_SPEED velocity along the +up axis.
+##
+## Symptom this fixes (M1 RC re-soak 5, ticket 86c9q96jv): boss sticks to
+## player on south-edge approach only — north / east / west approaches work
+## because their collision normals don't align with up_direction so the
+## GROUNDED-mode floor-detection branch never engages. Boss's larger
+## collision radius (24 px vs Grunt's 12 px) made the asymmetry observable
+## as sticking; smaller mobs are less affected for the same reason.
+##
+## Top-down 2D best practice — boss has no floor / gravity / jump concept,
+## so MOTION_MODE_FLOATING is the canonical motion mode. Mirrors the same
+## consideration future top-down mobs should adopt; documented in
+## `.claude/docs/combat-architecture.md` § "CharacterBody2D motion_mode
+## rule".
+func _apply_motion_mode() -> void:
+	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 
 
 ## Read the player's Vigor stat for the damage formula. Returns 0 if the
