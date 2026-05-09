@@ -222,8 +222,8 @@ func register_mob(mob: Node) -> void:
 	# register_mob (rare, but possible in tests) doesn't underflow the count.
 	var err: int = mob.mob_died.connect(_on_mob_died)
 	# DIAGNOSTIC (ticket 86c9qbhm5)
-	print("[RoomGate-diag] register_mob | OK %s class=%s mobs_alive=%d connect_err=%d" % [mob.name, mob.get_class(), _mobs_alive, err])
-	_combat_trace("RoomGate.register_mob", "OK %s class=%s mobs_alive=%d connect_err=%d" % [mob.name, mob.get_class(), _mobs_alive, err])
+	print("[RoomGate-diag] register_mob | OK %s id=%d class=%s mobs_alive=%d connect_err=%d" % [mob.name, mob.get_instance_id(), mob.get_class(), _mobs_alive, err])
+	_combat_trace("RoomGate.register_mob", "OK %s id=%d class=%s mobs_alive=%d connect_err=%d" % [mob.name, mob.get_instance_id(), mob.get_class(), _mobs_alive, err])
 
 
 ## Force-lock the gate from script. Production uses `body_entered`; tests
@@ -316,8 +316,10 @@ func _on_mob_died(_mob: Variant, _pos: Variant = null, _def: Variant = null) -> 
 	# we don't need any of them — we just count.
 	_mobs_alive = max(0, _mobs_alive - 1)
 	# DIAGNOSTIC (ticket 86c9qbhm5)
-	print("[RoomGate-diag] _on_mob_died | mobs_alive=%d state=%s death_wait_in_flight=%s" % [_mobs_alive, _state, _death_wait_in_flight])
-	_combat_trace("RoomGate._on_mob_died", "mobs_alive=%d state=%s death_wait_in_flight=%s" % [_mobs_alive, _state, _death_wait_in_flight])
+	var mid: int = _mob.get_instance_id() if _mob != null and _mob.has_method("get_instance_id") else -1
+	var mname: String = _mob.name if _mob != null and "name" in _mob else "<null>"
+	print("[RoomGate-diag] _on_mob_died | mob=%s id=%d mobs_alive=%d state=%s death_wait_in_flight=%s" % [mname, mid, _mobs_alive, _state, _death_wait_in_flight])
+	_combat_trace("RoomGate._on_mob_died", "mob=%s id=%d mobs_alive=%d state=%s death_wait_in_flight=%s" % [mname, mid, _mobs_alive, _state, _death_wait_in_flight])
 	if _mobs_alive == 0 and _state == STATE_LOCKED and not _death_wait_in_flight:
 		_death_wait_in_flight = true
 		_start_death_wait()
