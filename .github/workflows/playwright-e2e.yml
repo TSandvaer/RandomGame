@@ -1,0 +1,212 @@
+name: Playwright E2E (HTML5 artifact)
+
+# M1 RC sign-off gate — runs after release-github.yml produces a green HTML5
+# build artifact, then drives the Playwright harness against that artifact.
+#
+# Three skeleton specs:
+#   ac1-boot-and-sha     — build boots, [BuildInfo] SHA correct, no errors, no 404s
+#   regen-smoke          — out-of-combat HP regen activates after 3s idle
+#   room-traversal-smoke — Room 1 combat + door-walk → Room 2 advance
+#
+# Artifact: embergrave-html5-<sha> (single-unzip post-PR-#152 format).
+# The artifact name is resolved from the upstream release-build conclusion event.
+#
+# Local run:
+#   cd tests/playwright && npm ci
+#   npx playwright install chromium
+#   RELEASE_BUILD_ARTIFACT_PATH=/path/to/unzipped npm test
+
+on:
+  # Primary trigger: after release-github.yml completes on main
+  workflow_run:
+    workflows: ["Release to GitHub (M1 RC build)"]
+    types:
+      - completed
+    branches:
+      - main
+
+  # Manual trigger: run against a specific artifact or any branch
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        description: "GitHub Actions run ID of the release-github.yml run to test against. Leave blank to use the latest."
+        required: false
+        default: ""
+      artifact_name_prefix:
+        description: "Artifact name prefix (default: embergrave-html5)"
+        required: false
+        default: "embergrave-html5"
+
+jobs:
+  playwright-e2e:
+    name: Playwright E2E — HTML5 artifact smoke
+    runs-on: ubuntu-22.04
+
+    # Only run if the upstream release build succeeded (for workflow_run trigger)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---- Resolve the release-build artifact ----
+
+      - name: Resolve artifact run ID
+        id: resolve_run
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "run_id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.inputs.artifact_run_id }}" ]; then
+            echo "run_id=${{ github.event.inputs.artifact_run_id }}" >> "$GITHUB_OUTPUT"
+          else
+            # Find the latest successful release-github.yml run on main
+            latest_run=$(gh api repos/${{ github.repository }}/actions/workflows \
+              --jq '.workflows[] | select(.name == "Release to GitHub (M1 RC build)") | .id' | head -1)
+            latest_success=$(gh api "repos/${{ github.repository }}/actions/workflows/${latest_run}/runs?branch=main&status=success&per_page=1" \
+              --jq '.workflow_runs[0].id')
+            echo "run_id=${latest_success}" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download HTML5 artifact
+        uses: actions/download-artifact@v4
+        with:
+          # Artifact name format: embergrave-html5-<sha>
+          # The download-artifact action downloads all artifacts matching this
+          # prefix when run_id is set. We get the directory containing the zip.
+          name: ${{ github.event.inputs.artifact_name_prefix || 'embergrave-html5' }}-*
+          path: ./artifact-download
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.resolve_run.outputs.run_id }}
+        continue-on-error: true  # If exact name match fails, try wildcard below
+
+      - name: Download HTML5 artifact (fallback — any embergrave-html5 artifact)
+        if: ${{ hashFiles('./artifact-download/**') == '' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runId = '${{ steps.resolve_run.outputs.run_id }}';
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            });
+            const html5Artifact = artifacts.data.artifacts.find(
+              a => a.name.startsWith('embergrave-html5')
+            );
+            if (!html5Artifact) {
+              core.setFailed(`No embergrave-html5 artifact found in run ${runId}`);
+              return;
+            }
+            core.exportVariable('ARTIFACT_NAME', html5Artifact.name);
+            core.setOutput('artifact_name', html5Artifact.name);
+
+      - name: Download specific artifact by name
+        if: ${{ env.ARTIFACT_NAME != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ./artifact-download
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.resolve_run.outputs.run_id }}
+
+      - name: List downloaded artifact contents
+        run: |
+          echo "=== Artifact download directory ==="
+          ls -la ./artifact-download/ || echo "(empty)"
+          find ./artifact-download -type f | head -20
+
+      - name: Unzip HTML5 artifact
+        id: unzip
+        run: |
+          set -euo pipefail
+          # Post-PR-#152 single-unzip format:
+          # artifact-download/ contains embergrave-html5-<sha>-<label>.zip
+          # Unzip once to get: index.html, index.js, index.wasm, index.pck, etc.
+          ZIP_FILE=$(find ./artifact-download -name "*.zip" | head -1)
+          if [ -z "${ZIP_FILE}" ]; then
+            echo "ERROR: No zip file found in artifact-download/"
+            ls -la ./artifact-download/
+            exit 1
+          fi
+          echo "Unzipping: ${ZIP_FILE}"
+          mkdir -p ./html5-build
+          unzip -o "${ZIP_FILE}" -d ./html5-build
+          echo "=== HTML5 build contents ==="
+          ls -la ./html5-build/
+          # Verify expected files
+          test -f ./html5-build/index.html || (echo "ERROR: index.html missing" && exit 1)
+          test -f ./html5-build/index.js   || (echo "ERROR: index.js missing"   && exit 1)
+          test -f ./html5-build/index.wasm || (echo "ERROR: index.wasm missing" && exit 1)
+          test -f ./html5-build/index.pck  || (echo "ERROR: index.pck missing"  && exit 1)
+          echo "html5_dir=$(pwd)/html5-build" >> "$GITHUB_OUTPUT"
+
+      # ---- Node / Playwright setup ----
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: tests/playwright/package.json
+
+      - name: Install Playwright dependencies
+        working-directory: tests/playwright
+        run: npm ci
+
+      - name: Install Playwright browsers (Chromium only)
+        working-directory: tests/playwright
+        run: npx playwright install chromium --with-deps
+
+      # ---- Python for http.server (artifact-server fixture) ----
+      # ubuntu-22.04 ships python3; we alias it as python for the fixture
+      - name: Ensure python alias exists
+        run: |
+          python --version 2>/dev/null || \
+            (ln -sf /usr/bin/python3 /usr/local/bin/python && python --version)
+
+      # ---- Run Playwright tests ----
+
+      - name: Run Playwright E2E tests
+        working-directory: tests/playwright
+        env:
+          RELEASE_BUILD_ARTIFACT_PATH: ${{ steps.unzip.outputs.html5_dir }}
+          CI: "true"
+        run: npx playwright test
+
+      # ---- Upload artifacts on failure ----
+
+      - name: Upload Playwright report (always)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: tests/playwright/playwright-report/
+          retention-days: 14
+
+      - name: Upload test results (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-test-results-${{ github.run_id }}
+          path: tests/playwright/test-results/
+          retention-days: 7
+
+      # ---- Summary ----
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## Playwright E2E Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Artifact:** \`embergrave-html5\` from run \`${{ steps.resolve_run.outputs.run_id }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Specs run:**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`ac1-boot-and-sha\` — build boots + SHA correct + no errors + no 404s" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`regen-smoke\` — out-of-combat HP regen activates after 3.0s idle" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`room-traversal-smoke\` — Room 1 combat + door-walk + Room 2 advance" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "See \`playwright-report-${{ github.run_id }}\` artifact for full HTML report." >> "$GITHUB_STEP_SUMMARY"
