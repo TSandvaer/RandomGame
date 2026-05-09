@@ -207,17 +207,23 @@ func mobs_alive() -> int:
 ## Idempotent: re-registering the same mob is a no-op.
 func register_mob(mob: Node) -> void:
 	if mob == null:
+		print("[RoomGate-diag] register_mob | SKIP null")
 		return
 	if mob in _registered_mobs:
+		print("[RoomGate-diag] register_mob | SKIP already-registered %s" % mob.name)
 		return
 	if not mob.has_signal("mob_died"):
+		print("[RoomGate-diag] register_mob | SKIP no mob_died signal: %s (class=%s)" % [mob.name, mob.get_class()])
 		push_warning("RoomGate.register_mob: '%s' has no mob_died signal — skipped" % str(mob))
 		return
 	_registered_mobs.append(mob)
 	_mobs_alive += 1
 	# Connect with deferred so a synchronous mob_died emission inside
 	# register_mob (rare, but possible in tests) doesn't underflow the count.
-	mob.mob_died.connect(_on_mob_died)
+	var err: int = mob.mob_died.connect(_on_mob_died)
+	# DIAGNOSTIC (ticket 86c9qbhm5)
+	print("[RoomGate-diag] register_mob | OK %s class=%s mobs_alive=%d connect_err=%d" % [mob.name, mob.get_class(), _mobs_alive, err])
+	_combat_trace("RoomGate.register_mob", "OK %s class=%s mobs_alive=%d connect_err=%d" % [mob.name, mob.get_class(), _mobs_alive, err])
 
 
 ## Force-lock the gate from script. Production uses `body_entered`; tests
