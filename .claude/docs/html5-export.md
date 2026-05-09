@@ -10,6 +10,18 @@ HTML5 export uses the **`gl_compatibility`** renderer (Godot 4.3 default for web
 - **Polygon2D rendering quirks.** Polygon2D shapes that render correctly on `forward_plus`/`mobile` may not render in `gl_compatibility` — empirically demonstrated by the swing wedge invisibility bug. **Rule: prefer ColorRect / NinePatchRect for simple shapes** until Godot upstream resolves the Polygon2D divergence. PR #137 swapped the wedge from a 3-vertex Polygon2D to a rotated ColorRect with the bounding rectangle (`size = reach × radius*2`).
 - **Z-index sensitivity.** `z_index = -1` in `gl_compatibility` can sink a node below the room background's draw layer in ways that don't reproduce on desktop. The PR #137 wedge fix lifted z_index from `-1` to `+1` as part of the same swap. **Rule: don't rely on negative z_index for "draw above floor, below player body" layering** — use positive z_index above the floor's z_index or factor through CanvasLayer.
 
+## Resource enumeration on packed `.pck` resources
+
+**`DirAccess.current_is_dir()` returns false on subdirectories of packed `.pck` resources in HTML5.** Recursive `DirAccess` scans that work on desktop (and headless GUT) silently skip subdirs in HTML5 — entries that ARE directories get `current_is_dir() == false` and the recursion never descends. This bit `ContentRegistry.load_all()` in PR #166 (ticket `86c9qah1f`): `iron_sword.tres` lives at `resources/items/weapons/iron_sword.tres`, the recursive scan missed it in HTML5 only, and `Inventory.restore_from_save` push_warning'd `unknown item id 'iron_sword'` on every F5 reload.
+
+**Rule:** any HTML5-shipping content-scanning code that depends on `DirAccess` recursion needs a fallback path. The PR #166 fix is the canonical pattern — see `.claude/docs/combat-architecture.md` § "ContentRegistry.items_resolved" for the full three-pronged fallback:
+
+1. Recursive `DirAccess` scan (works on desktop)
+2. Explicit subdir scan of a known-roots constant (HTML5 fallback, quiet on open-fail)
+3. Direct `load()` of must-have paths (always works — `load()` reads from the resource cache, not DirAccess)
+
+**Latent surfaces in this codebase:** any future loot table walker, mob-def discovery, level-chunk autoloader, or affix-pool scanner that uses `DirAccess` recursion has the same latent bug class. Always pair with a pinned-paths fallback for save-critical resources, and ship an HTML5-build smoke test (headless GUT and desktop will both pass against the bug).
+
 ## Service-worker cache trap
 
 Godot HTML5 exports register a service worker that aggressively caches `index.js` / `index.wasm` / asset bundle. **Switching between artifacts on the same `localhost:8000` URL serves stale assets even after a normal F5 refresh** — including across browser sessions. This bit Sponsor multiple times during the M1 RC P0 wave: the new build SHA showed in BuildInfo from prior sessions in cache, while the trace data printed values from older code (e.g. `tint=(1.40,1.00,0.70)` from pre-PR-#137 even after PR #137's sub-1.0 fix shipped).
