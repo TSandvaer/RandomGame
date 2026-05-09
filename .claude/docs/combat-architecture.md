@@ -66,6 +66,8 @@ Each mob type ([`scripts/mobs/Grunt.gd`](scripts/mobs/Grunt.gd), `Charger.gd`, `
 
 Tier 1 invariant from `team/TESTING_BAR.md`: visual-primitive tests must assert observable color delta (`target != rest`), not just `tween_valid == true`. Test bar codified in PR #138 + post-mortem at `team/log/2026-05-html5-visual-feedback-no-op-postmortem.md`.
 
+**Tier 1 corollary — tween kill-and-restart pattern.** For any "second-event-during-active-tween-kills-and-restarts" pattern (hit-flash interrupted by a second hit, save-toast retriggered before fade-out completes, etc.), tests MUST assert **reference change** (`assert_ne(old_tween, new_tween)`), NOT `is_valid()` flip. Godot 4.3's `Tween.kill()` leaves the tween object in a valid-but-stopped state; `is_valid()` does not flip to false synchronously. Precedent: `tests/test_combat_visuals.gd::test_grunt_second_hit_during_flash_restarts_tween` and `tests/test_m2_w1_ux_polish.gd::test_t2_toast_throttle_reuses_single_widget` (PR #160 CI bounce — initial commit asserted `is_valid()` flip and CI flagged it; reference-change is the load-bearing invariant).
+
 ## `[combat-trace]` diagnostic shim
 
 [`scripts/util/DebugFlags.gd`](scripts/util/DebugFlags.gd) — `DebugFlags.combat_trace(tag, msg)` emits `[combat-trace]` console lines only when `OS.has_feature("web") == true`. Wired into:
