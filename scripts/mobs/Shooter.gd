@@ -143,6 +143,16 @@ var _hit_flash_target: CanvasItem = null
 var _hit_flash_uses_sprite: bool = false
 var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
 
+# Test-only escape hatch: when true, _spawn_projectile skips the actual
+# Projectile.instantiate() + parent.add_child() side-effects. The state
+# machine still advances (FIRING → POST_FIRE_RECOVERY) and projectile_fired
+# emits with a null payload + _shots_fired increments — sufficient for
+# integration tests that drive the state machine over many ticks without
+# leaking real Projectile nodes into the test tree (which can interfere with
+# the simulation's add_child timing in headless GUT context). Same pattern
+# as RoomGate.test_skip_death_wait.
+@export var test_skip_projectile_spawn: bool = false
+
 
 func _ready() -> void:
 	_apply_mob_def()
@@ -268,6 +278,8 @@ func _process_aiming(_delta: float) -> void:
 			# if we reach AIM_RANGE before the timer expires, velocity drops to
 			# ZERO on the next tick and the remaining windup completes standing still.
 			velocity = _vec_to_player_dir() * move_speed
+			_combat_trace("Shooter._process_aiming",
+				"dist=%.0f > AIM_RANGE=%.0f, velocity=(%.0f,%.0f)" % [dist, AIM_RANGE, velocity.x, velocity.y])
 		else:
 			velocity = Vector2.ZERO
 	else:
@@ -287,7 +299,27 @@ func _process_firing(_delta: float) -> void:
 
 
 func _process_post_fire(_delta: float) -> void:
-	velocity = Vector2.ZERO
+	# P0 #2 fix (ticket 86c9q7p4j): during POST_FIRE_RECOVERY, continue walking
+	# toward the player if dist > AIM_RANGE. Previously velocity=ZERO here, so
+	# the Shooter only closed the gap during the 0.55s AIMING window (gaining
+	# ~33px/cycle at 60px/s). With a 0.65s recovery window also zeroed, the
+	# effective close-the-gap speed was only ~27px/s averaged over the full
+	# aim+recovery cycle, meaning a player standing idle at 384px (Room 4 initial
+	# distance) was never reliably reached before the Sponsor stopped waiting.
+	# Fix: mirror the AIMING close-the-gap logic here. The Shooter walks toward
+	# the player at full move_speed during recovery when out of the sweet spot,
+	# exactly as it does while aiming. Kite interrupts still apply from AIMING.
+	if _player != null:
+		var dist: float = (_player.global_position - global_position).length()
+		if dist > AIM_RANGE:
+			# Still out of sweet spot — keep closing the gap during recovery.
+			velocity = _vec_to_player_dir() * move_speed
+			_combat_trace("Shooter._process_post_fire",
+				"dist=%.0f > AIM_RANGE=%.0f, closing gap at move_speed=%.0f" % [dist, AIM_RANGE, move_speed])
+		else:
+			velocity = Vector2.ZERO
+	else:
+		velocity = Vector2.ZERO
 	if _post_fire_recovery_left <= 0.0:
 		_pick_post_recovery_state()
 
@@ -381,6 +413,16 @@ func _spawn_projectile(dir: Vector2) -> void:
 	if d.length_squared() <= 0.0:
 		d = Vector2.RIGHT
 	d = d.normalized()
+	# Test-only escape hatch (Tess bounce #1 fix on PR #155): integration tests
+	# that drive the full aim+recovery cycle over many ticks need to skip the
+	# real Projectile spawn to avoid scene-tree side-effects in headless GUT
+	# context. State machine still advances (FIRING → POST_FIRE_RECOVERY via
+	# the caller); we increment _shots_fired and emit projectile_fired with
+	# a null payload so callers + signal-watchers still see the fire happen.
+	if test_skip_projectile_spawn:
+		_shots_fired += 1
+		projectile_fired.emit(null, d)
+		return
 	var p: Projectile = ProjectileScene.instantiate()
 	# Damage routed through the formula utility. Reads MobDef.damage_base +
 	# the player's Vigor mitigation at projectile-spawn time. Projectile is

@@ -262,3 +262,143 @@ func test_shooter_returns_to_idle_after_fire_cycle_when_player_leaves_aggro() ->
 
 	assert_eq(shooter.get_state(), Shooter.STATE_IDLE,
 		"shooter must return to IDLE when player leaves AGGRO_RADIUS post-recovery")
+
+
+# ===========================================================================
+# SHARPENED TESTS — P0 #2 regression (build embergrave-html5-356086a)
+# The original Bug 3 fix only added close-the-gap to AIMING state. The
+# missing piece: POST_FIRE_RECOVERY also held velocity=ZERO, meaning the
+# Shooter only closed the gap ~27px/s effective (33px over 0.55s AIMING,
+# then 0px over 0.65s POST_FIRE_RECOVERY). Fix: also close the gap in
+# POST_FIRE_RECOVERY when dist > AIM_RANGE. These tests would have FAILED
+# pre-fix and now PASS with the P0 #2 fix.
+# ===========================================================================
+
+## P0 #2 core: POST_FIRE_RECOVERY walks toward player when dist > AIM_RANGE.
+## Pre-fix this was velocity=ZERO unconditionally in _process_post_fire.
+func test_p0_shooter_closes_gap_during_post_fire_recovery() -> void:
+	var shooter: Shooter = _make_shooter(Vector2.ZERO)
+	var player: FakePlayer = _make_player(Vector2(400.0, 0.0))
+	# 400 px >> AIM_RANGE (300 px). Recovery timer still active (non-zero).
+	shooter.set_player(player)
+	shooter._post_fire_recovery_left = Shooter.POST_FIRE_RECOVERY  # timer still running
+	shooter._set_state(Shooter.STATE_POST_FIRE_RECOVERY)
+	shooter._is_dead = false
+
+	shooter._process_post_fire(1.0 / 60.0)
+
+	assert_gt(shooter.velocity.x, 0.0,
+		"REGRESSION CHECK (P0 #2): Shooter must walk toward player (velocity.x > 0) " +
+		"during POST_FIRE_RECOVERY when dist > AIM_RANGE. Pre-fix: velocity=ZERO.")
+	assert_gt(shooter.velocity.length(), 0.0,
+		"velocity must be non-zero during POST_FIRE_RECOVERY when out of sweet-spot")
+
+
+## P0 #2: POST_FIRE_RECOVERY holds position when player is in sweet-spot (KITE_RANGE..AIM_RANGE).
+func test_p0_post_fire_recovery_holds_position_in_sweet_spot() -> void:
+	var shooter: Shooter = _make_shooter(Vector2.ZERO)
+	var player: FakePlayer = _make_player(Vector2(200.0, 0.0))
+	# 200 px: sweet-spot (KITE_RANGE=120 < 200 < AIM_RANGE=300).
+	shooter.set_player(player)
+	shooter._post_fire_recovery_left = Shooter.POST_FIRE_RECOVERY
+	shooter._set_state(Shooter.STATE_POST_FIRE_RECOVERY)
+	shooter._is_dead = false
+
+	shooter._process_post_fire(1.0 / 60.0)
+
+	assert_eq(shooter.velocity, Vector2.ZERO,
+		"Shooter holds position during POST_FIRE_RECOVERY when player is in sweet-spot")
+
+
+## P0 #2 worst-case far-corner scenario: shooter at one corner, player at the
+## opposite end with a gap MUCH larger than one cycle can close. This forces
+## both AIMING and POST_FIRE_RECOVERY to spend the full cycle closing the gap
+## (neither phase reaches AIM_RANGE before the cycle ends, so velocity stays
+## non-zero throughout both). This isolates and measures the post-fix behavior
+## that PR #155 is required to deliver.
+##
+## Pre-fix: AIMING closes ~33px, POST_FIRE_RECOVERY closes 0px (held ZERO),
+## gap_closed ≈ 33px per cycle.
+## Post-fix: both AIMING (33px) and POST_FIRE_RECOVERY (~38px over its 0.65s
+## window when dist stays > AIM_RANGE), gap_closed ≈ 71px per cycle.
+##
+## Tess bounce #1 fix: enabled test_skip_projectile_spawn so the FIRING tick
+## doesn't side-effect-add a Projectile node into the test tree (which stalled
+## the simulation in headless GUT context). Drop straight into STATE_AIMING
+## with timer primed so we measure exactly the close-the-gap behavior across
+## the full aim+recovery cycle. Choose the initial gap so neither phase
+## individually reaches AIM_RANGE within its window — otherwise the post-fix
+## velocity drops to ZERO once dist <= AIM_RANGE and the test under-measures
+## the recovery contribution. For 1.2s at 60px/s movement = 72px potential;
+## start with dist=500 (>> 300+72) so the gap is never below AIM_RANGE during
+## the cycle, exposing the full velocity contribution from BOTH phases.
+func test_p0_far_corner_scenario_shooter_closes_gap_over_full_cycle() -> void:
+	# Choose an initial gap large enough that neither AIMING nor POST_FIRE_RECOVERY
+	# alone reaches AIM_RANGE. dist=500 > AIM_RANGE+full-cycle-movement (~372).
+	var shooter: Shooter = _make_shooter(Vector2(500.0, 96.0))
+	var player: FakePlayer = _make_player(Vector2(0.0, 96.0))
+	# Initial distance: 500px. After 72 ticks at 60px/s = 72px movement,
+	# dist ends at ~428px — still >> AIM_RANGE (300), so velocity is non-zero
+	# throughout the entire cycle and we measure the full close-gap contribution.
+	shooter.set_player(player)
+	shooter._is_dead = false
+	# Skip the real Projectile spawn — state machine still advances FIRING →
+	# POST_FIRE_RECOVERY via the caller, but no scene-tree side effects.
+	shooter.test_skip_projectile_spawn = true
+	# Skip SPOTTED entirely: drop straight into AIMING with the timer primed.
+	# This isolates the test to the aim+recovery cycle, removing the 0.15s
+	# SPOTTED_HOLD from the budget so all 72 ticks measure close-gap behavior.
+	shooter._aim_left = Shooter.AIM_DURATION
+	shooter._last_aim_dir = (player.global_position - shooter.global_position).normalized()
+	shooter._set_state(Shooter.STATE_AIMING)
+
+	var start_x: float = shooter.global_position.x
+	var delta: float = 1.0 / 60.0
+	# 72 ticks = 1.2s = one full aim+recovery cycle (0.55s AIMING + 0.65s recovery).
+	for _i: int in range(72):
+		shooter._tick_timers(delta)
+		match shooter.get_state():
+			Shooter.STATE_IDLE:
+				shooter._process_idle(delta)
+			Shooter.STATE_SPOTTED:
+				shooter._process_spotted(delta)
+			Shooter.STATE_AIMING:
+				shooter._process_aiming(delta)
+			Shooter.STATE_FIRING:
+				shooter._process_firing(delta)
+			Shooter.STATE_POST_FIRE_RECOVERY:
+				shooter._process_post_fire(delta)
+			Shooter.STATE_KITING:
+				shooter._process_kiting(delta)
+		shooter.global_position += shooter.velocity * delta
+
+	var end_x: float = shooter.global_position.x
+	var gap_closed: float = start_x - end_x  # positive means moved toward player (west)
+
+	# Pre-fix: gap_closed ≈ 33px (only AIMING window, recovery=ZERO).
+	# Post-fix: gap_closed ≈ 71px (both AIMING + RECOVERY at 60px/s).
+	# Assert > 50px to clearly distinguish pre-fix (~33px) from post-fix (~71px),
+	# allowing for state-transition single-tick gaps in the simulation.
+	assert_gt(gap_closed, 50.0,
+		"REGRESSION CHECK (P0 #2): Shooter must close > 50px gap in one full aim+recovery " +
+		"cycle when the gap remains >> AIM_RANGE throughout. " +
+		"Got gap_closed=%.1f px. Pre-fix would show ~33px (AIMING only — recovery held velocity=ZERO). " % gap_closed +
+		"Post-fix expects ~71px (AIMING + POST_FIRE_RECOVERY both walk toward player at move_speed=60).")
+
+
+## P0 #2: velocity direction during POST_FIRE_RECOVERY points toward player.
+func test_p0_post_fire_recovery_velocity_direction_toward_player() -> void:
+	var shooter: Shooter = _make_shooter(Vector2.ZERO)
+	var player: FakePlayer = _make_player(Vector2(0.0, -400.0))
+	# Player is directly north (negative y), dist=400 >> AIM_RANGE=300.
+	shooter.set_player(player)
+	shooter._post_fire_recovery_left = Shooter.POST_FIRE_RECOVERY
+	shooter._set_state(Shooter.STATE_POST_FIRE_RECOVERY)
+	shooter._is_dead = false
+
+	shooter._process_post_fire(1.0 / 60.0)
+
+	assert_almost_eq(shooter.velocity.x, 0.0, 1.0,
+		"velocity.x should be ~0 (player is due north)")
+	assert_lt(shooter.velocity.y, 0.0,
+		"velocity.y must be negative (moving north toward player)")

@@ -165,7 +165,15 @@ func _spawn_room_gate() -> void:
 	_room_gate.position = room_gate_position
 	_room_gate.trigger_size = room_gate_size
 	add_child(_room_gate)
+	# Position B contract (ticket 86c9q94fg): gate_unlocked fires when the door
+	# visual opens (after DEATH_TWEEN_WAIT_SECS delay). That is purely a visual
+	# event. room_cleared (which triggers Main._on_room_cleared → load next room)
+	# must NOT fire on gate_unlocked. It fires on gate_traversed — the signal
+	# that emits when the player CharacterBody2D walks through the now-open door.
+	# Disconnecting the old gate_unlocked → room_cleared path and replacing it
+	# with gate_traversed → room_cleared is the entire P0 #1 fix.
 	_room_gate.gate_unlocked.connect(_on_room_gate_unlocked)
+	_room_gate.gate_traversed.connect(_on_room_gate_traversed)
 
 
 func _spawn_healing_fountain() -> void:
@@ -262,9 +270,20 @@ func _get_shooter_def() -> MobDef:
 # ---- Internal -------------------------------------------------------
 
 func _on_room_gate_unlocked() -> void:
-	# Mark the room cleared in the global progression tracker. The
-	# StratumProgression autoload is registered in project.godot, so it's
-	# always reachable via the get_node path.
+	# Position B contract (ticket 86c9q94fg): gate_unlocked means the door
+	# VISUAL has opened (mobs are all dead, death-tween wait has elapsed).
+	# We do NOT advance the room counter here. room_cleared fires only when
+	# the player walks through the open door (see _on_room_gate_traversed).
+	# This handler is kept for potential future audio/visual hooks on door-open
+	# (e.g. door-grind SFX, camera cue) without coupling it to room advancement.
+	# [combat-trace] logging via RoomGate._unlock already emits a trace line.
+	pass
+
+
+func _on_room_gate_traversed() -> void:
+	# Player walked through the open door — NOW advance the room counter.
+	# [combat-trace] RoomGate.gate_traversed trace line fires just before this.
+	# Mark cleared in StratumProgression so re-enter doesn't re-spawn mobs.
 	var sp: Node = _get_stratum_progression()
 	if sp != null and chunk_def != null:
 		sp.call("mark_cleared", chunk_def.id)
