@@ -239,28 +239,100 @@ func test_grunt_dies_during_light_telegraph_no_swing() -> void:
 # ---- (g) EDGE: tint channels are HTML5-safe (all < 1.0 on R/G/B) ------
 
 func test_grunt_telegraph_tint_channels_are_html5_safe() -> void:
-	# WebGL2/sRGB clamps color to [0, 1]. A tint with any channel >= 1.0 on
-	# a white-background sprite is invisible. All channels must be < 1.0 so
-	# the color delta is never eaten by the clamp.
+	# WebGL2/sRGB clamps color to [0, 1]. A tint with any channel > 1.0 risks
+	# being clamped into invisibility on a white-background sprite. R/G must be
+	# < 1.0 (strict) so the visible delta from white survives the clamp; B/A
+	# only need to be <= 1.0. (GUT lacks `assert_le`; using assert_true with an
+	# explicit comparison.)
 	var tint: Color = Grunt.ATTACK_TELEGRAPH_TINT
 	assert_lt(tint.r, 1.0, "Grunt tint.r < 1.0 (HTML5 safe)")
 	assert_lt(tint.g, 1.0, "Grunt tint.g < 1.0 (HTML5 safe)")
-	# tint.b is allowed to be 0 (red tint); checking it doesn't exceed 1.0:
-	assert_le(tint.b, 1.0, "Grunt tint.b <= 1.0 (HTML5 safe)")
-	assert_le(tint.a, 1.0, "Grunt tint.a <= 1.0 (HTML5 safe)")
+	assert_true(tint.b <= 1.0, "Grunt tint.b <= 1.0 (HTML5 safe)")
+	assert_true(tint.a <= 1.0, "Grunt tint.a <= 1.0 (HTML5 safe)")
 
 
 func test_charger_telegraph_tint_channels_are_html5_safe() -> void:
 	var tint: Color = Charger.ATTACK_TELEGRAPH_TINT
 	assert_lt(tint.r, 1.0, "Charger tint.r < 1.0")
 	assert_lt(tint.g, 1.0, "Charger tint.g < 1.0")
-	assert_le(tint.b, 1.0, "Charger tint.b <= 1.0")
-	assert_le(tint.a, 1.0, "Charger tint.a <= 1.0")
+	assert_true(tint.b <= 1.0, "Charger tint.b <= 1.0")
+	assert_true(tint.a <= 1.0, "Charger tint.a <= 1.0")
 
 
 func test_shooter_telegraph_tint_channels_are_html5_safe() -> void:
 	var tint: Color = Shooter.ATTACK_TELEGRAPH_TINT
 	assert_lt(tint.r, 1.0, "Shooter tint.r < 1.0")
 	assert_lt(tint.g, 1.0, "Shooter tint.g < 1.0")
-	assert_le(tint.b, 1.0, "Shooter tint.b <= 1.0")
-	assert_le(tint.a, 1.0, "Shooter tint.a <= 1.0")
+	assert_true(tint.b <= 1.0, "Shooter tint.b <= 1.0")
+	assert_true(tint.a <= 1.0, "Shooter tint.a <= 1.0")
+
+
+# ---- Stratum1Boss: telegraph fires on melee + slam wind-up paths --------
+
+func test_stratum1_boss_attack_telegraph_tint_is_not_white() -> void:
+	# Tier 1 visible-delta bar — boss tint differs from white rest color.
+	assert_ne(Stratum1Boss.ATTACK_TELEGRAPH_TINT, Color(1.0, 1.0, 1.0, 1.0),
+		"Boss ATTACK_TELEGRAPH_TINT must differ from white (Tier 1 bar)")
+
+
+func test_stratum1_boss_telegraph_tint_channels_are_html5_safe() -> void:
+	var tint: Color = Stratum1Boss.ATTACK_TELEGRAPH_TINT
+	assert_lt(tint.r, 1.0, "Boss tint.r < 1.0")
+	assert_lt(tint.g, 1.0, "Boss tint.g < 1.0")
+	assert_true(tint.b <= 1.0, "Boss tint.b <= 1.0")
+	assert_true(tint.a <= 1.0, "Boss tint.a <= 1.0")
+
+
+func test_stratum1_boss_melee_telegraph_creates_tween() -> void:
+	# Boss melee path: skip_intro_for_tests so we start in IDLE not DORMANT,
+	# then put the player in MELEE_RANGE and tick — boss should enter
+	# STATE_TELEGRAPHING_MELEE and create the visual telegraph tween.
+	const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
+	var b: Stratum1Boss = BossScript.new()
+	b.skip_intro_for_tests = true
+	add_child_autofree(b)
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	b.global_position = Vector2.ZERO
+	p.global_position = Vector2(20.0, 0.0)  # within MELEE_RANGE
+	b.set_player(p)
+
+	b._physics_process(0.016)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
+		"boss enters TELEGRAPHING_MELEE when player in melee range")
+	var tween: Tween = b._attack_telegraph_tween
+	assert_not_null(tween, "_attack_telegraph_tween non-null in TELEGRAPHING_MELEE")
+	if tween != null:
+		assert_true(tween.is_valid(), "_attack_telegraph_tween running in TELEGRAPHING_MELEE")
+
+
+func test_stratum1_boss_slam_telegraph_creates_tween() -> void:
+	# Boss slam path: requires phase 2 (slam unlocks at PHASE_2). Drive into
+	# phase 2 by damaging boss past 66% threshold + tick past transition.
+	const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
+	const MobDefScript: Script = preload("res://scripts/content/MobDef.gd")
+	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 600})
+	var b: Stratum1Boss = BossScript.new()
+	b.skip_intro_for_tests = true
+	b.mob_def = def
+	add_child_autofree(b)
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	b.set_player(p)
+
+	# Drop HP to phase-2 boundary (396) then advance past transition.
+	b.take_damage(204, Vector2.ZERO, null)
+	b._physics_process(Stratum1Boss.PHASE_TRANSITION_DURATION + 0.01)
+	assert_eq(b.get_phase(), Stratum1Boss.PHASE_2, "boss in phase 2")
+
+	# Position player in slam radius (outside melee, inside slam).
+	b.global_position = Vector2.ZERO
+	p.global_position = Vector2(50.0, 0.0)  # > MELEE_RANGE (36), < SLAM_RADIUS
+	b._physics_process(0.016)
+	# Boss should pick slam telegraph (phase 2 + slam range + cooldown clear).
+	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_SLAM,
+		"boss enters TELEGRAPHING_SLAM in phase 2 at slam range")
+	var tween: Tween = b._attack_telegraph_tween
+	assert_not_null(tween, "_attack_telegraph_tween non-null in TELEGRAPHING_SLAM")
+	if tween != null:
+		assert_true(tween.is_valid(), "_attack_telegraph_tween running in TELEGRAPHING_SLAM")

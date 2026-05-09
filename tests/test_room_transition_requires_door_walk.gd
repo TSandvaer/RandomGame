@@ -210,3 +210,78 @@ func test_zero_mob_room_counter_only_on_door_walk() -> void:
 	# exit gate being connected to gate_unlocked in this minimal test).
 	assert_eq(exit.times_crossed, 1,
 		"zero-mob room: room counter advances once on gate_unlocked (door-walk simulation)")
+
+
+# ---- 8. NEW (Tess re-bounce): wait-then-unlock sequence via Timer ------
+
+func test_gate_does_not_unlock_until_death_wait_elapses() -> void:
+	# Verifies the actual delay: with test_skip_death_wait = false, killing
+	# the last mob does NOT immediately emit gate_unlocked — the Timer must
+	# elapse first. We simulate elapse via advance_death_wait_for_test().
+	var g: RoomGate = _make_gate()
+	g.test_skip_death_wait = false  # explicit: keep the wait active
+	# Manually lock the gate (without going through trigger_for_test which
+	# flips test_skip_death_wait on).
+	var m: FakeMob = _make_fake_mob()
+	g.register_mob(m)
+	g.lock()
+	assert_true(g.is_locked(), "gate locked")
+
+	watch_signals(g)
+	m.die()
+	# Last mob died — gate_unlocked must NOT fire yet (Timer is pending).
+	assert_signal_emit_count(g, "gate_unlocked", 0,
+		"gate_unlocked must NOT emit until DEATH_TWEEN_WAIT_SECS elapses")
+	assert_true(g._death_wait_in_flight,
+		"_death_wait_in_flight set — guard active during the wait window")
+	assert_eq(g.get_state(), RoomGate.STATE_LOCKED,
+		"gate stays LOCKED until the death-tween wait elapses")
+
+	# Simulate the timer expiring.
+	g.advance_death_wait_for_test()
+	assert_signal_emit_count(g, "gate_unlocked", 1,
+		"gate_unlocked emits exactly once after the wait elapses")
+	assert_eq(g.get_state(), RoomGate.STATE_UNLOCKED,
+		"gate transitions to UNLOCKED after the wait")
+
+
+func test_second_mob_death_during_wait_does_not_double_unlock() -> void:
+	# With the explicit wait active: two mobs die in quick succession;
+	# both _on_mob_died calls must collapse to a SINGLE _unlock when the
+	# timer elapses (not double-fire from the second death's branch).
+	var g: RoomGate = _make_gate()
+	g.test_skip_death_wait = false
+	var m1: FakeMob = _make_fake_mob()
+	var m2: FakeMob = _make_fake_mob()
+	g.register_mob(m1)
+	g.register_mob(m2)
+	g.lock()
+
+	watch_signals(g)
+	m1.die()
+	# m1 dying alone does not start the wait (m2 still alive).
+	assert_false(g._death_wait_in_flight,
+		"wait not started while m2 still alive")
+	m2.die()
+	# Now wait is in-flight.
+	assert_true(g._death_wait_in_flight, "wait started after last mob death")
+	assert_signal_emit_count(g, "gate_unlocked", 0,
+		"no unlock emitted yet — wait still pending")
+	# Advance — exactly one unlock.
+	g.advance_death_wait_for_test()
+	assert_signal_emit_count(g, "gate_unlocked", 1,
+		"gate_unlocked emits exactly once after wait elapses")
+
+
+func test_death_wait_secs_constant_sized_for_boss() -> void:
+	# Bug 1.1 (Tess re-bounce): DEATH_TWEEN_WAIT_SECS must cover the boss's
+	# worst-case death visual (BOSS_DEATH_HOLD 0.400s + DEATH_TWEEN_DURATION
+	# 0.200s = 0.600s). At 0.400 the door opened 200ms before the boss
+	# finished dissolving — regression of the original "I don't see it dying"
+	# Sponsor complaint.
+	const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
+	var boss_total: float = BossScript.BOSS_DEATH_HOLD + BossScript.DEATH_TWEEN_DURATION
+	assert_true(RoomGate.DEATH_TWEEN_WAIT_SECS >= boss_total,
+		"DEATH_TWEEN_WAIT_SECS (%.3f) must cover boss total death visual (%.3f)" % [
+			RoomGate.DEATH_TWEEN_WAIT_SECS, boss_total
+		])
