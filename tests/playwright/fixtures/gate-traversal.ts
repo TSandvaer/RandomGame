@@ -6,27 +6,28 @@
  * to let specs traverse Rooms 02..08 (which all use a RoomGate at
  * world-position (48, 144) with size (48, 80)) end-to-end.
  *
- * **OPEN ISSUE (see ac4-boss-clear.spec.ts header for fuller discussion):**
- * Even with the two-segment walk pattern correctly implemented AND the
- * player verified geometrically inside the trigger rect via Playwright
- * screenshot (e.g. world position ≈ (42, 144) — well inside trigger
- * X∈[24,72], Y∈[104,184]), the gate's `body_entered` signal does NOT
- * fire under Playwright-driven Chromium HTML5 physics. Zero
- * `[combat-trace] RoomGate.*` lines emit even after extensive walking
- * through the trigger area. The null result reproduces against both
- * m1-rc-1 (53a3412) and post-#166 origin/main, suggesting a deeper
- * cause than the spec mechanics. Candidates: shared sub_resource shape
- * resize not reaching physics server; gl_compatibility renderer + Area2D
- * detection quirk under headless Chromium; PackedScene.instantiate +
- * pre-add_child position/trigger_size mutations racing physics
- * registration. Investigation by Devon recommended; harness-side
- * workaround (JS bridge to `RoomGate.trigger_for_test()`) is a viable
- * fallback if the game-side path isn't easy to fix.
+ * **HISTORY — body_entered hypothesis was overturned by Devon's investigation
+ * (PR #171, ticket 86c9qbhm5):** Tess PR #170 conjectured that body_entered
+ * was not firing under Playwright + Chromium HTML5. Devon's regression canary
+ * `tests/playwright/specs/room-gate-body-entered-regression.spec.ts` proved
+ * 5/5 reliable firing when the player walks from `DEFAULT_PLAYER_SPAWN =
+ * (240, 200)` into Room02's gate via `W 2000ms then N 1500ms`. The real root
+ * cause of the AC4 spec's null result was **player drift during long combat
+ * in Rooms 02-08** — the prior `clearRoomMobs` helper used an aim-sweep
+ * (cycling through 8 directions) plus knockback feedback, which accumulated
+ * 100+px of westward+northward displacement before the gate-traversal walk.
+ * From the drifted position, the helper's W→N pattern landed against the
+ * north/west wall *outside* the trigger rect.
  *
- * The helper below is correct on paper and matches the dispatch's
- * recommended pattern. It WILL produce gate_unlocked + gate_traversed
- * traces once the body_entered detection is restored. Until then, AC4
- * stays `test.fail()` and the helper is documented for future use.
+ * **Harness rule that flowed out of the investigation:** combat that
+ * precedes a precise spawn-relative walk (like the gate traversal) MUST
+ * stay tight — NE-facing only, no aim-sweep — so the player remains within
+ * a small radius of `DEFAULT_PLAYER_SPAWN`. AC4's `clearRoomMobs` was
+ * updated accordingly. The `gateTraversalWalk` helper now also accepts an
+ * optional `expectedSpawn` parameter so the spec can assert "we are still
+ * near spawn" via the `[combat-trace] RoomGate._on_body_entered` line — if
+ * the body_entered fails to fire, we throw with explicit drift diagnostics
+ * instead of silently failing on the gate_unlocked check.
  *
  * Why this helper exists (the two failure modes it fixes):
  *
@@ -252,16 +253,49 @@ export interface GateTraversalResult {
   gateUnlocked: boolean;
   /** Whether the gate_traversed trace was observed during the walk. */
   gateTraversed: boolean;
+  /**
+   * Whether the `RoomGate._on_body_entered` trace fired during phase 3.
+   * Devon (PR #171) added this trace at function entry to distinguish
+   * "gate never reached" from "gate reached but state-machine wrong"
+   * failures. If false, the prior combat phase likely drifted the player
+   * away from `DEFAULT_PLAYER_SPAWN` so the W→N walk missed the trigger.
+   */
+  bodyEnteredFiredOnPhase3: boolean;
   /** Total wall-clock duration of the helper invocation, in ms. */
   durationMs: number;
+}
+
+/**
+ * Optional invocation options for `gateTraversalWalk`. Defaults preserve the
+ * pre-PR-#171 behaviour; opt-in fields provide defensive coverage against
+ * regressions in the calling spec's combat phase.
+ */
+export interface GateTraversalOptions {
+  /**
+   * If set, the helper will warn (not fail) if the prior combat phase has
+   * pushed the player far from this position. Currently unused at runtime
+   * because Playwright cannot read Godot world-coords without a JS bridge —
+   * but the parameter is propagated to log lines and the failure message
+   * for `_on_body_entered` so failures correlate cleanly back to drift.
+   *
+   * Format: `Vector2`-style `[x, y]` tuple matching `DEFAULT_PLAYER_SPAWN
+   * = (240, 200)`. Pass this from the spec to make drift-related failures
+   * self-explanatory; omit for legacy callers.
+   */
+  expectedSpawn?: [number, number];
 }
 
 /**
  * Walks the player through a RoomGate using the two-part walk pattern.
  *
  * Preconditions:
- *   - Player is at DEFAULT_PLAYER_SPAWN = (240, 200) (i.e. just after a
- *     room load — Main.gd:377 teleports here on every `_load_room_at_index`).
+ *   - Player is at (or very near) DEFAULT_PLAYER_SPAWN = (240, 200) (i.e.
+ *     just after a room load — Main.gd:377 teleports here on every
+ *     `_load_room_at_index`). **Devon PR #171 finding:** the calling spec
+ *     MUST keep combat tight (NE facing only, no aim-sweep) so the player
+ *     stays within ~50px of spawn before invoking this helper. Combat
+ *     loops that aim-cycle through 8 directions accumulate 100+px drift
+ *     over a 21s clear and the W→N walk lands outside the trigger rect.
  *   - All mobs in the room are dead (`mobs_alive == 0` on the gate). Walking
  *     into the trigger before mobs die would lock the gate and require the
  *     650ms DEATH_TWEEN_WAIT before unlock — handle-able but more fragile.
@@ -269,6 +303,9 @@ export interface GateTraversalResult {
  *   - No other movement keys are currently held.
  *
  * Postconditions:
+ *   - `RoomGate._on_body_entered` trace observed during phase 3 (added
+ *     by Devon PR #171 at function entry — load-bearing positive signal
+ *     that the trigger was reached).
  *   - `gate_unlocked` trace observed in the capture buffer (added during
  *     phase 3's body_entered #1).
  *   - `gate_traversed` trace observed in the capture buffer (added during
@@ -287,7 +324,8 @@ export async function gateTraversalWalk(
   page: Page,
   canvas: Locator,
   capture: ConsoleCapture,
-  roomLabel: string
+  roomLabel: string,
+  options: GateTraversalOptions = {}
 ): Promise<GateTraversalResult> {
   const t0 = Date.now();
 
@@ -344,16 +382,61 @@ export async function gateTraversalWalk(
   }
   await page.waitForTimeout(PHASE_SETTLE_MS);
 
-  // Verify gate_unlocked trace fired (synchronous on body_entered #1 when
-  // mobs_alive==0). If not, the walk didn't reach the trigger.
+  // Devon PR #171 added an explicit `_on_body_entered` trace at function
+  // entry. It is the load-bearing positive signal that the trigger rect was
+  // reached at all. Distinguish three cases:
+  //   1. _on_body_entered fired AND gate_unlocked fired → success path.
+  //   2. _on_body_entered fired but gate_unlocked didn't → state-machine
+  //      regression (gate didn't see mobs_alive==0, or stuck in OPEN).
+  //   3. Neither fired → walk didn't reach the trigger. Most common cause
+  //      since PR #171: prior combat drifted the player far from spawn.
   const phase3Lines = capture.getLines().slice(preLineCount);
+  const bodyEnteredFiredOnPhase3 = phase3Lines.some((l) =>
+    /\[combat-trace\] RoomGate\._on_body_entered/.test(l.text)
+  );
   const gateUnlocked = phase3Lines.some((l) =>
     /\[combat-trace\] RoomGate\._unlock \| gate_unlocked emitting/.test(l.text)
   );
 
+  if (!bodyEnteredFiredOnPhase3) {
+    // The walk didn't reach the trigger at all. Most common cause is player
+    // drift from prior combat — the calling spec's combat loop pushed the
+    // player far from `DEFAULT_PLAYER_SPAWN` (240, 200) so the W→N walk
+    // pattern landed against the room west/north wall outside the trigger.
+    //
+    // Fix discipline (Devon PR #171 finding 3): combat that precedes a
+    // precise spawn-relative walk MUST stay tight — NE-facing only, no
+    // aim-sweep — so the player remains near spawn before traversal.
+    const recent = capture
+      .getLines()
+      .slice(-30)
+      .map((l) => `  ${l.text}`)
+      .join("\n");
+    const spawnHint = options.expectedSpawn
+      ? ` Helper expected player near spawn ${options.expectedSpawn[0]},${options.expectedSpawn[1]}.`
+      : "";
+    throw new Error(
+      `[gate-traversal] ${roomLabel}: phase 3 walk-in did NOT fire ` +
+        `RoomGate._on_body_entered. The player did not reach the gate ` +
+        `trigger rect (X∈[24,72], Y∈[104,184]).${spawnHint} ` +
+        `\n\n**Most likely cause: player drift during prior combat.** ` +
+        `Per Devon's investigation (PR #171), aim-sweep + knockback during ` +
+        `extended combat (~21s) accumulates 100+px westward+northward drift, ` +
+        `so the W→N walk-in pattern lands against the wall outside the ` +
+        `trigger. Devon's regression canary ` +
+        `(room-gate-body-entered-regression.spec.ts) confirms body_entered ` +
+        `DOES fire reliably (5/5 runs) when the player walks from spawn ` +
+        `WITHOUT prior drift. Fix discipline: keep combat tight in the ` +
+        `calling spec's clearRoomMobs — NE-facing only, no aim-sweep, ` +
+        `click-only — so the player stays within ~50px of spawn.` +
+        `\n\nLast 30 trace lines:\n${recent}`
+    );
+  }
+
   if (!gateUnlocked) {
-    // Dump RoomGate-specific lines from the entire buffer first (they're rare
-    // and the most informative; combat traces drown them in the last-30 view).
+    // body_entered fired but the gate didn't unlock. State-machine
+    // regression — the gate saw the player but didn't see mobs_alive==0,
+    // or got stuck in OPEN with the lock() call short-circuiting wrong.
     const allGateLines = capture
       .getLines()
       .filter((l) => /\[combat-trace\] RoomGate\./.test(l.text))
@@ -365,13 +448,13 @@ export async function gateTraversalWalk(
       .map((l) => `  ${l.text}`)
       .join("\n");
     throw new Error(
-      `[gate-traversal] ${roomLabel}: phase 3 walk-in failed to fire ` +
-        `gate_unlocked trace. The player likely didn't reach the gate trigger ` +
-        `rect (X∈[24,72], Y∈[104,184]). Either the walk distance is too short, ` +
-        `the player got pinned to a wall outside the trigger, or the player is ` +
-        `still in STATE_ATTACK (half walk speed = 60px/s instead of 120px/s).\n` +
-        `\nAll RoomGate.* trace lines in buffer (should include lock + unlock ` +
-        `if the body_entered fired):\n${allGateLines || "  (none)"}` +
+      `[gate-traversal] ${roomLabel}: phase 3 fired _on_body_entered but ` +
+        `gate_unlocked did NOT follow. State-machine regression — the gate ` +
+        `saw the player but did not transition OPEN → LOCKED → UNLOCKED. ` +
+        `Possible causes: mobs_alive>0 (mobs not properly registered or not ` +
+        `dying), trigger fired on a non-CharacterBody2D body that bypassed ` +
+        `the lock() call, or RoomGate.lock() short-circuit logic regressed.` +
+        `\n\nAll RoomGate.* trace lines in buffer:\n${allGateLines || "  (none)"}` +
         `\n\nLast 30 trace lines:\n${recent}`
     );
   }
@@ -442,8 +525,14 @@ export async function gateTraversalWalk(
   const durationMs = Date.now() - t0;
   console.log(
     `[gate-traversal] ${roomLabel}: traversal complete in ${durationMs}ms ` +
-      `(gate_unlocked=${gateUnlocked}, gate_traversed=${gateTraversed}).`
+      `(body_entered=${bodyEnteredFiredOnPhase3}, ` +
+      `gate_unlocked=${gateUnlocked}, gate_traversed=${gateTraversed}).`
   );
 
-  return { gateUnlocked, gateTraversed, durationMs };
+  return {
+    gateUnlocked,
+    gateTraversed,
+    bodyEnteredFiredOnPhase3,
+    durationMs,
+  };
 }

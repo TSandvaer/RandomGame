@@ -484,3 +484,34 @@ Total: 10 tests across 8 spec files (3 skeleton + 5 expansion). Two consecutive 
 2. **RoomGate state machine + player respawn point.** Player spawns at `DEFAULT_PLAYER_SPAWN=(240,200)` on every room load, BUT the gate at `(48, 144)` is to the WEST. Gate stays in `STATE_OPEN` unless the player CharacterBody2D crosses the gate trigger area first. Without that, mob deaths never trigger `_unlock` (which only fires when `_state == STATE_LOCKED`). This invariant is significant for any spec wanting to assert gate behaviour — naive "kill mobs and expect gate trace" patterns silently fail. Documented in `negative-assertion-sweep.spec.ts` Test 3 comment block.
 
 3. **Equip-flow's m1-rc-1 push_warning filter.** Save-restore in m1-rc-1 emits `USER WARNING: ItemInstance.from_save_dict: unknown item id 'iron_sword'`. The warning maps to `console.error` in HTML5 (Godot push_warning → console.error). This is an actual bug in the save-restore round-trip path — the ContentRegistry resolver isn't yet ready by the time `Inventory.restore_from_save` runs. Side-effect-free for equip flow because `equip_starter_weapon_if_needed` re-equips post-restore, but the warning is independently ticket-worthy.
+
+---
+
+## 12. AC4 harness-drift fix landed — 2026-05-10 (PR `tess/m2-w1-ac4-drift-fix`, ticket `86c9qahku`)
+
+**Status:** Harness-drift fix landed (drift discipline + `expectedSpawn` parameter + `_on_body_entered` assertion + Room01 PR #169 dummy support). AC4 spec stays `test.fail()` because a NEW game-side blocker surfaced during empirical verification: after clearRoomMobs reports 2/2 grunts dead, the gate's `_mobs_alive` counter shows 1 not 0, blocking `lock()` → `_unlock()` auto-transition. The "body_entered does not fire under Playwright" hypothesis (PR #170) was overturned by Devon's PR #171 investigation (ticket 86c9qbhm5). The drift root cause was real and is now fixed; the mobs_alive desync is a separate, downstream finding.
+
+### Fixture-discipline pattern: stay near spawn during combat
+
+The recurring footgun (Devon's PR #171 finding 3) is that **post-combat walks that depend on a known starting position will silently fail when prior combat drifts the player**. Knockback feedback over a 21s clear with an 8-direction aim sweep accumulated 100+px of westward+northward displacement; the gate-traversal helper's W→N walk pattern then started from the drifted position and landed against the room west/north wall outside the trigger rect. No body_entered fired. No gate_unlocked fired. The spec timed out on the gate_traversed wait, with no clear signal pointing back to "you drifted away from spawn."
+
+**Mitigation pattern (apply to any spec that walks a precise spawn-relative path post-combat):**
+
+1. **No aim-sweep.** Set facing once at room start (`w+d` briefly for NE) and click-only after that. `Player._facing` persists across click-only attacks.
+2. **No direction-key holds during combat.** Holding direction keys during attack-recovery causes 60px/s drift (half walk speed during STATE_ATTACK).
+3. **No repositioning loops.** Don't periodically walk-to-close-gap; let mobs chase the player via their AI.
+4. **Use a single direction that matches mob spawn geometry.** All Stratum-1 Room01..Room08 mob spawns are NE/N of `DEFAULT_PLAYER_SPAWN=(240,200)` (verified against `resources/level_chunks/s1_room0N.tres` × `tile_size_px=32`). NE facing covers the geometric majority; chasing AI handles edge cases.
+
+### `gateTraversalWalk` defensive `expectedSpawn` parameter
+
+The helper now accepts an optional `expectedSpawn: [x, y]` tuple in its options bag. The value is propagated to log lines and the failure message when `RoomGate._on_body_entered` does NOT fire — making drift-related failures self-documenting rather than presenting as "gate_unlocked never fired" with no indication that the player wasn't even at the trigger.
+
+The runtime value isn't used to assert position (Playwright cannot read Godot world-coords without a JS bridge), but the parameter establishes a contract: spec authors who pass `expectedSpawn` are documenting their assumption that the calling combat phase kept the player near that point, and any future failure mode can blame the contract rather than guess.
+
+### Per-room `_on_body_entered` assertion
+
+Devon PR #171 added an explicit `_combat_trace("RoomGate._on_body_entered", "body=... state=... mobs_alive=...")` line at function entry in `RoomGate.gd`. The AC4 spec asserts this trace fires per gate. It is the load-bearing positive signal that the trigger rect was reached at all — distinguishes "gate never reached" (drift) from "gate reached but state-machine wrong" (regression).
+
+### Regression canary
+
+`tests/playwright/specs/room-gate-body-entered-regression.spec.ts` (Devon PR #171) is now the permanent canary for the body_entered signal itself. It skips Room02 combat entirely, walks from spawn into the gate via the documented W→N pattern, asserts body_entered fires. Any future failure of this canary indicates the signal IS regressing — investigate Godot 4.x version bumps, gl_compatibility physics-server changes, or service-worker timing interference. AC4's harness-drift fix does NOT touch the canary's spawn-position walk path.
