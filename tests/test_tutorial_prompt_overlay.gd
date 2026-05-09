@@ -139,9 +139,12 @@ func test_html5_safety_no_polygon2d_and_subone_colors() -> void:
 	for ch in [plate.color.r, plate.color.g, plate.color.b]:
 		assert_lt(ch, 1.0,
 			"plate color channel %f must be strictly sub-1.0 (HDR clamp)" % ch)
-	# Plate alpha is sub-1.0 too (75% per design — non-blocking ambient guidance).
-	assert_lt(plate.color.a, 1.0,
-		"plate alpha sub-1.0 (transparent ambient overlay, per design)")
+	# Plate alpha is 0 per Uma Beat 4 "no panel background" (Tess PR #164 note
+	# reconciliation, Drew Stage 2b — was 0.75). Sub-1.0 invariant still holds
+	# because 0.0 < 1.0; we tighten the assertion to "fully transparent" so a
+	# regression that re-introduces a plate background fails this test loudly.
+	assert_almost_eq(plate.color.a, 0.0, 0.001,
+		"plate alpha = 0.0 — no panel background per Uma Beat 4 (Stage 2b reconciliation)")
 
 
 # ============================================================================

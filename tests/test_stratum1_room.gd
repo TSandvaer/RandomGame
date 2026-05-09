@@ -1,10 +1,17 @@
 extends GutTest
 ## Integration tests for `scenes/levels/Stratum1Room01.tscn` — verifies the
-## room loads, builds against the authored chunk, spawns the grunts, and
-## reports correct bounds. Per testing bar §integration check.
+## room loads, builds against the authored chunk, spawns the practice
+## dummy, and reports correct bounds. Per testing bar §integration check.
+##
+## **Stage 2b update (ticket `86c9qaj3u`):** Room01 now spawns a single
+## PracticeDummy (not 2 grunts). The grunt-roster assertions below have
+## been updated to assert a PracticeDummy spawn instead. See
+## `team/uma-ux/player-journey.md` Beats 4-5 for the design rationale —
+## first room is non-threatening tutorial, grunts arrive in Room02.
 
 const Stratum1Room01Script: Script = preload("res://scripts/levels/Stratum1Room01.gd")
 const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
+const PracticeDummyScript: Script = preload("res://scripts/mobs/PracticeDummy.gd")
 
 
 func test_stratum1_room01_scene_loads() -> void:
@@ -37,27 +44,31 @@ func test_stratum1_room01_bounds_match_canvas() -> void:
 	assert_lte(bounds.size.y, 270.0, "height fits 270 logical px canvas")
 
 
-func test_stratum1_room01_spawns_grunts() -> void:
+func test_stratum1_room01_spawns_practice_dummy() -> void:
+	# Stage 2b: Room01 spawns a single PracticeDummy (not grunts) per
+	# Uma's player-journey Beat 4-5 spec. Grunts moved to Room02 onward.
 	var packed: PackedScene = load("res://scenes/levels/Stratum1Room01.tscn")
 	var room: Stratum1Room01 = packed.instantiate()
 	add_child_autofree(room)
 	var mobs: Array[Node] = room.get_spawned_mobs()
-	assert_gt(mobs.size(), 0, "room spawns at least one grunt")
-	for m: Node in mobs:
-		assert_true(m is Grunt, "all spawned mobs are Grunt instances")
-		# The mobs are children of the assembly root.
-		var grunt: Grunt = m
-		assert_eq(grunt.collision_layer, Grunt.LAYER_ENEMY, "grunt on enemy layer")
+	assert_eq(mobs.size(), 1, "room spawns exactly one tutorial entity (Stage 2b)")
+	var first: Node = mobs[0]
+	assert_true(first is PracticeDummy, "spawned mob is PracticeDummy (Stage 2b)")
+	var dummy: PracticeDummy = first
+	assert_eq(dummy.collision_layer, PracticeDummy.LAYER_ENEMY, "dummy on enemy layer")
+	# Dummy must NOT carry damage_base — non-threatening tutorial entity.
+	assert_false("damage_base" in dummy and int(dummy.get("damage_base")) > 0,
+		"PracticeDummy deals zero damage by design (no damage_base, or 0)")
 
 
-func test_stratum1_room01_grunts_positioned_inside_bounds() -> void:
+func test_stratum1_room01_dummy_positioned_inside_bounds() -> void:
 	var packed: PackedScene = load("res://scenes/levels/Stratum1Room01.tscn")
 	var room: Stratum1Room01 = packed.instantiate()
 	add_child_autofree(room)
 	var bounds: Rect2 = room.get_bounds_px()
 	for m: Node in room.get_spawned_mobs():
 		var n: Node2D = m
-		assert_true(bounds.has_point(n.position), "grunt at %s inside bounds %s" % [str(n.position), str(bounds)])
+		assert_true(bounds.has_point(n.position), "dummy at %s inside bounds %s" % [str(n.position), str(bounds)])
 
 
 func test_stratum1_room01_chunk_def_canonical() -> void:

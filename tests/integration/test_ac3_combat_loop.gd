@@ -25,15 +25,45 @@ const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const Stratum1Room01Script: Script = preload("res://scripts/levels/Stratum1Room01.gd")
+const LevelChunkDefScript: Script = preload("res://scripts/levels/LevelChunkDef.gd")
+const MobSpawnPointScript: Script = preload("res://scripts/levels/MobSpawnPoint.gd")
+const ChunkPortScript: Script = preload("res://scripts/levels/ChunkPort.gd")
 
 const PHYS_DELTA: float = 1.0 / 60.0
 
 
 # ---- Helpers ----------------------------------------------------------
 
+## Stage 2b: shipping `s1_room01.tres` spawns a PracticeDummy. AC3's
+## player-vs-grunt combat-loop coverage requires a grunt, so we inject a
+## synthetic single-grunt chunk_def at runtime. Mirrors the same pattern in
+## `tests/integration/test_ac2_first_kill.gd::_make_grunt_chunk_def`.
+func _make_grunt_chunk_def() -> LevelChunkDef:
+	var chunk: LevelChunkDef = LevelChunkDefScript.new()
+	chunk.id = &"s1_room01_test_grunt"
+	chunk.display_name = "Test — Single Grunt Room"
+	chunk.size_tiles = Vector2i(15, 8)
+	chunk.tile_size_px = 32
+	chunk.scene_path = "res://scenes/levels/chunks/s1_room01_chunk.tscn"
+	var entry: ChunkPort = ChunkPortScript.new()
+	entry.position_tiles = Vector2i(2, 4)
+	entry.direction = 3
+	entry.tag = &"entry"
+	chunk.ports = [entry]
+	var spawn_grunt: MobSpawnPoint = MobSpawnPointScript.new()
+	spawn_grunt.position_tiles = Vector2i(11, 3)
+	spawn_grunt.mob_id = &"grunt"
+	chunk.mob_spawns = [spawn_grunt]
+	return chunk
+
+
 func _load_room() -> Stratum1Room01:
 	var packed: PackedScene = load("res://scenes/levels/Stratum1Room01.tscn")
 	var room: Stratum1Room01 = packed.instantiate()
+	# Inject grunt chunk before _ready so AC3 combat coverage stays intact
+	# post-Stage 2b. See file-level docstring of test_ac2_first_kill.gd for
+	# the full rationale.
+	room.chunk_def = _make_grunt_chunk_def()
 	add_child_autofree(room)
 	return room
 

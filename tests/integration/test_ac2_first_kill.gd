@@ -5,11 +5,19 @@ extends GutTest
 ## The unit-level layer (`tests/test_player_attack.gd`, `tests/test_grunt.gd`)
 ## already verifies the individual surfaces in isolation. This file plays
 ## them together against the actual `Stratum1Room01.tscn` scene and an
-## actual `Player` node, walking the player toward the spawned grunt and
+## actual `Player` node, walking the player toward a spawned grunt and
 ## driving attacks via the public API until the grunt dies. The scene-level
 ## flow catches integration regressions that unit tests miss — e.g. a
 ## hitbox layer change, a player-mob layer mismatch, a grunt-spawn that
 ## leaves the mob outside player reach, a save-on-kill that hangs.
+##
+## **Stage 2b update (ticket `86c9qaj3u`):** the shipping `s1_room01.tres`
+## now spawns a single PracticeDummy (zero damage, HP=3) per Uma's player-
+## journey Beats 4-5. To preserve AC2's "player kills a grunt" coverage, the
+## test injects a synthetic chunk_def with a single grunt at runtime via
+## `_load_room_with_grunt_chunk` — the test still exercises the grunt
+## damage formula + AI on the same Stratum1Room01 scene + assembler. The
+## production roster is asserted in `tests/test_stratum1_room.gd` instead.
 ##
 ## **Why we drive `try_attack` / position directly instead of `Input.action_press`:**
 ## Headless GUT runs on the CI image with no display; there's no input
@@ -29,6 +37,9 @@ extends GutTest
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 const Stratum1Room01Script: Script = preload("res://scripts/levels/Stratum1Room01.gd")
+const LevelChunkDefScript: Script = preload("res://scripts/levels/LevelChunkDef.gd")
+const MobSpawnPointScript: Script = preload("res://scripts/levels/MobSpawnPoint.gd")
+const ChunkPortScript: Script = preload("res://scripts/levels/ChunkPort.gd")
 
 # A 50 HP grunt at 1 fist damage / 0.18s recovery is ~9s of pure swinging
 # plus walk-in. 15s sim budget is the outer bound — anything longer means
@@ -40,10 +51,42 @@ const PHYS_DELTA: float = 1.0 / 60.0
 
 # ---- Helpers ----------------------------------------------------------
 
+## Build a synthetic chunk_def with a single grunt for AC2 grunt-combat
+## tests. Stage 2b: the shipping `s1_room01.tres` spawns a PracticeDummy,
+## so the AC2 grunt-fight tests inject this fixture chunk to keep coverage.
+## See file-level docstring.
+func _make_grunt_chunk_def() -> LevelChunkDef:
+	var chunk: LevelChunkDef = LevelChunkDefScript.new()
+	chunk.id = &"s1_room01_test_grunt"
+	chunk.display_name = "Test — Single Grunt Room"
+	chunk.size_tiles = Vector2i(15, 8)
+	chunk.tile_size_px = 32
+	chunk.scene_path = "res://scenes/levels/chunks/s1_room01_chunk.tscn"
+	# Entry port — top-left tile (matches s1_room01 default).
+	var entry: ChunkPort = ChunkPortScript.new()
+	entry.position_tiles = Vector2i(2, 4)
+	entry.direction = 3
+	entry.tag = &"entry"
+	chunk.ports = [entry]
+	# Single grunt at center of the room.
+	var spawn_grunt: MobSpawnPoint = MobSpawnPointScript.new()
+	spawn_grunt.position_tiles = Vector2i(11, 3)
+	spawn_grunt.mob_id = &"grunt"
+	chunk.mob_spawns = [spawn_grunt]
+	return chunk
+
+
 func _load_room() -> Stratum1Room01:
+	# Load the Room01 scene but inject a single-grunt chunk_def so AC2's
+	# "player kills a grunt" coverage stays intact post-Stage 2b. The
+	# production chunk_def (PracticeDummy) is exercised in
+	# `tests/test_stratum1_room.gd`.
 	var packed: PackedScene = load("res://scenes/levels/Stratum1Room01.tscn")
 	assert_not_null(packed, "Stratum1Room01.tscn must load")
 	var room: Stratum1Room01 = packed.instantiate()
+	# Override chunk_def BEFORE add_child so the room's _ready picks up the
+	# test fixture rather than the default `s1_room01.tres`.
+	room.chunk_def = _make_grunt_chunk_def()
 	add_child_autofree(room)
 	return room
 
