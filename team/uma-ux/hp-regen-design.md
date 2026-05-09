@@ -1,6 +1,6 @@
 # HP Regen — Out-of-Combat Health Regeneration Design Spec
 
-**Owner:** Uma (UX / design specs) · **Phase:** M1 RC unblocker · **ClickUp:** `86c9q938b`
+**Owner:** Uma (UX / design specs) · **Phase:** M1 RC unblocker · **ClickUp:** `86c9q7pgc`
 **Drives:** Devon's implementation PR · **Status:** locked for Devon hand-off
 
 ---
@@ -321,4 +321,4 @@ CharacterBody2D parent modulate), consistent with hit-flash post-mortem lessons.
 - [ ] Self-Test Report comment on PR before Tess review (per `team/TESTING_BAR.md`)
 - [ ] Self-Test Report must claim ColorRect exemption from HTML5 gate OR trigger HTML5 build if
       Polygon2D is used instead
-- [ ] ClickUp `86c9q938b` flip to `ready for qa test` on PR open
+- [ ] ClickUp `86c9q7pgc` flip to `ready for qa test` on PR open
