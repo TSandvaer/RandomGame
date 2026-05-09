@@ -114,10 +114,30 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ## Tess (Tester)
 
-- Last updated: 2026-05-09 (run 033)
-- Status: **Playwright harness design — Sponsor M1 RC test-fatigue signal.** Sponsor asked (2026-05-09) why manual soak is not automated via Playwright. This run ships the design spec for a real-browser end-to-end test harness (`team/tess-qa/playwright-harness-design.md`) covering AC1 + AC2 + AC3 + AC5 + AC6 + HP-regen smoke, with a skeleton-PR-then-coverage-iteration landing plan. ClickUp `86c9q7wc7` flipped to `in progress`. Branch `tess/playwright-harness-design` off `origin/main` in worktree `RandomGame-tess-wt`. Design only — no code, no package.json, no harness scaffold in this run.
-- Working on: PR open — `design(spec): Playwright harness for Sponsor M1 RC soak automation`. Orchestrator merges; Tess is author.
-- Blocked on: nothing. Design-only PR; orchestrator merges per merge-identity protocol.
+- Last updated: 2026-05-09 (run 034)
+- Status: **Playwright harness skeleton — M1 RC sign-off gate, runs against embergrave-html5-356086a.** This run ships the full harness scaffold (`tests/playwright/` tree + `.github/workflows/playwright-e2e.yml`). Three skeleton specs: AC1 boot+SHA, regen smoke, room traversal smoke. ClickUp `86c9q7wc7` flipped to `ready for qa test` on PR open. Branch `tess/playwright-harness-skeleton` off `origin/main` in worktree `RandomGame-tess-wt`.
+- Working on: PR open — `infra(qa): Playwright/CDP end-to-end test harness for HTML5 build`. Orchestrator merges per merge-identity protocol (infra(qa) — Tess is author, not self-merging).
+- Blocked on: nothing.
+
+- Deliverables this run (run 034, 2026-05-09): **`tests/playwright/` harness scaffold + CI workflow + design doc "Skeleton landed" section.** Full file list: `package.json` + `tsconfig.json` + `playwright.config.ts` + `README.md` + `fixtures/artifact-server.ts` + `fixtures/console-capture.ts` + `fixtures/cache-mitigation.ts` + `specs/ac1-boot-and-sha.spec.ts` + `specs/regen-smoke.spec.ts` + `specs/room-traversal-smoke.spec.ts` + `.github/workflows/playwright-e2e.yml` + `team/tess-qa/playwright-harness-design.md` §10 (Skeleton landed). Run-start verification per `agent-verify-evidence.md`: read `scripts/player/Player.gd` to confirm regen trace lines (`regen activated`, `regen tick`, `regen deactivated`); read `scripts/debug/DebugFlags.gd` to confirm `[combat-trace]` shim format; read `scripts/combat/Hitbox.gd` to confirm `Hitbox.hit | team=player target=Grunt damage=6`; read `scripts/mobs/Grunt.gd` to confirm `Grunt._die | starting death sequence`; read `scenes/Main.gd` to confirm boot sentinel `[Main] M1 play-loop ready — Room 01 loaded, autoloads wired`; read `.github/workflows/release-github.yml` to confirm post-PR-#152 single-unzip artifact format; read `resources/items/weapons/iron_sword.tres` to confirm `damage = 6`.
+
+  - **Evidence-verified implementation decisions (per `agent-verify-evidence.md`):**
+    - Boot sentinel `[Main] M1 play-loop ready` confirmed from `scenes/Main.gd:147` — design doc §5 AC2 precondition referenced `[Inventory] starter iron_sword auto-equipped` which does NOT exist.
+    - Regen trace format `[combat-trace] Player | regen activated (HP N/M)` confirmed from `Player._set_regenerating()` at line 841.
+    - iron_sword `damage=6` confirmed from `iron_sword.tres:11`.
+    - `[combat-trace] Hitbox.hit | team=player target=Grunt damage=6` format confirmed from `Hitbox.gd:196`.
+    - `[combat-trace] Grunt._die | starting death sequence` format confirmed from `Grunt.gd:394`.
+    - Artifact format: artifact name `embergrave-html5-<sha>` contains zip `embergrave-html5-<sha>-<label>.zip`; single unzip gives HTML5 dir. CI workflow uses `actions/download-artifact@v4` + one `unzip` call.
+
+  - **Known gaps for follow-up PRs:**
+    - AC2 cold first-kill ≤60s (follow-up PR 1)
+    - AC3 death preservation (follow-up PR 1)
+    - AC5 full 30-min console silence (follow-up PR 2)
+    - AC6 quit-relaunch (follow-up PR 2)
+    - AC4 boss clear + AC7 gear drops (separate tickets, deferred)
+    - Room counter exact assertion: HUD CanvasLayer Label not DOM-addressable — needs Godot JS bridge or pixel-diff (Tier 3)
+
+- Previous run (run 033, 2026-05-09): **Playwright harness design — Sponsor M1 RC test-fatigue signal.** Sponsor asked (2026-05-09) why manual soak is not automated via Playwright. This run shipped the design spec for a real-browser end-to-end test harness (`team/tess-qa/playwright-harness-design.md`) covering AC1 + AC2 + AC3 + AC5 + AC6 + HP-regen smoke, with a skeleton-PR-then-coverage-iteration landing plan. ClickUp `86c9q7wc7` flipped to `in progress`. Branch `tess/playwright-harness-design` off `origin/main` in worktree `RandomGame-tess-wt`. Design only — no code, no package.json, no harness scaffold in this run.
 
 - Deliverables this run (run 033, 2026-05-09): **`team/tess-qa/playwright-harness-design.md` (NEW).** Nine sections covering goal + non-goal, TypeScript Playwright architecture choice (with rationale over Python + CDP), repo layout under `tests/playwright/`, artifact-serve mechanism (env var + globalSetup unzip + python -m http.server ephemeral port), AC coverage matrix (AC1 + AC2 + AC3 + AC5 + AC6 + HP-regen per `sponsor-soak-checklist-v2.md`), skeleton-vs-follow-up landing plan (~1 week to "pretty good"), CI integration (downstream of release-build + workflow_dispatch), implementation owner + cadence (Tess primary, Devon pairs on combat-trace shape), and open questions for orchestrator + Sponsor. Context reads: `orchestration-overview.md`, `combat-architecture.md`, `html5-export.md`, `team/TESTING_BAR.md`, `team/uma-ux/sponsor-soak-checklist-v2.md`, `team/log/2026-05-html5-visual-feedback-no-op-postmortem.md`, `team/tess-qa/soak-2026-05-07.md`, `team/tess-qa/automated-smoke-plan.md`, `team/tess-qa/m2-acceptance-plan-week-1.md`.
 

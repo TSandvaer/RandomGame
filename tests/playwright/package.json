@@ -1,0 +1,17 @@
+{
+  "name": "embergrave-playwright-e2e",
+  "version": "1.0.0",
+  "description": "Playwright E2E harness for Embergrave HTML5 build — M1 RC sign-off gate",
+  "private": true,
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:ui": "npx playwright test --ui",
+    "test:report": "npx playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

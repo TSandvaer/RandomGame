@@ -393,3 +393,62 @@ The HP-regen smoke probe depends on a `[regen]` console trace line from PR #148.
 ---
 
 *This document is paste-ready for a future Tess (or Devon) implementation dispatch. The architecture, repo layout, artifact-serve mechanism, AC matrix, CI integration, and ownership are all first-cut decisions with explicit rationale. The implementation agent should treat the AC coverage matrix's console line patterns as approximate — confirm the exact format by reading the `[combat-trace]` lines in `team/tess-qa/soak-2026-05-07.md` (which has real captured lines) before hardcoding patterns.*
+
+---
+
+## 10. Skeleton landed — 2026-05-09 (run 033, PR #150)
+
+**Status:** Skeleton implementation complete. PR open against `main` on branch `tess/playwright-harness-skeleton`.
+
+### Files shipped
+
+```
+tests/playwright/
+  package.json            — @playwright/test ^1.49, typescript ^5.7, @types/node ^22
+  tsconfig.json           — ES2020, commonjs, strict
+  playwright.config.ts    — Chromium-only, headless/headed toggle, globalSetup wired
+  README.md               — local run instructions + spec coverage table + env vars
+
+  fixtures/
+    artifact-server.ts    — RELEASE_BUILD_ARTIFACT_PATH → python http.server → PLAYWRIGHT_BASE_URL
+    console-capture.ts    — page.on("console") wrapper; waitForLine/getLines/clearLines/dump APIs
+    cache-mitigation.ts   — serviceWorkers:"block" + --disable-cache + --disable-application-cache
+
+  specs/
+    ac1-boot-and-sha.spec.ts       — boot sentinel, [BuildInfo] SHA cross-check, no errors, no 404s
+    regen-smoke.spec.ts            — [combat-trace] Player | regen activated, HP rising, deactivate on attack
+    room-traversal-smoke.spec.ts   — Hitbox.hit damage=6, Grunt._die, door-walk → Room 2
+
+.github/workflows/playwright-e2e.yml — workflow_run trigger + workflow_dispatch + artifact upload on failure
+```
+
+### Evidence-verified implementation decisions
+
+All decisions grounded in this-session live reads (per `agent-verify-evidence.md`):
+
+**Boot sentinel:** `[Main] M1 play-loop ready — Room 01 loaded, autoloads wired` (scenes/Main.gd:147). The design doc (§5 AC2 precondition) referenced `[Inventory] starter iron_sword auto-equipped (weapon slot)` — that line does not exist in the codebase. `Main._ready()` does not print it; `Inventory._ready()` only prints `[Inventory] autoload ready (capacity=N)`.
+
+**Regen trace lines:** `[combat-trace] Player | regen activated (HP N/M)` / `regen tick (HP N/M)` / `regen deactivated (HP N/M)` / `regen capped (HP N/M)` — all from `Player._set_regenerating()` and `_tick_regen()` (scripts/player/Player.gd:835–843, 826–829). Q4 from §9 ("Devon must confirm trace format") is resolved: the traces exist already via the `[combat-trace]` shim that fires only in HTML5.
+
+**iron_sword damage:** `damage=6` (resources/items/weapons/iron_sword.tres:11 `damage = 6`). Room traversal spec asserts this specifically.
+
+**Hitbox.hit format:** `[combat-trace] Hitbox.hit | team=player target=Grunt damage=6` (scripts/combat/Hitbox.gd:196). Room traversal spec matches on `team=player.*Grunt`.
+
+**Grunt._die format:** `[combat-trace] Grunt._die | starting death sequence` (scripts/mobs/Grunt.gd:394). Exact string in spec.
+
+**Room label format:** `STRATUM 1 · ROOM N/8` (scenes/Main.gd:904). Not DOM-accessible from Playwright (rendered on Godot CanvasLayer canvas), so room transition detection uses console-trace evidence in the skeleton. Noted as a known gap.
+
+**Artifact format (post-PR-#152):** `actions/download-artifact@v4` downloads artifact named `embergrave-html5-<sha>` containing `embergrave-html5-<sha>-<label>.zip`. CI workflow unzips this once with `unzip` to get the HTML5 directory. `RELEASE_BUILD_ARTIFACT_PATH` points to the unzipped directory.
+
+### Known gaps surfaced by skeleton
+
+- **Room counter detection:** Godot CanvasLayer label is not DOM-addressable. Exact `STRATUM 1 · ROOM 2/8` assertion deferred. Follow-up: Godot JS bridge endpoint or pixel-diff Tier 3 lane (Devon's deferred renderer-painting CI lane).
+- **Regen smoke precondition:** If player starts with full HP (hp_current == hp_max), regen suppresses correctly but the test loses coverage. Follow-up: add a controlled damage step via DevTools `eval` or a test-mode flag that exposes HP state.
+- **Room 01 grunt kill timing:** Room 01 may have 1 or more grunts at variable positions. The traversal spec uses a timed combat loop (up to 60s) — reliable for this room but fragile if spawn positions change. Follow-up: read grunt count from a console print or use a diagnostic-build with lowered grunt HP.
+- **Canvas-focus on CI (headless):** `canvas.click()` should focus the canvas in headless Chromium; verified pattern from design doc. If CI shows "no combat hits" on first run, the fix is `page.locator('canvas').focus()` before input events.
+
+### Follow-up PRs
+
+- **PR 1:** AC2 (cold first-kill ≤60s) + AC3 (death preservation)
+- **PR 2:** AC5 (120s console silence) + AC6 (quit-relaunch)
+- **Separate tickets:** AC4 boss clear (diagnostic-build); AC7 gear drops (RNG-seed injection design)
