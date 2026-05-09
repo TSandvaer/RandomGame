@@ -143,6 +143,27 @@ Future state-change/action-event pairs (aggro/attack, pickup/equip, dialog/advan
 
 **Naming + scope discipline:** `save_completed` is past-participle, fires once per save attempt, carries `(slot, ok)` payload. Don't add a `save_started` event unless a use case appears that needs the "save in flight" interval (no current need; saves are single-frame). Keep the signal narrow.
 
+### `ContentRegistry.items_resolved` — the second autoload-ready signal (added M2 W2, ticket 86c9qah1f)
+
+The save-restore path has a sibling boot-order discipline: `Inventory.restore_from_save` consumes Callables (`item_resolver`, `affix_resolver`) that read from the `ContentRegistry`'s `_items` / `_affixes` maps. If the registry's `load_all()` hasn't populated `_items[&"iron_sword"]` by the time `from_save_dict` calls the resolver, the resolver returns null, `ItemInstance.from_save_dict` push_warnings `unknown item id 'iron_sword'`, and the entry is dropped. (Save-restore on the live build is rescued by the post-restore `equip_starter_weapon_if_needed` auto-equip path — Sponsor never lost gear — but the warning pollutes console-silence assertions.)
+
+**Why the warning fired in HTML5 specifically (load-bearing — NOT a timing race):** in Godot 4.3 HTML5 / `gl_compatibility` exports, `DirAccess.list_dir_begin()` over a res:// path packed inside the .pck does not enumerate subdirectories reliably — `current_is_dir()` can return false for entries that ARE subdirs on desktop. Pre-fix, `ContentRegistry.load_all()` recursed from `resources/items/` and missed `weapons/iron_sword.tres` in the HTML5 build. Headless GUT + desktop both passed (DirAccess works there). The bug shipped because no test exercised the HTML5 `_items.has(&"iron_sword")` post-condition.
+
+**Fix shape:** `ContentRegistry.load_all()` is now three-pronged:
+1. Recursive `DirAccess` scan from the roots (works on desktop).
+2. Explicit subdir scan of `KNOWN_ITEM_SUBDIRS` (`weapons/`, `armors/`) — quiet on open-fail because the recursive scan above usually covers them already.
+3. Direct `load()` of `STARTER_ITEM_PATHS` (the always-works fallback — `load()` of a packed res:// path always succeeds because it reads from the resource cache, not DirAccess).
+
+`_on_item_resource_found` is now instance-equality-deduped so re-registration across the three passes doesn't push_warning. `is_resolved()` flips false → true at the end of `load_all()` and `items_resolved` emits; future async-style awaiters should `if not registry.is_resolved(): await registry.items_resolved`.
+
+**Subscriber contract (mirrors `Save.save_completed`):**
+- Today: synchronous consumer is `Inventory.restore_from_save` via the `item_resolver` / `affix_resolver` Callables Main exposes via `get_item_resolver()` / `get_affix_resolver()`. Because Main constructs the registry with `.load_all()` synchronously BEFORE `_load_save_or_defaults()` in `_ready`, the registry is always resolved by the time a Callable fires. The signal is a forward-compat hook, not a current dependency.
+- Future: a save-restore path that runs OUTSIDE `Main._ready` (deferred quick-load, mid-run save scrub, save-slot picker that pre-validates) must `await registry.items_resolved` before iterating saved items. The `is_resolved()` fast-path covers the synchronous-already-ready case; only the deferred branch awaits.
+
+**Naming + scope discipline:** `items_resolved` is past-participle, fires once per `load_all()` call, carries no payload. Don't add a `resolution_started` event — the registry is single-frame in M1/M2. Future schema-v4 promotion (per `team/devon-dev/save-schema-v4-plan.md`) may shift the registry to an autoload + add per-content-domain signals (e.g. `affixes_resolved` separate from `items_resolved`) — keep the M2 surface narrow until that lands.
+
+**Discipline on adding new save-critical content:** whenever a new item ships under `resources/items/` whose ID is referenced by saves OR by the starter-seed path (`Inventory._seed_starting_inventory`), append it to `STARTER_ITEM_PATHS` in `scripts/content/ContentRegistry.gd`. The DirAccess recursive scan still runs and will pick up the new path on desktop, but the explicit list is what guarantees HTML5 resolution. Ship a paired test in `tests/test_save_restore_resolver_ready.gd` that exercises a save with the new id through `Inventory.restore_from_save` + production resolvers.
+
 ## Room-load triggers vs. body_entered triggers
 
 A related class of bug, surfaced by M2 W1 P0 `86c9q96fv` + `86c9q96ht`: the boss spawned `STATE_DORMANT` and only woke when the player crossed an `Area2D` door-trigger via `body_entered`. But `Main._load_room_at_index` **teleports** the player to `DEFAULT_PLAYER_SPAWN = (240, 200)` rather than sliding them through the room boundary — no physics overlap event ever fires. Result: boss stayed dormant forever, rejecting damage AND skipping AI in `_physics_process`. Both Sponsor-reported P0s collapsed to one root cause.
