@@ -237,19 +237,33 @@ func _process_spotted(_delta: float) -> void:
 
 
 func _process_aiming(_delta: float) -> void:
-	# Hold position while aiming. Player who closes the gap forces a kite
-	# *interrupt* — checked here on every aim tick.
+	# Hold position while aiming — UNLESS the player is further than AIM_RANGE,
+	# in which case the shooter walks toward the player to close the gap (Bug 3
+	# fix, ticket 86c9q7xha). Without this close-the-gap path, the Shooter
+	# corner-camps: after POST_FIRE_RECOVERY _pick_post_recovery_state() re-enters
+	# AIMING when dist > KITE_RANGE, but the AIMING handler held zero velocity,
+	# so a player past AIM_RANGE (300 px) was outside projectile max-range
+	# (90 px/s × 1.6 s = 144 px) and could stand idle while the Shooter
+	# fired harmlessly. The fix: walk toward the player at move_speed when
+	# dist > AIM_RANGE; hold position in the sweet-spot (KITE_RANGE..AIM_RANGE).
+	# The kite-interrupt check still wins if the player closes in below KITE_RANGE.
 	if _player != null:
 		var dist: float = (_player.global_position - global_position).length()
 		if dist < KITE_RANGE:
 			_enter_kite()
 			return
-		# Re-track the last aim direction every tick so a player walking
-		# perpendicular to the shooter still gets shot toward (the direction
-		# locks at FIRING, not at aim start — projectiles aren't homing,
-		# just reactive).
 		_last_aim_dir = _vec_to_player_dir()
-	velocity = Vector2.ZERO
+		if dist > AIM_RANGE:
+			# Outside sweet-spot — close the gap while still tracking aim direction.
+			# Walk at base move_speed toward the player. The aim timer still ticks
+			# (see _tick_timers) so the shot eventually fires even while walking;
+			# if we reach AIM_RANGE before the timer expires, velocity drops to
+			# ZERO on the next tick and the remaining windup completes standing still.
+			velocity = _vec_to_player_dir() * move_speed
+		else:
+			velocity = Vector2.ZERO
+	else:
+		velocity = Vector2.ZERO
 	if _aim_left <= 0.0:
 		_set_state(STATE_FIRING)
 
