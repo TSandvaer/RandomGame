@@ -338,6 +338,8 @@ func test_p0_gate_unlocked_does_not_fire_gate_traversed() -> void:
 	watch_signals(g)
 	g.trigger_for_test(null)   # lock; test_skip_death_wait=true sets immediate unlock
 	m.die()                     # gate_unlocked fires
+	# Ticket 86c9qcf9z: drain one frame for CONNECT_DEFERRED dispatch.
+	await get_tree().process_frame
 	assert_signal_emitted(g, "gate_unlocked",
 		"gate_unlocked fires after all mobs die (sanity check)")
 	assert_signal_not_emitted(g, "gate_traversed",
@@ -359,6 +361,7 @@ func test_p0_room_cleared_not_emitted_on_gate_unlocked() -> void:
 	g.gate_traversed.connect(counter.bump)
 	g.trigger_for_test(null)
 	m.die()
+	await get_tree().process_frame
 	assert_signal_not_emitted(g, "gate_traversed")
 	assert_eq(counter.n, 0,
 		"REGRESSION CHECK: room_cleared count must be 0 after gate_unlocked — player has not walked through the door")
@@ -379,6 +382,7 @@ func test_p0_full_position_b_flow() -> void:
 	g.trigger_for_test(null)  # also sets test_skip_death_wait=true for synchronous unlock
 	# Step 2: kill last mob → gate_unlocked fires (door visual opens).
 	m.die()
+	await get_tree().process_frame
 	assert_eq(log.events, ["gate_unlocked"], "only gate_unlocked fired so far")
 	assert_eq(counter.n, 0, "room counter unchanged after gate_unlocked")
 	# Step 3: player walks through the open door → gate_traversed fires → room_cleared.
@@ -402,6 +406,7 @@ func test_p0_death_tween_wait_then_door_walk_sequence() -> void:
 	g.lock()  # lock without going through trigger_for_test (which sets skip_wait=true)
 	watch_signals(g)
 	m.die()
+	await get_tree().process_frame
 	# Timer in-flight: gate still LOCKED, gate_unlocked NOT fired.
 	assert_true(g.is_locked(), "gate still LOCKED while death-tween wait pending")
 	assert_signal_not_emitted(g, "gate_unlocked", "gate_unlocked not fired yet — timer pending")
@@ -427,6 +432,7 @@ func test_p0_gate_traversed_idempotent_no_double_advance() -> void:
 	g.gate_traversed.connect(counter.bump)
 	g.trigger_for_test(null)
 	m.die()
+	await get_tree().process_frame  # 86c9qcf9z: drain CONNECT_DEFERRED dispatch
 	g.traverse_for_test()
 	g.traverse_for_test()
 	g.traverse_for_test()
