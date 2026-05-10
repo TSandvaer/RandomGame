@@ -22,12 +22,20 @@
  *
  * **What this spec asserts:**
  *   1. Boot completes; iron_sword auto-equipped
- *   2. Room01 grunts killed (auto-advance to Room02)
+ *   2. Room01 PracticeDummy killed (Stage 2b PR #169 — auto-advance to
+ *      Room02 via `_install_room01_clear_listener`).
  *   3. SKIP Room02 combat — gate stays OPEN with mobs_alive=2
  *   4. From spawn (240, 200), walk WEST 2000ms then NORTH 1500ms
  *   5. **Assert** at least one `[combat-trace] RoomGate._on_body_entered`
  *      line appears in the capture buffer (any state, any body class — the
  *      gate's overlap detection is the only invariant).
+ *
+ * **Stage 2b update (PR #169):** Room01 now spawns 1 PracticeDummy at world
+ * (~368, 144) instead of 2 grunts. The dummy doesn't chase, so the player
+ * must walk NE and attack-sweep to kill it. Helper at
+ * `fixtures/room01-traversal.ts` encapsulates the discipline. The Room02-side
+ * body_entered assertion is unchanged — that's the load-bearing invariant
+ * this spec exists to canary.
  *
  * If this spec ever fails, the body_entered signal IS regressing under
  * Playwright. Investigate Godot 4.x version changes, gl_compatibility
@@ -49,6 +57,7 @@
 
 import { test, expect } from "@playwright/test";
 import { ConsoleCapture } from "../fixtures/console-capture";
+import { clearRoom01Dummy } from "../fixtures/room01-traversal";
 
 const BOOT_TIMEOUT_MS = 30_000;
 const ROOM_KILL_TIMEOUT_MS = 90_000;
@@ -82,28 +91,23 @@ test.describe("RoomGate body_entered fires under Playwright (regression — 86c9
     const clickX = (canvasBB?.x ?? 0) + (canvasBB?.width ?? 1280) / 2;
     const clickY = (canvasBB?.y ?? 0) + (canvasBB?.height ?? 720) / 2;
 
-    // ---- Phase 1: clear Room01 (NE facing, click only — no wandering) ----
-    // Room01 has no RoomGate; killing both grunts auto-advances to Room02.
-    await page.keyboard.down("w");
-    await page.keyboard.down("d");
-    await page.waitForTimeout(100);
-    await page.keyboard.up("w");
-    await page.keyboard.up("d");
-    await page.waitForTimeout(400);
-
-    const t0 = Date.now();
-    let kills = 0;
-    while (Date.now() - t0 < ROOM_KILL_TIMEOUT_MS && kills < 2) {
-      await canvas.click({ position: { x: clickX, y: clickY } });
-      await page.waitForTimeout(ATTACK_INTERVAL_MS);
-      kills = capture
-        .getLines()
-        .filter((l) => /\[combat-trace\] Grunt\._die/.test(l.text)).length;
-    }
+    // ---- Phase 1: clear Room01 (Stage 2b PR #169 — 1 PracticeDummy) ----
+    // Room01 has no RoomGate; killing the dummy auto-advances to Room02 via
+    // `_install_room01_clear_listener`. The dummy doesn't chase, so we walk
+    // NE and attack-sweep to reach + kill it (helper encapsulates pattern).
+    const result = await clearRoom01Dummy(
+      page,
+      canvas,
+      capture,
+      clickX,
+      clickY,
+      { budgetMs: ROOM_KILL_TIMEOUT_MS }
+    );
     expect(
-      kills,
-      "Room01 grunts must die for Room02 to load"
-    ).toBeGreaterThanOrEqual(2);
+      result.dummyKilled,
+      "Room01 PracticeDummy must die for Room02 to load (canary depends on " +
+        "reaching Room02's gate, which only exists after Room01 advances)."
+    ).toBe(true);
 
     // ---- Phase 2: settle for Room02 player respawn at DEFAULT_PLAYER_SPAWN ----
     // Player is teleported to (240, 200) on every _load_room_at_index. Wait
