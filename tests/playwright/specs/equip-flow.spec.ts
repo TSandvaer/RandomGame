@@ -6,6 +6,19 @@
  * combat-trace `source` enum cleanly distinguishes user clicks from system
  * auto-equips (ticket 86c9qah0v).
  *
+ * **Stage 2b update (PR #169 + this PR):** Room01 changed from "2 grunts" to
+ * "1 PracticeDummy". The Phase 2 "kill a grunt → damage=6" baseline now
+ * targets the dummy poof: the dummy takes a damage=6 hit too (Hitbox.hit
+ * trace fires the same way — same `team=player damage=6` shape). Phase 2.5's
+ * Tab → click-equipped-slot → click-grid-cell → re-equip flow still works in
+ * Room01 because Tab + InventoryPanel state is room-independent. After the
+ * dummy poof, a guaranteed iron_sword pickup spawns + auto-collects into the
+ * inventory grid (Pickup → `Inventory.on_pickup_collected` → `add(item)` —
+ * note this does NOT auto-equip, just lands in the grid alongside the
+ * originally-equipped one). The grid-cell-0 click in Phase 2.5 may equip the
+ * dummy-drop sword OR the unequipped-from-slot sword (both are
+ * iron_sword instances, both produce the same trace — assertion holds).
+ *
  * Verifies the equip-state persistence path AND the in-game LMB-click equip
  * path that PR #145 / #146 / closed P0 86c9q96m8 all hit in different ways:
  *
@@ -14,16 +27,22 @@
  *   1.5. **NEW (ticket 86c9qah0v):** assert the boot-window auto-equip emits
  *      `source=auto_starter` (positive) and ZERO `source=lmb_click` lines
  *      fire during cold boot (negative — no user click happened yet).
- *   2. Player kills a grunt → Hitbox.hit registers damage=6.
+ *   2. Player kills the Room01 PracticeDummy → at least one Hitbox.hit
+ *      damage=6 trace observed (proves iron_sword damage flows to combat).
  *   3. **(P0 86c9q96m8 fix coverage):** open Tab inventory, click the
  *      equipped slot to unequip (iron_sword → grid), then click the grid
  *      cell to re-equip via the LMB-click path. Asserts the
  *      `[combat-trace] Inventory.equip | source=lmb_click damage_after=6`
  *      line fires AND post-equip swing damage matches.
  *   4. F5 reload → Save autoload restores equipped state from snapshot.
- *   5. Post-reload: a fresh swing in Room 01 still produces damage=6 hits
- *      (proves Inventory._equipped["weapon"] AND Player._equipped_weapon
- *      both restored to iron_sword — the dual-surface invariant).
+ *   5. Post-reload: a fresh swing still produces damage=6 hits (proves
+ *      Inventory._equipped["weapon"] AND Player._equipped_weapon both
+ *      restored to iron_sword — the dual-surface invariant). Note: post-
+ *      reload, the player MIGHT be back in Room01 (if reload preserves
+ *      the room counter at 0) OR in Room02 (if reload occurred while in
+ *      Room02 and the save preserved that). Either way, the player can
+ *      swing at SOMETHING within combat range and the damage trace fires —
+ *      we don't assert which room.
  *      Negative assertion: NEITHER `source=lmb_click` NOR `source=auto_starter`
  *      lines fire post-reload (save-restore bypasses equip() entirely;
  *      auto_starter early-returns because slot is already populated).
@@ -69,6 +88,10 @@
 
 import { test, expect } from "@playwright/test";
 import { ConsoleCapture } from "../fixtures/console-capture";
+import {
+  clearRoom01Dummy,
+  waitForRoom02Load,
+} from "../fixtures/room01-traversal";
 
 const BOOT_TIMEOUT_MS = 30_000;
 const KILL_TIMEOUT_MS = 60_000;
@@ -155,58 +178,53 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
     const clickX = (canvasBB?.x ?? 0) + (canvasBB?.width ?? 1280) / 2;
     const clickY = (canvasBB?.y ?? 0) + (canvasBB?.height ?? 720) / 2;
 
-    // Set facing NE for grunt approach
-    await page.keyboard.down("w");
-    await page.keyboard.down("d");
-    await page.waitForTimeout(100);
-    await page.keyboard.up("w");
-    await page.keyboard.up("d");
-    await page.waitForTimeout(600);
-
-    // ---- Phase 2: Kill a grunt and observe pre-reload damage=6 ----
+    // ---- Phase 2: Kill the Room01 dummy and observe pre-reload damage=6 ----
+    //
+    // Stage 2b: Room01 ships 1 PracticeDummy at world (~368, 144). The dummy
+    // takes a damage=6 hit on the bandaid path (PR #146 still active) → 1 swing
+    // kills. The Hitbox.hit trace shape is the same as Grunt's — same
+    // `[combat-trace] Hitbox.hit | team=player ... damage=6` line — so the
+    // damage assertion here is identical. The helper handles the walk + sweep.
     const preReloadStart = Date.now();
-    let preReloadDamageObserved: number | null = null;
+    const room01ClearResult = await clearRoom01Dummy(
+      page,
+      canvas,
+      capture,
+      clickX,
+      clickY,
+      { budgetMs: KILL_TIMEOUT_MS }
+    );
+    expect(
+      room01ClearResult.dummyKilled,
+      "Stage 2b Phase 2: Room01 PracticeDummy must die. The dummy poof " +
+        "produces the load-bearing damage=6 Hitbox.hit trace this phase " +
+        "asserts on."
+    ).toBe(true);
 
-    while (Date.now() - preReloadStart < KILL_TIMEOUT_MS) {
-      await canvas.click({ position: { x: clickX, y: clickY } });
-      await page.waitForTimeout(ATTACK_INTERVAL_MS);
-
-      const hitLine = capture
-        .getLines()
-        .find((l) =>
-          /\[combat-trace\] Hitbox\.hit \| team=player.*damage=(\d+)/.test(
-            l.text
-          )
-        );
-      if (hitLine) {
-        const m = hitLine.text.match(/damage=(\d+)/);
-        if (m) {
-          preReloadDamageObserved = parseInt(m[1], 10);
-          console.log(
-            `[equip-flow] Pre-reload first hit damage=${preReloadDamageObserved}`
-          );
-          break;
-        }
-      }
-    }
-    expect(preReloadDamageObserved).not.toBeNull();
+    // Now extract the first damage=N value from the captured Hitbox.hit lines.
+    const preReloadHitLine = capture
+      .getLines()
+      .find((l) =>
+        /\[combat-trace\] Hitbox\.hit \| team=player.*damage=(\d+)/.test(l.text)
+      );
+    expect(
+      preReloadHitLine,
+      "After Room01 dummy clear, expected at least one Hitbox.hit team=player " +
+        "trace in the buffer (the dummy-killing swing). None found — the " +
+        "dummy died but no Hitbox.hit fired? Check the Hitbox combat-trace shim."
+    ).toBeDefined();
+    const preReloadMatch = preReloadHitLine!.text.match(/damage=(\d+)/);
+    expect(preReloadMatch).not.toBeNull();
+    const preReloadDamageObserved = parseInt(preReloadMatch![1], 10);
+    console.log(
+      `[equip-flow] Pre-reload first hit damage=${preReloadDamageObserved} ` +
+        `(dummy poof at t=${Date.now() - preReloadStart}ms).`
+    );
     expect(preReloadDamageObserved).toBeGreaterThanOrEqual(2);
 
-    // Continue attacking until at least one grunt dies — proves the full
-    // combat→damage→death pipeline before reload.
-    while (Date.now() - preReloadStart < KILL_TIMEOUT_MS) {
-      await canvas.click({ position: { x: clickX, y: clickY } });
-      await page.waitForTimeout(ATTACK_INTERVAL_MS);
-      const dieLine = capture
-        .getLines()
-        .find((l) => /\[combat-trace\] Grunt\._die/.test(l.text));
-      if (dieLine) {
-        console.log(
-          `[equip-flow] Pre-reload kill landed at t=${Date.now() - preReloadStart}ms.`
-        );
-        break;
-      }
-    }
+    // Settle for Room02 load — the dummy poof auto-advances via
+    // _install_room01_clear_listener.
+    await waitForRoom02Load(page, 1500);
 
     // ---- Phase 2.5: P0 86c9q96m8 — drive the LMB-click equip path ----
     //
@@ -416,46 +434,58 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
     const clickX2 = (canvasBB2?.x ?? 0) + (canvasBB2?.width ?? 1280) / 2;
     const clickY2 = (canvasBB2?.y ?? 0) + (canvasBB2?.height ?? 720) / 2;
 
-    // Set facing NE again — facing is per-instance state, lost in reload
-    await page.keyboard.down("w");
-    await page.keyboard.down("d");
-    await page.waitForTimeout(100);
-    await page.keyboard.up("w");
-    await page.keyboard.up("d");
-    await page.waitForTimeout(600);
-
+    // Stage 2b: F5 reload restores save (equipped state survives) but Main's
+    // `_ready` always cold-loads Room01 (`_current_room_index = 0` initial,
+    // `_load_save_or_defaults` doesn't restore room counter — see scenes/
+    // Main.gd:748-788). The player respawns at DEFAULT_PLAYER_SPAWN with the
+    // Room01 PracticeDummy re-instantiated. We re-run the dummy-clear helper:
+    // a successful kill produces the post-reload Hitbox.hit damage=N trace
+    // we assert below.
     const postReloadStart = Date.now();
+    const postReloadClearResult = await clearRoom01Dummy(
+      page,
+      canvas,
+      capture,
+      clickX2,
+      clickY2,
+      { budgetMs: POST_RELOAD_HIT_TIMEOUT_MS }
+    );
+    expect(
+      postReloadClearResult.dummyKilled,
+      "Post-reload: Room01 PracticeDummy must die. Save-restore re-spawned " +
+        "the dummy and the player; the equipped iron_sword should still " +
+        "produce damage=6 hits. If the dummy doesn't die in the helper's " +
+        "attack budget, either the equipped weapon was wiped (PR #146 class " +
+        "regression) or the helper drifted."
+    ).toBe(true);
+
+    // Find the first Hitbox.hit team=player line emitted during the helper's
+    // sweep. The buffer was cleared right before page.reload(), so the entire
+    // current buffer is post-reload activity.
+    const postReloadHitLine = capture
+      .getLines()
+      .find((l) =>
+        /\[combat-trace\] Hitbox\.hit \| team=player.*damage=(\d+)/.test(l.text)
+      );
     let postReloadDamageObserved: number | null = null;
-
-    while (Date.now() - postReloadStart < POST_RELOAD_HIT_TIMEOUT_MS) {
-      await canvas.click({ position: { x: clickX2, y: clickY2 } });
-      await page.waitForTimeout(ATTACK_INTERVAL_MS);
-
-      const hitLine = capture
-        .getLines()
-        .find((l) =>
-          /\[combat-trace\] Hitbox\.hit \| team=player.*damage=(\d+)/.test(
-            l.text
-          )
+    if (postReloadHitLine) {
+      const m = postReloadHitLine.text.match(/damage=(\d+)/);
+      if (m) {
+        postReloadDamageObserved = parseInt(m[1], 10);
+        console.log(
+          `[equip-flow] Post-reload first hit damage=${postReloadDamageObserved} ` +
+            `(${postReloadClearResult.attacksFired} attacks fired, ` +
+            `${postReloadClearResult.durationMs}ms helper duration).`
         );
-      if (hitLine) {
-        const m = hitLine.text.match(/damage=(\d+)/);
-        if (m) {
-          postReloadDamageObserved = parseInt(m[1], 10);
-          console.log(
-            `[equip-flow] Post-reload first hit damage=${postReloadDamageObserved}`
-          );
-          break;
-        }
       }
     }
 
     // ---- MAIN ASSERTION ----
     expect(
       postReloadDamageObserved,
-      "Post-reload: no Hitbox.hit|team=player observed in 60s. The harness " +
-        "could not produce a swing→hit. Either canvas focus failed or grunts " +
-        "were not in range. Re-check spawn positions in Room 01."
+      "Post-reload: no Hitbox.hit|team=player observed in the helper's " +
+        "post-reload dummy clear. The dummy died (kill confirmed) but no " +
+        "Hitbox.hit trace fired — the combat-trace shim has regressed."
     ).not.toBeNull();
 
     expect(

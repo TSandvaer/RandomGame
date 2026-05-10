@@ -60,6 +60,7 @@ Several gates are non-negotiable per memory rules:
 - **ClickUp status as hard gate** (memory `clickup-status-as-hard-gate.md`): every dispatch / PR-open / merge pairs with a ClickUp status move in the same tool round. Heartbeat tick audits the board against reality.
 - **Product vs component completeness** (memory `product-vs-component-completeness.md`): "tests pass" ≠ "product ships"; verify integration surface (Main.tscn) at every "feature-complete" claim, not just CI green.
 - **Agent-verify-evidence** (memory `agent-verify-evidence.md`): agents must check CI logs / file contents before refusing or asserting impossibility — recovery from the Stratum1BossRoom incident.
+- **Roster-swap audit gate** (`team/tess-qa/playwright-harness-design.md` § "Roster-swap regression discipline"): any PR that mutates a `resources/level_chunks/*.tres` file's `mob_spawns` (count, type, or position) MUST run the full Playwright harness against the new artifact AND audit every spec whose trace assertions match on the affected mob class. PR #169's silent breakage of 6 specs is the cautionary tale — the harness went red-on-main for ~24h before being noticed. Self-Test Report must include the all-specs harness run output.
 
 ## Git workflow
 

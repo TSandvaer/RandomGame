@@ -515,3 +515,42 @@ Devon PR #171 added an explicit `_combat_trace("RoomGate._on_body_entered", "bod
 ### Regression canary
 
 `tests/playwright/specs/room-gate-body-entered-regression.spec.ts` (Devon PR #171) is now the permanent canary for the body_entered signal itself. It skips Room02 combat entirely, walks from spawn into the gate via the documented W→N pattern, asserts body_entered fires. Any future failure of this canary indicates the signal IS regressing — investigate Godot 4.x version bumps, gl_compatibility physics-server changes, or service-worker timing interference. AC4's harness-drift fix does NOT touch the canary's spawn-position walk path.
+
+---
+
+## 13. Roster-swap regression discipline — 2026-05-10 (PR `tess/m2-w1-spec-roster-swap-fix`, ticket `86c9qcfck`)
+
+**Status:** 6 specs updated to traverse Stage 2b's Room01 (1 PracticeDummy instead of 2 grunts). Helper at `tests/playwright/fixtures/room01-traversal.ts` extracts the walk-NE-then-attack-sweep pattern that AC4's PR #172 first encoded. All 6 specs pass against `origin/main` post-PR-#172. Full harness state: 12/12 (AC4 still `test.fail()` pending the `_mobs_alive` desync game-side investigation).
+
+### The discipline (applies to any future PR that changes a level chunk's mob roster)
+
+**Rule:** any PR that mutates a `resources/level_chunks/*.tres` file's `mob_spawns` array (count, type, or position) MUST audit every harness spec that traverses that level. Six specs (AC2, AC3, equip-flow, room-traversal-smoke, negative-assertion-sweep Test 2, room-gate-body-entered-regression) all assumed Room01 had 2 grunts; PR #169 silently broke them by swapping to 1 PracticeDummy. They went red-on-main for ~24h before being noticed.
+
+**Audit checklist (paste into the roster-swap PR's Self-Test Report):**
+
+1. **Trace patterns:** does any spec match on `Grunt._die`, `Charger._die`, `Shooter._die`, etc., for the room being changed? If the new roster removes that mob class, those matchers become vacuous and silently pass (or fail if a count assertion is paired). Search the harness for the affected mob class name.
+2. **Combat budget:** does any spec depend on the room's mob HP / damage rates for timing (e.g. "die in 17 seconds because 2 grunts deal 6 dmg/s")? PR #169's PracticeDummy deals zero damage, so AC3's death-trigger pattern broke immediately.
+3. **Auto-advance vs RoomGate:** does the room use `_install_room01_clear_listener` (Room01 only) or a RoomGate (Room02-08)? Roster swaps don't usually break this surface, but worth verifying the new mob class still emits `mob_died` (the dummy does, by design — see `scripts/mobs/PracticeDummy.gd` signal contract).
+4. **Walk-to-mob discipline:** does the new mob CHASE? PR #169's PracticeDummy is rooted-by-design — every spec that previously relied on grunts closing to attack range now needs a walk-NE-then-attack-sweep pattern. Use `clearRoom01Dummy` as the canonical reference.
+5. **Pickup side-effects:** does the new mob drop something? PR #169's dummy drops a guaranteed iron_sword pickup (which lands in the inventory grid via `Inventory.add` — NOT `equip()`, so no `[combat-trace] Inventory.equip` line fires from the pickup). Specs that count `Inventory.equip` traces or rely on inventory grid state need to account for the auto-pickup-on-walk behavior.
+
+### Centralized helper pattern
+
+Multi-spec traversal patterns live in `tests/playwright/fixtures/`, not duplicated per spec. The roster-swap PR found six specs that needed nearly-identical Room01 traversal logic; centralizing in `room01-traversal.ts` means a future Stage 2c or PR-#146-bandaid retirement edits one file. Same pattern as `gate-traversal.ts` (PR #170/#171/#172).
+
+When a per-spec `clearXMobs` helper grows past ~50 lines AND is duplicated across 2+ specs, factor it into a fixture. The factored helper should:
+
+1. Accept the canvas `Locator`, `ConsoleCapture`, click coords, and an options bag with a `budgetMs` knob.
+2. Document its preconditions (player position, canvas focus, no held keys) and postconditions (trace lines that should be in the buffer after success).
+3. Throw with a useful failure message including the last 30 trace lines on budget exhaustion.
+4. Return a result object with `dummyKilled` / `gateTraversed` / `attacksFired` / `durationMs` for spec-side instrumentation.
+
+### Bandaid coexistence as a first-class concern
+
+Specs that depend on PR #146's `equip_starter_weapon_if_needed` boot-time auto-equip (i.e. damage=6 from swing 1) MUST document the bandaid-retired path in their header. The retirement ticket is `86c9qbb3k`; when it ships, a paired spec-update PR will need to:
+
+1. Insert a Tab→click-grid-cell flow between the Room01 dummy poof and the Room02 entry (to equip the dropped iron_sword).
+2. Update the `damage>=2` assertions to `damage===1` (FIST_DAMAGE) until the equip step.
+3. Adjust per-direction `attacksPerDir` if needed (dummy still dies in 3 swings at FIST_DAMAGE=1, which fits the helper's current budget without change).
+
+The header documentation makes this PR cheap to write — every affected spec already cites the retirement ticket and the change shape. Don't make the future spec-update PR re-discover the constraints.

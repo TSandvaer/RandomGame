@@ -30,6 +30,13 @@
  *     no RoomGate per Main.gd:381. If a gate trace appears, room loading
  *     mis-instantiated a gate — a misconfiguration symptom.
  *
+ *     **Stage 2b update (PR #169):** Room01's mob roster swapped from
+ *     "2 grunts that chase" to "1 PracticeDummy that doesn't chase." The
+ *     test now expects exactly 1 `PracticeDummy._die` trace and ZERO
+ *     `Grunt._die` traces during Room01's life. The no-RoomGate invariant
+ *     is unchanged — Room01 still uses `_install_room01_clear_listener` to
+ *     auto-advance on the dummy's death.
+ *
  *   Test 3 — gate_traversed never precedes gate_unlocked:
  *     Within any captured trace stream, EVERY `gate_traversed` line must
  *     have at least one preceding `gate_unlocked emitting` line in the
@@ -69,6 +76,7 @@
 
 import { test, expect } from "@playwright/test";
 import { ConsoleCapture } from "../fixtures/console-capture";
+import { clearRoom01Dummy } from "../fixtures/room01-traversal";
 
 const BOOT_TIMEOUT_MS = 30_000;
 const ROOM01_CLEAR_TIMEOUT_MS = 60_000;
@@ -153,26 +161,48 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
     const clickX = (canvasBB?.x ?? 0) + (canvasBB?.width ?? 1280) / 2;
     const clickY = (canvasBB?.y ?? 0) + (canvasBB?.height ?? 720) / 2;
 
-    // Set facing NE for grunt approach
-    await page.keyboard.down("w");
-    await page.keyboard.down("d");
-    await page.waitForTimeout(100);
-    await page.keyboard.up("w");
-    await page.keyboard.up("d");
-    await page.waitForTimeout(APPROACH_WAIT_MS);
+    // Stage 2b (PR #169): Room01 has 1 PracticeDummy at world (~368, 144),
+    // not 2 grunts. The dummy doesn't chase, so we walk-NE-then-attack-sweep
+    // to reach + kill it. Helper handles the geometry. Auto-advance to
+    // Room02 on dummy death is via _install_room01_clear_listener (no
+    // RoomGate involvement — that's the negative-assertion below).
+    const result = await clearRoom01Dummy(
+      page,
+      canvas,
+      capture,
+      clickX,
+      clickY,
+      { budgetMs: ROOM01_CLEAR_TIMEOUT_MS }
+    );
+    expect(
+      result.dummyKilled,
+      `PracticeDummy must die for Room02 to load (and for the no-gate-traces ` +
+        `negative assertion below to be exercised against actual Room01 life).`
+    ).toBe(true);
 
-    // Kill Room 01 grunts (auto-advance happens on last grunt death via
-    // _install_room01_clear_listener — NO RoomGate involvement).
-    const start = Date.now();
-    let kills = 0;
-    while (Date.now() - start < ROOM01_CLEAR_TIMEOUT_MS && kills < 2) {
-      await canvas.click({ position: { x: clickX, y: clickY } });
-      await page.waitForTimeout(ATTACK_INTERVAL_MS);
-      kills = capture
-        .getLines()
-        .filter((l) => /\[combat-trace\] Grunt\._die/.test(l.text)).length;
-    }
-    expect(kills).toBeGreaterThanOrEqual(2);
+    // Snapshot the full set of mob-death traces observed during Room01 life.
+    // Stage 2b expectation: exactly 1 PracticeDummy._die, 0 Grunt._die,
+    // 0 Charger._die, 0 Shooter._die.
+    const dummyDeaths = capture
+      .getLines()
+      .filter((l) => /\[combat-trace\] PracticeDummy\._die/.test(l.text)).length;
+    const gruntDeaths = capture
+      .getLines()
+      .filter((l) => /\[combat-trace\] Grunt\._die/.test(l.text)).length;
+    expect(
+      dummyDeaths,
+      `Stage 2b Room01: expected exactly 1 PracticeDummy._die trace; got ` +
+        `${dummyDeaths}. Either the chunk_def reverted to grunts (regression) ` +
+        `or the dummy didn't die (helper failure).`
+    ).toBe(1);
+    expect(
+      gruntDeaths,
+      `Stage 2b Room01: expected 0 Grunt._die traces during Room01's life; ` +
+        `got ${gruntDeaths}. Room01's chunk_def must NOT spawn grunts ` +
+        `(PR #169). If grunts died here, the chunk_def regressed OR Room02 ` +
+        `loaded faster than expected and we counted Room02 grunt deaths in ` +
+        `the same buffer scope.`
+    ).toBe(0);
 
     // ---- THE NEGATIVE ASSERTION ----
     // Stratum1Room01 has no RoomGate (Main.gd:381 docstring; .tscn ships no
