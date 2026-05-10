@@ -84,6 +84,8 @@ func test_killing_mobs_does_not_advance_room_counter() -> void:
 	# Kill both mobs.
 	m1.die()
 	m2.die()
+	# Ticket 86c9qcf9z: drain one frame for CONNECT_DEFERRED dispatch.
+	await get_tree().process_frame
 	assert_eq(g.mobs_alive(), 0, "both mobs dead")
 	# Room counter (exit crossing) must be 0 — mob death alone never advances it.
 	assert_eq(exit.times_crossed, 0, "killing mobs never advances the room counter")
@@ -100,6 +102,7 @@ func test_gate_unlocks_after_wait_but_counter_still_zero() -> void:
 
 	watch_signals(g)
 	m.die()
+	await get_tree().process_frame
 	# Immediately after death, gate has not unlocked yet (DEATH_TWEEN_WAIT_SECS
 	# timer is running in the scene tree — in headless tests without is_inside_tree
 	# the gate falls back to immediate unlock, so we verify the timer guard).
@@ -128,6 +131,7 @@ func test_room_counter_advances_exactly_once_per_room() -> void:
 	g.gate_unlocked.connect(exit.on_player_cross)
 	g.trigger_for_test(null)
 	m.die()  # headless: falls back to immediate unlock (no scene tree timer)
+	await get_tree().process_frame
 	assert_eq(exit.times_crossed, 1, "room counter advances exactly once on gate_unlocked")
 
 
@@ -159,6 +163,7 @@ func test_mob_death_and_door_walk_in_same_tick_counted_correctly() -> void:
 	watch_signals(g)
 	# Die fires (headless: immediate unlock).
 	m.die()
+	await get_tree().process_frame
 	assert_eq(g.mobs_alive(), 0, "mob count zero after death")
 	# gate_unlocked must have fired exactly once.
 	assert_signal_emit_count(g, "gate_unlocked", 1, "gate_unlocked fires once")
@@ -181,6 +186,7 @@ func test_gate_unlocked_not_emitted_immediately_on_mob_death() -> void:
 	watch_signals(g)
 	m1.die()
 	m2.die()
+	await get_tree().process_frame
 	# gate_unlocked fires once (headless fallback) — the re-entry guard (_death_wait_in_flight)
 	# must prevent a second _unlock call from the second mob death.
 	assert_signal_emit_count(g, "gate_unlocked", 1,
@@ -229,6 +235,7 @@ func test_gate_does_not_unlock_until_death_wait_elapses() -> void:
 
 	watch_signals(g)
 	m.die()
+	await get_tree().process_frame
 	# Last mob died — gate_unlocked must NOT fire yet (Timer is pending).
 	assert_signal_emit_count(g, "gate_unlocked", 0,
 		"gate_unlocked must NOT emit until DEATH_TWEEN_WAIT_SECS elapses")
@@ -259,10 +266,12 @@ func test_second_mob_death_during_wait_does_not_double_unlock() -> void:
 
 	watch_signals(g)
 	m1.die()
+	await get_tree().process_frame
 	# m1 dying alone does not start the wait (m2 still alive).
 	assert_false(g._death_wait_in_flight,
 		"wait not started while m2 still alive")
 	m2.die()
+	await get_tree().process_frame
 	# Now wait is in-flight.
 	assert_true(g._death_wait_in_flight, "wait started after last mob death")
 	assert_signal_emit_count(g, "gate_unlocked", 0,

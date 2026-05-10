@@ -50,6 +50,17 @@ When a mob's HP reaches 0, the synchronous chain is:
 
 `MobLootSpawner.on_mob_died` calls `parent_for_pickups.call_deferred("add_child", pickup)` (PR #142 fix) — Pickup root is an Area2D, and adding it during physics flush triggers the same `USER ERROR: Can't change this state while flushing queries` panic. The `_spawn_death_particles` adds in each of 4 mob types also use `room.call_deferred("add_child", burst)` defensively.
 
+**RoomGate uses `CONNECT_DEFERRED` for `mob_died` listeners** (ticket 86c9qcf9z). `RoomGate.register_mob` connects with `mob.mob_died.connect(_on_mob_died, CONNECT_DEFERRED)` so the `_mobs_alive` decrement queues to end-of-frame instead of running inside the mob's synchronous emit chain. **Why this matters:** `MultiMobRoom._register_mobs_with_gate` runs from `MultiMobRoom._ready`, which itself runs during a physics-flush window when `Main._load_room_at_index` is called from a previous room's `gate_traversed → _on_room_gate_traversed → room_cleared → _on_room_cleared` chain (rooted in a CharacterBody2D `body_entered` callback). Subsequent `mob_died.emit` calls reach the gate via this connection, and prior to the deferred fix the gate's decrement competed with other physics-flush mutations (Pickup adds, particle adds, room transitions). Tess's PR #172 AC4 trace empirically observed two grunts emitting `Grunt._die` but only ONE decrement landing on the gate, leaving `_mobs_alive=1, state=open` and blocking the gate from ever transitioning to UNLOCKED. CONNECT_DEFERRED sidesteps the entire race class — every mob_died emission queues an end-of-frame decrement that runs outside the flush window.
+
+**Cross-tree signal-connection discipline (load-bearing).** Any signal-handler that:
+
+1. is connected from a context running during physics flush (e.g. inside `_ready` of a node added via `add_child` from a prior room's death / traversal callback), AND
+2. the connected handler mutates persistent state the receiver later inspects (counter, list, gate-state)
+
+should be connected with `CONNECT_DEFERRED`. The synchronous-emit alternative is timing-sensitive and may lose decrements/increments under physics-flush re-entry. `Levels.subscribe_to_mob` already uses `CONNECT_ONE_SHOT` (a different concern — once-per-life XP); `Main._wire_mob` connects synchronously but only forwards to a deferred-add-child path. RoomGate is the canonical example of a counter-style listener that needs CONNECT_DEFERRED.
+
+**Test-side consequence.** GUT tests that fire `mob_died` synchronously and then immediately inspect `gate.mobs_alive()` / `gate.is_unlocked()` must `await get_tree().process_frame` between the emit and the assertion. The pre-existing `test_room_gate.gd` / `test_room_advance_only_on_door_walk.gd` / `test_room_transition_requires_door_walk.gd` tests were updated alongside the CONNECT_DEFERRED migration to drain a frame between every `m.die()` call and the next assertion.
+
 ## Mob hit-flash (PR #140 fix)
 
 Each mob type ([`scripts/mobs/Grunt.gd`](scripts/mobs/Grunt.gd), `Charger.gd`, `Shooter.gd`, `Stratum1Boss.gd`) has `_play_hit_flash`. The current implementation:

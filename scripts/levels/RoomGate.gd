@@ -185,6 +185,34 @@ func mobs_alive() -> int:
 ##
 ## Safe to call before OR after the gate locks. Late registration is valid.
 ## Idempotent: re-registering the same mob is a no-op.
+##
+## **Connection mode (ticket 86c9qcf9z fix):** the connection uses
+## `CONNECT_DEFERRED` so the gate's `_on_mob_died` decrement is queued to
+## end-of-frame rather than running synchronously inside the mob's
+## `_die → mob_died.emit` chain. This is load-bearing because
+## `MultiMobRoom._register_mobs_with_gate` (the production caller of this
+## method) runs from `MultiMobRoom._ready`, which itself runs during a
+## physics-flush window when Main loads a new room from the prior room's
+## `gate_traversed` body_entered callback. With a synchronous connection,
+## any subsequent `mob_died.emit` chained off a Hitbox.body_entered hit
+## runs the gate's decrement INSIDE that flush, where it competes with
+## other physics-flush mutations (Pickup adds, particle adds, room
+## transitions). Tess's PR #172 AC4 trace empirically observed this race:
+## both grunts emitted `Grunt._die` (clearRoomMobs counted 2/2) but the
+## gate's `_mobs_alive` counter only decremented once, leaving the gate
+## stuck at `mobs_alive=1, state=open` after Player walked through.
+##
+## Deferred dispatch sidesteps the race entirely — the decrement queues to
+## the next frame, after the physics flush + signal-handler cascade has
+## fully completed. The state-machine semantics are unchanged: the gate
+## still flips to UNLOCKED once `_mobs_alive` hits 0, the death-tween
+## wait still fires, `gate_unlocked` still emits exactly once. Existing
+## `tests/test_room_gate.gd` tests pass against the deferred mode because
+## GUT awaits frame ticks via `_await_physics_settles` patterns.
+##
+## See `.claude/docs/combat-architecture.md § "Mob `_die` death pipeline"`
+## for the broader physics-flush rule + cross-tree signal-connection
+## discipline that this fix codifies.
 func register_mob(mob: Node) -> void:
 	if mob == null:
 		return
@@ -195,13 +223,12 @@ func register_mob(mob: Node) -> void:
 		return
 	_registered_mobs.append(mob)
 	_mobs_alive += 1
-	# Connect with deferred so a synchronous mob_died emission inside
-	# register_mob (rare, but possible in tests) doesn't underflow the count.
-	var err: int = mob.mob_died.connect(_on_mob_died)
-	# Investigation 86c9qcf9z: instrument both registrations and decrements so
-	# the AC4 boss-clear spec's trace pair pinpoints any signal-emission
-	# desync between the spawned grunt set and the gate's _mobs_alive count.
-	# Logged unconditionally (combat_trace gates on web feature internally).
+	# CONNECT_DEFERRED: ticket 86c9qcf9z. Decouples the gate decrement from
+	# the physics-flush window in which mob_died.emit runs.
+	var err: int = mob.mob_died.connect(_on_mob_died, CONNECT_DEFERRED)
+	# Trace pair (paired with _on_mob_died trace below) pinpoints any future
+	# desync between register and decrement at the [combat-trace] level.
+	# combat_trace gates on `OS.has_feature("web")` so HTML5-only.
 	_combat_trace("RoomGate.register_mob",
 		"mob=%s id=%d mobs_alive=%d connect_err=%d" % [
 			mob.name, mob.get_instance_id(), _mobs_alive, err
