@@ -9,6 +9,14 @@ extends GutTest
 ##   3. Edge: room with zero mobs -> gate immediately unlocked on lock.
 ##   4. Edge: mob death from off-screen attacks counts (signal-driven).
 ##   5. Edge: rapid mob deaths in same frame counted correctly.
+##
+## **Ticket 86c9qcf9z (CONNECT_DEFERRED migration):** the gate now connects
+## the mob.mob_died signal with `CONNECT_DEFERRED` so the decrement runs at
+## end-of-frame rather than synchronously inside the mob's _die chain. Tests
+## that emit `m.die()` synchronously now await one frame via `_await_frame`
+## before asserting `mobs_alive()` / `is_unlocked()`. The state-machine
+## semantics are unchanged; only the dispatch timing shifts by one frame.
+## See RoomGate.register_mob docstring for the full rationale.
 
 const RoomGateScript: Script = preload("res://scripts/levels/RoomGate.gd")
 
@@ -37,6 +45,15 @@ func _make_fake_mob() -> FakeMob:
 	var m: FakeMob = FakeMob.new()
 	add_child_autofree(m)
 	return m
+
+
+# Helper: drain one process-frame so CONNECT_DEFERRED handlers run.
+# Ticket 86c9qcf9z: register_mob now connects with CONNECT_DEFERRED, so
+# the gate's _on_mob_died decrement runs at end-of-frame rather than
+# synchronously inside the emit call. Tests that fire m.die() and then
+# inspect mobs_alive() / is_unlocked() must await a frame between the two.
+func _await_frame() -> void:
+	await get_tree().process_frame
 
 
 # ---- 1. Gate locks when player enters room --------------------------
@@ -86,11 +103,16 @@ func test_gate_unlocks_when_all_mobs_die() -> void:
 	assert_true(g.is_locked())
 	watch_signals(g)
 	m1.die()
+	# CONNECT_DEFERRED dispatch (ticket 86c9qcf9z): drain one frame for the
+	# gate's _on_mob_died decrement to land.
+	await _await_frame()
 	assert_true(g.is_locked(), "still locked with 2 alive")
 	assert_eq(g.mobs_alive(), 2)
 	m2.die()
+	await _await_frame()
 	assert_true(g.is_locked(), "still locked with 1 alive")
 	m3.die()
+	await _await_frame()
 	assert_eq(g.mobs_alive(), 0)
 	assert_true(g.is_unlocked(), "unlocked once final mob dies")
 	assert_signal_emitted(g, "gate_unlocked")
@@ -103,6 +125,7 @@ func test_unlocked_state_is_terminal() -> void:
 	g.register_mob(m)
 	g.trigger_for_test(null)
 	m.die()
+	await _await_frame()
 	assert_eq(g.get_state(), RoomGate.STATE_UNLOCKED)
 	# Re-trigger doesn't push us back to LOCKED.
 	g.trigger_for_test(null)
@@ -159,6 +182,7 @@ func test_offscreen_mob_death_still_counts() -> void:
 	g.trigger_for_test(null)
 	assert_true(g.is_locked())
 	m.die()
+	await _await_frame()
 	assert_true(g.is_unlocked(),
 		"mob dying off-screen still counts toward the gate's clear condition")
 
@@ -170,6 +194,13 @@ func test_rapid_same_frame_deaths_all_counted() -> void:
 	# (i.e. all in the same physics frame from the gate's POV). Each must
 	# decrement the counter; the gate must NOT short-circuit on the first
 	# death and miss the rest.
+	#
+	# Ticket 86c9qcf9z: this is the regression test that pins the desync
+	# fix. Pre-CONNECT_DEFERRED, the gate's _on_mob_died ran inside each
+	# m.die() emit's synchronous handler chain. The real-game equivalent
+	# of this scenario (Tess's PR #172 AC4 spec) saw only ONE of the three
+	# decrements land. With CONNECT_DEFERRED, all three queue up and drain
+	# in order at end-of-frame.
 	var g: RoomGate = _make_gate()
 	var m1: FakeMob = _make_fake_mob()
 	var m2: FakeMob = _make_fake_mob()
@@ -182,6 +213,11 @@ func test_rapid_same_frame_deaths_all_counted() -> void:
 	m1.die()
 	m2.die()
 	m3.die()
+	# Drain ONE frame — CONNECT_DEFERRED queues all three decrements; they
+	# run in connect-order at end-of-frame. The single frame drain is
+	# sufficient because deferred-call dispatch is FIFO and all three were
+	# queued in the same frame.
+	await _await_frame()
 	assert_eq(g.mobs_alive(), 0, "all three deaths counted")
 	assert_true(g.is_unlocked(), "gate unlocked after burst of deaths")
 
@@ -198,8 +234,10 @@ func test_late_registration_after_lock_still_tracked() -> void:
 	g.register_mob(m2)
 	assert_eq(g.mobs_alive(), 2)
 	m1.die()
+	await _await_frame()
 	assert_true(g.is_locked(), "gate still locked while m2 is alive")
 	m2.die()
+	await _await_frame()
 	assert_true(g.is_unlocked(), "gate unlocks once both mobs dead, including the late one")
 
 

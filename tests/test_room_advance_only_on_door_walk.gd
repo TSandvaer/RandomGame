@@ -123,6 +123,8 @@ func test_killing_all_mobs_without_gate_trigger_does_not_unlock() -> void:
 
 	# Kill the mob WITHOUT locking the gate first.
 	m.die()
+	# Ticket 86c9qcf9z: drain one frame so CONNECT_DEFERRED dispatch lands.
+	await get_tree().process_frame
 
 	assert_eq(g.get_state(), RoomGate.STATE_OPEN,
 		"gate must remain OPEN when mobs die before player crosses it")
@@ -141,6 +143,7 @@ func test_multiple_mob_kills_without_gate_trigger_stays_open() -> void:
 
 	m1.die()
 	m2.die()
+	await get_tree().process_frame
 
 	assert_eq(g.mobs_alive(), 0)
 	assert_eq(g.get_state(), RoomGate.STATE_OPEN,
@@ -203,6 +206,7 @@ func test_lock_then_kill_all_mobs_unlocks_gate() -> void:
 
 	watch_signals(g)
 	m.die()
+	await get_tree().process_frame
 
 	assert_true(g.is_unlocked(), "gate must UNLOCK once last mob dies (after gate locked)")
 	assert_signal_emitted(g, "gate_unlocked")
@@ -220,9 +224,11 @@ func test_lock_then_kill_multiple_mobs_unlocks_on_last() -> void:
 
 	watch_signals(g)
 	m1.die()
+	await get_tree().process_frame
 	assert_signal_not_emitted(g, "gate_unlocked",
 		"gate must stay locked after first mob — second still alive")
 	m2.die()
+	await get_tree().process_frame
 	assert_signal_emitted(g, "gate_unlocked", "gate unlocks when last mob dies")
 
 

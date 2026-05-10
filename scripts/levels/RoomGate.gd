@@ -185,6 +185,34 @@ func mobs_alive() -> int:
 ##
 ## Safe to call before OR after the gate locks. Late registration is valid.
 ## Idempotent: re-registering the same mob is a no-op.
+##
+## **Connection mode (ticket 86c9qcf9z fix):** the connection uses
+## `CONNECT_DEFERRED` so the gate's `_on_mob_died` decrement is queued to
+## end-of-frame rather than running synchronously inside the mob's
+## `_die → mob_died.emit` chain. This is load-bearing because
+## `MultiMobRoom._register_mobs_with_gate` (the production caller of this
+## method) runs from `MultiMobRoom._ready`, which itself runs during a
+## physics-flush window when Main loads a new room from the prior room's
+## `gate_traversed` body_entered callback. With a synchronous connection,
+## any subsequent `mob_died.emit` chained off a Hitbox.body_entered hit
+## runs the gate's decrement INSIDE that flush, where it competes with
+## other physics-flush mutations (Pickup adds, particle adds, room
+## transitions). Tess's PR #172 AC4 trace empirically observed this race:
+## both grunts emitted `Grunt._die` (clearRoomMobs counted 2/2) but the
+## gate's `_mobs_alive` counter only decremented once, leaving the gate
+## stuck at `mobs_alive=1, state=open` after Player walked through.
+##
+## Deferred dispatch sidesteps the race entirely — the decrement queues to
+## the next frame, after the physics flush + signal-handler cascade has
+## fully completed. The state-machine semantics are unchanged: the gate
+## still flips to UNLOCKED once `_mobs_alive` hits 0, the death-tween
+## wait still fires, `gate_unlocked` still emits exactly once. Existing
+## `tests/test_room_gate.gd` tests pass against the deferred mode because
+## GUT awaits frame ticks via `_await_physics_settles` patterns.
+##
+## See `.claude/docs/combat-architecture.md § "Mob `_die` death pipeline"`
+## for the broader physics-flush rule + cross-tree signal-connection
+## discipline that this fix codifies.
 func register_mob(mob: Node) -> void:
 	if mob == null:
 		return
@@ -195,9 +223,16 @@ func register_mob(mob: Node) -> void:
 		return
 	_registered_mobs.append(mob)
 	_mobs_alive += 1
-	# Connect with deferred so a synchronous mob_died emission inside
-	# register_mob (rare, but possible in tests) doesn't underflow the count.
-	mob.mob_died.connect(_on_mob_died)
+	# CONNECT_DEFERRED: ticket 86c9qcf9z. Decouples the gate decrement from
+	# the physics-flush window in which mob_died.emit runs.
+	var err: int = mob.mob_died.connect(_on_mob_died, CONNECT_DEFERRED)
+	# Trace pair (paired with _on_mob_died trace below) pinpoints any future
+	# desync between register and decrement at the [combat-trace] level.
+	# combat_trace gates on `OS.has_feature("web")` so HTML5-only.
+	_combat_trace("RoomGate.register_mob",
+		"mob=%s id=%d mobs_alive=%d connect_err=%d" % [
+			mob.name, mob.get_instance_id(), _mobs_alive, err
+		])
 
 
 ## Force-lock the gate from script. Production uses `body_entered`; tests
@@ -279,13 +314,37 @@ func _on_area_entered_ignored(_area: Area2D) -> void:
 	pass  # Gate never responds to Area2D entry — CharacterBody2D only.
 
 
-func _on_mob_died(_mob: Variant, _pos: Variant = null, _def: Variant = null) -> void:
+func _on_mob_died(mob: Variant, _pos: Variant = null, _def: Variant = null) -> void:
 	# Signal signature varies (Grunt/Charger/Shooter all take 3 args), but
 	# we don't need any of them — we just count.
 	_mobs_alive = max(0, _mobs_alive - 1)
+	# Investigation 86c9qcf9z: trace the decrement so we can pair register vs.
+	# decrement counts when AC4 hits the desync class. mob may be null/freed
+	# in some test contexts; guard the name/id lookup.
+	var mob_name: String = "<null>"
+	var mob_id: int = 0
+	if mob != null and is_instance_valid(mob):
+		mob_name = str(mob.name) if "name" in mob else "<unnamed>"
+		mob_id = mob.get_instance_id() if mob.has_method("get_instance_id") else 0
+	_combat_trace("RoomGate._on_mob_died",
+		"mob=%s id=%d mobs_alive=%d state=%s" % [
+			mob_name, mob_id, _mobs_alive, _state_name()
+		])
 	if _mobs_alive == 0 and _state == STATE_LOCKED and not _death_wait_in_flight:
 		_death_wait_in_flight = true
 		_start_death_wait()
+
+
+## Trace-helper: render the current state as a stable label for trace pairs.
+## Mirrors RoomGate._state's StringName values for grep simplicity.
+func _state_name() -> String:
+	if _state == STATE_OPEN:
+		return "open"
+	if _state == STATE_LOCKED:
+		return "locked"
+	if _state == STATE_UNLOCKED:
+		return "unlocked"
+	return str(_state)
 
 
 ## Start (or skip) the DEATH_TWEEN_WAIT_SECS delay before unlocking.
