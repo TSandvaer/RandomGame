@@ -461,3 +461,45 @@ func test_die_emits_combat_trace_die_line() -> void:
 	# Downstream consequence still holds (Tier 2 bar): the mob actually died.
 	assert_true(s.is_dead(), "lethal take_damage still kills the shooter")
 	assert_eq(s.get_state(), Shooter.STATE_DEAD)
+
+
+# ---- Shooter.pos harness-observability trace (ticket 86c9tz7zg) -------
+#
+# The AC4 Shooter-chase sub-helper (tests/playwright/fixtures/kiting-mob-
+# chase.ts) cannot kill a kiting Shooter by fixed-position click-spam — it
+# must PURSUE, and the Playwright harness has no JS bridge into Godot, so it
+# steers off this throttled `[combat-trace] Shooter.pos` line. Same spy
+# pattern as test_die_emits_combat_trace_die_line above: the real shim is
+# HTML5-only, so we slot a recording spy under the DebugFlags name and drive
+# physics frames directly. Paired with the trace emit in Shooter._physics_process.
+
+func test_pos_trace_emits_after_throttle_interval() -> void:
+	var s: Shooter = _make_shooter()
+	# Place at a known world position so the trace payload is predictable.
+	s.global_position = Vector2(384, 96)
+	var spy: CombatTraceSpy = _install_combat_trace_spy()
+	# One physics frame just under the throttle interval — no emit yet.
+	s._physics_process(Shooter.POS_TRACE_INTERVAL - 0.01)
+	var emitted_early: bool = spy.has_tag("Shooter.pos")
+	# A second frame pushes the accumulator past POS_TRACE_INTERVAL — emit.
+	s._physics_process(0.02)
+	var emitted_after: bool = spy.has_tag("Shooter.pos")
+	# Capture the payload of the emitted line before restoring DebugFlags.
+	var pos_msg: String = ""
+	for c: Array in spy.calls:
+		if c[0] == "Shooter.pos":
+			pos_msg = c[1]
+			break
+	_restore_debug_flags(spy)
+	assert_false(emitted_early,
+		"Shooter.pos must NOT emit before POS_TRACE_INTERVAL elapses — the " +
+		"trace is throttled so it is a cheap no-op on perf")
+	assert_true(emitted_after,
+		"Shooter.pos must emit once the throttle accumulator passes " +
+		"POS_TRACE_INTERVAL — the AC4 chase helper steers off this line")
+	# Downstream consequence (Tier 2 bar): the payload carries the world
+	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/.
+	assert_string_contains(pos_msg, "pos=(384,96)",
+		"Shooter.pos payload must carry the parseable world-coord tuple")
+	assert_string_contains(pos_msg, "dist_to_player=",
+		"Shooter.pos payload must carry dist_to_player for the chase helper")

@@ -321,3 +321,75 @@ func test_hitbox_payload_unchanged_by_visual_feedback() -> void:
 	assert_eq(hb.lifetime, Player.LIGHT_HITBOX_LIFETIME, "hitbox lifetime unchanged")
 	assert_eq(hb.team, Hitbox.TEAM_PLAYER)
 	assert_eq(hb.get_parent(), p)
+
+
+# --- Player.pos harness-observability trace (ticket 86c9tz7zg) ----------
+#
+# The AC4 Shooter-chase sub-helper (tests/playwright/fixtures/kiting-mob-
+# chase.ts) steers the player toward a kiting Shooter by reading the
+# throttled `[combat-trace] Player.pos` line — the Playwright harness has no
+# JS bridge into Godot. Same recording-spy pattern as
+# test_shooter.gd::test_pos_trace_emits_after_throttle_interval: the real
+# combat_trace shim is HTML5-only, so we slot a spy under the DebugFlags
+# autoload name and drive physics frames directly. Paired with the trace
+# emit in Player._physics_process.
+
+class CombatTraceSpy:
+	extends Node
+	var calls: Array = []  # Array of [tag, msg]
+	func combat_trace(tag: String, msg: String = "") -> void:
+		calls.append([tag, msg])
+	func has_tag(tag: String) -> bool:
+		for c: Array in calls:
+			if c[0] == tag:
+				return true
+		return false
+	func msg_for(tag: String) -> String:
+		for c: Array in calls:
+			if c[0] == tag:
+				return c[1]
+		return ""
+
+
+func _install_combat_trace_spy() -> CombatTraceSpy:
+	var root: Node = get_tree().root
+	var real: Node = root.get_node_or_null("DebugFlags")
+	assert_not_null(real, "DebugFlags autoload must exist to swap for the spy")
+	real.name = "DebugFlags__real_parked"
+	var spy: CombatTraceSpy = CombatTraceSpy.new()
+	spy.name = "DebugFlags"
+	root.add_child(spy)
+	return spy
+
+
+func _restore_debug_flags(spy: CombatTraceSpy) -> void:
+	var root: Node = get_tree().root
+	root.remove_child(spy)
+	spy.free()
+	var parked: Node = root.get_node_or_null("DebugFlags__real_parked")
+	if parked != null:
+		parked.name = "DebugFlags"
+
+
+func test_pos_trace_emits_after_throttle_interval() -> void:
+	var p: Player = _make_player_in_tree()
+	p.global_position = Vector2(240, 200)
+	var spy: CombatTraceSpy = _install_combat_trace_spy()
+	# One physics frame just under the throttle interval — no emit yet.
+	p._physics_process(Player.POS_TRACE_INTERVAL - 0.01)
+	var emitted_early: bool = spy.has_tag("Player.pos")
+	# A second frame pushes the accumulator past POS_TRACE_INTERVAL — emit.
+	p._physics_process(0.02)
+	var emitted_after: bool = spy.has_tag("Player.pos")
+	var pos_msg: String = spy.msg_for("Player.pos")
+	_restore_debug_flags(spy)
+	assert_false(emitted_early,
+		"Player.pos must NOT emit before POS_TRACE_INTERVAL elapses — the " +
+		"trace is throttled so it stays a cheap no-op on perf")
+	assert_true(emitted_after,
+		"Player.pos must emit once the throttle accumulator passes " +
+		"POS_TRACE_INTERVAL — the AC4 chase helper steers off this line")
+	# Downstream consequence (Tier 2 bar): the payload carries the world
+	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/.
+	assert_string_contains(pos_msg, "pos=(240,200)",
+		"Player.pos payload must carry the parseable world-coord tuple")

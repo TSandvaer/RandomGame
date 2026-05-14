@@ -325,21 +325,23 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
 
         // ---- Shooter-aware pre-pass: pursue + kill kiting mobs first ----
         //
-        // The Shooter does NOT chase — it KITES (walks away when the player
-        // closes below KITE_RANGE; scripts/mobs/Shooter.gd § "Distance
-        // bands"). The near-spawn click-spam loop below can never land a hit
-        // on a kiter, so any room with shooterCount > 0 routes its Shooter
-        // kills through chaseAndClearKitingMobs FIRST: that sub-helper
-        // pursues the Shooter, pins it against the east wall it spawned
-        // near, lands the kill, THEN walks the player back WEST toward
+        // The Shooter does NOT chase — it KITES (walks directly away from
+        // the player when the player closes below KITE_RANGE;
+        // scripts/mobs/Shooter.gd § "Distance bands"). The near-spawn
+        // click-spam loop below can never land a hit on a kiter, so any
+        // room with shooterCount > 0 routes its Shooter kills through
+        // chaseAndClearKitingMobs FIRST. That sub-helper reads the
+        // throttled `Player.pos` / `Shooter.pos` traces, steers the player
+        // AT the kiter's live position until in swing range, click-spams
+        // the kill, THEN walks the player (position-steered) back toward
         // DEFAULT_PLAYER_SPAWN so the subsequent gateTraversalWalk still
         // has predictable geometry (chase-then-RETURN — ticket 86c9tz7zg).
         //
-        // Every Stratum-1 Shooter spawns in the EAST half of its room
-        // (tile X >= 11; verified across s1_room04/06/07/08.tres), so a
-        // single east-dominant pursue covers them all — no per-room tuning.
-        // After this pre-pass the remaining mobs (Grunt/Charger) are all
-        // chasers and are cleared by the unchanged near-spawn loop below.
+        // Because the Shooter kites relative to the PLAYER (not toward a
+        // fixed corner), a blind directional pursuit overshoots — the
+        // helper must track the kiter, hence the position traces. After
+        // this pre-pass the remaining mobs (Grunt/Charger) are all chasers
+        // and are cleared by the unchanged near-spawn loop below.
         if (shooterCount > 0) {
           await chaseAndClearKitingMobs(
             page,
@@ -348,9 +350,7 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
             roomLabel,
             shooterCount,
             clickX,
-            clickY,
-            /\[combat-trace\] Shooter\._die/,
-            { pursueKeys: ["d"], verticalProbe: true }
+            clickY
           );
         }
 
