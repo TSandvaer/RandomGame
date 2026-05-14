@@ -22,6 +22,14 @@ dist/
 *.pck
 *.tar.gz
 
+# Extracted HTML5 build dirs that agents create in worktrees (diagnostic
+# builds, AC-verification artifact extracts). These are ~8-38MB unpacked
+# zips — never commit them; a stray `git add -A` would otherwise stage them.
+diag-build/
+.ac4-artifact/
+.artifact-extract/
+html5-build-extract/
+
 # IDE / editors
 .vscode/
 .idea/
