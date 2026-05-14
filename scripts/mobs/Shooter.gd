@@ -120,6 +120,19 @@ var _is_dead: bool = false
 var _last_aim_dir: Vector2 = Vector2.RIGHT
 var _player: Node2D = null
 
+# Throttle accumulator for the HTML5-only `Shooter.pos` harness-observability
+# trace (see `_physics_process`). The Shooter KITES — it walks away from the
+# player rather than into melee — so a browser-driven spec cannot kill it by
+# fixed-position click-spam; it must PURSUE. The Playwright harness has no JS
+# bridge into Godot, so this throttled world-coord trace is how the AC4
+# Shooter-chase sub-helper (ticket 86c9tz7zg) tracks where the kiter actually
+# is. Mirrors `Player.pos`.
+var _pos_trace_accum: float = 0.0
+## How often the `Shooter.pos` trace emits — see `Player.POS_TRACE_INTERVAL`
+## for the rationale (fine enough to steer a pursuit, cheap enough to be a
+## no-op on perf; combat_trace is HTML5-only).
+const POS_TRACE_INTERVAL: float = 0.25
+
 # Attack-telegraph tween for the aim-state red-glow visual.
 var _attack_telegraph_tween: Tween = null
 
@@ -216,6 +229,22 @@ func _physics_process(delta: float) -> void:
 	if _is_dead:
 		return
 	_tick_timers(delta)
+
+	# Harness-observability trace (HTML5-only via the combat_trace shim).
+	# Throttled world-coord + distance readback so the AC4 Shooter-chase
+	# sub-helper can pursue this kiting mob — see the `_pos_trace_accum`
+	# declaration above and `Player.pos` for the full rationale. No-op on
+	# headless GUT / desktop (combat_trace gates on `OS.has_feature("web")`).
+	_pos_trace_accum += delta
+	if _pos_trace_accum >= POS_TRACE_INTERVAL:
+		_pos_trace_accum = 0.0
+		var dist_to_player: float = -1.0
+		if _player != null:
+			dist_to_player = (_player.global_position - global_position).length()
+		_combat_trace("Shooter.pos",
+			"pos=(%.0f,%.0f) state=%s hp=%d dist_to_player=%.0f" % [
+				global_position.x, global_position.y, _state, hp_current, dist_to_player
+			])
 
 	match _state:
 		STATE_IDLE:

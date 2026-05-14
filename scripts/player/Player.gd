@@ -158,6 +158,16 @@ const SWING_WEDGE_Z_INDEX: int = 1
 var _state: StringName = STATE_IDLE
 var _facing: Vector2 = Vector2.DOWN
 
+# Throttle accumulator for the HTML5-only `Player.pos` harness-observability
+# trace (see `_physics_process`). The Playwright harness cannot read Godot
+# world-coords without a JS bridge — this trace is how browser-driven specs
+# (notably the AC4 Shooter-chase sub-helper) steer the player toward a mob.
+var _pos_trace_accum: float = 0.0
+## How often the `Player.pos` trace emits. 0.25 s is fine-grained enough for
+## the harness to course-correct a pursuit, cheap enough to be a no-op on
+## perf (one print every ~15 physics frames, HTML5-only).
+const POS_TRACE_INTERVAL: float = 0.25
+
 # Dodge bookkeeping
 var _dodge_time_left: float = 0.0
 var _dodge_cooldown_left: float = 0.0
@@ -270,6 +280,21 @@ func _physics_process(delta: float) -> void:
 			_process_attack(delta)
 
 	move_and_slide()
+
+	# Harness-observability trace (HTML5-only via the combat_trace shim).
+	# Throttled world-coord readback so Playwright specs can steer the player
+	# relative to mobs — the Playwright harness has no JS bridge into Godot,
+	# so this trace is the only way browser-driven specs (the AC4 Shooter-
+	# chase sub-helper, ticket 86c9tz7zg) can pursue a kiting mob. Costs one
+	# print every POS_TRACE_INTERVAL seconds; combat_trace is a no-op unless
+	# `OS.has_feature("web")`, so headless GUT / desktop pay nothing.
+	_pos_trace_accum += delta
+	if _pos_trace_accum >= POS_TRACE_INTERVAL:
+		_pos_trace_accum = 0.0
+		_combat_trace("Player.pos",
+			"pos=(%.0f,%.0f) state=%s" % [
+				global_position.x, global_position.y, _state
+			])
 
 
 # ---- Public API (used by tests, hitbox scripts, save) -------------------

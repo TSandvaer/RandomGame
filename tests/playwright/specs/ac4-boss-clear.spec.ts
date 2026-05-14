@@ -112,6 +112,7 @@
 import { test, expect } from "@playwright/test";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import { gateTraversalWalk } from "../fixtures/gate-traversal";
+import { chaseAndClearKitingMobs } from "../fixtures/kiting-mob-chase";
 
 const BOOT_TIMEOUT_MS = 30_000;
 /** Per-room combat budget — enough to kill 4 mobs at production HP. */
@@ -146,82 +147,105 @@ const TOTAL_GATED_MOBS = ROOM_MOB_COUNTS.slice(1).reduce((a, b) => a + b, 0);
 const TOTAL_PRE_BOSS_MOBS =
   TOTAL_GATED_MOBS + ROOM_MOB_COUNTS[0];
 
+// Shooter count per room (authored in resources/level_chunks/s1_roomNN.tres).
+// The Shooter is a ranged KITER — it walks AWAY from the player rather than
+// chasing into melee (scripts/mobs/Shooter.gd § "Distance bands"). The
+// default near-spawn click-spam in `clearRoomMobs` cannot land a hit on a
+// kiter, so any room with a Shooter > 0 routes its Shooter kills through the
+// `chaseAndClearKitingMobs` pursuit sub-helper instead.
+//
+// Room 04 is the only PURE-Shooter room — it is the AC4 hard wall the
+// chase-then-return sub-helper exists to fix (ticket 86c9tz7zg). Rooms 06-08
+// also contain Shooters; routing their Shooters through the same pursuit
+// helper makes their clear deterministic rather than relying on the
+// incidental "Grunt/Charger crowds the player so the Shooter is caught in
+// the wedge by luck" behaviour that passed pre-fix.
+const ROOM_SHOOTER_COUNTS = [
+  0, // Room 01 (practice_dummy)
+  0, // Room 02 (2 grunts)
+  0, // Room 03 (grunt + charger)
+  1, // Room 04 (1 shooter — PURE Shooter room)
+  0, // Room 05 (2 grunts + charger)
+  1, // Room 06 (2 chargers + 1 shooter)
+  2, // Room 07 (2 chargers + 2 shooters)
+  2, // Room 08 (grunt + charger + 2 shooters)
+];
+
 test.describe("AC4 — Stratum-1 boss reach + clear", () => {
-  // **STATUS: still test.fail() — but the blocker has MOVED. The Room 02
-  // gate bug is FIXED; the current blocker is the Room 04 pure-Shooter
-  // room. Re-armed against origin/main `339a189` (PR #183 merged).**
+  // **STATUS: still test.fail() — but the blocker has MOVED AGAIN. The
+  // Room 02 gate bug (PR #183) AND the Room 04 pure-Shooter kiting wall
+  // (PR #186, this branch) are both FIXED; the current blocker is now
+  // Room 05. Re-armed against origin/main `8885473` + this branch's
+  // chase-helper commits.**
   //
   // ---- What PR #183 fixed (verified — no longer the blocker) ----
   //
-  // The PRIOR `test.fail()` comment described a Room 02 blocker: the gate's
-  // `_mobs_alive` counter showed 1 after 2/2 grunt deaths, so `lock()`
-  // never auto-unlocked. Root cause turned out to be `MultiMobRoom.
-  // _spawn_room_gate()` doing a synchronous Area2D `add_child` from
-  // `_ready()` INSIDE a physics-flush window (Rooms 02..08 are loaded from
-  // the prior room's `gate_traversed` → ... → `_load_room_at_index` chain,
-  // rooted in a `body_entered` physics callback). The Area2D add panicked
-  // (`USER ERROR: Can't change this state while flushing queries`), the
-  // C++ early-returned, and the gate was left improperly inserted —
-  // `is_inside_tree()` false, monitoring never activated, zero
-  // `RoomGate.register_mob` traces. PR #183 (`d640330`, ticket 86c9tqvxx)
-  // deferred the Area2D-fixture pass (`_spawn_room_gate` +
-  // `_spawn_healing_fountain` + `_register_mobs_with_gate`) to
-  // `call_deferred("_assemble_room_fixtures")`, landing it after the flush.
+  // An earlier `test.fail()` comment described a Room 02 blocker: the
+  // gate's `_mobs_alive` counter showed 1 after 2/2 grunt deaths, so
+  // `lock()` never auto-unlocked. Root cause turned out to be
+  // `MultiMobRoom._spawn_room_gate()` doing a synchronous Area2D
+  // `add_child` from `_ready()` INSIDE a physics-flush window (Rooms
+  // 02..08 are loaded from the prior room's `gate_traversed` → ... →
+  // `_load_room_at_index` chain, rooted in a `body_entered` physics
+  // callback). The Area2D add panicked (`USER ERROR: Can't change this
+  // state while flushing queries`), the C++ early-returned, and the gate
+  // was left improperly inserted — `is_inside_tree()` false, monitoring
+  // never activated, zero `RoomGate.register_mob` traces. PR #183
+  // (`d640330`, ticket 86c9tqvxx) deferred the Area2D-fixture pass
+  // (`_spawn_room_gate` + `_spawn_healing_fountain` +
+  // `_register_mobs_with_gate`) to
+  // `call_deferred("_assemble_room_fixtures")`, landing it after the
+  // flush. Rooms 02 + 03 (both chase-mob rooms) have traversed
+  // end-to-end since #183 merged.
   //
-  // **Empirical re-arm run on origin/main `339a189` (release-build
-  // artifact, run 25869366760) confirms PR #183 works as designed:**
-  //   - Room 01 practice_dummy dies (~12.5s).
-  //   - Room 02 — 2 grunts cleared 2/2; gate traversal complete
-  //     (body_entered=true, gate_unlocked=true, gate_traversed=true).
-  //   - Room 03 — grunt + charger cleared 2/2; gate traversal complete.
-  // The Room 02 gate-registration bug is genuinely gone — Rooms 02 AND 03
-  // (both chase-mob rooms) now traverse end-to-end.
+  // ---- What PR #186 fixed (this branch — no longer the blocker) ----
   //
-  // ---- The CURRENT blocker: Room 04 pure-Shooter room ----
+  // The PRIOR `test.fail()` comment named **Room 04** as the blocker: the
+  // spec's `clearRoomMobs` helper was built on the premise "all mobs
+  // chase, so even south/west spawns close to melee range" — true for
+  // Grunt and Charger, but the **Shooter actively KITES**: it walks AWAY
+  // from the player when the player closes below `KITE_RANGE` (see
+  // `scripts/mobs/Shooter.gd` § "Distance bands"). Room 04's only mob is
+  // a single Shooter, so near-spawn NE-facing click-spam never landed a
+  // hit — `[ac4-boss] Room 04: only killed 0/1 mobs in 90000ms`.
   //
-  // The spec now fails at **Room 04**, not Room 02. Empirical signature
-  // from the `339a189` run:
-  //   `[ac4-boss] Room 04: only killed 0/1 mobs in 90000ms.
-  //    Combat broke down`
-  // with the trailing trace buffer showing the player click-spamming
-  // (`Player.try_attack | FIRED kind=light facing=(1.0,0.0)`) and the
-  // Shooter only emitting `Shooter._play_attack_telegraph` — never
-  // `Shooter._die`.
+  // PR #186 (ticket 86c9tz7zg, this branch) adds the
+  // `chaseAndClearKitingMobs` sub-helper (`tests/playwright/fixtures/
+  // kiting-mob-chase.ts`): for any room with `ROOM_SHOOTER_COUNTS[i] > 0`
+  // it reads the throttled `Player.pos` / `Shooter.pos` traces and steers
+  // the player AT the kiter's live position until in swing range, then
+  // click-spams the kill. `clearRoomMobs` now returns
+  // `{ chaseTraversedGate }` — because a kiting Shooter retreats
+  // *through* the RoomGate trigger rect, the pursuit routinely drives the
+  // gate's full OPEN→LOCKED→UNLOCKED→traversed sequence as an emergent
+  // consequence of cornering the kiter; when that happens the per-room
+  // loop skips its own `gateTraversalWalk` and asserts the chase-driven
+  // gate sequence instead. Room 04 (the only PURE-Shooter room) now
+  // clears end-to-end.
   //
-  // Root cause is a **harness assumption that is false for the Shooter**,
-  // NOT a game bug. `clearRoomMobs` (Rooms 02-08) is built on the premise
-  // "all mobs chase, so even south/west spawns close to melee range" — true
-  // for Grunt and Charger, but the **Shooter actively KITES**: it walks
-  // AWAY from the player when the player closes below `KITE_RANGE` (see
-  // `scripts/mobs/Shooter.gd` § "Distance bands"). Room 04's only mob is a
-  // single Shooter at tile (12,3) — far NE. The player stands near
-  // `DEFAULT_PLAYER_SPAWN` doing NE-facing click-spam (the tight-combat
-  // discipline PR #171 mandates) and the Shooter simply maintains distance
-  // — the swing wedge never reaches it. Rooms 05-08 also contain Shooters
-  // but ALSO contain Grunts/Chargers that keep the player engaged near
-  // spawn; Room 04 is the only PURE-Shooter room, so it is the hard wall.
+  // ---- The CURRENT blocker: Room 05 ----
   //
-  // This is a genuine harness tension, not a quick fix: the Shooter needs
-  // a CHASE phase to corner it, but PR #171's drift discipline forbids
-  // wandering during combat (drift breaks the subsequent gate-traversal
-  // walk). A correct fix needs a Shooter-specific sub-helper that chases
-  // the Shooter down THEN walks the player back to spawn-area before the
-  // gate walk — or projectile-dodge + corner-trap geometry. Out of scope
-  // for this re-arm PR (which only corrects the spec's status to reflect
-  // reality post-#183). Tracked as AC4 residue under ticket 86c9qckrd.
+  // With Rooms 01–04 clearing deterministically, the spec now fails at
+  // **Room 05** (2 grunts + 1 charger). This is a pre-existing failure
+  // unmasked by #186's progress — NOT introduced by the chase helper
+  // (Room 05 has `ROOM_SHOOTER_COUNTS[5] == 0`, so the chase pre-pass
+  // does not even run for it). It is tracked separately as AC4 residue
+  // under ticket **86c9u05d7** and is out of scope for PR #186, which
+  // only owns getting the spec PAST Room 04.
   //
   // ---- Why this spec STAYS test.fail() (not split into test()) ----
   //
   // The spec is a single monolithic sequential test (cold-boot → Room 01
   // → ... → Room 08 → Boss). It cannot be cleanly split into a passing
-  // `test()` half and a failing `test.fail()` half — Room 04 is step 4 of
+  // `test()` half and a failing `test.fail()` half — Room 05 is step 5 of
   // 8 and everything after it depends on traversing it. Extracting
-  // "Rooms 01-03 pass" into its own `test()` would require a second cold
+  // "Rooms 01-04 pass" into its own `test()` would require a second cold
   // boot and a partial-run harness the spec doesn't have. So the spec
   // stays `test.fail()`, but the comment now accurately names the CURRENT
-  // blocker (Room 04 Shooter kiting) so the next person to fix the
-  // Shooter helper flips it green knowingly — and no FIXED bug (#183's
-  // Room 02 gate) is masked behind a stale annotation.
+  // blocker (Room 05, ticket 86c9u05d7) so the next person to fix it
+  // flips the spec green knowingly — and no FIXED bug (#183's Room 02
+  // gate, #186's Room 04 Shooter wall) is masked behind a stale
+  // annotation.
   test.fail(
     "AC4 — Stratum-1 boss reach + clear in ≤10min from cold start",
     async ({ page, context }) => {
@@ -287,20 +311,82 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       // Cycling between N and NE facing covers mobs approaching from
       // either direction without inducing significant player drift (the
       // direction key for facing is held only ~80ms per cycle).
+      // Result of `clearRoomMobs`. `chaseTraversedGate` is true when the
+      // Shooter chase sub-helper roamed through the RoomGate trigger and
+      // drove the gate all the way to `gate_traversed` — in which case the
+      // per-room loop SKIPS its own `gateTraversalWalk` (the room counter
+      // has already advanced).
+      type ClearRoomResult = { chaseTraversedGate: boolean };
+
       const clearRoomMobs = async (
         roomLabel: string,
-        expectedMobs: number
-      ): Promise<void> => {
+        expectedMobs: number,
+        shooterCount: number = 0
+      ): Promise<ClearRoomResult> => {
         console.log(
           `[ac4-boss] ${roomLabel}: clearing ${expectedMobs} mobs ` +
-            `(N + NE alternating facing, click-only, NO walk).`
+            `(${shooterCount} kiting Shooter(s) via chase sub-helper, ` +
+            `rest via N + E alternating click-spam).`
         );
+
+        // ---- Shooter-aware pre-pass: pursue + kill kiting mobs first ----
+        //
+        // The Shooter does NOT chase — it KITES (walks directly away from
+        // the player's live position when the player closes below
+        // KITE_RANGE; scripts/mobs/Shooter.gd § "Distance bands"). The
+        // near-spawn click-spam loop below can never land a hit on a kiter,
+        // so any room with shooterCount > 0 routes its Shooter kills through
+        // chaseAndClearKitingMobs FIRST. That sub-helper reads the throttled
+        // `Player.pos` / `Shooter.pos` traces and steers the player AT the
+        // kiter's live position until in swing range, then click-spams the
+        // kill (ticket 86c9tz7zg).
+        //
+        // A kiting Shooter retreats *wherever the player is not* — routinely
+        // into the room's west end, through the RoomGate trigger rect. The
+        // chase therefore CANNOT avoid the gate region; cornering the kiter
+        // often means following it there, which drives the gate's full
+        // OPEN→LOCKED→UNLOCKED→traversed sequence (a valid traversal — kill
+        // the kiter while roaming, walk out the door). The helper reports
+        // whether `gate_traversed` fired; when it did, this room's gate is
+        // already done and the per-room loop skips `gateTraversalWalk`.
+        let chaseTraversedGate = false;
+        if (shooterCount > 0) {
+          const chaseResult = await chaseAndClearKitingMobs(
+            page,
+            canvas,
+            capture,
+            roomLabel,
+            shooterCount,
+            clickX,
+            clickY
+          );
+          chaseTraversedGate = chaseResult.gateTraversed;
+        }
 
         const preDeathLines = capture
           .getLines()
           .filter((l) =>
             /\[combat-trace\] (Grunt|Charger|Shooter)\._die/.test(l.text)
           ).length;
+
+        // If the room is pure-Shooter (e.g. Room 04), the chase pre-pass has
+        // already cleared everything — skip the chase-mob click-spam loop.
+        if (shooterCount >= expectedMobs) {
+          console.log(
+            `[ac4-boss] ${roomLabel}: all ${expectedMobs} mob(s) were ` +
+              `kiting Shooters — cleared by the chase sub-helper ` +
+              `(chaseTraversedGate=${chaseTraversedGate}).`
+          );
+          return { chaseTraversedGate };
+        }
+
+        // Chasers still to kill = total minus the Shooters the pre-pass
+        // already cleared. `preDeathLines` snapshotted AFTER the chase
+        // pre-pass, so `deathsNow - preDeathLines` below counts only NEW
+        // (chaser) deaths — compare it against `chaserMobs`, not the full
+        // `expectedMobs`, or a room with Shooters would never satisfy the
+        // exit condition.
+        const chaserMobs = expectedMobs - shooterCount;
 
         const roomStart = Date.now();
         // Cycle facing through N → E (single-key presses produce clean
@@ -346,12 +432,13 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
                 /\[combat-trace\] (Grunt|Charger|Shooter)\._die/.test(l.text)
               ).length;
             const roomKills = deathsNow - preDeathLines;
-            if (roomKills >= expectedMobs) {
+            if (roomKills >= chaserMobs) {
               console.log(
-                `[ac4-boss] ${roomLabel}: cleared ${roomKills}/${expectedMobs} ` +
-                  `at t=${Date.now() - roomStart}ms.`
+                `[ac4-boss] ${roomLabel}: cleared ${roomKills}/${chaserMobs} ` +
+                  `chaser mob(s) at t=${Date.now() - roomStart}ms ` +
+                  `(+${shooterCount} Shooter(s) cleared by chase pre-pass).`
               );
-              return;
+              return { chaseTraversedGate };
             }
           }
         }
@@ -364,9 +451,10 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
           ).length;
         const finalKills = deathsFinal - preDeathLines;
         throw new Error(
-          `[ac4-boss] ${roomLabel}: only killed ${finalKills}/${expectedMobs} ` +
-            `mobs in ${PER_ROOM_TIMEOUT_MS}ms. Combat broke down — last 30 ` +
-            `trace lines:\n` +
+          `[ac4-boss] ${roomLabel}: only killed ${finalKills}/${chaserMobs} ` +
+            `chaser mob(s) in ${PER_ROOM_TIMEOUT_MS}ms ` +
+            `(${shooterCount} Shooter(s) handled separately by the chase ` +
+            `pre-pass). Combat broke down — last 30 trace lines:\n` +
             capture
               .getLines()
               .slice(-30)
@@ -568,26 +656,127 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       for (let i = 1; i < 8; i++) {
         const roomLabel = `Room 0${i + 1}`;
 
-        // Phase 1+2: clear all mobs (gate stays OPEN with mobs_alive==0).
-        // Combat is tight (NE-facing only, click-only, no aim-sweep) so the
-        // player stays near DEFAULT_PLAYER_SPAWN for the gate walk below.
-        await clearRoomMobs(roomLabel, ROOM_MOB_COUNTS[i]);
-
-        // Negative-assertion (PR #155 cautionary tale): gate_traversed must
-        // NOT have fired yet — we haven't walked into the gate trigger. If
-        // it has fired, the state-change signal is short-circuiting to the
-        // progression trigger. Snapshot trace count BEFORE the helper drives
-        // the walk, so we can scope the assertion to the right window.
-        const preWalkTraversedCount = capture
+        // Snapshot gate-trace counts BEFORE clearing the room, so the
+        // post-clear assertions are scoped to THIS room's gate lifecycle.
+        const preRoomTraversedCount = capture
           .getLines()
           .filter((l) =>
             /\[combat-trace\] RoomGate\.gate_traversed/.test(l.text)
           ).length;
-        const preWalkBodyEnteredCount = capture
+        const preRoomBodyEnteredCount = capture
           .getLines()
           .filter((l) =>
             /\[combat-trace\] RoomGate\._on_body_entered/.test(l.text)
           ).length;
+        const preRoomUnlockedCount = capture
+          .getLines()
+          .filter((l) =>
+            /\[combat-trace\] RoomGate\._unlock \| gate_unlocked emitting/.test(
+              l.text
+            )
+          ).length;
+
+        // Phase 1+2: clear all mobs. Chaser mobs (Grunt/Charger) are cleared
+        // via tight near-spawn click-spam. Kiting Shooters
+        // (ROOM_SHOOTER_COUNTS) are pursued by the chaseAndClearKitingMobs
+        // sub-helper, which roams the room freely tracking the kiter — and
+        // because a kiting Shooter retreats *through* the RoomGate trigger,
+        // that pursuit routinely drives the gate's full
+        // OPEN→LOCKED→UNLOCKED→traversed sequence as an emergent consequence
+        // of cornering the kiter. `clearRoomMobs` surfaces that via
+        // `chaseTraversedGate`.
+        const { chaseTraversedGate } = await clearRoomMobs(
+          roomLabel,
+          ROOM_MOB_COUNTS[i],
+          ROOM_SHOOTER_COUNTS[i]
+        );
+
+        if (chaseTraversedGate) {
+          // ---- Gate was traversed by the chase itself ----
+          //
+          // The Shooter chase roamed through the gate trigger and drove the
+          // gate to `gate_traversed` while cornering the kiter — a valid,
+          // causally-ordered traversal (the gate auto-unlocks when the last
+          // registered mob dies while LOCKED, then the player crossing the
+          // trigger again fires `gate_traversed`). The room counter has
+          // already advanced, so we MUST NOT call `gateTraversalWalk` (it
+          // would operate on the NEXT room's still-locked gate). Instead,
+          // assert the chase produced the correct gate trace sequence.
+          console.log(
+            `[ac4-boss] ${roomLabel}: gate traversed by the Shooter chase ` +
+              `itself — skipping gateTraversalWalk, asserting gate sequence.`
+          );
+
+          const unlockedDelta =
+            capture
+              .getLines()
+              .filter((l) =>
+                /\[combat-trace\] RoomGate\._unlock \| gate_unlocked emitting/.test(
+                  l.text
+                )
+              ).length - preRoomUnlockedCount;
+          const traversedDelta =
+            capture
+              .getLines()
+              .filter((l) =>
+                /\[combat-trace\] RoomGate\.gate_traversed/.test(l.text)
+              ).length - preRoomTraversedCount;
+
+          expect(
+            unlockedDelta,
+            `${roomLabel}: chase-driven traversal must include exactly 1 ` +
+              `gate_unlocked trace; got ${unlockedDelta}.`
+          ).toBe(1);
+          expect(
+            traversedDelta,
+            `${roomLabel}: chase-driven traversal must include exactly 1 ` +
+              `gate_traversed trace (idempotency invariant — RoomGate.` +
+              `_traversed_emitted guard); got ${traversedDelta}.`
+          ).toBe(1);
+
+          // Causality: gate_unlocked must precede gate_traversed (combat-
+          // architecture.md §"State-change signals vs. progression triggers").
+          const unlockTs = capture
+            .getLines()
+            .filter((l) =>
+              /\[combat-trace\] RoomGate\._unlock \| gate_unlocked emitting/.test(
+                l.text
+              )
+            )
+            .map((l) => l.timestamp)
+            .slice(-1)[0];
+          const traversedTs = capture
+            .getLines()
+            .filter((l) =>
+              /\[combat-trace\] RoomGate\.gate_traversed/.test(l.text)
+            )
+            .map((l) => l.timestamp)
+            .slice(-1)[0];
+          expect(
+            unlockTs <= traversedTs,
+            `${roomLabel}: gate_unlocked (${unlockTs}) must precede ` +
+              `gate_traversed (${traversedTs}) even on a chase-driven ` +
+              `traversal (causality invariant).`
+          ).toBe(true);
+
+          // Settle frame for room load + player respawn.
+          await page.waitForTimeout(800);
+          continue;
+        }
+
+        // ---- Normal path: drive the two-part gate-traversal walk ----
+        //
+        // The chase did not traverse the gate (chaser-only room, or the
+        // Shooter chase happened to clear the kiter without crossing the
+        // trigger). The gate is OPEN with `mobs_alive == 0` — the kill-first
+        // precondition gateTraversalWalk expects.
+        //
+        // Negative-assertion (PR #155 cautionary tale): gate_traversed must
+        // NOT have fired yet — we haven't walked into the gate trigger. If
+        // it has fired, the state-change signal is short-circuiting to the
+        // progression trigger.
+        const preWalkTraversedCount = preRoomTraversedCount;
+        const preWalkBodyEnteredCount = preRoomBodyEnteredCount;
 
         // Phases 3-5: drive the two-part walk pattern. Helper handles its
         // own internal assertions for _on_body_entered + gate_unlocked +
