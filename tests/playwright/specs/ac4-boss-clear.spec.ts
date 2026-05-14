@@ -112,6 +112,7 @@
 import { test, expect } from "@playwright/test";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import { gateTraversalWalk } from "../fixtures/gate-traversal";
+import { chaseAndClearKitingMobs } from "../fixtures/kiting-mob-chase";
 
 const BOOT_TIMEOUT_MS = 30_000;
 /** Per-room combat budget — enough to kill 4 mobs at production HP. */
@@ -145,6 +146,30 @@ const ROOM_MOB_COUNTS = [
 const TOTAL_GATED_MOBS = ROOM_MOB_COUNTS.slice(1).reduce((a, b) => a + b, 0);
 const TOTAL_PRE_BOSS_MOBS =
   TOTAL_GATED_MOBS + ROOM_MOB_COUNTS[0];
+
+// Shooter count per room (authored in resources/level_chunks/s1_roomNN.tres).
+// The Shooter is a ranged KITER — it walks AWAY from the player rather than
+// chasing into melee (scripts/mobs/Shooter.gd § "Distance bands"). The
+// default near-spawn click-spam in `clearRoomMobs` cannot land a hit on a
+// kiter, so any room with a Shooter > 0 routes its Shooter kills through the
+// `chaseAndClearKitingMobs` pursuit sub-helper instead.
+//
+// Room 04 is the only PURE-Shooter room — it is the AC4 hard wall the
+// chase-then-return sub-helper exists to fix (ticket 86c9tz7zg). Rooms 06-08
+// also contain Shooters; routing their Shooters through the same pursuit
+// helper makes their clear deterministic rather than relying on the
+// incidental "Grunt/Charger crowds the player so the Shooter is caught in
+// the wedge by luck" behaviour that passed pre-fix.
+const ROOM_SHOOTER_COUNTS = [
+  0, // Room 01 (practice_dummy)
+  0, // Room 02 (2 grunts)
+  0, // Room 03 (grunt + charger)
+  1, // Room 04 (1 shooter — PURE Shooter room)
+  0, // Room 05 (2 grunts + charger)
+  1, // Room 06 (2 chargers + 1 shooter)
+  2, // Room 07 (2 chargers + 2 shooters)
+  2, // Room 08 (grunt + charger + 2 shooters)
+];
 
 test.describe("AC4 — Stratum-1 boss reach + clear", () => {
   // **STATUS: still test.fail() — but the blocker has MOVED. The Room 02
@@ -289,18 +314,70 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       // direction key for facing is held only ~80ms per cycle).
       const clearRoomMobs = async (
         roomLabel: string,
-        expectedMobs: number
+        expectedMobs: number,
+        shooterCount: number = 0
       ): Promise<void> => {
         console.log(
           `[ac4-boss] ${roomLabel}: clearing ${expectedMobs} mobs ` +
-            `(N + NE alternating facing, click-only, NO walk).`
+            `(${shooterCount} kiting Shooter(s) via chase sub-helper, ` +
+            `rest via N + E alternating click-spam).`
         );
+
+        // ---- Shooter-aware pre-pass: pursue + kill kiting mobs first ----
+        //
+        // The Shooter does NOT chase — it KITES (walks away when the player
+        // closes below KITE_RANGE; scripts/mobs/Shooter.gd § "Distance
+        // bands"). The near-spawn click-spam loop below can never land a hit
+        // on a kiter, so any room with shooterCount > 0 routes its Shooter
+        // kills through chaseAndClearKitingMobs FIRST: that sub-helper
+        // pursues the Shooter, pins it against the east wall it spawned
+        // near, lands the kill, THEN walks the player back WEST toward
+        // DEFAULT_PLAYER_SPAWN so the subsequent gateTraversalWalk still
+        // has predictable geometry (chase-then-RETURN — ticket 86c9tz7zg).
+        //
+        // Every Stratum-1 Shooter spawns in the EAST half of its room
+        // (tile X >= 11; verified across s1_room04/06/07/08.tres), so a
+        // single east-dominant pursue covers them all — no per-room tuning.
+        // After this pre-pass the remaining mobs (Grunt/Charger) are all
+        // chasers and are cleared by the unchanged near-spawn loop below.
+        if (shooterCount > 0) {
+          await chaseAndClearKitingMobs(
+            page,
+            canvas,
+            capture,
+            roomLabel,
+            shooterCount,
+            clickX,
+            clickY,
+            /\[combat-trace\] Shooter\._die/,
+            { pursueKeys: ["d"], verticalProbe: true }
+          );
+        }
 
         const preDeathLines = capture
           .getLines()
           .filter((l) =>
             /\[combat-trace\] (Grunt|Charger|Shooter)\._die/.test(l.text)
           ).length;
+
+        // If the room is pure-Shooter (e.g. Room 04), the chase pre-pass has
+        // already cleared everything — skip the chase-mob click-spam loop.
+        if (shooterCount >= expectedMobs) {
+          console.log(
+            `[ac4-boss] ${roomLabel}: all ${expectedMobs} mob(s) were ` +
+              `kiting Shooters — cleared by the chase sub-helper, no ` +
+              `chase-mob click-spam needed.`
+          );
+          return;
+        }
+
+        // Chasers still to kill = total minus the Shooters the pre-pass
+        // already cleared. `preDeathLines` snapshotted AFTER the chase
+        // pre-pass, so `deathsNow - preDeathLines` below counts only NEW
+        // (chaser) deaths — compare it against `chaserMobs`, not the full
+        // `expectedMobs`, or a room with Shooters would never satisfy the
+        // exit condition.
+        const chaserMobs = expectedMobs - shooterCount;
 
         const roomStart = Date.now();
         // Cycle facing through N → E (single-key presses produce clean
@@ -346,10 +423,11 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
                 /\[combat-trace\] (Grunt|Charger|Shooter)\._die/.test(l.text)
               ).length;
             const roomKills = deathsNow - preDeathLines;
-            if (roomKills >= expectedMobs) {
+            if (roomKills >= chaserMobs) {
               console.log(
-                `[ac4-boss] ${roomLabel}: cleared ${roomKills}/${expectedMobs} ` +
-                  `at t=${Date.now() - roomStart}ms.`
+                `[ac4-boss] ${roomLabel}: cleared ${roomKills}/${chaserMobs} ` +
+                  `chaser mob(s) at t=${Date.now() - roomStart}ms ` +
+                  `(+${shooterCount} Shooter(s) cleared by chase pre-pass).`
               );
               return;
             }
@@ -364,9 +442,10 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
           ).length;
         const finalKills = deathsFinal - preDeathLines;
         throw new Error(
-          `[ac4-boss] ${roomLabel}: only killed ${finalKills}/${expectedMobs} ` +
-            `mobs in ${PER_ROOM_TIMEOUT_MS}ms. Combat broke down — last 30 ` +
-            `trace lines:\n` +
+          `[ac4-boss] ${roomLabel}: only killed ${finalKills}/${chaserMobs} ` +
+            `chaser mob(s) in ${PER_ROOM_TIMEOUT_MS}ms ` +
+            `(${shooterCount} Shooter(s) handled separately by the chase ` +
+            `pre-pass). Combat broke down — last 30 trace lines:\n` +
             capture
               .getLines()
               .slice(-30)
@@ -569,9 +648,16 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         const roomLabel = `Room 0${i + 1}`;
 
         // Phase 1+2: clear all mobs (gate stays OPEN with mobs_alive==0).
-        // Combat is tight (NE-facing only, click-only, no aim-sweep) so the
-        // player stays near DEFAULT_PLAYER_SPAWN for the gate walk below.
-        await clearRoomMobs(roomLabel, ROOM_MOB_COUNTS[i]);
+        // Chaser mobs (Grunt/Charger) are cleared via tight near-spawn
+        // click-spam; kiting Shooters (ROOM_SHOOTER_COUNTS) are pursued +
+        // cornered by the chaseAndClearKitingMobs sub-helper, which then
+        // walks the player back toward DEFAULT_PLAYER_SPAWN — so combat
+        // still ends with the player near spawn for the gate walk below.
+        await clearRoomMobs(
+          roomLabel,
+          ROOM_MOB_COUNTS[i],
+          ROOM_SHOOTER_COUNTS[i]
+        );
 
         // Negative-assertion (PR #155 cautionary tale): gate_traversed must
         // NOT have fired yet — we haven't walked into the gate trigger. If
