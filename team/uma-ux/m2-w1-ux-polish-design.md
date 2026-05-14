@@ -431,6 +431,173 @@ This is intentional. **The Stats panel showing wrong damage when surfaces diverg
 
 ---
 
+## M2 W2 Addendum — Color-blind secondary cue for equipped distinction (`86c9qah1q`)
+
+**Owner:** Uma (UX / design specs) · **Phase:** M2 Week 2 · **Drives:** Devon's follow-up implementation
+**ClickUp ticket:** `86c9qah1q`
+**Status:** Design locked — ready for Devon dispatch.
+
+---
+
+### Context
+
+The M2 W1 equipped-indicator (ticket `86c9q7p48`, shipped PR #160) uses two visual cues:
+
+1. A 2 px `#7AC773` green outline on all four sides of the equipped slot.
+2. A `#7AC773`-plate badge reading `EQUIPPED` in dark text (`#1B1A1F`).
+
+The outline is a **single-hue green signal** — invisible to red-green-deficient viewers (protanopia / deuteranopia, affecting ~8% of male players). The badge text itself is shape-readable if the player can read the word, but the badge plate is also green. Neither cue survives monochrome rendering (e.g. grayscale display mode, OLED power-saving) or severe low-contrast environments.
+
+M2 W2 requirement: add an explicit **non-color** secondary cue so the equipped state is unambiguous to all CVD types and in monochrome.
+
+---
+
+### Option evaluation
+
+Three candidates were evaluated against four criteria:
+- **HTML5 / `gl_compatibility` renderer safety** (no Polygon2D, no HDR colors, no negative z_index)
+- **CVD coverage** (protanopia, deuteranopia, tritanopia, and monochrome/grayscale)
+- **Visual noise** in a dense 8×3 inventory grid
+- **Implementation cost for Devon**
+
+#### Option A — Glyph in the EQUIPPED badge
+
+Prepend a checkmark glyph (U+2713 `✓`) to the badge text: `"✓ EQUIPPED"`.
+
+| Criterion | Assessment |
+|---|---|
+| HTML5 safety | **Fully safe.** The glyph is a Unicode character rendered by Godot's font pipeline via the existing `Label` node inside `BadgePlate`. Label renders identically across `gl_compatibility` (HTML5) and `forward_plus` (desktop) — same as every other HUD text. No new node type, no Polygon2D, no shader. |
+| CVD coverage | **Covers all CVD types + monochrome.** The checkmark is a shape cue — it reads in grayscale, under protanopia/deuteranopia/tritanopia simulation, and for any viewer who can distinguish the character from surrounding text. Even if the green badge plate is invisible in CVD simulation, the `✓` shape distinguishes the badge from an empty slot. |
+| Visual noise | **Minimal.** The badge is already 60 × 12 px. Adding `✓` widens the rendered text slightly; at font size 9 the glyph is approximately 7 px wide. The badge plate may need to grow from 60 px to 68 px wide (see exact spec below). The density of the surrounding grid is unaffected. |
+| Implementation cost | **Lowest of the three.** Devon changes one string constant (`"EQUIPPED"` → `"✓ EQUIPPED"`) and adjusts the badge plate width. One line of GDScript changed; zero new nodes. |
+
+#### Option B — Luminance blend (brighten slot bg ~8%)
+
+Modulate the equipped slot Button to raise its luminance ~8% vs. unequipped slots.
+
+| Criterion | Assessment |
+|---|---|
+| HTML5 safety | **Risky.** `_render_cell` (InventoryPanel.gd:384–387) already mutates `btn.modulate` for the disabled-state dimming path (`Color(1,1,1,0.4)` when disabled). A second modulate consumer on the same Button risks a conflict or cascade reset — the existing code path would silently override an equipped-brightness modulate on any `_render_cell` call. Requires careful ordering or a second modulate surface (e.g. a child ColorRect overlay), which raises complexity. |
+| CVD coverage | **Insufficient as a primary accessibility cue.** An 8% brightness lift on an already-dark slot (#1B1A1F ≈ luminance 0.05) produces a slot luminance of ≈ 0.054 — a delta of ~7% relative luminance. WCAG 2.1 AA contrast for UI components requires a contrast ratio of 3:1 between active and inactive states. The 8% luminance bump does not reach that threshold. Luminance-only cues also fail completely on displays with poor gamma calibration (common in gaming monitors tuned for high contrast). |
+| Visual noise | Low — the brighten is subtle by design. |
+| Implementation cost | Medium — requires a non-conflicting implementation strategy (child ColorRect overlay vs. direct modulate), and carries ongoing fragility risk if `_render_cell`'s modulate logic evolves. |
+
+**Verdict: rejected.** Fails the CVD threshold; carries a load-bearing btn.modulate conflict risk.
+
+#### Option C — Pattern fill (diagonal striped overlay)
+
+Add a diagonal stripe pattern over the equipped slot.
+
+| Criterion | Assessment |
+|---|---|
+| HTML5 safety | **Blocked.** Diagonal stripes require a Polygon2D (explicitly banned per `.claude/docs/html5-export.md` § Polygon2D rendering quirks and PR #137 cautionary tale) or a `ShaderMaterial` (no shader authoring in programmer-art tier; introduces a new primitive class for one slot effect). Neither `ColorRect` nor `Label` can produce a diagonal stripe natively. The only HTML5-safe path would be pre-baked diagonal-stripe PNG texture tiles applied via a TextureRect, which introduces an asset-pipeline dependency that doesn't exist yet. |
+| CVD coverage | Good if the pattern were achievable. |
+| Visual noise | Medium-to-high in a dense 8-column grid — diagonal stripes compete visually with item names. |
+| Implementation cost | High — Polygon2D banned; shader requires new primitive class; texture requires art-pipeline stub. |
+
+**Verdict: rejected.** Blocked by HTML5 Polygon2D ban; implementation cost is disproportionate to the M2 W2 scope.
+
+---
+
+### Decision: Option A with a refined badge spec
+
+**Recommended:** Option A — glyph prefix in the EQUIPPED badge.
+
+**Rationale (one line):** the `✓` checkmark renders through the existing Label font pipeline (HTML5-safe, zero new nodes), survives all CVD types and monochrome, adds no grid-density noise, and costs Devon one string constant change.
+
+A combination approach was considered (A + B together) but rejected: Option B's luminance cue fails the CVD accessibility threshold even as a secondary signal, and its btn.modulate conflict risk is not worth the marginal reinforcement. Option A alone is sufficient as a genuine non-color cue.
+
+---
+
+### Design spec (locked for Devon implementation)
+
+#### Change 1 — Badge text and plate width
+
+**File:** `scripts/ui/InventoryPanel.gd`, function `_build_equipped_indicators_for_slot`.
+
+| Property | Current value | New value |
+|---|---|---|
+| `badge_label.text` | `"EQUIPPED"` | `"✓ EQUIPPED"` |
+| `plate.size` | `Vector2(60, 12)` | `Vector2(72, 12)` |
+
+The plate grows from 60 px to 72 px to accommodate the glyph prefix at font size 9. At 9 pt, `✓ EQUIPPED` measures approximately 66–68 px on Godot's default font; 72 px gives 2 px breathing room on each side of the existing center-align.
+
+No other badge properties change. Color constants (`COLOR_EQUIPPED_BADGE_PLATE`, `COLOR_EQUIPPED_BADGE_TEXT`) are unchanged.
+
+The badge position (offset `(2, 2)` from slot top-left) remains. The plate's right edge moves from x=62 to x=74 — still fully inside the 96 px slot width with 22 px clearance on the right.
+
+#### Change 2 — Badge position anchor update (minor)
+
+The `BadgePlate` ColorRect is already positioned at `(2, 2)` with `size (60, 12)` in `_build_equipped_indicators_for_slot` (InventoryPanel.gd:613). Devon updates only `plate.size = Vector2(72, 12)` and `badge_label.text = "✓ EQUIPPED"`. No repositioning needed.
+
+#### No changes to
+
+- The 4 outline ColorRect edges (positions, sizes, colors).
+- `_set_equipped_indicator` visibility logic — it drives `BadgePlate` visibility; `BadgeLabel` is a child of `BadgePlate` so it inherits visibility automatically.
+- `COLOR_EQUIPPED_INDICATOR`, `COLOR_EQUIPPED_BADGE_PLATE`, `COLOR_EQUIPPED_BADGE_TEXT` constants — unchanged.
+- Any other InventoryPanel function.
+- Ticket 3 (PR #160) acceptance criteria — AC3.1 through AC3.7 remain satisfied. The badge now contains `✓ EQUIPPED` where previously `EQUIPPED`; tests that assert badge `visible == true` / `visible == false` are still valid. Tests that assert `badge_label.text == "EQUIPPED"` must be updated to `badge_label.text == "✓ EQUIPPED"`.
+
+#### Integration point in `_set_equipped_indicator`
+
+No change to this function's logic. It drives `BadgePlate.visible` via `get_node_or_null("BadgePlate")` — `BadgeLabel` is a child of the plate and inherits visibility. The glyph change is purely in the Label's text content, which `_set_equipped_indicator` does not touch.
+
+```
+_set_equipped_indicator(btn, has_item)
+    → finds "OutlineTop", "OutlineBottom", "OutlineLeft", "OutlineRight", "BadgePlate"
+    → sets each .visible = has_item
+    → BadgeLabel inherits BadgePlate.visible automatically (parent-child)
+```
+
+#### Godot font pipeline note (HTML5 safety confirmation)
+
+U+2713 (`✓`) is included in Godot 4.3's bundled fallback font (Noto Sans). The Label renders it at font size 9 via the same CPU-side rasterizer path as all other HUD text — identical across `gl_compatibility` (HTML5) and `forward_plus` (desktop). There is no WebGL2-specific glyph rendering path that would cause divergence. This exempts the change from the HTML5 visual-verification gate's "screenshot required" requirement under the platform-agnostic-fixes rule — but Devon's Self-Test Report MUST explicitly claim this exemption by stating: _"glyph rendered via Godot Label font pipeline, identical across renderers; no Polygon2D, no shader, no modulate."_
+
+If Devon is uncertain whether the glyph renders in the production font (i.e., a custom font is substituted at some point in M2+), the fallback is to use `"[check] EQUIPPED"` as ASCII-safe text. Document this fallback risk in the implementation PR if a custom font is in scope.
+
+---
+
+### Acceptance criteria (ticket `86c9qah1q`)
+
+- **AC-CB1:** With iron_sword equipped, the EQUIPPED badge reads `✓ EQUIPPED` (checkmark visible, not just the word EQUIPPED). Badge plate is 72 × 12 px, centered text, font size 9, all existing colors unchanged.
+- **AC-CB2:** In a browser accessibility simulation (Chrome DevTools → Rendering → Emulate vision deficiencies → Deuteranopia), the badge text `✓ EQUIPPED` is distinguishable from the empty slot — the checkmark glyph shape is readable regardless of hue perception.
+- **AC-CB3:** With no weapon equipped, the badge is hidden (same as AC3.2 from ticket 3). No regression.
+- **AC-CB4:** Equipping / unequipping updates the badge visibility correctly (driven by `_set_equipped_indicator`, same signal path as AC3.4/AC3.5 from ticket 3). No new signal connections required.
+- **AC-CB5 (HTML5 exemption):** badge text change is via Label — same Godot font pipeline as all other HUD text. Devon's Self-Test Report must claim this exemption explicitly: _"glyph rendered via Label font pipeline, identical across renderers; no Polygon2D, no shader."_
+- **AC-CB6 (regression):** Any existing GUT test that asserts `badge_label.text == "EQUIPPED"` is updated to assert `badge_label.text == "✓ EQUIPPED"`. CI must be green before PR opens.
+
+---
+
+### Test bar additions (mandatory, paired with implementation)
+
+**Tier 1 (visual-primitive invariant):**
+- Assert `badge_label.text == "✓ EQUIPPED"` for any equipped slot — replaces the prior `== "EQUIPPED"` assertion in `tests/test_m2_w1_ux_polish.gd` (or equivalent test file targeting ticket 3 badge content).
+- Assert `plate.size == Vector2(72, 12)` — plate width is the load-bearing layout change; test the actual built node, not a constant.
+
+**Tier 2 (accessibility-simulation note):** GUT cannot drive Chrome's CVD simulation. This is acknowledged. The AC-CB2 check is a manual Self-Test step — Devon opens the HTML5 release-build in Chrome with Deuteranopia simulation active and confirms the glyph is visible. Screenshot in Self-Test Report.
+
+---
+
+### What the HTML5 visual-verification gate needs to check
+
+1. Badge text reads `✓ EQUIPPED` (not just `EQUIPPED`) — verify via screenshot of the equipped slot at Tab-open in the HTML5 artifact.
+2. Badge plate is visually wider (72 px vs 60 px) — confirm the text is not clipped.
+3. Glyph `✓` renders as the checkmark character (not a box / missing glyph) — confirms the bundled Godot font includes U+2713 in the HTML5 export.
+4. All existing ticket 3 visual checks still pass (4-sided green outline visible, badge hidden when slot is empty).
+
+---
+
+### Hand-off checklist for Devon (M2 W2, ticket `86c9qah1q`)
+
+- [ ] In `_build_equipped_indicators_for_slot` (InventoryPanel.gd:624–631): change `badge_label.text = "EQUIPPED"` → `"✓ EQUIPPED"` and `plate.size = Vector2(60, 12)` → `Vector2(72, 12)`.
+- [ ] Update any GUT test asserting `badge_label.text == "EQUIPPED"` → `"✓ EQUIPPED"`.
+- [ ] Update any GUT test asserting `plate.size == Vector2(60, 12)` → `Vector2(72, 12)`.
+- [ ] Self-Test Report on PR: include HTML5 screenshot of badge showing `✓ EQUIPPED` text; claim Label-pipeline exemption explicitly; include Chrome Deuteranopia simulation screenshot (AC-CB2).
+- [ ] ClickUp `86c9qah1q` flip to `in progress` on branch open, `ready for qa test` on PR open.
+- [ ] PR title: `design(ux): color-blind secondary cue for equipped distinction (#86c9qah1q)`.
+
+---
+
 ## Hand-off checklist for Devon
 
 - [ ] Add `signal save_completed(slot: int, ok: bool)` to `Save.gd` + emit on both success and failure paths.
