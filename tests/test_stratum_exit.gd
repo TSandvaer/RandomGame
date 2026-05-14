@@ -26,10 +26,15 @@ func _make_exit() -> StratumExit:
 	return exit
 
 
+## Instantiates the boss room and drains one frame so the deferred
+## `_assemble_room_fixtures` pass (ticket 86c9tv8uf physics-flush fix) has
+## landed — the StratumExit + door trigger are built there, not in `_ready`.
+## Callers must `await _make_room()`.
 func _make_room() -> Stratum1BossRoom:
 	var packed: PackedScene = load("res://scenes/levels/Stratum1BossRoom.tscn")
 	var room: Stratum1BossRoom = packed.instantiate()
 	add_child_autofree(room)
+	await get_tree().process_frame
 	return room
 
 
@@ -221,7 +226,7 @@ func test_interaction_area_collision_mask_targets_player() -> void:
 # ---- Integration with Stratum1BossRoom -------------------------------
 
 func test_room_spawns_stratum_exit_inactive() -> void:
-	var room: Stratum1BossRoom = _make_room()
+	var room: Stratum1BossRoom = await _make_room()
 	assert_not_null(room.get_stratum_exit(),
 		"Stratum1BossRoom spawns a StratumExit child on _ready")
 	var exit: StratumExit = room.get_stratum_exit()
@@ -229,7 +234,7 @@ func test_room_spawns_stratum_exit_inactive() -> void:
 
 
 func test_room_activates_exit_on_boss_death() -> void:
-	var room: Stratum1BossRoom = _make_room()
+	var room: Stratum1BossRoom = await _make_room()
 	var boss: Stratum1Boss = room.get_boss()
 	var exit: StratumExit = room.get_stratum_exit()
 	assert_false(exit.is_active(), "precondition: exit inactive before boss death")
@@ -250,7 +255,7 @@ func test_room_exit_position_within_arena() -> void:
 	# Default exit placement at (240, 30) is inside the 480x270 arena and
 	# at the "top" — opposite the door trigger at (240, 250). Player walks
 	# deeper to descend. Sanity-check the bounds.
-	var room: Stratum1BossRoom = _make_room()
+	var room: Stratum1BossRoom = await _make_room()
 	var exit: StratumExit = room.get_stratum_exit()
 	assert_gte(exit.position.x, 0.0)
 	assert_lt(exit.position.x, 480.0)
