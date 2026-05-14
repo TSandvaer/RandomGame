@@ -130,9 +130,11 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
         bootReadyLines.map((l) => `  ${l.text}`).join("\n")
     ).toBe(1);
 
-    // Negative assertion: NO Inventory auto-equipped fired more than once on
-    // a single boot — that would mean save-restore + starter-seed both
-    // fired (PR #146 boot-order regression class).
+    // Negative assertion: the retired PR #146 boot-equip bandaid must NOT
+    // fire at all (ticket 86c9qbb3k). There is no `[Inventory] starter
+    // iron_sword auto-equipped` line any more, and no boot-window
+    // Inventory.equip trace of any source — the player boots fistless and
+    // equips by picking up the Room01 dummy drop.
     const autoEquipLines = capture
       .getLines()
       .filter((l) =>
@@ -140,9 +142,20 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
       );
     expect(
       autoEquipLines.length,
-      `[Inventory] starter iron_sword auto-equipped must fire at most once. ` +
-        `Got ${autoEquipLines.length} occurrences (PR #146 regression class).`
-    ).toBeLessThanOrEqual(1);
+      `The retired PR #146 boot-equip line must NEVER fire (ticket 86c9qbb3k). ` +
+        `Got ${autoEquipLines.length} occurrence(s) of ` +
+        `'[Inventory] starter iron_sword auto-equipped'.`
+    ).toBe(0);
+    const bootEquipTraces = capture
+      .getLines()
+      .filter((l) => /\[combat-trace\] Inventory\.equip \|/.test(l.text));
+    expect(
+      bootEquipTraces.length,
+      `No Inventory.equip trace of any source should fire during the cold-boot ` +
+        `window — nothing equips until the player picks up the dummy drop ` +
+        `(ticket 86c9qbb3k). Got ${bootEquipTraces.length}:\n` +
+        bootEquipTraces.map((l) => `  ${l.text}`).join("\n")
+    ).toBe(0);
 
     capture.detach();
   });
@@ -162,10 +175,6 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
     await page.goto(baseURL, { waitUntil: "domcontentloaded" });
 
     await capture.waitForLine(/\[Main\] M1 play-loop ready/, BOOT_TIMEOUT_MS);
-    await capture.waitForLine(
-      /\[Inventory\] starter iron_sword auto-equipped \(weapon slot\)/,
-      5_000
-    );
 
     const canvas = page.locator("canvas").first();
     await canvas.click();
@@ -176,9 +185,10 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
     const clickY = (canvasBB?.y ?? 0) + (canvasBB?.height ?? 720) / 2;
 
     // Stage 2b (PR #169): Room01 has 1 PracticeDummy at world (~368, 144),
-    // not 2 grunts. The dummy doesn't chase, so we walk-NE-then-attack-sweep
-    // to reach + kill it. Helper handles the geometry. Auto-advance to
-    // Room02 on dummy death is via _install_room01_clear_listener (no
+    // not 2 grunts. The helper walk-NE-then-attack-sweeps to kill it, then
+    // walks the player onto the dummy-dropped iron_sword Pickup (ticket
+    // 86c9qbb3k — the Room01 → Room02 advance is gated on the pickup-equip).
+    // Auto-advance to Room02 is via _install_room01_clear_listener (no
     // RoomGate involvement — that's the negative-assertion below).
     const result = await clearRoom01Dummy(
       page,
@@ -192,6 +202,11 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
       result.dummyKilled,
       `PracticeDummy must die for Room02 to load (and for the no-gate-traces ` +
         `negative assertion below to be exercised against actual Room01 life).`
+    ).toBe(true);
+    expect(
+      result.pickupEquipped,
+      `The dummy-dropped iron_sword Pickup must be collected + auto-equipped — ` +
+        `the Room01 → Room02 advance is gated on it (ticket 86c9qbb3k).`
     ).toBe(true);
 
     // Snapshot the full set of mob-death traces observed during Room01 life.
@@ -291,10 +306,10 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
     await page.goto(baseURL, { waitUntil: "domcontentloaded" });
 
     await capture.waitForLine(/\[Main\] M1 play-loop ready/, BOOT_TIMEOUT_MS);
-    await capture.waitForLine(
-      /\[Inventory\] starter iron_sword auto-equipped/,
-      5_000
-    );
+    // No `[Inventory] starter iron_sword auto-equipped` line — the boot-equip
+    // bandaid is retired (ticket 86c9qbb3k). This test only asserts the
+    // STATIC gate-causality invariant, which holds regardless of whether the
+    // player is equipped, so the fistless start is fine here.
 
     const canvas = page.locator("canvas").first();
     await canvas.click();
@@ -304,10 +319,10 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
     const clickX = (canvasBB?.x ?? 0) + (canvasBB?.width ?? 1280) / 2;
     const clickY = (canvasBB?.y ?? 0) + (canvasBB?.height ?? 720) / 2;
 
-    // Drive a longer combat sequence — kill Room 01 grunts, let Room 02
-    // attempt unfold. We don't care if we reach Room 02's gate or not;
-    // the static causality assertion below holds regardless of how far
-    // we get.
+    // Drive a longer combat sequence — the static causality assertion below
+    // holds regardless of how far we get (and regardless of whether the
+    // player is equipped — a fistless player still kills the dummy in 3
+    // FIST_DAMAGE swings).
     await page.keyboard.down("w");
     await page.keyboard.down("d");
     await page.waitForTimeout(100);

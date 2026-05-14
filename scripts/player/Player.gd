@@ -261,10 +261,12 @@ func _ready() -> void:
 	# `_resolve_player`, InventoryPanel `_player_node`) find this node via
 	# group lookup. Idempotent: add_to_group is a no-op if already in the group.
 	add_to_group("player")
-	# NOTE: equip_starter_weapon_if_needed() is intentionally NOT called here.
-	# It must fire AFTER Main._load_save_or_defaults() so a save-restore
-	# (which resets Inventory + re-applies saved equipped state) cannot clobber
-	# the starter equip. Main._ready() calls it after _load_save_or_defaults().
+	# NOTE: there is no boot-time starter-weapon auto-equip — not here, not in
+	# Main._ready(). The PR #146 `equip_starter_weapon_if_needed` bandaid was
+	# retired in ticket 86c9qbb3k. The player starts fistless by design; the
+	# Stage-2b Room01 PracticeDummy drops an iron_sword the player picks up,
+	# and `Inventory.on_pickup_collected` auto-equips the first weapon picked
+	# up. A save-restored equipped weapon is re-applied by save-restore.
 	# See: fix(combat|inventory) PR — iron_sword integration-surface fix.
 
 
@@ -622,8 +624,9 @@ func _die() -> void:
 
 ## Internal helper — fetch the Inventory autoload if it's registered.
 ## Returns null in bare-instantiated test contexts that don't register
-## the autoload (most Player unit tests). Inventory.equip_starter_weapon_if_needed
-## is the only caller; it is defensive when the return is null.
+## the autoload (most Player unit tests). Defensive lookup helper; callers
+## must null-check the return. (The PR #146 boot-equip path that previously
+## used this was retired in ticket 86c9qbb3k.)
 func _find_inventory_autoload() -> Node:
 	if not is_inside_tree():
 		return null

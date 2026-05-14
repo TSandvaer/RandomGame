@@ -21,9 +21,10 @@
  * sweep, NE facing only) so the player stays near spawn before traversal.
  *
  * **What this spec asserts:**
- *   1. Boot completes; iron_sword auto-equipped
- *   2. Room01 PracticeDummy killed (Stage 2b PR #169 — auto-advance to
- *      Room02 via `_install_room01_clear_listener`).
+ *   1. Boot completes (player boots fistless — bandaid retired, 86c9qbb3k).
+ *   2. Room01 PracticeDummy killed + the dummy-dropped iron_sword Pickup
+ *      collected/auto-equipped (the `clearRoom01Dummy` helper handles both;
+ *      the Room01 → Room02 advance is gated on the pickup-equip).
  *   3. SKIP Room02 combat — gate stays OPEN with mobs_alive=2
  *   4. From spawn (240, 200), walk WEST 2000ms then NORTH 1500ms
  *   5. **Assert** at least one `[combat-trace] RoomGate._on_body_entered`
@@ -78,11 +79,10 @@ test.describe("RoomGate body_entered fires under Playwright (regression — 86c9
       process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:8000";
     await page.goto(baseURL, { waitUntil: "domcontentloaded" });
 
+    // No `[Inventory] starter iron_sword auto-equipped` line — the PR #146
+    // boot-equip bandaid is retired (ticket 86c9qbb3k). The player boots
+    // fistless; `clearRoom01Dummy` below handles the kill + pickup-equip.
     await capture.waitForLine(/\[Main\] M1 play-loop ready/, BOOT_TIMEOUT_MS);
-    await capture.waitForLine(
-      /\[Inventory\] starter iron_sword auto-equipped \(weapon slot\)/,
-      5_000
-    );
 
     const canvas = page.locator("canvas").first();
     await canvas.click();
@@ -107,6 +107,12 @@ test.describe("RoomGate body_entered fires under Playwright (regression — 86c9
       result.dummyKilled,
       "Room01 PracticeDummy must die for Room02 to load (canary depends on " +
         "reaching Room02's gate, which only exists after Room01 advances)."
+    ).toBe(true);
+    expect(
+      result.pickupEquipped,
+      "Room01 iron_sword Pickup must be collected + auto-equipped — the " +
+        "Room01 → Room02 advance is gated on it (ticket 86c9qbb3k). Without " +
+        "the pickup-equip, Room02 never loads and there is no gate to canary."
     ).toBe(true);
 
     // ---- Phase 2: settle for Room02 player respawn at DEFAULT_PLAYER_SPAWN ----

@@ -18,13 +18,23 @@
  * stand still in Room02's two grunts to die.
  *
  * The harness validates the "equipped survives" half by:
- *   1. Boot completes; iron_sword auto-equipped (verified via Inventory line)
- *   2. Player kills the Room01 PracticeDummy (auto-advances to Room02)
+ *   1. Boot completes; the player is FISTLESS (the PR #146 boot-equip bandaid
+ *      is retired — ticket 86c9qbb3k).
+ *   2. Player kills the Room01 PracticeDummy (3 fistless swings) and walks
+ *      onto the dummy-dropped iron_sword Pickup — `Inventory.on_pickup_collected`
+ *      auto-equips it (`source=auto_pickup`). The Room01 → Room02 advance is
+ *      gated on that equip. The `clearRoom01Dummy` helper handles all of this.
  *   3. Player walks toward Room02 grunts and stands still (no attacks) until HP=0
  *   4. After death, Main._on_player_died → apply_death_rule respawns player
- *      at Room 01 with HP=100 and equipped state preserved
- *   5. Player kills the (re-spawned) Room01 PracticeDummy AGAIN, advances to
- *      Room02 again
+ *      at Room 01 with HP=100 and **equipped state preserved** (the M1 death
+ *      rule keeps the equipped iron_sword).
+ *   5. Player kills the (re-spawned) Room01 PracticeDummy AGAIN. This time the
+ *      player is ALREADY equipped (death rule preserved the iron_sword), so
+ *      the kill is weapon-scaled (damage=6) and the Room01 → Room02 advance is
+ *      NOT gated (immediate-advance path). The fresh dummy still drops an
+ *      iron_sword Pickup, but the player already has a weapon so it does NOT
+ *      auto-swap (first-weapon-only rule) — the helper detects the
+ *      already-equipped case and skips its pickup-collection phase.
  *   6. Resume combat — assert next Hitbox.hit STILL reads damage=6 (iron_sword)
  *      and the kill pipeline still completes against a Room02 grunt
  *
@@ -55,22 +65,19 @@
  *   to assert "damage survived the respawn." Whichever swing lands first
  *   (dummy hit OR grunt hit) is the load-bearing post-respawn assertion.
  *
- *   Death respawn doesn't re-emit the [Main] boot line; it re-emits
- *   `[Inventory] starter iron_sword auto-equipped` only if equip_starter_
- *   weapon_if_needed is called by the respawn flow (which it ISN'T in
- *   apply_death_rule — the equipped state is simply preserved from before
- *   death). Therefore the post-death proof is positive damage=6 hits, NOT
- *   re-firing the auto-equip line.
+ *   Death respawn doesn't re-emit the [Main] boot line, and apply_death_rule
+ *   does NOT re-equip anything — the equipped iron_sword is simply PRESERVED
+ *   from before death (M1 death rule). Therefore the post-death proof is
+ *   positive damage=6 hits, NOT an equip trace.
  *
- * **iron_sword bandaid coexistence (PR #146 retirement ticket 86c9qbb3k):**
- * With bandaid active (today), Player damage=6 → Room02 grunts die in a few
- * hits + dummy dies in 1 hit. With bandaid retired, player drops in
- * fistless and Room01 dummy still kills in 3 swings (FIST_DAMAGE=1 × HP=3),
- * then drops an iron_sword pickup that goes into the inventory. **The
- * post-bandaid path needs an explicit Tab→click flow to equip that pickup
- * before Room02 — this spec breaks on the post-bandaid path until then.**
- * Document explicitly so the bandaid-retirement spec-update PR knows what
- * to change.
+ * **Onboarding flow (ticket 86c9qbb3k — bandaid retired):** the player drops
+ * in fistless; the Room01 dummy poofs in 3 FIST_DAMAGE=1 swings and drops an
+ * iron_sword Pickup the player walks onto to auto-equip. The first
+ * `clearRoom01Dummy` call (Phase 2a) does the full kill + pickup-collection.
+ * The SECOND call (Phase 3, post-respawn) sees an already-equipped player
+ * (death rule preserved the iron_sword) — the helper detects that via the
+ * weapon-scaled kill-sweep damage and skips its pickup phase, so this spec
+ * works on BOTH the fistless-first-clear and the equipped-respawn-clear.
  *
  * References:
  *   - team/decisions/DECISIONS.md "M1 death rule" 2026-05-02
@@ -115,11 +122,11 @@ test.describe("AC3 — death preserves level + V/F/E + equipped weapon", () => {
     await page.goto(baseURL, { waitUntil: "domcontentloaded" });
 
     // ---- Phase 1: Cold-boot integration baseline ----
+    // The player boots FISTLESS (the PR #146 boot-equip bandaid is retired,
+    // ticket 86c9qbb3k) — there is no `[Inventory] starter iron_sword
+    // auto-equipped` line. The player equips by picking up the dummy's drop
+    // in Phase 2a below.
     await capture.waitForLine(/\[Main\] M1 play-loop ready/, BOOT_TIMEOUT_MS);
-    await capture.waitForLine(
-      /\[Inventory\] starter iron_sword auto-equipped \(weapon slot\)/,
-      5_000
-    );
 
     const canvas = page.locator("canvas").first();
     await canvas.click();
@@ -136,7 +143,7 @@ test.describe("AC3 — death preserves level + V/F/E + equipped weapon", () => {
     // to Room02 first to find a damage source. The helper handles the
     // walk-NE-then-attack-sweep discipline.
     console.log(
-      "[ac3-death] Phase 2a: Clearing Room01 dummy (Stage 2b — to reach Room02 grunts)..."
+      "[ac3-death] Phase 2a: Clearing Room01 dummy + collecting iron_sword Pickup..."
     );
     const room01ClearResult = await clearRoom01Dummy(
       page,
@@ -144,13 +151,20 @@ test.describe("AC3 — death preserves level + V/F/E + equipped weapon", () => {
       capture,
       clickX,
       clickY,
-      { budgetMs: 30_000 }
+      { budgetMs: 40_000 }
     );
     expect(
       room01ClearResult.dummyKilled,
       "Stage 2b: Room01 PracticeDummy must die for the player to reach Room02 " +
         "grunts (the only damage source post-PR-#169). The death-rule test " +
         "depends on Room02 entry."
+    ).toBe(true);
+    expect(
+      room01ClearResult.pickupEquipped,
+      "Ticket 86c9qbb3k: the player must collect + auto-equip the dummy-dropped " +
+        "iron_sword. The Room01 → Room02 advance is gated on this equip; the " +
+        "whole death-rule test depends on the player being equipped so the " +
+        "post-respawn damage=6 assertion is meaningful."
     ).toBe(true);
     await waitForRoom02Load(page, 1500);
 
@@ -238,14 +252,16 @@ test.describe("AC3 — death preserves level + V/F/E + equipped weapon", () => {
 
     // ---- Phase 3: Post-respawn — assert equipped weapon survived ----
     //
-    // Stage 2b: post-death, the player is back at Room01 with a freshly-
-    // instantiated PracticeDummy. We re-run the Room01 dummy-clear helper:
-    // a successful kill proves the equipped weapon flowed through the
-    // death-rule (a damage=1 fistless swing couldn't kill HP=3 in the
-    // helper's per-direction attacksPerDir = 3 budget, so the kill itself
-    // is the load-bearing positive assertion — and we also extract the
-    // first damage=N value from the Hitbox.hit traces produced during the
-    // helper's sweep).
+    // Post-death, the player is back at Room01 with a freshly-instantiated
+    // PracticeDummy AND the iron_sword still equipped (the M1 death rule
+    // preserves equipped state). We re-run the Room01 dummy-clear helper: the
+    // player is ALREADY equipped, so the kill-sweep hits are weapon-scaled
+    // (damage=6), the Room01 → Room02 advance is NOT gated (immediate-advance
+    // path), and the helper detects the already-equipped case and skips its
+    // pickup-collection phase. We extract the first damage=N value from the
+    // Hitbox.hit traces during the sweep — it MUST be >=2 (proves the
+    // iron_sword survived apply_death_rule). A damage=1 result would mean the
+    // death rule wiped the equipped weapon.
 
     // Mark our place in the buffer; post-respawn evidence is everything after
     // this point.
@@ -263,9 +279,12 @@ test.describe("AC3 — death preserves level + V/F/E + equipped weapon", () => {
       postRespawnClearResult.dummyKilled,
       "Post-respawn: Room01 PracticeDummy must die again. The dummy was " +
         "re-instantiated by apply_death_rule's Room01 reload. If the kill " +
-        "doesn't land, either (a) the room didn't reload (apply_death_rule " +
-        "regression), or (b) the equipped weapon was wiped → fistless damage=1 " +
-        "doesn't fit the helper's swing budget (PR #146 regression class)."
+        "doesn't land at all, the room didn't reload (apply_death_rule " +
+        "regression). NOTE: the load-bearing death-rule assertion is the " +
+        "post-respawn damage value below — if the death rule WIPED the " +
+        "equipped weapon, the kill-sweep hits drop to damage=1 (and the " +
+        "damage>=2 assertion fails) even though the helper would still " +
+        "complete by re-equipping via the re-dropped Pickup."
     ).toBe(true);
 
     // Find the first Hitbox.hit team=player line AFTER preRespawnLineCount.

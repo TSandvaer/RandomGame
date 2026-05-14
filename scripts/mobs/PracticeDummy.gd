@@ -41,6 +41,16 @@ extends CharacterBody2D
 ## physics-flush rule (see `.claude/docs/combat-architecture.md` § "Physics
 ## flush rule"; this exact pattern is in `MobLootSpawner.on_mob_died`).
 ##
+## **Pickup → Inventory wiring (ticket `86c9qbb3k`):** the dummy bypasses
+## `MobLootSpawner` (its `mob_died` carries `mob_def == null`), so the Pickup
+## it spawns is NOT wired to `Inventory` by `Main._on_mob_died`'s
+## `auto_collect_pickups` path. The dummy therefore connects the Pickup's
+## `picked_up` signal to the `Inventory` autoload's `on_pickup_collected`
+## itself — the same hook `auto_collect_pickups` uses for MobLootSpawner
+## pickups. When the player walks onto the Pickup, `on_pickup_collected` adds
+## the iron_sword to the grid AND auto-equips it (first-weapon-on-pickup,
+## the design-correct path that retired PR #146's boot-equip bandaid).
+##
 ## **Layer convention** mirrors Grunt: collision_layer = enemy (bit 4),
 ## collision_mask = world (bit 1) + player (bit 2). The Player's swing
 ## hitbox lives on `player_hitbox` (bit 3) masking `enemy` (bit 4) — that's
@@ -223,10 +233,30 @@ func _spawn_iron_sword_pickup() -> void:
 	var pickup: Pickup = pickup_scene.instantiate() as Pickup
 	pickup.configure(instance)
 	pickup.position = global_position
+	# Wire the Pickup → Inventory hook. The dummy bypasses MobLootSpawner
+	# (mob_def == null), so Main._on_mob_died's auto_collect_pickups path never
+	# sees this Pickup. Connect it here to the same `on_pickup_collected` hook —
+	# when the player walks onto it, the iron_sword lands in the grid AND
+	# auto-equips (first-weapon-on-pickup, ticket 86c9qbb3k). Skipped silently
+	# in bare-instanced test contexts where no Inventory autoload is registered.
+	var inventory: Node = _resolve_inventory()
+	if inventory != null and inventory.has_method("on_pickup_collected"):
+		if not pickup.picked_up.is_connected(inventory.on_pickup_collected):
+			pickup.picked_up.connect(inventory.on_pickup_collected)
 	# Defer add_child — Pickup root is Area2D; sync add panics during physics flush.
 	room.call_deferred("add_child", pickup)
 	_combat_trace("PracticeDummy._spawn_iron_sword_pickup",
 		"deferred-add iron_sword at (%.1f,%.1f)" % [global_position.x, global_position.y])
+
+
+## Resolve the `Inventory` autoload, or null in a bare-instanced test context
+## where no autoloads are registered. Mirrors the group/autoload lookup
+## convention used elsewhere (e.g. `Inventory._find_player`).
+func _resolve_inventory() -> Node:
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return null
+	return loop.root.get_node_or_null("Inventory")
 
 
 ## Ember-poof on death. Mirrors Grunt's burst with 2x particle count for

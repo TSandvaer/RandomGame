@@ -32,8 +32,8 @@ extends Node
 ##                                              success removes from inventory
 ##                                              and applies via Player.equip_item.
 ##                                              `source` tags the combat-trace
-##                                              line (lmb_click vs auto_starter,
-##                                              ticket 86c9qah0v).
+##                                              line (lmb_click vs auto_pickup,
+##                                              ticket 86c9qah0v / 86c9qbb3k).
 ##   Inventory.unequip(slot)         -> ItemInstance   returns the unequipped
 ##                                              item back into inventory; null
 ##                                              if slot empty or full inventory
@@ -98,78 +98,9 @@ var _items: Array[ItemInstance] = []
 var _equipped: Dictionary = {}  # StringName slot -> ItemInstance
 
 
-## Path to the T1 iron sword resource that seeds the player's starting
-## inventory. Verified present in the project at M1 RC.
-const IRON_SWORD_PATH: String = "res://resources/items/weapons/iron_sword.tres"
-
 func _ready() -> void:
 	# Smoke line so Tess can grep boot output.
 	print("[Inventory] autoload ready (capacity=%d)" % CAPACITY)
-	_seed_starting_inventory()
-
-
-## Seed a single iron_sword into the inventory on a fresh game-start (both
-## _items and _equipped empty). Only-if-empty rule: existing save files that
-## already have inventory/equipped state are untouched — no dupe on reload.
-## Called from _ready() so the sword is present before any scene boots.
-func _seed_starting_inventory() -> void:
-	if not _items.is_empty() or not _equipped.is_empty():
-		# An existing save was already restored — respect it.
-		return
-	var def: ItemDef = load(IRON_SWORD_PATH) as ItemDef
-	if def == null:
-		push_warning("[Inventory] _seed_starting_inventory: iron_sword.tres not found at %s" % IRON_SWORD_PATH)
-		return
-	var inst: ItemInstance = ItemInstance.new(def, ItemDef.Tier.T1)
-	# Bypass the public add() to avoid spurious inventory_changed before the
-	# Player node is in the tree; the internal append is identical.
-	_items.append(inst)
-	print("[Inventory] starting iron_sword seeded (id=%s damage=%d)" % [def.id, def.base_stats.damage if def.base_stats != null else -1])
-
-
-## Auto-equip the first iron_sword in the inventory into the weapon slot —
-## called from Main._ready() AFTER _load_save_or_defaults() so a save-restore
-## cannot clobber the result. Only runs if the weapon slot is empty, so an
-## existing save's equipped weapon is never overwritten.
-##
-## **Re-seed if needed:** `Inventory.restore_from_save` calls `_items.clear()`
-## as part of its reset loop, which wipes the iron_sword that
-## `_seed_starting_inventory` placed in `_items` at autoload `_ready`. If a
-## pre-PR-145 save loads with `equipped: {}` AND `stash: []`, both `_items`
-## and `_equipped` are empty after restore — and we need the starter sword in
-## the weapon slot. Re-running `_seed_starting_inventory` here is the
-## idempotent path: it's only-if-empty internally, so it's a no-op when the
-## inventory has any item (e.g. a stash item the save brought back).
-##
-## **Combat-trace source tag (`auto_starter`):** this auto-equip path routes
-## through `equip()` like LMB-click, but tags the resulting trace line with
-## `source=auto_starter` rather than the default `lmb_click`. The negative-
-## assertion sweep at boot can then assert `source=lmb_click` is absent during
-## the boot/restore window (no user click happened) AND `source=auto_starter`
-## is present (positive proof the auto-equip fired). Pre-fix this path emitted
-## `source=lmb_click`, polluting the negative-assertion sweep — see ticket
-## `86c9qah0v` for the original bug.
-func equip_starter_weapon_if_needed() -> void:
-	if _equipped.has(SLOT_WEAPON) and _equipped[SLOT_WEAPON] != null:
-		# Weapon already equipped (restored save or prior equip). No-op.
-		return
-	# If the inventory is empty (fresh start OR pre-PR-145 save just cleared
-	# _items via restore_from_save), re-seed so we have an iron_sword to equip.
-	# _seed_starting_inventory is itself only-if-empty, so this is safe to call
-	# unconditionally — it won't dupe.
-	_seed_starting_inventory()
-	# Find the first iron_sword in inventory and equip it.
-	for it_v: ItemInstance in _items:
-		if it_v == null or it_v.def == null:
-			continue
-		if it_v.def.id == &"iron_sword":
-			equip(it_v, SLOT_WEAPON, &"auto_starter")
-			print("[Inventory] starter iron_sword auto-equipped (weapon slot)")
-			return
-	# No iron_sword in inventory — defensive (seed may have failed or been
-	# consumed by a prior save's state). No-op; player ships fistless which
-	# was the original M1 RC state.
-	push_warning("[Inventory] equip_starter_weapon_if_needed: no iron_sword in inventory to auto-equip")
 
 
 # ---- Public API -------------------------------------------------------
@@ -256,15 +187,18 @@ func get_equipped_map() -> Dictionary:
 ## scoped to user/system equip paths (never save-restore).
 ##
 ## **`source` parameter (`86c9qah0v` fix):** distinguishes user-driven equips
-## from system-driven equips so the boot/restore negative-assertion sweep can
-## tell them apart. Default `&"lmb_click"` preserves backwards-compat for all
-## existing callers (`InventoryPanel._handle_inventory_click`, GUT tests).
-## `equip_starter_weapon_if_needed` overrides to `&"auto_starter"` — the boot-
-## time auto-equip is system-driven, not user-driven, so it must NOT pollute
-## the `lmb_click` channel that Playwright greps for during the user-click
-## window. Future system-driven equip paths (e.g. fast-travel re-equip,
-## scripted scenes) should add their own `source` tag rather than reusing
-## `lmb_click`.
+## from system-driven equips so the negative-assertion sweep can tell them
+## apart. Default `&"lmb_click"` preserves backwards-compat for all existing
+## callers (`InventoryPanel._handle_inventory_click`, GUT tests).
+## `on_pickup_collected` overrides to `&"auto_pickup"` — the
+## auto-equip-first-weapon-on-pickup onboarding path is system-driven, not
+## user-driven, so it must NOT pollute the `lmb_click` channel that Playwright
+## greps for during the user-click window. (`&"auto_starter"` — the old
+## PR #146 boot-equip tag — is **deprecated**; that bandaid was retired in
+## ticket `86c9qbb3k`. No current producer passes it; see the source-tag
+## footnote in `_emit_equip_trace`.) Future system-driven equip paths
+## (e.g. fast-travel re-equip, scripted scenes) should add their own `source`
+## tag rather than reusing `lmb_click`.
 func equip(item: ItemInstance, slot: StringName, source: StringName = &"lmb_click") -> bool:
 	if item == null:
 		return false
@@ -298,8 +232,8 @@ func equip(item: ItemInstance, slot: StringName, source: StringName = &"lmb_clic
 	# DevTools console so equip-flow regressions are observable in soak. Pure
 	# instrumentation; no-op outside HTML5 (DebugFlags.combat_trace gate).
 	# `source` defaults to `lmb_click` so all existing user-click callers stay
-	# correctly tagged; `equip_starter_weapon_if_needed` overrides to
-	# `auto_starter` (ticket `86c9qah0v`).
+	# correctly tagged; `on_pickup_collected` overrides to `auto_pickup` for the
+	# auto-equip-first-weapon-on-pickup onboarding path (ticket `86c9qbb3k`).
 	_emit_equip_trace(item, slot, source)
 	return true
 
@@ -409,9 +343,43 @@ func restore_from_save(data: Dictionary, item_resolver: Callable, affix_resolver
 # ---- Loot pickup hook --------------------------------------------
 
 ## Convenience hook for `Pickup.picked_up(item, pickup)` — single-item
-## variant. Mirrors `add(item)` but ignores the second argument.
+## variant. Adds the item to the grid, then **auto-equips the first weapon
+## the player picks up** so the player is never fistless during onboarding
+## (ticket `86c9qbb3k` — replaces the retired PR #146 boot-equip bandaid).
+##
+## **Auto-equip-first-weapon-on-pickup rule:** if the collected item is a
+## weapon AND the weapon slot is currently empty, the item is immediately
+## equipped via `equip(item, SLOT_WEAPON, &"auto_pickup")`. This is the
+## design-correct onboarding path — the Stage-2b PracticeDummy drops an
+## iron_sword, the player walks onto it, and it auto-equips through the
+## legitimate pickup flow (no boot-time seeding, no `Main._ready` bandaid).
+##
+## **First-weapon-only — NOT auto-swap.** If a weapon is already equipped,
+## a subsequently-collected weapon just lands in the grid; it does NOT
+## auto-swap. Mid-run weapon swaps stay user-driven (Tab → LMB-click). The
+## auto-equip is strictly an onboarding affordance: "your first weapon is
+## equipped the moment you grab it."
+##
+## **Combat-trace `source=auto_pickup`:** the auto-equip routes through
+## `equip()` and tags its trace line `source=auto_pickup` (distinct from
+## `lmb_click` user-clicks). The negative-assertion sweep can tell the
+## onboarding auto-equip apart from a user click. (`auto_starter` — the old
+## PR #146 boot-equip tag — is retired; see `equip()` docstring.)
 func on_pickup_collected(item: ItemInstance, _pickup: Variant = null) -> void:
-	add(item)
+	if not add(item):
+		return
+	# Auto-equip-first-weapon-on-pickup: only when the picked-up item is a
+	# weapon AND no weapon is currently equipped. First-weapon-only — an
+	# already-equipped weapon is never auto-swapped.
+	if item == null or item.def == null:
+		return
+	if item.def.slot != ItemDef.Slot.WEAPON:
+		return
+	var current_weapon: ItemInstance = _equipped.get(SLOT_WEAPON, null) as ItemInstance
+	if current_weapon != null:
+		# A weapon is already equipped — leave the pickup in the grid.
+		return
+	equip(item, SLOT_WEAPON, &"auto_pickup")
 
 
 ## Subscribe to every Pickup the given MobLootSpawner produced from an
@@ -519,12 +487,18 @@ func _find_player() -> Node:
 ##   [combat-trace] Inventory.equip | item=<id> slot=<weapon|armor> \
 ##       source=<source_tag> damage_after=<N>
 ##
-## `source_tag` enum (ticket `86c9qah0v`):
+## `source_tag` enum (ticket `86c9qah0v` / `86c9qbb3k`):
 ##   - `lmb_click` — user-driven equip via `InventoryPanel._handle_inventory_click`.
 ##     Default for `equip()` so existing callers don't need to pass a tag.
-##   - `auto_starter` — system-driven boot-time auto-equip via
-##     `equip_starter_weapon_if_needed`. Distinct so the negative-assertion
-##     sweep at boot can tell user-clicks from system-equips apart.
+##   - `auto_pickup` — system-driven auto-equip-first-weapon-on-pickup via
+##     `on_pickup_collected`. Distinct so the negative-assertion sweep can tell
+##     user-clicks from the onboarding auto-equip apart.
+##   - `auto_starter` — **deprecated, no current producer.** Was the PR #146
+##     boot-equip bandaid's tag (`equip_starter_weapon_if_needed`, retired in
+##     ticket `86c9qbb3k`). `equip()` has no `match`/branch on `source`, so the
+##     value still type-checks as a valid `StringName` input — but nothing in
+##     the codebase passes it any more. Kept documented (not deleted) so a
+##     future re-introduction of a boot-time equip path has a named slot.
 ##   - (future) — additional `source` tags should be added rather than
 ##     overloading `lmb_click`.
 ##

@@ -5,6 +5,14 @@ extends GutTest
 ##   1. MobLootSpawner spawns pickups; Inventory ingests them.
 ##   2. Multiple drops in quick succession all picked up correctly.
 ##   3. Pickup near full inventory: graceful capacity check.
+##
+## **Ticket 86c9qbb3k note:** `Inventory.on_pickup_collected` now AUTO-EQUIPS
+## the first WEAPON the player picks up (auto-equip-first-weapon-on-pickup —
+## the onboarding path that retired the PR #146 boot-equip bandaid). Tests 1
+## and 2 here exercise the MobLootSpawner → Pickup → Inventory ROUTING, which
+## is orthogonal to equip behaviour — so they drop ARMOR items (armor never
+## auto-equips on pickup) to keep the routing assertions clean. Test 4 is the
+## dedicated auto-equip-on-pickup-via-this-path coverage.
 
 const LootRollerScript: Script = preload("res://scripts/loot/LootRoller.gd")
 const MobLootSpawnerScript: Script = preload("res://scripts/loot/MobLootSpawner.gd")
@@ -49,7 +57,11 @@ func test_spawner_drop_routes_to_inventory_via_pickup() -> void:
 	var room: Node2D = _make_room_root()
 	spawner.set_parent_for_pickups(room)
 
-	var item_def: ItemDef = ContentFactory.make_item_def({"id": &"int_weapon"})
+	# ARMOR item — armor never auto-equips on pickup, so the routing assertion
+	# (item lands in the grid) is clean (ticket 86c9qbb3k).
+	var item_def: ItemDef = ContentFactory.make_item_def({
+		"id": &"int_armor", "slot": ItemDef.Slot.ARMOR,
+	})
 	var table: LootTableDef = _build_table_with(item_def, 1)
 	var mob_def: MobDef = ContentFactory.make_mob_def({"loot_table": table})
 
@@ -76,7 +88,11 @@ func test_multiple_drops_all_picked_up() -> void:
 	var room: Node2D = _make_room_root()
 	spawner.set_parent_for_pickups(room)
 
-	var item_def: ItemDef = ContentFactory.make_item_def({"id": &"int_burst"})
+	# ARMOR items — armor never auto-equips on pickup, so all N drops land in
+	# the grid and the count assertion stays clean (ticket 86c9qbb3k).
+	var item_def: ItemDef = ContentFactory.make_item_def({
+		"id": &"int_burst", "slot": ItemDef.Slot.ARMOR,
+	})
 	var table: LootTableDef = _build_table_with(item_def, 3)
 	var mob_def: MobDef = ContentFactory.make_mob_def({"loot_table": table})
 
@@ -122,6 +138,42 @@ func test_pickup_near_full_inventory_gracefully_rejects() -> void:
 	# Capacity respected — inventory still 24 items.
 	assert_eq(_inv().get_items().size(), 24, "full inventory does not overflow")
 	assert_signal_emitted(_inv(), "add_rejected")
+
+
+# =======================================================================
+# Test 4 — auto-equip-first-weapon-on-pickup via the MobLootSpawner path
+# =======================================================================
+
+func test_weapon_drop_auto_equips_first_weapon_on_pickup() -> void:
+	# Ticket 86c9qbb3k: when a WEAPON is picked up and no weapon is equipped,
+	# Inventory.on_pickup_collected auto-equips it. This exercises that through
+	# the full MobLootSpawner → Pickup → Inventory path (the same path the
+	# Stage-2b dummy drop walks, just via the loot-table spawner).
+	var roller: LootRoller = LootRollerScript.new()
+	roller.seed_rng(44)
+	var spawner: MobLootSpawner = MobLootSpawnerScript.new(roller)
+	var room: Node2D = _make_room_root()
+	spawner.set_parent_for_pickups(room)
+
+	# A weapon drop (default slot is WEAPON).
+	var weapon_def: ItemDef = ContentFactory.make_item_def({"id": &"drop_weapon"})
+	var table: LootTableDef = _build_table_with(weapon_def, 1)
+	var mob_def: MobDef = ContentFactory.make_mob_def({"loot_table": table})
+
+	var spawned: Array[Node] = spawner.on_mob_died(null, Vector2.ZERO, mob_def)
+	assert_eq(spawned.size(), 1, "one weapon drop spawned")
+	_inv().auto_collect_pickups(spawned)
+	# Precondition: no weapon equipped before the pickup.
+	assert_null(_inv().get_equipped(&"weapon"), "no weapon equipped pre-pickup")
+	# Player walks onto the pickup.
+	(spawned[0] as Pickup).emit_signal("picked_up", (spawned[0] as Pickup).item, spawned[0])
+	# The weapon must have auto-equipped — not just landed in the grid.
+	var equipped: ItemInstance = _inv().get_equipped(&"weapon") as ItemInstance
+	assert_not_null(equipped,
+		"first weapon picked up auto-equips (ticket 86c9qbb3k onboarding rule)")
+	assert_eq(equipped.def.id, &"drop_weapon", "the auto-equipped weapon is the dropped one")
+	assert_eq(_inv().get_items().size(), 0,
+		"the auto-equipped weapon moved from grid into the slot — grid is empty")
 
 
 # =======================================================================

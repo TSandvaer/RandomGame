@@ -4,48 +4,41 @@
  * AC2 — Cold launch → first Room02 grunt killed in ≤60 s with weapon-scaled
  * damage
  *
- * **Stage 2b rescope (PR #169 + this PR):** Pre-PR-#169, AC2's "first kill"
- * targeted the Room01 grunts (the same room the player drops in to). PR #169
- * swapped Room01's roster from "2 grunts that chase" to "1 PracticeDummy
- * that doesn't chase" — the dummy isn't a meaningful "first kill" benchmark
- * for combat performance because it has HP=3, deals zero damage, and dies in
- * one hit on the bandaid path (PR #146 still active). AC2's metric stays
+ * **Stage 2b rescope (PR #169) + bandaid retirement (ticket 86c9qbb3k):**
+ * Pre-PR-#169, AC2's "first kill" targeted the Room01 grunts. PR #169
+ * swapped Room01's roster to "1 PracticeDummy that doesn't chase" — not a
+ * meaningful combat benchmark (HP=3, zero damage). AC2's metric stays
  * "first MOB kill within 60 s of boot," but the target is now the **first
  * Room02 grunt** (the first real combat encounter).
  *
  * Verifies the M1 RC soak checklist v2 §5 AC2 (re-scoped for Stage 2b):
- *   1. Cold launch (fresh Chrome profile, no save) completes boot.
- *   2. The starter iron_sword is auto-equipped (boot integration line present).
- *   3. The PracticeDummy poofs in Room01 (`PracticeDummy._die`) — proves the
- *      tutorial path works.
- *   4. The first Room02 grunt dies within 60s of `[Main] M1 play-loop ready`
- *      (re-scoped AC2 deadline).
+ *   1. Cold launch (fresh Chrome profile, no save) completes boot. The
+ *      player boots FISTLESS (the PR #146 boot-equip bandaid is retired).
+ *   2. The player clears Room01: kills the PracticeDummy with FIST_DAMAGE=1
+ *      swings, then walks onto the dummy-dropped iron_sword Pickup, which
+ *      auto-equips (`Inventory.on_pickup_collected` → `source=auto_pickup`).
+ *      The Room01 → Room02 advance is gated on that equip.
+ *   3. The PracticeDummy poofs in Room01 (`PracticeDummy._die`).
+ *   4. The first Room02 grunt dies within 60s of `[Main] M1 play-loop ready`.
  *   5. The hits that killed the grunt land at weapon-scaled damage (>=2;
- *      iron_sword=6).
+ *      iron_sword=6) — the player picked up + equipped the iron_sword in
+ *      Room01, so Room02 combat is weapon-scaled.
  *   6. The Grunt `_die` + `_force_queue_free` trace shape is correct.
  *   7. No `USER ERROR: Can't change this state while flushing queries` panic.
  *
  * Why this test exists:
  *   This is the regression class that bit M1 RC twice (PR #145 + PR #146).
  *   The fistless-start P0: combat fired but `damage=1` per swing because the
- *   iron_sword wasn't actually equipped at the Player surface even though the
- *   Inventory autoload reported it equipped. Headless GUT tests passed.
- *   The harness watches the integration surface — the actual Hitbox.hit
- *   trace's `damage=N` value is what proves the equipped weapon flowed
- *   through to combat.
+ *   iron_sword wasn't actually equipped at the Player surface. The harness
+ *   watches the integration surface — the actual Hitbox.hit trace's
+ *   `damage=N` value proves the equipped weapon flowed through to combat.
  *
- * **iron_sword bandaid coexistence (PR #146 retirement ticket 86c9qbb3k):**
- * The bandaid auto-equips iron_sword at boot, so Player damage = 6 on every
- * hit (dummy and grunts alike). When the bandaid retires, the player drops
- * in fistless and the Room01 dummy poofs at FIST_DAMAGE=1 (3 hits) — but
- * the dummy still drops an iron_sword pickup that lands in the inventory
- * grid (NOT auto-equipped — pickup → `Inventory.add(item)`, not
- * `Inventory.equip()`). On the post-bandaid path the player will need a Tab
- * → click-grid-cell flow to actually equip the dropped sword before Room02
- * combat. This spec works in the bandaid-active world today; when 86c9qbb3k
- * ships, the spec needs an explicit Tab→click step BETWEEN the dummy poof
- * and the Room02 entry, and the assertion below for damage>=2 in Room02
- * stays valid because by then the player has equipped the dropped sword.
+ * **Onboarding flow (ticket 86c9qbb3k):** the player is fistless at boot and
+ * equips the iron_sword by walking onto the dummy's drop — the
+ * `clearRoom01Dummy` helper handles the full kill + pickup-collection flow
+ * (`result.pickupEquipped` confirms the onboarding equip happened). The
+ * Room02 `damage>=2` assertion is the proof that the pickup-equip propagated
+ * all the way through to combat.
  *
  * Difference from `room-traversal-smoke.spec.ts`:
  *   The traversal spec covers Room01 dummy poof + Room02 entry but does not
@@ -106,24 +99,22 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
     const bootReadyAt = Date.now();
     expect(bootLine).toContain("M1 play-loop ready");
 
-    // 2. Starter iron_sword auto-equipped at game start (PR #145 + #146 surface).
-    //    This is the integration proof that survives both:
-    //    - PR #145: Inventory.gd seeds iron_sword + auto-equips
-    //    - PR #146: Main._ready calls equip_starter_weapon_if_needed AFTER
-    //              save-restore (so save-restore can't clobber it)
-    //    If this line is missing on a fresh-save boot, AC2 has regressed at
-    //    the integration surface — without needing a kill to detect it.
-    //
-    //    NOTE on the bandaid retirement (ticket 86c9qbb3k): when this line
-    //    no longer fires on cold boot (because the bandaid retired), the
-    //    test needs a paired Tab→click flow after the dummy-drop to equip
-    //    the dropped iron_sword before the Room02 grunt encounter. See
-    //    spec header for full bandaid-coexistence rationale.
-    const equipLine = await capture.waitForLine(
-      /\[Inventory\] starter iron_sword auto-equipped \(weapon slot\)/,
-      5_000
-    );
-    expect(equipLine).toContain("auto-equipped");
+    // 2. The player boots FISTLESS — the PR #146 boot-equip bandaid is retired
+    //    (ticket 86c9qbb3k). There is NO `[Inventory] starter iron_sword
+    //    auto-equipped` line any more, and NO Inventory.equip trace of any
+    //    source during the boot window. The player equips by walking onto the
+    //    dummy's iron_sword drop in Room01 (asserted via the helper below).
+    await page.waitForTimeout(500);
+    const bootEquipLines = capture
+      .getLines()
+      .filter((l) => /\[combat-trace\] Inventory\.equip \|/.test(l.text));
+    expect(
+      bootEquipLines.length,
+      `AC2 boot-window negative (86c9qbb3k): expected ZERO Inventory.equip ` +
+        `lines during cold boot — the player is fistless until they pick up ` +
+        `the dummy drop. Got ${bootEquipLines.length}:\n` +
+        bootEquipLines.map((l) => `  ${l.text}`).join("\n")
+    ).toBe(0);
 
     const canvas = page.locator("canvas").first();
     await canvas.click(); // Focus + initial click (south-facing miss; OK)
@@ -133,26 +124,34 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
     const clickX = (canvasBB?.x ?? 0) + (canvasBB?.width ?? 1280) / 2;
     const clickY = (canvasBB?.y ?? 0) + (canvasBB?.height ?? 720) / 2;
 
-    // ---- Phase 2: Clear Room 01 dummy (Stage 2b PR #169) ----
-    // The helper walks NE and attack-sweeps to kill the PracticeDummy at
-    // world (~368, 144). Auto-advance to Room02 fires via
-    // _install_room01_clear_listener on dummy death.
+    // ---- Phase 2: Clear Room 01 dummy + collect the iron_sword Pickup ----
+    // The helper walks NE and attack-sweeps to kill the PracticeDummy (3
+    // fistless swings), then walks the player onto the dummy-dropped
+    // iron_sword Pickup. `Inventory.on_pickup_collected` auto-equips it; the
+    // Room01 → Room02 advance is GATED on that equip, so `pickupEquipped`
+    // must be true for Room02 to load.
     const room01Result = await clearRoom01Dummy(
       page,
       canvas,
       capture,
       clickX,
       clickY,
-      { budgetMs: 30_000 }
+      { budgetMs: 40_000 }
     );
     expect(
       room01Result.dummyKilled,
-      "Room01 PracticeDummy must die for Room02 to load. The dummy poof is " +
-        "the path to the AC2 first-kill target (a Room02 grunt)."
+      "Room01 PracticeDummy must die — the path to the AC2 first-kill target."
+    ).toBe(true);
+    expect(
+      room01Result.pickupEquipped,
+      "Room01 iron_sword Pickup must be collected + auto-equipped. The Room01 " +
+        "→ Room02 advance is gated on this equip; if it never happened, Room02 " +
+        "(the AC2 first-kill room) is unreachable AND the player would be " +
+        "fistless in Room02 (damage=1 — the exact PR #145/#146 regression class)."
     ).toBe(true);
     console.log(
-      `[ac2-first-kill] Room01 dummy poofed in ${room01Result.durationMs}ms ` +
-        `(${room01Result.attacksFired} attacks).`
+      `[ac2-first-kill] Room01 dummy poofed + iron_sword equipped in ` +
+        `${room01Result.durationMs}ms (${room01Result.attacksFired} attacks).`
     );
 
     // Settle for Room02 load + player teleport to DEFAULT_PLAYER_SPAWN.
@@ -184,8 +183,10 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
       remainingDeadlineMs,
       `Room01 dummy clear took ${
         Date.now() - bootReadyAt
-      }ms — leaving < 0ms of the 60s AC2 budget for the Room02 kill. The ` +
-        `dummy-clear helper has regressed (was ~5-12s pre-bandaid-retirement).`
+      }ms — leaving < 5s of the 60s AC2 budget for the Room02 kill. The ` +
+        `dummy-clear helper has regressed. Expected ~15-30s: 3 fistless ` +
+        `swings to poof the dummy + the pickup-collection walk (ticket ` +
+        `86c9qbb3k — the player is fistless until they grab the dummy drop).`
     ).toBeGreaterThan(5_000); // Need at least 5s to land a grunt kill.
 
     while (Date.now() - combatStart < remainingDeadlineMs) {

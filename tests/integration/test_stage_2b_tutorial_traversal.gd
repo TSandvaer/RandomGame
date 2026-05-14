@@ -1,31 +1,38 @@
 extends GutTest
-## Tier 3 integration test for Stage 2b tutorial traversal (ticket
-## `86c9qaj3u`). Drives the actual `Main.tscn` cold-open through the
-## Room01 tutorial sequence + Room02 entry, asserting:
+## Tier 3 integration test for Stage 2b tutorial traversal (tickets
+## `86c9qaj3u` + `86c9qbb3k`). Drives the actual `Main.tscn` cold-open
+## through the Room01 tutorial sequence + Room02 entry, asserting:
 ##
 ##   1. Main boots into Room01 with a PracticeDummy + the WASD beat already
-##      latched.
+##      latched. The player boots FISTLESS (the PR #146 boot-equip bandaid
+##      was retired — ticket 86c9qbb3k).
 ##   2. Player movement detection latches the dodge beat.
 ##   3. Player dodge latches the LMB beat.
-##   4. Three LMB hits kill the dummy → mob_died → RMB beat latches → door
-##      opens (room-clear listener fires) → Main advances to Room02.
-##   5. **CRITICAL**: at Room02 entry the player has the iron_sword equipped
-##      (proves the dummy-drop pickup → auto-collect → Inventory.equip flow
-##      worked end-to-end). This is the design-correct path that retires
-##      PR #146's boot-equip bandaid (bandaid stays in main this PR per
-##      dispatch scope; the assertion here just proves the new path works
-##      so the next-PR bandaid retirement is safe).
+##   4. Three fist hits (FIST_DAMAGE=1 each) kill the dummy → mob_died → RMB
+##      beat latches → the dummy drops a guaranteed iron_sword Pickup.
+##   5. **CRITICAL — the real pickup path.** The Room01 → Room02 advance is
+##      GATED on the player collecting that Pickup (`Main._on_room01_mob_died`
+##      arms `_room01_awaiting_pickup_equip` because the player is fistless).
+##      The test WALKS THE PLAYER ONTO THE DROPPED PICKUP — moves the player's
+##      body onto the Pickup's Area2D and runs physics frames so the real
+##      `body_entered → picked_up → Inventory.on_pickup_collected → equip`
+##      flow fires. This is the design-correct onboarding path that retired
+##      PR #146's boot-equip bandaid. (Pre-this-PR the iron-sword-equipped
+##      assertion was satisfied by the bandaid, NOT the dummy drop — the
+##      test never actually exercised the pickup flow.)
+##   6. Once the iron_sword auto-equips, the gate releases and Main advances
+##      to Room02. At Room02 entry the player has the iron_sword equipped on
+##      BOTH dual-surfaces (Inventory + Player).
 ##
-## **Why Tier 3 here, not in test_m1_play_loop.gd:** `test_m1_play_loop.gd`
-## tests the M1 play-loop spine (Room01 → Room02 → ... → BossRoom). Stage 2b
-## is a tutorial-flow add-on; the integration coverage of the new flow is
-## scope-correct in its own file. This file is the hand-off integration the
-## sponsor-soak script + tester checklist (PJ-09 .. PJ-14) automate against.
+## **Why Tier 3 here:** this is the hand-off integration the sponsor-soak
+## script + tester checklist (PJ-09 .. PJ-14) automate against.
 ##
 ## **Why we drive `try_attack` directly instead of `Input.action_press`:**
 ## Headless GUT has no input queue. We bypass the input layer (covered by
 ## unit tests) and exercise the engine surface the input handler ultimately
-## calls. Same convention as `tests/integration/test_ac2_first_kill.gd`.
+## calls. The Pickup-collection step, however, IS driven through the real
+## Area2D physics overlap (move the body, run physics frames) — the
+## `body_entered` signal flow is exactly what the production game uses.
 
 const PHYS_DELTA: float = 1.0 / 60.0
 const TEST_SLOT: int = 991  # avoid collisions with other integration tests
@@ -52,19 +59,13 @@ func before_each() -> void:
 	if s != null and s.has_save(TEST_SLOT):
 		s.delete_save(TEST_SLOT)
 	# Also clear the production slot Main uses (SAVE_SLOT = 0) so the actual
-	# Main scene boots cold. Mirrors test_tutorial_prompt_overlay.gd's
-	# discipline.
+	# Main scene boots cold.
 	if s != null and s.has_save(0):
 		s.delete_save(0)
 	# Reset the Inventory autoload's equipped map AND items list so a previous
-	# test's iron_sword equip doesn't leak into the cold-open state. We must
-	# use `reset()` (not `clear_unequipped`) — clear_unequipped only touches
-	# the stash, leaving `_equipped` populated from a prior test. With
-	# `_equipped[weapon]` non-null, `equip_starter_weapon_if_needed` no-ops
-	# in Main._ready and the new Player instance never gets the iron_sword
-	# applied to ITS `_equipped_weapon` surface (the dual-surface drift this
-	# test exists to catch). `reset()` also calls `_apply_unequip_to_player`
-	# on the OLD player — which is fine because that player is mid-free.
+	# test's iron_sword equip doesn't leak into the cold-open state. With the
+	# PR #146 bandaid retired (ticket 86c9qbb3k), a reset Inventory is exactly
+	# the fresh-boot state: empty grid, empty equipped map, player fistless.
 	var inv: Node = _inventory()
 	if inv != null and inv.has_method("reset"):
 		inv.reset()
@@ -95,9 +96,22 @@ func _first_dummy(room: Node) -> PracticeDummy:
 	return null
 
 
-# ---- 1: cold-open boots Room01 with WASD beat already latched ---------
+# Recursively search a node subtree for the first Pickup. The dummy adds its
+# iron_sword Pickup (deferred) to its own parent — a child of the Room01 node
+# — so a recursive walk is the robust way to find it.
+func _find_pickup(node: Node) -> Pickup:
+	if node is Pickup:
+		return node as Pickup
+	for child in node.get_children():
+		var found: Pickup = _find_pickup(child)
+		if found != null:
+			return found
+	return null
 
-func test_cold_open_boots_room01_with_wasd_beat_latched() -> void:
+
+# ---- 1: cold-open boots Room01 with WASD beat latched + player fistless ---
+
+func test_cold_open_boots_room01_with_wasd_beat_and_fistless_player() -> void:
 	var main: Main = _instantiate_main()
 	await _await_tutorial_wire()
 	var room: Node = main.get_current_room()
@@ -108,62 +122,106 @@ func test_cold_open_boots_room01_with_wasd_beat_latched() -> void:
 	# PracticeDummy spawned (one mob, type matches).
 	var dummy: PracticeDummy = _first_dummy(room)
 	assert_not_null(dummy, "Room01 spawned a PracticeDummy on boot")
+	# Ticket 86c9qbb3k: player boots FISTLESS — no boot-equip bandaid.
+	var p: Player = main.get_player()
+	assert_null(p.get_equipped_weapon(),
+		"player boots fistless — the PR #146 boot-equip bandaid is retired; " +
+		"the player equips by picking up the dummy's iron_sword drop")
+	assert_null(_inventory().get_equipped(&"weapon"),
+		"Inventory weapon slot empty at cold boot (no boot-time seed/equip)")
 
 
-# ---- 2: full traversal — kill dummy, advance to Room02, equipped ------
+# ---- 2: full traversal — kill dummy, WALK ONTO PICKUP, advance equipped ---
 
-func test_full_tutorial_traversal_lands_room02_with_iron_sword_equipped() -> void:
-	# This is the headline Tier 3 invariant — the entire Stage 2b flow
-	# end-to-end, with the load-bearing iron_sword-equipped assertion at
-	# Room02 entry.
+func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() -> void:
+	# The headline Tier 3 invariant — the entire Stage 2b flow end-to-end,
+	# driving the REAL pickup path: the player walks onto the dummy-dropped
+	# iron_sword Pickup, the Area2D body_entered fires, and the auto-equip-on-
+	# pickup flow equips the sword. The Room01 → Room02 advance is gated on
+	# that equip (Main._on_room01_mob_died arms the gate while the player is
+	# fistless), so reaching Room02 PROVES the pickup was collected + equipped.
 	var main: Main = _instantiate_main()
 	await _await_tutorial_wire()
 	var room: Node = main.get_current_room()
 	var dummy: PracticeDummy = _first_dummy(room)
 	assert_not_null(dummy, "Room01 dummy present")
 	var p: Player = main.get_player()
+
 	# Step 1: drive movement → dodge beat.
 	p.velocity = Vector2(Player.WALK_SPEED, 0.0)
 	room._physics_process(PHYS_DELTA)
 	assert_true(room.get_tutorial_beat_emitted(&"dodge"),
 		"dodge beat fires on movement detection")
+
 	# Step 2: drive dodge → LMB beat.
 	p.velocity = Vector2.ZERO
 	var ok: bool = p.try_dodge(Vector2.RIGHT)
 	assert_true(ok, "try_dodge accepted (player at idle, no cooldown)")
 	assert_true(room.get_tutorial_beat_emitted(&"lmb_strike"),
 		"lmb_strike beat fires on iframes_started")
-	# Step 3: kill the dummy. Three fist hits at FIST_DAMAGE=1 = HP_MAX.
-	# Drive via direct take_damage (Tier 1 grunt-kill paths cover the
-	# physics-Hitbox flow; this test focuses on the tutorial-flow + iron-
-	# sword integration). HP=3 → three hits exactly.
+
+	# Step 3: kill the dummy. Player is FISTLESS now (bandaid retired), so the
+	# dummy takes three FIST_DAMAGE=1 hits to die (HP_MAX=3). Drive via direct
+	# take_damage (Tier 1 grunt-kill paths cover the physics-Hitbox flow).
 	for _i in PracticeDummy.HP_MAX:
 		dummy.take_damage(1, Vector2.ZERO, null)
 	assert_true(dummy.is_dead(), "dummy dies after HP_MAX fist hits")
 	assert_true(room.get_tutorial_beat_emitted(&"rmb_heavy"),
 		"rmb_heavy beat fires on dummy poof")
-	# Step 4: dummy's deferred Pickup add_child + Main's Room01 deferred
-	# room-clear listener both land on the next frame. Process frames until
-	# Main has advanced to Room02.
-	# Main._on_room01_mob_died → call_deferred("_on_room_cleared") → next
-	# frame → load_room_at_index(1). Two frames is generous.
+	# Capture the dummy's death position BEFORE it frees — the Pickup spawns
+	# at this world position.
+	var pickup_world_pos: Vector2 = dummy.global_position
+
+	# Step 4: let the dummy's deferred Pickup add_child land. The Room01 →
+	# Room02 advance is GATED (player fistless), so Room01 stays alive and the
+	# Pickup persists — it is NOT destroyed by an immediate room-load.
+	await get_tree().process_frame
+	# We must still be in Room01 — the gate is holding the advance.
+	assert_eq(main.get_current_room_index(), 0,
+		"Room01 → Room02 advance is GATED on pickup-equip — still in Room01 " +
+		"because the player has not collected the iron_sword Pickup yet")
+	# Find the dummy-dropped Pickup in the Room01 subtree.
+	var pickup: Pickup = _find_pickup(room)
+	assert_not_null(pickup,
+		"the dummy dropped an iron_sword Pickup into the Room01 subtree")
+	assert_not_null(pickup.item, "the Pickup carries an ItemInstance")
+	assert_eq(pickup.item.def.id, &"iron_sword",
+		"the dropped Pickup is the iron_sword (deterministic dummy drop)")
+
+	# Step 5: WALK THE PLAYER ONTO THE PICKUP. Move the player's body onto the
+	# Pickup's Area2D and run physics frames so the real `body_entered` signal
+	# fires — exactly the production overlap-detection path. (We set the
+	# position directly rather than driving WALK_SPEED for N frames; the
+	# load-bearing part is the real Area2D overlap event, not the walk input.)
+	p.global_position = pickup.global_position
+	# A few physics frames for the Area2D monitoring to register the overlap
+	# and fire body_entered → picked_up → Inventory.on_pickup_collected.
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+
+	# Step 6: the pickup-equip + the gate release + the room advance all chain
+	# through deferred calls — drain a few frames for Room02 to load.
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await get_tree().process_frame
-	# Sponsor's perspective: by now we should be in Room02 with the
-	# iron_sword equipped.
+
+	# The player must now be in Room02 — which is ONLY reachable by collecting
+	# + equipping the iron_sword Pickup (the gate held the advance until then).
 	assert_eq(main.get_current_room_index(), 1,
-		"Main advanced to Room02 (index 1) after dummy poof")
-	# CRITICAL — iron_sword auto-collected and equipped. The auto-collect
-	# happens in Main._on_mob_died → Inventory.auto_collect_pickups, which
-	# runs in PR #146's boot-equip-bandaid era was preceded by the boot-
-	# equip path. Stage 2b's design-correct path is: dummy drops sword →
-	# auto-collect → equip. Assert both surfaces of the equipped-weapon
+		"Main advanced to Room02 (index 1) — proves the iron_sword Pickup was " +
+		"collected + auto-equipped, releasing the Room01 onboarding gate. " +
+		"Pickup was at world ~%s." % pickup_world_pos)
+
+	# CRITICAL — the iron_sword is equipped on BOTH dual-surfaces, via the
+	# legitimate dummy-drop → pickup → auto-equip flow (NOT the retired
+	# boot-equip bandaid). Assert both surfaces of the equipped-weapon
 	# dual-surface rule (per `.claude/docs/combat-architecture.md`).
 	var equipped: ItemDef = p.get_equipped_weapon()
-	assert_not_null(equipped, "Player surface: equipped weapon non-null")
+	assert_not_null(equipped,
+		"Player surface: equipped weapon non-null after the pickup-equip")
 	assert_eq(equipped.id, &"iron_sword",
-		"Player surface: equipped weapon is iron_sword (dummy drop → auto-collect)")
+		"Player surface: equipped weapon is iron_sword (dummy drop → pickup → auto-equip)")
 	var inv: Node = _inventory()
 	var inv_equipped = inv.get_equipped(&"weapon")
 	assert_not_null(inv_equipped, "Inventory surface: equipped weapon non-null")

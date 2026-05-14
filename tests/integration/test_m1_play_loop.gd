@@ -549,20 +549,18 @@ func test_save_load_round_trips_inventory_items_via_production_resolvers() -> vo
 	var inventory: Node = _inventory()
 	inventory.add(inv_item)
 	inventory.add(eq_item)
-	# At this point Main._ready already auto-equipped the starter iron_sword
-	# (via equip_starter_weapon_if_needed). The equip-swap below replaces
-	# the starter with eq_item and — per the P0 86c9q96m8 fix
-	# (.claude/docs/combat-architecture.md §"Equipped-weapon dual-surface rule"
-	# failure mode 3) — pushes the previously-equipped starter back into the
-	# grid instead of leaking it. Pre-fix the starter was silently dropped on
-	# the floor; post-fix it survives, so post-equip-swap the grid holds
-	# BOTH inv_item AND the starter iron_sword. The save round-trip below
-	# preserves both and the count is 2.
+	# Ticket 86c9qbb3k: the PR #146 boot-equip bandaid is retired — the player
+	# boots FISTLESS, so there is no starter iron_sword to push back from the
+	# weapon slot. `add()` does NOT auto-equip (only `on_pickup_collected`
+	# does), so both inv_item and eq_item sit in the grid. `equip(eq_item, ..)`
+	# moves eq_item from the grid into the empty weapon slot — nothing is
+	# pushed back. Post-equip the grid holds ONLY inv_item; the save round-trip
+	# below preserves it and the count is 1.
 	inventory.equip(eq_item, &"weapon")
 	# Sanity pre-state.
-	assert_eq(inventory.get_items().size(), 2,
-		"pre-save: 2 items in inventory (inv_item + starter iron_sword pushed " +
-		"back from equipped slot via P0 86c9q96m8 equip-swap fix)")
+	assert_eq(inventory.get_items().size(), 1,
+		"pre-save: 1 item in inventory (inv_item) — eq_item moved into the " +
+		"empty weapon slot; no starter sword to push back (boot-equip bandaid retired)")
 	assert_not_null(inventory.get_equipped(&"weapon"), "pre-save: weapon equipped")
 	# Save through the production path.
 	assert_true(main.save_now(0), "production save_now succeeds")
@@ -579,28 +577,19 @@ func test_save_load_round_trips_inventory_items_via_production_resolvers() -> vo
 	assert_false(loaded.is_empty(), "load_game returns persisted data")
 	inventory.restore_from_save(loaded, prod_item_resolver, prod_affix_resolver)
 	# Assert: items survived round-trip with id + affixes.
-	# Two items expected post-fix: inv_item (T2, swift=0.075) and the starter
-	# iron_sword pushed back from the equipped slot during the equip-swap above
-	# (P0 86c9q96m8 fix). The starter is a vanilla T1 iron_sword with no
-	# affixes — we identify inv_item by its rolled affix shape (swift @ 0.075
-	# is the unique signature) since insertion order is implementation detail.
+	# Ticket 86c9qbb3k: with the PR #146 boot-equip bandaid retired, the player
+	# boots fistless — there is no starter iron_sword in the grid. After the
+	# equip-swap above, the grid holds exactly ONE item: inv_item (T2,
+	# swift=0.075). The save round-trip must preserve it.
 	var items: Array = inventory.get_items()
-	assert_eq(items.size(), 2,
-		"BB-2: 2 inventory items survive round-trip — inv_item + starter " +
-		"iron_sword pushed back by the P0 86c9q96m8 equip-swap fix")
-	# Pick out inv_item by its T2 + swift @ 0.075 signature (the starter is T1
-	# with zero affixes, so the test is unambiguous).
-	var restored_inv: ItemInstance = null
-	for it_v in items:
-		var it_cand: ItemInstance = it_v as ItemInstance
-		if it_cand == null or it_cand.def == null:
-			continue
-		if int(it_cand.rolled_tier) == int(ItemDef.Tier.T2) and it_cand.rolled_affixes.size() == 1:
-			restored_inv = it_cand
-			break
+	assert_eq(items.size(), 1,
+		"BB-2: 1 inventory item survives round-trip — inv_item (no starter " +
+		"sword in the grid; the boot-equip bandaid that seeded one is retired)")
+	# inv_item is identified by its T2 + swift @ 0.075 signature.
+	var restored_inv: ItemInstance = items[0] as ItemInstance
 	assert_not_null(restored_inv,
-		"BB-2: T2/swift inv_item must be present after round-trip — " +
-		"if null, the round-trip dropped the inventory item or its affixes")
+		"BB-2: inv_item must be present after round-trip — " +
+		"if null, the round-trip dropped the inventory item")
 	assert_not_null(restored_inv.def, "BB-2: restored ItemInstance has resolved ItemDef")
 	assert_eq(restored_inv.def.id, &"iron_sword", "BB-2: id round-trips")
 	assert_eq(int(restored_inv.rolled_tier), int(ItemDef.Tier.T2), "BB-2: tier round-trips")
@@ -608,23 +597,6 @@ func test_save_load_round_trips_inventory_items_via_production_resolvers() -> vo
 	var restored_aff: AffixRoll = restored_inv.rolled_affixes[0]
 	assert_eq(restored_aff.def.id, &"swift", "BB-2: affix id round-trips")
 	assert_almost_eq(restored_aff.rolled_value, 0.075, 1e-6, "BB-2: affix rolled_value round-trips")
-	# Cross-check: the OTHER item in the grid is the previously-equipped
-	# starter — vanilla T1 iron_sword with zero affixes. This is the load-
-	# bearing assertion that the equip-swap leak fix is preserving the item.
-	var starter_present: bool = false
-	for it_v in items:
-		var it_cand: ItemInstance = it_v as ItemInstance
-		if it_cand == null or it_cand.def == null:
-			continue
-		if it_cand == restored_inv:
-			continue
-		if it_cand.def.id == &"iron_sword" and it_cand.rolled_affixes.size() == 0:
-			starter_present = true
-			break
-	assert_true(starter_present,
-		"P0 86c9q96m8: starter iron_sword (T1, no affixes) must be in the grid " +
-		"post-round-trip — proves the equip-swap pushed it back to inventory " +
-		"and the save preserved it. Pre-fix the starter was leaked.")
 	# Equipped weapon survived too.
 	var restored_eq: ItemInstance = inventory.get_equipped(&"weapon") as ItemInstance
 	assert_not_null(restored_eq, "BB-2: equipped weapon survives round-trip")

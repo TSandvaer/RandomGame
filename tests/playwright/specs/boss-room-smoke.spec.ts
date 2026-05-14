@@ -38,12 +38,12 @@ test.describe("Boss room smoke (M2 W1 P0 fix)", () => {
     const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:8000";
     await page.goto(baseURL, { waitUntil: "domcontentloaded" });
 
-    // Boot must complete cleanly.
+    // Boot must complete cleanly. (No `[Inventory] starter iron_sword
+    // auto-equipped` line — the PR #146 boot-equip bandaid is retired,
+    // ticket 86c9qbb3k; the player boots fistless and equips by picking up
+    // the Room01 dummy drop. This smoke test only checks the boot path, so
+    // it does not need the player equipped.)
     await capture.waitForLine(/\[Main\] M1 play-loop ready/, BOOT_TIMEOUT_MS);
-    await capture.waitForLine(
-      /\[Inventory\] starter iron_sword auto-equipped \(weapon slot\)/,
-      5_000
-    );
 
     // No 'Can't change this state while flushing queries' panic during boot —
     // the deferred trigger_entry_sequence in Stratum1BossRoom._ready is

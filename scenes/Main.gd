@@ -97,6 +97,19 @@ var _current_room_index: int = 0
 var _boss_room: Stratum1BossRoom = null
 var _loot_spawner: MobLootSpawner = null
 
+## Room01 onboarding gate (ticket 86c9qbb3k). When the Room01 PracticeDummy
+## dies it drops an iron_sword Pickup; the room advance to Room02 must WAIT
+## until the player walks onto that Pickup and auto-equips it — otherwise the
+## immediate room-load would `queue_free` Room01 (and the Pickup with it)
+## before the player could ever collect it, and the "never fistless"
+## onboarding guarantee would be impossible. This flag is set true when the
+## dummy dies while the player is unequipped; `_on_weapon_equipped` clears it
+## and fires the deferred room advance. If the player is ALREADY equipped when
+## the dummy dies (e.g. a save-restored weapon, or a post-death respawn that
+## preserved the equipped weapon per the M1 death rule), the gate is skipped
+## and the room advances immediately as before.
+var _room01_awaiting_pickup_equip: bool = false
+
 # HUD widgets (built by _build_hud).
 var _hp_label: Label = null
 var _hp_bar: ProgressBar = null
@@ -159,16 +172,13 @@ func _ready() -> void:
 	# Load save (or defaults) BEFORE loading the first room so the player's
 	# HP / XP / level / equipped state is correct when the room spawns mobs.
 	_load_save_or_defaults()
-	# Auto-equip the starter iron_sword AFTER save-restore so the save can't
-	# clobber it. equip_starter_weapon_if_needed is a no-op when the weapon
-	# slot is already filled (either by the save-restore above, or by a prior
-	# equip call on this boot). Calling it here guarantees fresh starts AND
-	# pre-PR-145 saves (equipped:{} = empty) all get the starter sword.
-	# DO NOT call this in Player._ready() — that fires before _load_save_or_defaults,
-	# so Inventory.restore_from_save would immediately clobber the equip result.
-	var starter_inv: Node = _inventory()
-	if starter_inv != null and starter_inv.has_method("equip_starter_weapon_if_needed"):
-		starter_inv.equip_starter_weapon_if_needed()
+	# NOTE: there is no boot-time starter-weapon auto-equip here any more. The
+	# PR #146 `equip_starter_weapon_if_needed` bandaid was retired in ticket
+	# 86c9qbb3k. The design-correct onboarding path is auto-equip-first-weapon-
+	# on-pickup: the Stage-2b Room01 PracticeDummy drops an iron_sword, the
+	# player walks onto it, and `Inventory.on_pickup_collected` auto-equips it
+	# (first-weapon-only). A save-restored equipped weapon is honored by
+	# `_load_save_or_defaults` above, exactly as before.
 	_load_room_at_index(0)
 	_refresh_hud_full()
 	print("[Main] M1 play-loop ready — Room 01 loaded, autoloads wired")
@@ -365,6 +375,11 @@ func _load_room_at_index(index: int) -> void:
 	if index < 0 or index >= ROOM_SCENE_PATHS.size():
 		push_error("[Main] room index %d out of range" % index)
 		return
+	# Defensive: clear the Room01 onboarding pickup gate on any room load.
+	# Normally `_on_weapon_equipped` clears it before firing the advance, but
+	# any other code path that loads a room while the gate is armed must not
+	# leak the `Inventory.item_equipped` connection into the next room.
+	_clear_room01_pickup_gate()
 	# Tear down old room. Use queue_free so any signal listeners running on
 	# this tick can finish first (mirrors Grunt._die's defer-free pattern).
 	if _current_room != null:
@@ -477,6 +492,17 @@ func _install_room01_clear_listener(_room: Node, mobs: Array[Node]) -> void:
 # Room01 mob death handler — when the last live mob dies, fire the
 # room_cleared synthetic signal. mob_died emits BEFORE the queue_free
 # deferred call, so we count "still-alive non-dead mobs" on the current room.
+#
+# **Onboarding pickup gate (ticket 86c9qbb3k).** Room01's dummy drops an
+# iron_sword Pickup on death. If the player is not yet equipped, the room
+# advance MUST wait until the player collects that Pickup and auto-equips —
+# otherwise `_on_room_cleared → _load_room_at_index` would `queue_free` Room01
+# (taking the Pickup with it) on the very next frame, before the player could
+# ever reach it. We arm `_room01_awaiting_pickup_equip` and connect to
+# `Inventory.item_equipped`; the room advances from `_on_weapon_equipped` once
+# the weapon slot is filled. If the player is ALREADY equipped (save-restored
+# weapon, or a post-death respawn that preserved equipped state), the gate is
+# skipped and the room advances immediately.
 func _on_room01_mob_died(_a: Variant = null, _b: Variant = null, _c: Variant = null) -> void:
 	if _current_room == null:
 		return
@@ -486,10 +512,61 @@ func _on_room01_mob_died(_a: Variant = null, _b: Variant = null, _c: Variant = n
 	for n: Node in _current_room.get_spawned_mobs():
 		if is_instance_valid(n) and not _mob_is_dead(n):
 			alive_count += 1
-	if alive_count == 0:
-		# Deferred so any other `mob_died` listeners on this tick (XP gain,
-		# loot drop) finish their work first.
-		call_deferred("_on_room_cleared")
+	if alive_count != 0:
+		return
+	# Room01's dummy is dead. Decide: gate on pickup-equip, or advance now.
+	if _current_room_index == 0 and not _player_has_weapon_equipped():
+		# Player is fistless — wait for the iron_sword Pickup to be collected
+		# and auto-equipped before advancing. Arm the gate.
+		_room01_awaiting_pickup_equip = true
+		var inventory: Node = _inventory()
+		if inventory != null and inventory.has_signal("item_equipped"):
+			if not inventory.is_connected("item_equipped", _on_weapon_equipped):
+				inventory.connect("item_equipped", _on_weapon_equipped)
+		return
+	# Player already equipped (save-restored weapon, or a respawn that
+	# preserved equipped state) — no pickup needed, advance immediately.
+	# Deferred so any other `mob_died` listeners on this tick (XP gain,
+	# loot drop) finish their work first.
+	call_deferred("_on_room_cleared")
+
+
+# Returns true if the player currently has a weapon equipped (Inventory's
+# weapon slot is occupied). Used by the Room01 onboarding pickup gate.
+func _player_has_weapon_equipped() -> bool:
+	var inventory: Node = _inventory()
+	if inventory == null or not inventory.has_method("get_equipped"):
+		return false
+	return inventory.get_equipped(&"weapon") != null
+
+
+# Inventory.item_equipped handler — armed only while the Room01 onboarding
+# pickup gate is open. When the player walks onto the dummy-dropped iron_sword
+# Pickup, `Inventory.on_pickup_collected` auto-equips it and fires
+# `item_equipped`. That's our cue to finally advance Room01 → Room02. One-shot:
+# we disconnect immediately so a later equip (Tab → LMB-click swap) doesn't
+# re-trigger a room advance.
+func _on_weapon_equipped(_item: Variant = null, slot: Variant = null) -> void:
+	if not _room01_awaiting_pickup_equip:
+		return
+	if slot != null and StringName(slot) != &"weapon":
+		# Some other slot (armor) was equipped — keep waiting for the weapon.
+		return
+	_clear_room01_pickup_gate()
+	# Deferred so the equip's own signal listeners finish first, mirroring the
+	# immediate-advance path above.
+	call_deferred("_on_room_cleared")
+
+
+# Disarm the Room01 onboarding pickup gate: clear the flag and drop the
+# `Inventory.item_equipped` connection. Idempotent — safe to call when the
+# gate was never armed.
+func _clear_room01_pickup_gate() -> void:
+	_room01_awaiting_pickup_equip = false
+	var inventory: Node = _inventory()
+	if inventory != null and inventory.has_signal("item_equipped") \
+			and inventory.is_connected("item_equipped", _on_weapon_equipped):
+		inventory.disconnect("item_equipped", _on_weapon_equipped)
 
 
 func _mob_is_dead(m: Node) -> bool:

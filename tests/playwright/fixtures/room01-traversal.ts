@@ -14,14 +14,20 @@
  * Stage 2c shifts the dummy spawn position or HP; centralizing it means one
  * edit ripples to all callers.
  *
- * **iron_sword bandaid coexistence (PR #146 retirement ticket 86c9qbb3k):**
- * The bandaid auto-equips iron_sword at boot, so Player damage = 6. With
- * dummy HP = 3, 1 swing kills. When the bandaid retires (player drops in
- * fistless per Uma's design-correct path), dummy HP = 3 / FIST_DAMAGE = 1
- * → 3 swings to kill. The helper cycles `attacksPerDir = 4` per direction
- * which works in BOTH cases — overkill at damage=6, exact at damage=1. When
- * the bandaid retires, the dummy-poof timing budget shifts but the helper
- * does not need to change.
+ * **iron_sword bandaid RETIRED (ticket 86c9qbb3k — this PR).** The PR #146
+ * boot-equip bandaid is gone: the player drops in FISTLESS and the Room01
+ * dummy poofs at FIST_DAMAGE = 1 (HP = 3 → 3 swings to kill). The dummy then
+ * drops a guaranteed iron_sword Pickup; the player must WALK ONTO that
+ * Pickup to auto-equip it (`Inventory.on_pickup_collected` →
+ * auto-equip-first-weapon). The Room01 → Room02 advance is GATED on that
+ * equip (`Main._on_room01_mob_died` holds the advance while the player is
+ * fistless) — so this helper now has a Phase F pickup-collection step:
+ * after the dummy dies it walks the player over the drop position until the
+ * `[combat-trace] Inventory.equip | ... source=auto_pickup` line fires. The
+ * Pickup also has an initial-overlap check (it collects against a player
+ * already standing on the drop tile from the killing blow), so the walk is
+ * belt-and-suspenders. `clearRoom01Dummy` returns `pickupEquipped` so callers
+ * can assert the onboarding equip happened.
  *
  * **Spawn geometry rationale:** PR #169's `s1_room01.tres` places the dummy
  * at `position_tiles = (11, 4)` × `tile_size_px = 32` = chunk-local (352, 128),
@@ -85,16 +91,31 @@ const ATTACK_INTERVAL_MS = 220;
 export interface Room01ClearOptions {
   /**
    * Total wall-clock budget for the dummy-clear phase. Default 90 s — generous
-   * so spec authors don't have to tune. Real cost on the bandaid path
-   * (damage=6) is typically ≤ 5 s; on the post-bandaid path (damage=1) ≤ 12 s.
+   * so spec authors don't have to tune. Post-bandaid (fistless, damage=1) the
+   * dummy poofs in 3 swings; real cost is typically ≤ 12 s + a few seconds for
+   * the pickup-collection phase.
    */
   budgetMs?: number;
   /** Per-direction attack count during the sweep. Default 3. */
   attacksPerDir?: number;
+  /**
+   * Skip the Phase F pickup-collection step. Default false. Set true ONLY for
+   * specs that deliberately want to leave the player fistless / leave the
+   * Room01 → Room02 advance gated (none currently — the gate means Room02 is
+   * unreachable without the pickup, so almost every caller wants the pickup).
+   */
+  skipPickup?: boolean;
 }
 
 export interface Room01ClearResult {
   dummyKilled: boolean;
+  /**
+   * True once the dummy-dropped iron_sword Pickup was collected AND
+   * auto-equipped (the `[combat-trace] Inventory.equip | source=auto_pickup`
+   * line was observed). When false after a non-skipped run, the Room01 →
+   * Room02 advance gate is still closed and Room02 will not load.
+   */
+  pickupEquipped: boolean;
   durationMs: number;
   attacksFired: number;
 }
@@ -112,18 +133,23 @@ export interface Room01ClearResult {
  *   - The player is at (or near) `DEFAULT_PLAYER_SPAWN = (240, 200)` —
  *     fresh boot or fresh room load.
  *
- * Postconditions:
+ * Postconditions (default, `skipPickup` false):
  *   - At least one `[combat-trace] PracticeDummy._die` line in the buffer.
- *   - The room-clear flow has fired via `Main._install_room01_clear_listener`
- *     → `_on_room_cleared` → `_load_room_at_index(1)`. After ~1500ms settle,
- *     the player is teleported back to (240, 200) in Room02.
+ *   - At least one `[combat-trace] Inventory.equip | source=auto_pickup` line
+ *     (the player walked onto the dummy-dropped iron_sword Pickup and it
+ *     auto-equipped). `result.pickupEquipped` is true.
+ *   - The Room01 → Room02 advance gate (`Main._on_room01_mob_died`) has
+ *     released — the room-clear flow fires `_on_room_cleared` →
+ *     `_load_room_at_index(1)`. After ~1500ms settle, the player is
+ *     teleported to (240, 200) in Room02, now holding the iron_sword.
  *
  * Note: caller still needs to `waitForTimeout(~1500ms)` AFTER this helper
  * returns to let the Room02 load complete. The helper does not embed that
  * wait so callers can decide how to use the post-clear window (e.g. snapshot
  * line counts before the room-load fires).
  *
- * Throws if the dummy doesn't die within the budget.
+ * Throws if the dummy doesn't die within the budget, or (when `skipPickup`
+ * is false) if the Pickup is never collected/auto-equipped.
  */
 export async function clearRoom01Dummy(
   page: Page,
@@ -135,6 +161,7 @@ export async function clearRoom01Dummy(
 ): Promise<Room01ClearResult> {
   const budgetMs = options.budgetMs ?? 90_000;
   const attacksPerDir = options.attacksPerDir ?? 3;
+  const skipPickup = options.skipPickup ?? false;
   const t0 = Date.now();
 
   const preDummyDeaths = capture
@@ -145,6 +172,21 @@ export async function clearRoom01Dummy(
       .getLines()
       .filter((l) => /\[combat-trace\] PracticeDummy\._die/.test(l.text))
       .length > preDummyDeaths;
+
+  // The dummy-dropped iron_sword Pickup auto-equips via
+  // `Inventory.on_pickup_collected` → `equip(item, &"weapon", &"auto_pickup")`,
+  // which emits `[combat-trace] Inventory.equip | ... source=auto_pickup`.
+  const preAutoPickupEquips = capture
+    .getLines()
+    .filter((l) =>
+      /\[combat-trace\] Inventory\.equip \| .*source=auto_pickup/.test(l.text)
+    ).length;
+  const checkPickupEquipped = () =>
+    capture
+      .getLines()
+      .filter((l) =>
+        /\[combat-trace\] Inventory\.equip \| .*source=auto_pickup/.test(l.text)
+      ).length > preAutoPickupEquips;
 
   let attacksFired = 0;
 
@@ -176,33 +218,25 @@ export async function clearRoom01Dummy(
   await page.waitForTimeout(700);
   await page.keyboard.up("w");
   await page.waitForTimeout(150);
-  if (checkDummyDead()) {
-    return {
-      dummyKilled: true,
-      durationMs: Date.now() - t0,
-      attacksFired,
-    };
-  }
+  let dummyKilled = checkDummyDead();
 
   // ---- Phase B: walk pure E for 1300ms (X: 240 → ~396; walls clamp) ----
-  await page.keyboard.down("d");
-  await page.waitForTimeout(1300);
-  await page.keyboard.up("d");
-  await page.waitForTimeout(150);
-  if (checkDummyDead()) {
-    return {
-      dummyKilled: true,
-      durationMs: Date.now() - t0,
-      attacksFired,
-    };
+  if (!dummyKilled) {
+    await page.keyboard.down("d");
+    await page.waitForTimeout(1300);
+    await page.keyboard.up("d");
+    await page.waitForTimeout(150);
+    dummyKilled = checkDummyDead();
   }
 
   // ---- Phase C: 8-direction attack sweep ----
-  let dummyKilled = await attackSweep(SWEEP_DIRECTIONS);
+  if (!dummyKilled) {
+    dummyKilled = await attackSweep(SWEEP_DIRECTIONS);
+  }
 
   // ---- Phase D: small SW correction + retry sweep (in case walls clamped
   // the player far from the dummy) ----
-  if (!dummyKilled && Date.now() - t0 < budgetMs - 8_000) {
+  if (!dummyKilled && Date.now() - t0 < budgetMs - 12_000) {
     await page.keyboard.down("s");
     await page.keyboard.down("a");
     await page.waitForTimeout(200);
@@ -213,7 +247,7 @@ export async function clearRoom01Dummy(
   }
 
   // ---- Phase E: extra N+E walk + sweep retry (if phase B undershot) ----
-  if (!dummyKilled && Date.now() - t0 < budgetMs - 8_000) {
+  if (!dummyKilled && Date.now() - t0 < budgetMs - 12_000) {
     await page.keyboard.down("w");
     await page.waitForTimeout(500);
     await page.keyboard.up("w");
@@ -238,8 +272,84 @@ export async function clearRoom01Dummy(
     );
   }
 
+  // ---- Phase F: collect the dummy-dropped iron_sword Pickup ----
+  //
+  // Ticket 86c9qbb3k: the dummy drops a guaranteed iron_sword Pickup at its
+  // death position (world ~368, 144). On a FISTLESS player the Room01 →
+  // Room02 advance is GATED on the auto-equip (`Main._on_room01_mob_died`
+  // holds the advance while the player has no weapon), so Room02 is
+  // UNREACHABLE until the Pickup is collected. The Pickup has an
+  // initial-overlap check (it collects against a player already standing on
+  // the drop tile from the killing blow), so the player is OFTEN already
+  // equipped by the time we get here — `checkPickupEquipped()` short-circuits.
+  //
+  // **Already-equipped case (post-reload / post-respawn).** If the player
+  // ALREADY had a weapon when the dummy died (a save-restored weapon, or a
+  // post-death respawn that preserved equipped state per the M1 death rule),
+  // `Main._on_room01_mob_died` advances IMMEDIATELY — no gate, no pickup
+  // needed. We detect that case via the kill-sweep Hitbox.hit damage: a
+  // weapon-scaled hit (damage >= 2) means the player was equipped before the
+  // kill, so Phase F is skipped (the dropped Pickup just rides along until the
+  // room frees, and `on_pickup_collected` would not auto-swap an equipped
+  // weapon anyway). Fistless kills are damage=1 → Phase F is required.
+  let pickupEquipped = checkPickupEquipped();
+  const killSweepWasWeaponScaled = capture
+    .getLines()
+    .some((l) => {
+      const m = l.text.match(
+        /\[combat-trace\] Hitbox\.hit \| team=player.*damage=(\d+)/
+      );
+      return m != null && parseInt(m[1], 10) >= 2;
+    });
+  const playerWasAlreadyEquipped = killSweepWasWeaponScaled && !pickupEquipped;
+  if (!skipPickup && !pickupEquipped && !playerWasAlreadyEquipped) {
+    // Criss-cross walk centred on the dummy's death position. After the kill
+    // sweep the player is near (368, 144) but the exact offset is unknown, so
+    // we sweep short walk-bursts in all 8 directions to drag the player's
+    // body across the Pickup's Area2D (radius 8 + player body radius ~10).
+    const PICKUP_WALK: { keys: string[]; ms: number }[] = [
+      { keys: ["a"], ms: 260 },
+      { keys: ["w"], ms: 260 },
+      { keys: ["d"], ms: 520 },
+      { keys: ["s"], ms: 520 },
+      { keys: ["a"], ms: 520 },
+      { keys: ["w"], ms: 520 },
+      { keys: ["d"], ms: 260 },
+      { keys: ["s"], ms: 260 },
+    ];
+    const pickupDeadline = Date.now() + Math.min(20_000, budgetMs);
+    pickupLoop: while (Date.now() < pickupDeadline) {
+      for (const step of PICKUP_WALK) {
+        for (const k of step.keys) await page.keyboard.down(k);
+        await page.waitForTimeout(step.ms);
+        for (const k of step.keys) await page.keyboard.up(k);
+        await page.waitForTimeout(120);
+        if (checkPickupEquipped()) {
+          pickupEquipped = true;
+          break pickupLoop;
+        }
+      }
+    }
+    if (!pickupEquipped) {
+      throw new Error(
+        `[room01-traversal] dummy died but the iron_sword Pickup was never ` +
+          `collected/auto-equipped within the pickup budget. The player is ` +
+          `still fistless and the Room01 → Room02 advance gate is closed — ` +
+          `Room02 will not load. Expected a ` +
+          `[combat-trace] Inventory.equip | source=auto_pickup line. ` +
+          `Last 30 trace lines:\n` +
+          capture
+            .getLines()
+            .slice(-30)
+            .map((l) => `  ${l.text}`)
+            .join("\n")
+      );
+    }
+  }
+
   return {
     dummyKilled,
+    pickupEquipped,
     durationMs: Date.now() - t0,
     attacksFired,
   };

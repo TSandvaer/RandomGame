@@ -79,11 +79,10 @@ test.describe("tutorial-beat-trace — TutorialEventBus.request_beat emits [comb
       await page.goto(baseURL, { waitUntil: "domcontentloaded" });
 
       // ---- Phase 1: Boot ----
+      // No `[Inventory] starter iron_sword auto-equipped` line — the PR #146
+      // boot-equip bandaid is retired (ticket 86c9qbb3k). The player boots
+      // fistless; `clearRoom01Dummy` (Phase 4) handles the kill + pickup-equip.
       await capture.waitForLine(/\[Main\] M1 play-loop ready/, BOOT_TIMEOUT_MS);
-      await capture.waitForLine(
-        /\[Inventory\] starter iron_sword auto-equipped/,
-        5_000
-      );
 
       // ---- Phase 2: Focus canvas + get geometry ----
       const canvas = page.locator("canvas").first();
