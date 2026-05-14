@@ -490,6 +490,7 @@ func _die() -> void:
 	if _is_dead:
 		return
 	_is_dead = true
+	_combat_trace("Charger._die", "starting death sequence")
 	# Cancel every pending action so a death-during-charge doesn't slide the
 	# corpse forward, and so a death-during-telegraph doesn't fire the
 	# charge from a dead body. Spec edge probe.
