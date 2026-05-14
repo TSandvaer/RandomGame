@@ -30,6 +30,10 @@ const TEST_SLOT: int = 998
 const EXPECTED_GREEN_R: float = 0.478
 const EXPECTED_GREEN_G: float = 0.780
 const EXPECTED_GREEN_B: float = 0.451
+# Badge checkmark shape (ticket 86c9qah1q) — mirrors InventoryPanel
+# BADGE_CHECK_SIZE and the R channel of COLOR_EQUIPPED_BADGE_TEXT (#1B1A1F).
+const EXPECTED_BADGE_CHECK_SIZE: Vector2 = Vector2(9, 9)
+const EXPECTED_BADGE_DARK_R: float = 0.10588235
 
 
 func _inv() -> Node:
@@ -344,8 +348,10 @@ func test_t3_outline_color_is_canonical_green() -> void:
 			assert_lt(ch, 1.0, "%s channel %f sub-1.0 (HTML5 HDR clamp)" % [edge_name, ch])
 
 
-# AC3.7 — badge plate color uses the same green at 92% alpha; badge text
-# uses panel-bg-dark for high-contrast (color-blind safe).
+# AC3.7 / AC-CB1 / AC-CB2 / AC-CB5 / AC-CB6 — badge plate color uses the same
+# green at 92% alpha; badge text + checkmark shape use panel-bg-dark for high
+# contrast; the checkmark is a renderer-agnostic SHAPE (not a font glyph); and
+# the whole badge content fits inside the plate (no overflow / clipping).
 func test_t3_badge_plate_and_text_colors() -> void:
 	var panel: InventoryPanel = _make_panel()
 	var btn: Button = panel._equipped_cells.get(&"weapon", null) as Button
@@ -357,30 +363,48 @@ func test_t3_badge_plate_and_text_colors() -> void:
 	# Plate is 92% alpha (matches InventoryPanel chrome alpha).
 	assert_almost_eq(plate.color.a, 0.92, 0.005,
 		"plate alpha = 92% (transient-but-real chrome)")
-	# AC-CB1 / AC-CB6 — badge label text reads "✓ EQUIPPED" (U+2713 prefix).
-	# Replaces the prior "EQUIPPED" assertion per Uma's M2 W2 Addendum § Test bar.
-	# The checkmark is the color-blind secondary cue — a non-color shape that
-	# survives protanopia/deuteranopia/tritanopia and monochrome rendering.
+	# AC-CB1 / AC-CB6 — badge label text reads plain "EQUIPPED" (font-safe
+	# ASCII). The color-blind secondary cue is a separate checkmark SHAPE node
+	# ("BadgeCheck"), NOT a U+2713 glyph inside the text run: the Godot 4.3
+	# `gl_compatibility` (HTML5) default font has no "✓" glyph and rendered it
+	# as a notdef "tofu" box in PR #179's first cut (Tess's pr179 captures).
 	var label: Label = plate.get_node("BadgeLabel") as Label
 	assert_not_null(label, "badge label exists")
-	assert_eq(label.text, "✓ EQUIPPED",
-		"badge text reads ✓ EQUIPPED — checkmark glyph is the CVD secondary cue (AC-CB1, AC-CB6)")
-	# AC-CB2 / AC-CB5 — the badge text must FIT INSIDE the plate. This is the
-	# exact gap that let PR #179's first cut ship a clipped, illegible badge
-	# past green CI: the old test only asserted `text ==` and a hardcoded
-	# `plate.size ==`, never that the rendered glyph string fits the rect.
-	# The label is PRESET_FULL_RECT, so if its real minimum size exceeds the
-	# plate, the content overflows + clips against the dark cell behind it.
+	assert_eq(label.text, "EQUIPPED",
+		"badge text reads plain ASCII EQUIPPED (font-safe; ✓ cue is a separate shape)")
+	# The checkmark cue is a shape node with two ColorRect strokes — assert it
+	# exists, is sized, and uses the dark high-contrast badge-text color. A
+	# font glyph would have left no such node (the PR #179-first-cut failure
+	# mode); requiring the shape node closes that gap.
+	var check: Control = plate.get_node("BadgeCheck") as Control
+	assert_not_null(check, "badge checkmark shape node exists (CVD secondary cue, AC-CB1/AC-CB6)")
+	assert_eq(check.size, EXPECTED_BADGE_CHECK_SIZE,
+		"checkmark shape is %s px" % [EXPECTED_BADGE_CHECK_SIZE])
+	var check_strokes: Array = check.get_children()
+	assert_eq(check_strokes.size(), 2,
+		"checkmark is built from 2 ColorRect strokes (short + long), not a font glyph")
+	for stroke_v in check_strokes:
+		var stroke: ColorRect = stroke_v as ColorRect
+		assert_not_null(stroke, "checkmark stroke is a ColorRect (renderer-agnostic primitive)")
+		assert_almost_eq(stroke.color.r, EXPECTED_BADGE_DARK_R, 0.005,
+			"checkmark stroke uses the dark high-contrast badge-text color")
+	# AC-CB2 / AC-CB5 — the badge content must FIT INSIDE the plate. This is
+	# the exact gap that let PR #179's first cut ship a clipped, illegible
+	# badge past green CI: the old test only asserted `text ==` and a
+	# hardcoded `plate.size ==`, never that the rendered content fits the rect.
 	# Assert the plate is at least as large as the label's measured minimum
-	# size on BOTH axes — this is renderer/font-agnostic and catches overflow
-	# by construction.
+	# size on BOTH axes, AND that the label's own rect sits fully inside the
+	# plate — renderer/font-agnostic, catches overflow by construction.
 	var label_min: Vector2 = label.get_minimum_size()
-	assert_true(plate.size.x >= label_min.x,
-		"badge plate width %.1f >= label min width %.1f — ✓ EQUIPPED fits horizontally (AC-CB2)"
-			% [plate.size.x, label_min.x])
+	assert_true(label.position.x + label_min.x <= plate.size.x + 0.01,
+		"badge label right edge %.1f fits within plate width %.1f — EQUIPPED + ✓ shape fit horizontally (AC-CB2)"
+			% [label.position.x + label_min.x, plate.size.x])
 	assert_true(plate.size.y >= label_min.y,
-		"badge plate height %.1f >= label min height %.1f — ✓ EQUIPPED fits vertically, no spill below plate (AC-CB5)"
+		"badge plate height %.1f >= label min height %.1f — EQUIPPED fits vertically, no spill below plate (AC-CB5)"
 			% [plate.size.y, label_min.y])
+	assert_true(plate.size.y >= EXPECTED_BADGE_CHECK_SIZE.y,
+		"badge plate height %.1f >= checkmark height %.1f — ✓ shape fits vertically"
+			% [plate.size.y, EXPECTED_BADGE_CHECK_SIZE.y])
 	# The plate must also stay inside its 96 px host Button (position is pinned
 	# at x=2) so the badge never overhangs the cell edge.
 	assert_true(plate.position.x + plate.size.x <= 96.0,
@@ -388,7 +412,7 @@ func test_t3_badge_plate_and_text_colors() -> void:
 			% [plate.position.x + plate.size.x])
 	# And it must not reach down into the centered button-text region: the
 	# plate is pinned at y=2; keep its bottom comfortably in the top quarter
-	# of the 96 px cell so the ✓ glyph never overlaps the item-name glyph.
+	# of the 96 px cell so the badge never overlaps the centered item name.
 	assert_true(plate.position.y + plate.size.y <= 24.0,
 		"badge plate bottom edge %.1f stays in the cell's top quarter, clear of the centered item text"
 			% [plate.position.y + plate.size.y])
