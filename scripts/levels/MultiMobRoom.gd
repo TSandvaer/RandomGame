@@ -96,49 +96,43 @@ func _ready() -> void:
 	if chunk_def == null:
 		push_error("MultiMobRoom: no chunk_def assigned")
 		return
-	# `_build()` stays synchronous: it spawns CharacterBody2D mobs (no Area2D
-	# monitoring mutation) and populates `_assembly.mobs` immediately, which
-	# `Main._wire_room_signals` reads via `get_spawned_mobs()` on the same
-	# tick the room is added. The mob spawn/parent pass MUST be complete
-	# before `_register_mobs_with_gate` runs — see `_assemble_room_fixtures`.
+	# `_build()` stays synchronous: it instantiates the chunk geometry +
+	# every mob CharacterBody2D and splices them into this room's tree, so
+	# `get_spawned_mobs()` / `get_bounds_px()` / the perimeter-wall geometry
+	# are all live the same tick the room is added — `Main._wire_room_signals`
+	# (and `test_room_boundary_walls.gd`) rely on that synchronous contract.
+	#
+	# This `_build()` `add_child` is physics-flush-safe ONLY because the
+	# next-room load no longer runs inside a physics-flush window — see the
+	# `CONNECT_DEFERRED` on `gate_traversed` in `_spawn_room_gate()` (ticket
+	# 86c9u1cx1). With that deferral, `Main._on_room_cleared → _load_room_at_index
+	# → _world.add_child(room) → MultiMobRoom._ready()` runs at end-of-frame,
+	# OUTSIDE `PhysicsServer2D.flush_queries()`, so the mob CharacterBody2D +
+	# CollisionShape2D inserts here land on a clean tick. Were `_build()` to
+	# run inside a flush, those inserts would panic with `USER ERROR: Can't
+	# change this state while flushing queries` (`body_set_shape_disabled` /
+	# `body_set_shape_as_one_way_collision`) and leave the mobs' shapes
+	# unregistered → un-hittable → room unbeatable (the Room 05 freeze).
 	_build()
 	# Defer the Area2D-fixture pass (RoomGate + HealingFountain spawn) AND
 	# `_register_mobs_with_gate` out of the physics-flush window.
 	#
-	# Root cause (ticket 86c9tqvxx — the real AC4 blocker): Rooms 02..08 are
-	# loaded by `Main._load_room_at_index`, which for every room past Room 01
-	# runs inside a physics-flush window — the call chain is rooted in the
-	# PRIOR room's `RoomGate.gate_traversed` → `MultiMobRoom._on_room_gate_traversed`
-	# → `room_cleared` → `Main._on_room_cleared` → `_load_room_at_index` →
-	# `_world.add_child(room)` → `MultiMobRoom._ready()`, and `gate_traversed`
-	# itself emits from `RoomGate._on_body_entered` (a CharacterBody2D physics
-	# callback). `_spawn_room_gate()` does a synchronous `add_child` of a
-	# `RoomGate` — an Area2D — and adding an Area2D + activating its monitoring
-	# inside a physics flush panics with `USER ERROR: Can't change this state
-	# while flushing queries` (see `.claude/docs/combat-architecture.md`
-	# § "Physics-flush rule"). The C++ early-returns, leaving the gate
-	# improperly inserted: `RoomGate.is_inside_tree()` reads false, so the
-	# gate's `_combat_trace` shim no-ops (zero `[combat-trace] RoomGate.register_mob`
-	# lines ever emit — the empirical AC4 symptom) AND the gate's Area2D never
-	# monitors, so `body_entered` never fires, the gate never locks/unlocks,
-	# and traversal past Room 02 is impossible.
-	#
-	# Deferring lands `_spawn_room_gate` AFTER the physics flush completes —
-	# the Area2D `add_child` + monitoring activation then run on a clean tick.
-	# This mirrors the `Stratum1Room01._ready → call_deferred("_wire_tutorial_flow")`
-	# and `Stratum1BossRoom._ready → call_deferred("trigger_entry_sequence")`
-	# precedents (same `.claude/docs` § "Room-load triggers vs body_entered
-	# triggers" rule). `_spawn_healing_fountain` is folded into the deferred
-	# pass because it too does `add_child` from this physics-flush `_ready`.
+	# Root cause (ticket 86c9tqvxx): `_spawn_room_gate()` does an `add_child`
+	# of a `RoomGate` Area2D + activates its monitoring. Even with the
+	# `gate_traversed` `CONNECT_DEFERRED` above making the *next-room* load
+	# flush-safe, deferring this pass is kept belt-and-suspenders: it also
+	# covers the FIRST room's load and mirrors the
+	# `Stratum1Room01._ready → call_deferred("_wire_tutorial_flow")` and
+	# `Stratum1BossRoom._ready → call_deferred("trigger_entry_sequence")`
+	# precedents. `_spawn_healing_fountain` is folded in because it too does
+	# an `add_child` of a fixture node.
 	call_deferred("_assemble_room_fixtures")
 
 
-## Deferred fixture pass — runs one frame after `_ready`, OUTSIDE the
-## physics-flush window that `Main._load_room_at_index` invokes `_ready`
-## inside. Spawns the RoomGate + HealingFountain Area2D-derived fixtures
-## and registers every spawned mob with the gate. Idempotent-safe: if the
-## room is freed before the deferred call lands, the `is_inside_tree`
-## guard bails cleanly.
+## Deferred fixture pass — runs one frame after `_ready`. Spawns the RoomGate
+## + HealingFountain Area2D-derived fixtures and registers every spawned mob
+## with the gate. Idempotent-safe: if the room is freed before the deferred
+## call lands, the `is_inside_tree` guard bails cleanly.
 func _assemble_room_fixtures() -> void:
 	if not is_inside_tree():
 		return
@@ -181,6 +175,13 @@ func get_room_id() -> StringName:
 
 # ---- Build ---------------------------------------------------------
 
+## Construct the chunk assembly (geometry + mob CharacterBody2Ds) and splice
+## it into this room's tree. Synchronous by design — `Main._wire_room_signals`
+## and `test_room_boundary_walls.gd` read `get_spawned_mobs()` / the perimeter
+## geometry the same tick the room is added. This `add_child(_assembly.root)`
+## is physics-flush-safe ONLY because the next-room load is deferred out of
+## the flush via the `gate_traversed` `CONNECT_DEFERRED` (ticket 86c9u1cx1) —
+## see `_ready()` for the full rationale.
 func _build() -> void:
 	var assembler: LevelAssembler = LevelAssembler.new()
 	var spawner: Callable = Callable(self, "_spawn_mob")
@@ -218,7 +219,24 @@ func _spawn_room_gate() -> void:
 	# Disconnecting the old gate_unlocked → room_cleared path and replacing it
 	# with gate_traversed → room_cleared is the entire P0 #1 fix.
 	_room_gate.gate_unlocked.connect(_on_room_gate_unlocked)
-	_room_gate.gate_traversed.connect(_on_room_gate_traversed)
+	# CONNECT_DEFERRED (ticket 86c9u1cx1 — load-bearing): `gate_traversed` is
+	# emitted from `RoomGate._on_body_entered`, a `body_entered` physics
+	# callback that runs synchronously inside `PhysicsServer2D.flush_queries()`.
+	# A SYNCHRONOUS connection would run `_on_room_gate_traversed → room_cleared
+	# → Main._on_room_cleared → _load_room_at_index` entirely inside that flush
+	# window — and `_load_room_at_index` does `_world.add_child(next_room)` +
+	# `next_room.add_child(_player)`, splicing CharacterBody2D + CollisionShape2D
+	# subtrees into the physics server mid-flush. That panics with `USER ERROR:
+	# Can't change this state while flushing queries` (`body_set_shape_disabled`
+	# / `body_set_shape_as_one_way_collision`), leaving the next room's mobs'
+	# collision shapes UNREGISTERED — the mobs render + AI-tick but are
+	# un-hittable, never die, and the room can never clear. This was the Room 05
+	# 3-concurrent-chaser freeze. CONNECT_DEFERRED queues the entire next-room
+	# load to end-of-frame, OUTSIDE the flush, so every body/shape splice in the
+	# load chain runs on a clean tick. Mirrors PR #173's `mob_died`
+	# CONNECT_DEFERRED on RoomGate.register_mob (same physics-flush race class).
+	# See `.claude/docs/combat-architecture.md` § "Physics-flush rule".
+	_room_gate.gate_traversed.connect(_on_room_gate_traversed, CONNECT_DEFERRED)
 
 
 func _spawn_healing_fountain() -> void:
