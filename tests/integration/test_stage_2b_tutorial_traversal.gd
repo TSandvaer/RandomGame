@@ -162,25 +162,23 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 
 	# Step 3: kill the dummy. Player is FISTLESS now (bandaid retired), so the
 	# dummy takes three FIST_DAMAGE=1 hits to die (HP_MAX=3). Drive via direct
-	# take_damage (Tier 1 grunt-kill paths cover the physics-Hitbox flow).
+	# take_damage. The dummy's `_die` spawns the iron_sword Pickup (deferred
+	# add_child) at the dummy's own death position.
 	for _i in PracticeDummy.HP_MAX:
 		dummy.take_damage(1, Vector2.ZERO, null)
 	assert_true(dummy.is_dead(), "dummy dies after HP_MAX fist hits")
 	assert_true(room.get_tutorial_beat_emitted(&"rmb_heavy"),
 		"rmb_heavy beat fires on dummy poof")
-	# Capture the dummy's death position BEFORE it frees — the Pickup spawns
-	# at this world position.
-	var pickup_world_pos: Vector2 = dummy.global_position
 
-	# Step 4: let the dummy's deferred Pickup add_child land. The Room01 →
-	# Room02 advance is GATED (player fistless), so Room01 stays alive and the
-	# Pickup persists — it is NOT destroyed by an immediate room-load.
+	# Step 4: drain one frame so the dummy's deferred `add_child` lands the
+	# Pickup in the room. The Pickup's `_ready` runs on this frame and defers
+	# `_activate_and_check_initial_overlap` (which will run NEXT frame).
 	await get_tree().process_frame
-	# We must still be in Room01 — the gate is holding the advance.
+	# The Room01 → Room02 advance is still GATED (player fistless) — Room01 is
+	# still alive, so the Pickup persists.
 	assert_eq(main.get_current_room_index(), 0,
 		"Room01 → Room02 advance is GATED on pickup-equip — still in Room01 " +
 		"because the player has not collected the iron_sword Pickup yet")
-	# Find the dummy-dropped Pickup in the Room01 subtree.
 	var pickup: Pickup = _find_pickup(room)
 	assert_not_null(pickup,
 		"the dummy dropped an iron_sword Pickup into the Room01 subtree")
@@ -189,16 +187,20 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 		"the dropped Pickup is the iron_sword (deterministic dummy drop)")
 
 	# Step 5: WALK THE PLAYER ONTO THE PICKUP. Move the player's body onto the
-	# Pickup's Area2D and run physics frames so the real `body_entered` signal
-	# fires — exactly the production overlap-detection path. (We set the
-	# position directly rather than driving WALK_SPEED for N frames; the
-	# load-bearing part is the real Area2D overlap event, not the walk input.)
-	p.global_position = pickup.global_position
-	# A few physics frames for the Area2D monitoring to register the overlap
-	# and fire body_entered → picked_up → Inventory.on_pickup_collected.
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-	await get_tree().physics_frame
+	# Pickup's exact position NOW — after the Pickup is in the tree but BEFORE
+	# its deferred `_activate_and_check_initial_overlap` runs (queued during
+	# the Pickup's `_ready` above; runs next idle frame). When that deferred
+	# pass runs, `get_overlapping_bodies()` finds the player concentric with
+	# the Pickup and collects immediately — the exact production
+	# overlap-detection path (same pre-existing-overlap pattern
+	# `test_hitbox_overlapping_at_spawn.gd` exercises for Hitbox). Re-assert
+	# the position each physics frame so the player's `move_and_slide` cannot
+	# drift it back out of the Pickup's radius-8 collision shape before the
+	# overlap check lands.
+	for _i in 4:
+		p.global_position = pickup.global_position
+		p.velocity = Vector2.ZERO
+		await get_tree().physics_frame
 
 	# Step 6: the pickup-equip + the gate release + the room advance all chain
 	# through deferred calls — drain a few frames for Room02 to load.
@@ -211,7 +213,7 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 	assert_eq(main.get_current_room_index(), 1,
 		"Main advanced to Room02 (index 1) — proves the iron_sword Pickup was " +
 		"collected + auto-equipped, releasing the Room01 onboarding gate. " +
-		"Pickup was at world ~%s." % pickup_world_pos)
+		"Pickup spawned at world ~%s." % dummy_pos)
 
 	# CRITICAL — the iron_sword is equipped on BOTH dual-surfaces, via the
 	# legitimate dummy-drop → pickup → auto-equip flow (NOT the retired
