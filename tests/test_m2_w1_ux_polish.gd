@@ -30,6 +30,10 @@ const TEST_SLOT: int = 998
 const EXPECTED_GREEN_R: float = 0.478
 const EXPECTED_GREEN_G: float = 0.780
 const EXPECTED_GREEN_B: float = 0.451
+# Badge checkmark shape (ticket 86c9qah1q) — mirrors InventoryPanel
+# BADGE_CHECK_SIZE and the R channel of COLOR_EQUIPPED_BADGE_TEXT (#1B1A1F).
+const EXPECTED_BADGE_CHECK_SIZE: Vector2 = Vector2(9, 9)
+const EXPECTED_BADGE_DARK_R: float = 0.10588235
 
 
 func _inv() -> Node:
@@ -344,8 +348,10 @@ func test_t3_outline_color_is_canonical_green() -> void:
 			assert_lt(ch, 1.0, "%s channel %f sub-1.0 (HTML5 HDR clamp)" % [edge_name, ch])
 
 
-# AC3.7 — badge plate color uses the same green at 92% alpha; badge text
-# uses panel-bg-dark for high-contrast (color-blind safe).
+# AC3.7 / AC-CB1 / AC-CB2 / AC-CB5 / AC-CB6 — badge plate color uses the same
+# green at 92% alpha; badge text + checkmark shape use panel-bg-dark for high
+# contrast; the checkmark is a renderer-agnostic SHAPE (not a font glyph); and
+# the whole badge content fits inside the plate (no overflow / clipping).
 func test_t3_badge_plate_and_text_colors() -> void:
 	var panel: InventoryPanel = _make_panel()
 	var btn: Button = panel._equipped_cells.get(&"weapon", null) as Button
@@ -357,10 +363,72 @@ func test_t3_badge_plate_and_text_colors() -> void:
 	# Plate is 92% alpha (matches InventoryPanel chrome alpha).
 	assert_almost_eq(plate.color.a, 0.92, 0.005,
 		"plate alpha = 92% (transient-but-real chrome)")
-	# Badge label text reads "EQUIPPED".
+	# AC-CB1 / AC-CB6 — badge label text reads plain "EQUIPPED" (font-safe
+	# ASCII). The color-blind secondary cue is a separate checkmark SHAPE node
+	# ("BadgeCheck"), NOT a U+2713 glyph inside the text run: the Godot 4.3
+	# `gl_compatibility` (HTML5) default font has no "✓" glyph and rendered it
+	# as a notdef "tofu" box in PR #179's first cut (Tess's pr179 captures).
 	var label: Label = plate.get_node("BadgeLabel") as Label
 	assert_not_null(label, "badge label exists")
-	assert_eq(label.text, "EQUIPPED", "badge text reads EQUIPPED")
+	assert_eq(label.text, "EQUIPPED",
+		"badge text reads plain ASCII EQUIPPED (font-safe; ✓ cue is a separate shape)")
+	# The checkmark cue is a shape node with two ColorRect strokes — assert it
+	# exists, is sized, and uses the dark high-contrast badge-text color. A
+	# font glyph would have left no such node (the PR #179-first-cut failure
+	# mode); requiring the shape node closes that gap.
+	var check: Control = plate.get_node("BadgeCheck") as Control
+	assert_not_null(check, "badge checkmark shape node exists (CVD secondary cue, AC-CB1/AC-CB6)")
+	assert_eq(check.size, EXPECTED_BADGE_CHECK_SIZE,
+		"checkmark shape is %s px" % [EXPECTED_BADGE_CHECK_SIZE])
+	var check_strokes: Array = check.get_children()
+	assert_eq(check_strokes.size(), 2,
+		"checkmark is built from 2 ColorRect strokes (short + long), not a font glyph")
+	for stroke_v in check_strokes:
+		var stroke: ColorRect = stroke_v as ColorRect
+		assert_not_null(stroke, "checkmark stroke is a ColorRect (renderer-agnostic primitive)")
+		assert_almost_eq(stroke.color.r, EXPECTED_BADGE_DARK_R, 0.005,
+			"checkmark stroke uses the dark high-contrast badge-text color")
+	# AC-CB2 / AC-CB5 — the badge content must FIT INSIDE the plate. This is
+	# the exact gap that let PR #179's first cut ship a clipped, illegible
+	# badge past green CI: the old test only asserted `text ==` and a
+	# hardcoded `plate.size ==`, never that the rendered content fits the rect.
+	#
+	# WIDTH was the overflow axis on PR #179 ("✓ EQUIPPED" too wide for the
+	# 72 px plate). Assert the label's own rect — positioned after the
+	# checkmark area — sits fully inside the plate width. This is the
+	# renderer/font-agnostic invariant: it scales with the real measured
+	# `get_minimum_size().x`, so a wider font can never silently overflow.
+	var label_min: Vector2 = label.get_minimum_size()
+	assert_true(label.position.x + label_min.x <= plate.size.x + 0.01,
+		"badge label right edge %.1f fits within plate width %.1f — EQUIPPED + ✓ shape fit horizontally (AC-CB2)"
+			% [label.position.x + label_min.x, plate.size.x])
+	# The checkmark shape must also fit inside the plate width, sitting before
+	# the label with the configured gap.
+	assert_true(check.position.x + check.size.x <= label.position.x + 0.01,
+		"checkmark shape right edge %.1f clears the label start %.1f (no overlap)"
+			% [check.position.x + check.size.x, label.position.x])
+	# HEIGHT — the plate must be tall enough for the checkmark shape, and the
+	# checkmark must sit fully within it (vertically centred). NOT asserted
+	# against `label.get_minimum_size().y`: that is the font's full ~27 px
+	# line box, not the visible glyph height — the label is vertically
+	# centre-aligned and draws the glyphs centred within the shorter plate.
+	assert_true(plate.size.y >= EXPECTED_BADGE_CHECK_SIZE.y,
+		"badge plate height %.1f >= checkmark height %.1f — ✓ shape fits vertically"
+			% [plate.size.y, EXPECTED_BADGE_CHECK_SIZE.y])
+	assert_true(check.position.y >= -0.01 and check.position.y + check.size.y <= plate.size.y + 0.01,
+		"checkmark shape (y %.1f, h %.1f) sits fully within the %.1f px plate"
+			% [check.position.y, check.size.y, plate.size.y])
+	# The plate must also stay inside its 96 px host Button (position is pinned
+	# at x=2) so the badge never overhangs the cell edge.
+	assert_true(plate.position.x + plate.size.x <= 96.0,
+		"badge plate right edge %.1f within the 96 px equipped-cell button"
+			% [plate.position.x + plate.size.x])
+	# And it must not reach down into the centered button-text region: the
+	# plate is pinned at y=2; keep its bottom comfortably in the top quarter
+	# of the 96 px cell so the badge never overlaps the centered item name.
+	assert_true(plate.position.y + plate.size.y <= 24.0,
+		"badge plate bottom edge %.1f stays in the cell's top quarter, clear of the centered item text"
+			% [plate.position.y + plate.size.y])
 
 
 # AC3.1 / AC3.4 — Tier 2 integration: real Inventory.equip flips outlines on.

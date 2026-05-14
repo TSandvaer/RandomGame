@@ -76,6 +76,29 @@ const COLOR_CELL_EMPTY: Color = Color(0.2274509804, 0.2078431373, 0.2509803922, 
 const COLOR_EQUIPPED_INDICATOR: Color = Color(0.478, 0.780, 0.451, 1.0)  # #7AC773
 const COLOR_EQUIPPED_BADGE_PLATE: Color = Color(0.478, 0.780, 0.451, 0.92)  # #7AC773 @92%
 const COLOR_EQUIPPED_BADGE_TEXT: Color = Color(0.10588235, 0.10196078, 0.12156863, 1.0)  # #1B1A1F
+# Horizontal padding (px) added on each side of the badge content to derive
+# the BadgePlate WIDTH. Width is the axis that overflowed in PR #179 — it is
+# derived from the label's measured minimum WIDTH + checkmark area + this pad,
+# so it can never drift out of sync with the font / string (ticket 86c9qah1q).
+const BADGE_PLATE_H_PADDING: float = 4.0
+# Fixed plate HEIGHT (px). NOT derived from `Label.get_minimum_size().y`:
+# that returns the font's full line-box height (~27 px for the default theme
+# font at size 9 — ascent + descent + leading), which would make the plate
+# absurdly tall and push it down into the centered item-name text. The visible
+# glyph cap-height at font size 9 is far smaller; the pre-`✓` `main` build
+# shipped a 12 px plate that rendered "EQUIPPED" cleanly (vertical_alignment
+# CENTER draws the glyphs centred regardless of the line-box metric). 14 px
+# keeps that proven fit and gives the 9 px checkmark shape breathing room.
+const BADGE_PLATE_HEIGHT: float = 14.0
+# The checkmark secondary cue is drawn as a SHAPE (two rotated ColorRect
+# strokes), not a font glyph — the Godot 4.3 `gl_compatibility` (HTML5)
+# default font has no U+2713 "✓" glyph and renders it as notdef "tofu".
+# BADGE_CHECK_SIZE is the checkmark's bounding box; BADGE_CHECK_STROKE its
+# stroke thickness; BADGE_CHECK_TEXT_GAP the gap between the checkmark and
+# the "EQUIPPED" label.
+const BADGE_CHECK_SIZE: Vector2 = Vector2(9, 9)
+const BADGE_CHECK_STROKE: float = 2.0
+const BADGE_CHECK_TEXT_GAP: float = 3.0
 
 # Tier colors (Uma palette.md).
 const TIER_COLORS: Dictionary = {
@@ -560,12 +583,17 @@ func _build_equipped_row() -> void:
 		hbox.add_child(btn)
 		_equipped_cells[slot] = btn
 		# Equipped-state indicators (Ticket 3 — `86c9q7p48`). 4 outline
-		# ColorRects + 1 EQUIPPED badge (ColorRect plate + Label text). All
-		# default-hidden; `_set_equipped_indicator` flips them on when the
-		# slot has an item. Per Uma's design § "Visual spec (locked)":
+		# ColorRects + 1 EQUIPPED badge (ColorRect plate + checkmark-shape +
+		# Label text). All default-hidden; `_set_equipped_indicator` flips
+		# them on when the slot has an item. Per Uma's design § "Visual spec":
 		#   - 2 px green outline on all 4 sides, color #7AC773
-		#   - 60 × 12 px EQUIPPED badge at top-left, font color #1B1A1F on
-		#     #7AC773 plate (high-contrast for color-blind readers)
+		#   - "EQUIPPED" badge at top-left, font color #1B1A1F on #7AC773
+		#     plate, with a checkmark SHAPE (two rotated ColorRect strokes,
+		#     ticket 86c9qah1q) as the color-blind secondary cue. The plate
+		#     is auto-sized to the checkmark area + the label's measured
+		#     minimum size + padding so the content always fits — no
+		#     hardcoded size. The "✓" is a shape, NOT a font glyph: the
+		#     HTML5 default font has no U+2713 and rendered it as tofu.
 		# All ColorRects + Label render identically in `gl_compatibility`
 		# (HTML5) and `forward_plus` (desktop) — zero Polygon2D, all colors
 		# strictly sub-1.0 per channel.
@@ -583,8 +611,10 @@ func _build_equipped_row() -> void:
 ##   - bottom edge: ColorRect at (0, 96)   size (96, 2)
 ##   - left   edge: ColorRect at (-2, -2)  size (2, 100)
 ##   - right  edge: ColorRect at (96, -2)  size (2, 100)
-##   - badge  plate: ColorRect at (2, 2)   size (60, 12)
-##   - badge  text:  Label  text="EQUIPPED" centered on plate
+##   - badge  plate: ColorRect at (2, 2)  size = check area + label min size + padding
+##   - badge  check: Control "BadgeCheck" — 2 rotated ColorRect strokes, the
+##                   CVD secondary cue drawn as a SHAPE (no font glyph)
+##   - badge  text:  Label  text="EQUIPPED" positioned right of the checkmark
 ##
 ## All children have `mouse_filter = MOUSE_FILTER_IGNORE` so they don't
 ## intercept clicks on the Button. Default `z_index = 0`; the Button paints
@@ -609,27 +639,69 @@ func _build_equipped_indicators_for_slot(btn: Button) -> void:
 	var right_edge: ColorRect = _make_outline_edge(Vector2(96, -2), Vector2(2, 100))
 	right_edge.name = "OutlineRight"
 	btn.add_child(right_edge)
-	# Badge plate
+	# Badge plate. Size is computed from the label's real minimum size + the
+	# checkmark-glyph area below (NOT a hardcoded constant) — see the sizing
+	# block after the children are built. Position stays pinned at top-left.
 	var plate: ColorRect = ColorRect.new()
 	plate.name = "BadgePlate"
 	plate.color = COLOR_EQUIPPED_BADGE_PLATE
 	plate.position = Vector2(2, 2)
-	plate.size = Vector2(60, 12)
 	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	plate.visible = false
 	btn.add_child(plate)
+	# Color-blind secondary cue (ticket `86c9qah1q`): a checkmark SHAPE that
+	# survives all CVD types + monochrome. Drawn from two rotated ColorRect
+	# strokes — NOT a font glyph. PR #179's first cut used the U+2713 "✓"
+	# character; the Godot 4.3 `gl_compatibility` (HTML5) default font has no
+	# glyph for it, so it rendered as a notdef "tofu" box in the release build
+	# (visible in Tess's pr179 captures as a boxed "27" — 0x2713's codepoint).
+	# ColorRect strokes render identically on `gl_compatibility` (HTML5) and
+	# `forward_plus` (desktop) with zero font dependency — the docs' "prefer
+	# ColorRect for simple shapes" rule (see .claude/docs/html5-export.md).
+	var check: Control = _make_badge_checkmark()
+	check.name = "BadgeCheck"
+	check.position = Vector2(BADGE_PLATE_H_PADDING, 0)  # vertical centre set after plate sized
+	plate.add_child(check)
 	# Badge text — Label child of the plate so it scrolls with the plate if
-	# layout ever shifts.
+	# layout ever shifts. Reads plain "EQUIPPED" (font-safe ASCII — always
+	# renders); the checkmark SHAPE to its left is the CVD cue, not a glyph
+	# inside the text run.
 	var badge_label: Label = Label.new()
 	badge_label.name = "BadgeLabel"
 	badge_label.text = "EQUIPPED"
 	badge_label.add_theme_color_override("font_color", COLOR_EQUIPPED_BADGE_TEXT)
 	badge_label.add_theme_font_size_override("font_size", 9)
-	badge_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	badge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	badge_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	plate.add_child(badge_label)
+	# Size the plate. WIDTH is derived from the label's *actual* rendered
+	# minimum width + the fixed checkmark area + horizontal padding — PR #179's
+	# 72 px hardcode was too narrow for "✓ EQUIPPED" at font size 9 and the
+	# label content overflowed + clipped against the dark cell. Deriving the
+	# width from `get_minimum_size().x` makes the horizontal fit correct by
+	# construction across every font, with no magic number to drift out of
+	# sync. `get_minimum_size()` resolves here because `_build_equipped_row`
+	# runs from `_ready` with the panel already in the tree, so the Label has
+	# a resolved theme + font. HEIGHT is the fixed BADGE_PLATE_HEIGHT — see
+	# that constant for why `get_minimum_size().y` is the WRONG height source
+	# (it returns the ~27 px full line box, not the visible glyph height).
+	var label_min: Vector2 = badge_label.get_minimum_size()
+	plate.size = Vector2(
+		BADGE_PLATE_H_PADDING          # left pad
+		+ BADGE_CHECK_SIZE.x           # checkmark shape area
+		+ BADGE_CHECK_TEXT_GAP         # gap between check and text
+		+ ceil(label_min.x)            # measured label width
+		+ BADGE_PLATE_H_PADDING,       # right pad
+		BADGE_PLATE_HEIGHT)
+	# Position the label after the checkmark area; give it the plate's height
+	# so its own vertical-centre alignment draws the glyphs centred.
+	badge_label.position = Vector2(
+		BADGE_PLATE_H_PADDING + BADGE_CHECK_SIZE.x + BADGE_CHECK_TEXT_GAP,
+		0)
+	badge_label.size = Vector2(ceil(label_min.x), plate.size.y)
+	# Centre the checkmark vertically within the plate.
+	check.position.y = (plate.size.y - BADGE_CHECK_SIZE.y) * 0.5
 
 
 ## Helper — build one outline-edge ColorRect at the given position/size with
@@ -643,6 +715,56 @@ func _make_outline_edge(pos: Vector2, sz: Vector2) -> ColorRect:
 	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	edge.visible = false
 	return edge
+
+
+## Helper — build the color-blind secondary-cue checkmark as a SHAPE (ticket
+## `86c9qah1q`). Returns a `BADGE_CHECK_SIZE`-sized Control containing two
+## rotated ColorRect strokes that together read as a "✓": a short stroke from
+## the lower-left descending to the bottom vertex, and a longer stroke rising
+## from that vertex to the upper-right.
+##
+## Why a shape and not the U+2713 character: the Godot 4.3 `gl_compatibility`
+## (HTML5) default font has no glyph for "✓" and renders it as a notdef
+## "tofu" box (Tess's pr179 captures showed a boxed "27" — 0x2713's codepoint
+## digits). ColorRect strokes are font-independent and render identically on
+## `gl_compatibility` (HTML5) and `forward_plus` (desktop). Strokes use the
+## same dark badge-text color as the "EQUIPPED" label for a unified high-
+## contrast cue on the green plate. `pivot_offset = (0,0)` so `rotation`
+## pivots about each stroke's top-left corner — positions are computed for
+## that pivot.
+func _make_badge_checkmark() -> Control:
+	var root: Control = Control.new()
+	root.custom_minimum_size = BADGE_CHECK_SIZE
+	root.size = BADGE_CHECK_SIZE
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var w: float = BADGE_CHECK_SIZE.x
+	var h: float = BADGE_CHECK_SIZE.y
+	var t: float = BADGE_CHECK_STROKE
+	# Short stroke: from ~(0.10w, 0.50h) down-right to the bottom vertex
+	# ~(0.40w, 0.82h). Length + angle from that delta.
+	var short_start: Vector2 = Vector2(w * 0.10, h * 0.50)
+	var bottom_vertex: Vector2 = Vector2(w * 0.40, h * 0.82)
+	var short_vec: Vector2 = bottom_vertex - short_start
+	var short_stroke: ColorRect = ColorRect.new()
+	short_stroke.color = COLOR_EQUIPPED_BADGE_TEXT
+	short_stroke.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	short_stroke.size = Vector2(short_vec.length() + t * 0.5, t)
+	short_stroke.position = short_start - Vector2(0, t * 0.5)
+	short_stroke.pivot_offset = Vector2.ZERO
+	short_stroke.rotation = short_vec.angle()
+	root.add_child(short_stroke)
+	# Long stroke: from the bottom vertex up-right to ~(0.92w, 0.16h).
+	var long_end: Vector2 = Vector2(w * 0.92, h * 0.16)
+	var long_vec: Vector2 = long_end - bottom_vertex
+	var long_stroke: ColorRect = ColorRect.new()
+	long_stroke.color = COLOR_EQUIPPED_BADGE_TEXT
+	long_stroke.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	long_stroke.size = Vector2(long_vec.length() + t * 0.5, t)
+	long_stroke.position = bottom_vertex - Vector2(0, t * 0.5)
+	long_stroke.pivot_offset = Vector2.ZERO
+	long_stroke.rotation = long_vec.angle()
+	root.add_child(long_stroke)
+	return root
 
 
 ## Toggle visibility of the 4 outline ColorRects + badge plate on the given
