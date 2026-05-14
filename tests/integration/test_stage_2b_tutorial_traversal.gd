@@ -163,7 +163,10 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 	# Step 3: kill the dummy. Player is FISTLESS now (bandaid retired), so the
 	# dummy takes three FIST_DAMAGE=1 hits to die (HP_MAX=3). Drive via direct
 	# take_damage. The dummy's `_die` spawns the iron_sword Pickup (deferred
-	# add_child) at the dummy's own death position.
+	# add_child) at the dummy's own death position — capture that position now,
+	# before the dummy frees, so the failure message can report where the
+	# Pickup was expected to spawn.
+	var dummy_pos: Vector2 = dummy.global_position
 	for _i in PracticeDummy.HP_MAX:
 		dummy.take_damage(1, Vector2.ZERO, null)
 	assert_true(dummy.is_dead(), "dummy dies after HP_MAX fist hits")
