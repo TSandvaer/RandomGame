@@ -423,6 +423,11 @@ class CombatTraceSpy:
 			if c[0] == tag:
 				return true
 		return false
+	func has_msg_containing(tag: String, needle: String) -> bool:
+		for c: Array in calls:
+			if c[0] == tag and (c[1] as String).find(needle) != -1:
+				return true
+		return false
 
 
 ## Swap the real DebugFlags autoload for a recording spy. Returns the spy;
@@ -485,6 +490,35 @@ func test_take_damage_emits_combat_trace_line() -> void:
 	# Downstream consequence still holds (Tier 2 bar): HP actually dropped.
 	assert_eq(s.get_hp(), 30, "non-lethal take_damage still decrements HP (40 - 10)")
 	assert_false(s.is_dead())
+
+
+# ---- 20: take_damage on an already-dead shooter emits IGNORED already_dead -
+#
+# infra(combat-trace) ticket 86c9u2v7k. Tess's QA of PR #192 flagged that
+# after the take_damage success-path trace landed, `Shooter.take_damage`
+# still early-returned SILENTLY on the `_is_dead` guard — whereas
+# `Grunt.take_damage` emits an `IGNORED already_dead` trace on that same
+# rejection path. Console-based soak debugging needs the rejection line to
+# tell "hit hit a corpse" apart from "hit never registered". Same
+# CombatTraceSpy injection pattern as test_take_damage_emits_combat_trace_line.
+
+func test_take_damage_on_dead_shooter_emits_ignored_already_dead() -> void:
+	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 20})
+	var s: Shooter = _make_shooter_with_def(def)
+	# Kill the shooter first (lethal hit drives the real death path).
+	s.take_damage(20, Vector2.ZERO, null)
+	assert_true(s.is_dead(), "precondition: shooter is dead before the rejected hit")
+	var spy: CombatTraceSpy = _install_combat_trace_spy()
+	# This hit must be rejected at the `_is_dead` guard — and emit the trace.
+	s.take_damage(10, Vector2.ZERO, null)
+	var captured: bool = spy.has_msg_containing("Shooter.take_damage", "IGNORED already_dead")
+	_restore_debug_flags(spy)
+	assert_true(captured,
+		"Shooter.take_damage must emit [combat-trace] Shooter.take_damage " +
+		"IGNORED already_dead on the _is_dead early-return — mirrors Grunt so " +
+		"soak console greps distinguish corpse-hits from unregistered hits")
+	# Downstream consequence (Tier 2 bar): the rejected hit changed nothing.
+	assert_eq(s.get_hp(), 0, "rejected take_damage does not decrement HP further")
 
 
 # ---- Shooter.pos harness-observability trace (ticket 86c9tz7zg) -------
