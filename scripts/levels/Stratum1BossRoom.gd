@@ -152,6 +152,15 @@ func _assemble_room_fixtures() -> void:
 		return
 	_build_door_trigger()
 	_spawn_stratum_exit()
+	# HTML5-only datapoint (ticket 86c9tv8uf): confirms the deferred fixture
+	# pass actually ran and the door-trigger Area2D is now in the tree +
+	# monitoring. If a physics-flush regression ever re-breaks the Area2D
+	# insertion, `monitoring` reads false here and Sponsor / the Playwright
+	# harness can see it in the console without a native build.
+	if _door_trigger != null:
+		_combat_trace("Stratum1BossRoom._assemble_room_fixtures",
+			"door_trigger built — inside_tree=%s monitoring=%s" % [
+				str(_door_trigger.is_inside_tree()), str(_door_trigger.monitoring)])
 	# M2 W1 P0 fix (`86c9q96fv` + `86c9q96ht`): the boss starts STATE_DORMANT
 	# and only wakes via `trigger_entry_sequence()` → 1.8 s timer → `wake()`.
 	# The original wake-gate was the door-trigger Area2D at (240, 250) — but
@@ -302,6 +311,14 @@ func _on_door_trigger_body_entered(body: Node) -> void:
 	# guard is belt-and-suspenders — it prevents a future bare-Node or wrong-
 	# class body from entering the mask (e.g. during tests) from triggering the
 	# cinematic sequence by mistake.
+	# HTML5-only datapoint (ticket 86c9tv8uf): proves the door-trigger Area2D
+	# is monitoring and actually saw a body. Logged BEFORE the CharacterBody2D
+	# filter so "trigger saw something" vs "trigger saw nothing" is always
+	# distinguishable in the console — the same Case A / Case B distinction
+	# `RoomGate._on_body_entered` uses. This is the trace the Playwright
+	# boss-room spec asserts on to confirm the physics-flush fix landed.
+	_combat_trace("Stratum1BossRoom._on_door_trigger_body_entered",
+		"body=%s is_character_body=%s" % [str(body), str(body is CharacterBody2D)])
 	if not body is CharacterBody2D:
 		return
 	trigger_entry_sequence()
@@ -372,3 +389,18 @@ func entry_sequence_elapsed_ms() -> int:
 	if _entry_completed_time_ms == 0 or _entry_started_time_ms == 0:
 		return -1
 	return _entry_completed_time_ms - _entry_started_time_ms
+
+
+## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
+## Same pattern as `RoomGate._combat_trace` and the mob `_combat_trace`
+## helpers; emits in HTML5 builds so Sponsor's DevTools console (and the
+## Playwright harness) can confirm the boss-room door-trigger Area2D is
+## monitoring + sees bodies — the observable surface for the ticket
+## 86c9tv8uf physics-flush fix, which otherwise produces no GDScript
+## exception (Godot's `USER ERROR` macros log + return-early in C++).
+func _combat_trace(tag: String, msg: String = "") -> void:
+	var df: Node = null
+	if is_inside_tree():
+		df = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(tag, msg)
