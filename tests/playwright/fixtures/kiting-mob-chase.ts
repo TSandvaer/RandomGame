@@ -73,31 +73,50 @@
  * normal `gateTraversalWalk` (the gate is still OPEN with `mobs_alive == 0`
  * — the kill-first precondition that helper expects).
  *
- * **Return-to-spawn step (ticket 86c9u1cy2 — Room 04 determinism):**
+ * **Post-chase gate resolution (ticket 86c9u1cy2 — Room 04 determinism):**
  *
- * When the chase clears the kiter WITHOUT driving `gate_traversed`, the
- * caller falls back to `gateTraversalWalk` — and that helper has a hard
- * precondition: *the player is at (or very near) `DEFAULT_PLAYER_SPAWN =
- * (240, 200)`*. Its whole two-segment W→N walk geometry is computed from
- * that spawn position (see `fixtures/gate-traversal.ts` header). But the
- * chase just roamed the player ALL OVER the room cornering the kiting
- * Shooter — the player ends wherever the kill happened to land, which is
- * non-deterministic. Pre-fix, `chaseAndClearKitingMobs` had NO
- * return-to-spawn step, so for Room 04 (the only pure-Shooter room — its
- * `gateTraversalWalk` runs from wherever the chase left the player) the
- * subsequent walk started from a random position and missed the trigger
- * rect ~50% of headed runs. Room 04 was ~50% flaky as a direct result of
- * PR #186 adding the chase without a position-reset.
+ * PR #186 added the chase but left the gate in an indeterminate state, and
+ * Room 04 (the only PURE-Shooter room — it has no chaser pre-pass keeping
+ * the player near spawn) was ~50% flaky as a direct result. The root cause
+ * is that cornering a kiting Shooter routinely walks the player THROUGH the
+ * RoomGate trigger while the kiter is alive — so when the chase finishes,
+ * the gate is rarely still OPEN. After the kill loop the gate is in exactly
+ * one of three states, and pre-fix the helper handled none of them:
  *
- * The fix: after the chase clears every mob, if `gate_traversed` did NOT
- * fire during the chase, the helper position-steers the player back to
- * within `RETURN_TO_SPAWN_TOLERANCE_PX` of `DEFAULT_PLAYER_SPAWN` using the
- * exact same `Player.pos`-trace-driven steering the chase itself uses. The
- * caller's `gateTraversalWalk` then starts from a predictable position —
- * determinism restored. When the chase DID traverse the gate, the room
- * counter has already advanced and the player has been teleported to the
- * NEXT room's spawn by `Main._load_room_at_index`; the return step is
- * skipped (steering would fight the room load).
+ *   A. Already TRAVERSED — `gate_traversed` fired during the chase. (But
+ *      the kill loop exits the INSTANT the kiter's `_die` trace appears,
+ *      and `_unlock` + `gate_traversed` land several frames LATER via the
+ *      deferred `mob_died` decrement — so sampling `gateTraversed`
+ *      immediately RACED the state machine. Fix: a bounded
+ *      `GATE_SETTLE_WINDOW_MS` poll after the kill loop, before sampling —
+ *      early-exits the moment `gate_traversed` is seen.)
+ *
+ *   B. UNLOCKED but not traversed — the chase entered the trigger, the
+ *      kiter died, the gate auto-unlocked, but the player's kill-site
+ *      position didn't re-cross the trigger to fire `gate_traversed`. The
+ *      caller's fallback `gateTraversalWalk` CANNOT finish this — that
+ *      helper is built for an OPEN gate and asserts `gate_unlocked` fires
+ *      during its walk-in (against an UNLOCKED gate the walk-in fires
+ *      `gate_traversed` straight away and the `gate_unlocked` assertion
+ *      throws — this was the exact Room 04 failure shape). Fix:
+ *      `finishTraversalFromUnlocked` steers the player just EAST of the
+ *      trigger then walks WEST across it, firing the single `body_entered`
+ *      the UNLOCKED gate needs for `gate_traversed`.
+ *
+ *   C. Still OPEN — the chase cleared the kiter WITHOUT ever entering the
+ *      trigger. The caller's `gateTraversalWalk` handles this, but it has a
+ *      hard precondition: the player is near `DEFAULT_PLAYER_SPAWN =
+ *      (240, 200)` (its two-segment W→N walk geometry is computed from that
+ *      point — see `fixtures/gate-traversal.ts` header). The chase roamed
+ *      the player all over the room. Fix: `returnToSpawn` position-steers
+ *      the player back to spawn so the fallback walk is deterministic.
+ *
+ * All three branches reuse the chase's own `Player.pos`-trace-driven
+ * steering (`steerToPoint`). The net contract: `chaseAndClearKitingMobs`
+ * always leaves the room in a clean, deterministic state — either
+ * `gateTraversed = true` (caller skips `gateTraversalWalk`) or
+ * `gateTraversed = false` with the gate OPEN and the player at spawn
+ * (caller runs `gateTraversalWalk` from its required position).
  *
  * **Generality:** parameterised by the mob's `posPattern` / `deathPattern`
  * regexes — it handles *any* mob that emits a `.pos` trace, not just Room
@@ -187,6 +206,74 @@ const RETURN_TO_SPAWN_BUDGET_MS = 8_000;
 const RETURN_BURST_MS = 250;
 
 /**
+ * Window the helper waits AFTER the kill loop for the gate state machine to
+ * finish reacting (ticket 86c9u1cy2). The kill loop exits the instant the
+ * kiter's `_die` trace appears — but at that moment the gate is typically
+ * still LOCKED (the chase walked the player through the trigger while the
+ * kiter was alive) with `_mobs_alive` about to hit 0. The deferred
+ * `mob_died` decrement, the `_unlock` (`gate_unlocked`), and — because the
+ * chase usually leaves the player inside/near the now-unlocked trigger —
+ * the `gate_traversed` emission all land over the NEXT several frames.
+ *
+ * Without this settle window, `gateTraversed` was sampled too early and
+ * read `false` even when the gate was about to traverse on its own;
+ * `returnToSpawn` then walked the player around while `gate_traversed`
+ * fired underneath it, advancing the room counter to the NEXT room and
+ * leaving the caller's `gateTraversalWalk` operating on the wrong gate.
+ * 2.5s comfortably covers the 0.65s DEATH_TWEEN_WAIT + the deferred
+ * decrement + a player-still-coasting re-cross of the trigger; the poll
+ * early-exits the moment `gate_traversed` is observed, so a chase that
+ * cleanly traversed pays only a few ms here.
+ */
+const GATE_SETTLE_WINDOW_MS = 2_500;
+
+/** Poll cadence while waiting out `GATE_SETTLE_WINDOW_MS`. */
+const GATE_SETTLE_POLL_MS = 100;
+
+/**
+ * RoomGate trigger geometry for Rooms 02..08 (world coords). The gate node
+ * sits at `(48, 144)` with `trigger_size = (48, 80)` (see
+ * `MultiMobRoom.room_gate_position` / `room_gate_size` and the
+ * `fixtures/gate-traversal.ts` header) → the RectangleShape2D occupies
+ * `X ∈ [24, 72]`, `Y ∈ [104, 184]`. The finish-traversal step steers the
+ * player to a staging point just EAST of the rect, then walks WEST into it
+ * to fire the single `body_entered` the UNLOCKED gate needs for
+ * `gate_traversed`.
+ */
+const GATE_TRIGGER = { xMin: 24, xMax: 72, yMin: 104, yMax: 184 };
+
+/**
+ * Staging point for the finish-traversal step: just EAST of the trigger
+ * rect, vertically centred in the Y-band. The player is steered here first
+ * (guarantees they are OUTSIDE the trigger so the subsequent west walk
+ * produces a fresh non-overlap → overlap `body_entered` transition), then
+ * walks pure-west across the rect. X=120 is ~48px east of the rect's east
+ * edge (72) — comfortably outside — and Y=144 is the rect's vertical
+ * centre.
+ */
+const FINISH_TRAVERSAL_STAGE = { x: 120, y: 144 };
+
+/** Tolerance (px) for "reached the finish-traversal staging point". */
+const FINISH_STAGE_TOLERANCE_PX = 28;
+
+/**
+ * Budget for steering the player to `FINISH_TRAVERSAL_STAGE`. Same
+ * reasoning as `RETURN_TO_SPAWN_BUDGET_MS` — a closed ~320px room, 120px/s
+ * walk; 6s is generous headroom.
+ */
+const FINISH_STAGE_BUDGET_MS = 6_000;
+
+/**
+ * Pure-west walk duration for the finish-traversal re-entry. From the
+ * staging X≈120, walking west at 120px/s for 1100ms covers ~132px — the
+ * player crosses the trigger's east edge (X=72) at ~t=400ms (firing
+ * `body_entered` → `gate_traversed` on the UNLOCKED gate) and ends pinned
+ * against the room west wall. Mirrors `gate-traversal.ts`
+ * `WALK_WEST_BACK_INTO_GATE_MS`.
+ */
+const FINISH_TRAVERSAL_WALK_WEST_MS = 1_100;
+
+/**
  * Result of a `chaseAndClearKitingMobs` invocation.
  */
 export interface KitingChaseResult {
@@ -195,11 +282,19 @@ export interface KitingChaseResult {
   /** Count of matching death traces observed during the chase. */
   kills: number;
   /**
-   * Whether a `RoomGate.gate_traversed` trace fired during the chase. The
-   * chase roams the room freely to corner the kiter, which routinely drives
-   * the gate's full OPEN→LOCKED→UNLOCKED→traversed sequence. When true, the
-   * calling spec SKIPS its own `gateTraversalWalk` for the room (the chase
-   * already traversed it) — see `ac4-boss-clear.spec.ts`.
+   * Whether the room's `RoomGate` reached `gate_traversed` by the time the
+   * helper returned. The chase roams the room freely to corner the kiter,
+   * which routinely drives the gate's `OPEN→LOCKED→UNLOCKED` sequence; the
+   * helper then finishes the traversal itself when the gate is left
+   * UNLOCKED-but-not-traversed (see the "Post-chase gate resolution" note in
+   * the module header — ticket 86c9u1cy2). So this is `true` whenever the
+   * chase touched the gate at all. When `true`, the calling spec SKIPS its
+   * own `gateTraversalWalk` for the room (the gate is already traversed and
+   * the room counter has advanced) — see `ac4-boss-clear.spec.ts`. When
+   * `false`, the chase never entered the gate, it is still OPEN with
+   * `mobs_alive == 0`, and the player has been steered back to
+   * `DEFAULT_PLAYER_SPAWN` so the caller's `gateTraversalWalk` runs from its
+   * required position.
    */
   gateTraversed: boolean;
   /**
@@ -315,32 +410,34 @@ const GATE_UNLOCKED_PATTERN =
   /\[combat-trace\] RoomGate\._unlock \| gate_unlocked emitting/;
 
 /**
- * Steers the player back to within `RETURN_TO_SPAWN_TOLERANCE_PX` of
- * `DEFAULT_PLAYER_SPAWN` using the same `Player.pos`-trace-driven steering
- * the chase uses. Called after the chase clears every mob but did NOT drive
- * `gate_traversed` — so the caller's fallback `gateTraversalWalk` starts
- * from a predictable position (ticket 86c9u1cy2 — Room 04 determinism).
+ * Position-steers the player toward a fixed world point using the same
+ * `Player.pos`-trace-driven steering the chase uses. Stops once within
+ * `tolerancePx` of the target or `budgetMs` elapses.
  *
  * Best-effort: if no `Player.pos` trace is available or the budget expires
  * before convergence, it logs the shortfall and returns rather than
- * throwing — a slightly-off return still leaves `gateTraversalWalk` with
- * better-than-random geometry, and the caller's own `_on_body_entered`
- * assertion is the hard gate if the walk still misses.
+ * throwing — a slightly-off position still beats a fully-random one, and
+ * every caller has its own downstream hard assertion.
  *
- * Returns the final measured distance to spawn (px), or `null` if no
+ * Returns the final measured distance to the target (px), or `null` if no
  * `Player.pos` reading was ever available.
  */
-async function returnToSpawn(
+async function steerToPoint(
   page: Page,
   capture: ConsoleCapture,
   roomLabel: string,
-  playerPosPattern: RegExp
+  playerPosPattern: RegExp,
+  target: { x: number; y: number },
+  tolerancePx: number,
+  budgetMs: number,
+  burstMs: number,
+  label: string
 ): Promise<number | null> {
   const t0 = Date.now();
   let lastDist: number | null = null;
   let cycle = 0;
 
-  while (Date.now() - t0 < RETURN_TO_SPAWN_BUDGET_MS) {
+  while (Date.now() - t0 < budgetMs) {
     cycle++;
     const player = latestPos(capture, playerPosPattern);
     if (player === null) {
@@ -350,39 +447,157 @@ async function returnToSpawn(
       continue;
     }
 
-    const dx = DEFAULT_PLAYER_SPAWN.x - player.x;
-    const dy = DEFAULT_PLAYER_SPAWN.y - player.y;
+    const dx = target.x - player.x;
+    const dy = target.y - player.y;
     const dist = Math.round(Math.hypot(dx, dy));
     lastDist = dist;
 
-    if (dist <= RETURN_TO_SPAWN_TOLERANCE_PX) {
+    if (dist <= tolerancePx) {
       console.log(
-        `[kiting-chase] ${roomLabel}: returned to spawn ` +
-          `(dist=${dist}px <= ${RETURN_TO_SPAWN_TOLERANCE_PX}px tolerance) ` +
-          `at t=${Date.now() - t0}ms after ${cycle} cycle(s) — ` +
-          `gateTraversalWalk geometry is now deterministic.`
+        `[kiting-chase] ${roomLabel}: ${label} — reached target ` +
+          `(${target.x},${target.y}) dist=${dist}px <= ${tolerancePx}px ` +
+          `tolerance at t=${Date.now() - t0}ms after ${cycle} cycle(s).`
       );
       return dist;
     }
 
-    // Steer toward spawn. `keysToward` already returns [] for a ~zero
-    // vector, but the tolerance check above catches "close enough" first.
+    // Steer toward the target. `keysToward` returns [] for a ~zero vector,
+    // but the tolerance check above catches "close enough" first.
     const steerKeys = keysToward(dx, dy);
-    await holdKeys(page, steerKeys, RETURN_BURST_MS);
+    await holdKeys(page, steerKeys, burstMs);
     await page.waitForTimeout(SETTLE_MS);
   }
 
-  // Budget exhausted without converging — best-effort, do not throw. A
-  // partial return still beats a fully-random position, and the caller's
-  // `gateTraversalWalk` has its own `_on_body_entered` hard assertion.
+  // Budget exhausted without converging — best-effort, do not throw.
   console.warn(
-    `[kiting-chase] ${roomLabel}: return-to-spawn did not converge within ` +
-      `${RETURN_TO_SPAWN_BUDGET_MS}ms (last dist=${lastDist ?? "unknown"}px, ` +
-      `${cycle} cycle(s)). Proceeding anyway — gateTraversalWalk will assert ` +
-      `on _on_body_entered if the walk still misses the trigger. Check that ` +
-      `the build emits '${playerPosPattern}' (HTML5 release build required).`
+    `[kiting-chase] ${roomLabel}: ${label} — did not converge on ` +
+      `(${target.x},${target.y}) within ${budgetMs}ms (last dist=` +
+      `${lastDist ?? "unknown"}px, ${cycle} cycle(s)). Proceeding anyway — ` +
+      `the caller's own assertion is the hard gate. Check that the build ` +
+      `emits '${playerPosPattern}' (HTML5 release build required).`
   );
   return lastDist;
+}
+
+/**
+ * Steers the player back to within `RETURN_TO_SPAWN_TOLERANCE_PX` of
+ * `DEFAULT_PLAYER_SPAWN`. Called after the chase clears every mob but the
+ * gate was never entered (still OPEN) — so the caller's fallback
+ * `gateTraversalWalk` starts from its required spawn-relative position
+ * (ticket 86c9u1cy2 — Room 04 determinism).
+ */
+async function returnToSpawn(
+  page: Page,
+  capture: ConsoleCapture,
+  roomLabel: string,
+  playerPosPattern: RegExp
+): Promise<number | null> {
+  return steerToPoint(
+    page,
+    capture,
+    roomLabel,
+    playerPosPattern,
+    DEFAULT_PLAYER_SPAWN,
+    RETURN_TO_SPAWN_TOLERANCE_PX,
+    RETURN_TO_SPAWN_BUDGET_MS,
+    RETURN_BURST_MS,
+    "return-to-spawn"
+  );
+}
+
+/**
+ * Finishes a traversal on an already-UNLOCKED gate (ticket 86c9u1cy2).
+ *
+ * **Why this is needed.** Cornering a kiting Shooter routinely walks the
+ * player THROUGH the RoomGate trigger while the kiter is alive: the gate
+ * goes `OPEN → LOCKED`, and once the kiter dies the gate auto-unlocks
+ * (`LOCKED → UNLOCKED`). So when the chase finishes, the gate is frequently
+ * already UNLOCKED — it just needs ONE more `body_entered` transition to
+ * fire `gate_traversed` (`RoomGate._on_body_entered` emits `gate_traversed`
+ * on a single body_entered when `_state == STATE_UNLOCKED`). But the chase's
+ * kill-site position rarely lands the player back across the trigger on its
+ * own, so `gate_traversed` doesn't fire.
+ *
+ * The caller's fallback `gateTraversalWalk` CANNOT finish it either — that
+ * helper is built for an OPEN gate (its phase-3 asserts `gate_unlocked`
+ * fires during the walk-in; against an already-UNLOCKED gate the walk-in
+ * fires `gate_traversed` straight away and the `gate_unlocked` assertion
+ * throws). So the chase must finish its own traversal.
+ *
+ * **What it does:** steer the player to `FINISH_TRAVERSAL_STAGE` (just EAST
+ * of the trigger rect — guarantees they are OUTSIDE it so the next walk
+ * produces a fresh non-overlap → overlap transition), then walk pure-WEST
+ * across the rect. `body_entered` fires as the player crosses the east
+ * edge → the UNLOCKED gate emits `gate_traversed`.
+ *
+ * Returns `true` if `gate_traversed` was observed, `false` otherwise. The
+ * caller treats a `false` here the same as any other non-traversal — but in
+ * practice the staging walk reliably crosses the trigger.
+ */
+async function finishTraversalFromUnlocked(
+  page: Page,
+  capture: ConsoleCapture,
+  roomLabel: string,
+  playerPosPattern: RegExp,
+  preTraversedCount: number
+): Promise<boolean> {
+  console.log(
+    `[kiting-chase] ${roomLabel}: gate is UNLOCKED but not yet traversed — ` +
+      `finishing the traversal (steer EAST of trigger, then walk WEST in).`
+  );
+
+  // Step 1: steer to the staging point just east of the trigger rect.
+  await steerToPoint(
+    page,
+    capture,
+    roomLabel,
+    playerPosPattern,
+    FINISH_TRAVERSAL_STAGE,
+    FINISH_STAGE_TOLERANCE_PX,
+    FINISH_STAGE_BUDGET_MS,
+    RETURN_BURST_MS,
+    "finish-traversal staging"
+  );
+  await page.waitForTimeout(SETTLE_MS);
+
+  // Step 2: walk pure-WEST across the trigger rect — body_entered fires as
+  // the player crosses the east edge (X=72), and the UNLOCKED gate emits
+  // gate_traversed on that single transition.
+  console.log(
+    `[kiting-chase] ${roomLabel}: finish-traversal — walk WEST ` +
+      `(${FINISH_TRAVERSAL_WALK_WEST_MS}ms) across trigger east edge ` +
+      `(X=${GATE_TRIGGER.xMax}) to fire body_entered → gate_traversed.`
+  );
+  await page.keyboard.down("a");
+  await page.waitForTimeout(FINISH_TRAVERSAL_WALK_WEST_MS);
+  await page.keyboard.up("a");
+
+  // Wait for the gate_traversed trace (room_cleared fires on it → Main
+  // loads the next room). Typical observed latency: 50-200ms after the
+  // walk completes.
+  let traversed = false;
+  try {
+    await capture.waitForLine(GATE_TRAVERSED_PATTERN, 5_000);
+    traversed = countLines(capture, GATE_TRAVERSED_PATTERN) > preTraversedCount;
+  } catch {
+    traversed = false;
+  }
+
+  if (traversed) {
+    console.log(
+      `[kiting-chase] ${roomLabel}: finish-traversal complete — ` +
+        `gate_traversed observed.`
+    );
+  } else {
+    console.warn(
+      `[kiting-chase] ${roomLabel}: finish-traversal walk did NOT produce a ` +
+        `gate_traversed trace within 5s. The caller will fall back to ` +
+        `gateTraversalWalk — but note that helper expects an OPEN gate, not ` +
+        `an UNLOCKED one, so the fallback may also fail. Check the gate ` +
+        `trigger geometry constants against scripts/levels/RoomGate.gd.`
+    );
+  }
+  return traversed;
 }
 
 /**
@@ -399,17 +614,20 @@ async function returnToSpawn(
  *   - The build emits `Player.pos` / `Shooter.pos` traces (HTML5 release
  *     build — they are no-ops in headless GUT).
  *
- * Postconditions:
+ * Postconditions (the helper always leaves the room in a deterministic
+ * state — see the "Post-chase gate resolution" note in the module header,
+ * ticket 86c9u1cy2):
  *   - `expectedMobs` matching death traces observed (or the helper throws
  *     with the last 30 trace lines on budget exhaustion).
- *   - `KitingChaseResult.gateTraversed` reflects whether the chase drove
- *     the room's gate all the way to `gate_traversed`.
- *   - When `gateTraversed` is FALSE, the player has been steered back to
- *     within `RETURN_TO_SPAWN_TOLERANCE_PX` of `DEFAULT_PLAYER_SPAWN` (best-
- *     effort) so the caller's fallback `gateTraversalWalk` starts from a
- *     predictable position — see the "Return-to-spawn step" note in the
- *     module header (ticket 86c9u1cy2). When `gateTraversed` is TRUE the
- *     room has already advanced and the player is at the next room's spawn.
+ *   - `KitingChaseResult.gateTraversed == true` — the gate is fully
+ *     traversed (the chase drove it, or `finishTraversalFromUnlocked`
+ *     finished it), the room counter has advanced, and the player is at
+ *     the NEXT room's spawn. The caller skips `gateTraversalWalk`.
+ *   - `KitingChaseResult.gateTraversed == false` — the chase never entered
+ *     the gate; it is still OPEN with `mobs_alive == 0` and the player has
+ *     been steered back to within `RETURN_TO_SPAWN_TOLERANCE_PX` of
+ *     `DEFAULT_PLAYER_SPAWN`. The caller runs `gateTraversalWalk` from its
+ *     required position.
  *
  * @param page          Playwright page.
  * @param canvas        The game canvas locator.
@@ -526,17 +744,70 @@ export async function chaseAndClearKitingMobs(
     );
   }
 
-  // ---- Detect whether the chase drove the room's gate to traversal ----
+  // ---- Gate-settle window — let the gate state machine finish reacting ----
+  //
+  // The kill loop above exits the INSTANT the kiter's `_die` trace appears.
+  // But cornering a kiting Shooter routinely means the chase already walked
+  // the player THROUGH the RoomGate trigger while the kiter was still alive
+  // — so at kill time the gate is typically LOCKED with `_mobs_alive` about
+  // to hit 0. The deferred `mob_died` decrement, the `_unlock`
+  // (`gate_unlocked`), and — because the chase usually leaves the player
+  // inside/near the now-unlocked trigger — the `gate_traversed` emission
+  // all land over the NEXT several frames, AFTER the kill loop has exited.
+  //
+  // Sampling `gateTraversed` immediately (the pre-fix behaviour) therefore
+  // RACES the gate: it could read `false` while `gate_traversed` was a few
+  // frames away from firing on its own. The fix waits out a bounded settle
+  // window, polling for `gate_traversed`; the wait early-exits the moment
+  // the trace is observed, so a clean chase-driven traversal costs only a
+  // few ms here. THEN `gateTraversed` is sampled — authoritatively.
+  const settleStart = Date.now();
+  while (Date.now() - settleStart < GATE_SETTLE_WINDOW_MS) {
+    if (countLines(capture, GATE_TRAVERSED_PATTERN) > preTraversedCount) {
+      break; // gate traversed on its own — no need to wait the full window
+    }
+    await page.waitForTimeout(GATE_SETTLE_POLL_MS);
+  }
+
+  // ---- Detect the gate's post-chase state, then resolve it ----
   //
   // Cornering a kiting Shooter routinely means following it through the
-  // RoomGate trigger rect — which locks the gate (player entered the room),
-  // and once the Shooter dies while LOCKED the gate auto-unlocks. If the
-  // player then crosses the trigger again it fires `gate_traversed`. That
-  // is a valid traversal; the caller skips its own `gateTraversalWalk` when
-  // this is true. If the chase cleared the kiter without ever entering the
-  // trigger, the gate is still OPEN with `mobs_alive == 0` and the caller
-  // falls back to the normal walk.
-  const gateTraversed =
+  // RoomGate trigger rect — which locks the gate (`OPEN → LOCKED`), and once
+  // the Shooter dies while LOCKED the gate auto-unlocks (`LOCKED →
+  // UNLOCKED`). After the settle window above, the gate is in exactly one
+  // of three states; each needs different handling so the caller is left
+  // with a clean, deterministic situation (ticket 86c9u1cy2):
+  //
+  //   A. Already TRAVERSED — `gate_traversed` fired during the chase /
+  //      settle. The room counter advanced, the player was teleported to
+  //      the NEXT room's spawn. Nothing to do; caller skips gateTraversalWalk.
+  //
+  //   B. UNLOCKED but not traversed — the chase entered the trigger and the
+  //      kiter died, so the gate auto-unlocked, but the player's kill-site
+  //      position didn't re-cross the trigger to fire `gate_traversed`.
+  //      `gateTraversalWalk` CANNOT finish this — it is built for an OPEN
+  //      gate and asserts `gate_unlocked` fires during its walk-in (against
+  //      an UNLOCKED gate the walk-in fires `gate_traversed` straight away
+  //      and that assertion throws). So the chase finishes its own
+  //      traversal: `finishTraversalFromUnlocked` steers east of the
+  //      trigger, then walks west across it to fire the single body_entered
+  //      the UNLOCKED gate needs. This flips the result to traversed and
+  //      the caller skips gateTraversalWalk.
+  //
+  //   C. Still OPEN — the chase cleared the kiter WITHOUT ever entering the
+  //      trigger (`mobs_alive == 0`, state OPEN). The caller's fallback
+  //      `gateTraversalWalk` handles this correctly, but it has a hard
+  //      precondition: the player is near `DEFAULT_PLAYER_SPAWN = (240,200)`
+  //      (its W→N walk geometry is computed from that point). The chase
+  //      roamed the player all over the room, so `returnToSpawn` steers
+  //      them back before the caller runs gateTraversalWalk.
+  //
+  // Pre-fix, `chaseAndClearKitingMobs` did NONE of this — it sampled
+  // gateTraversed immediately (racing case A vs B) and never repositioned
+  // the player (case C ran gateTraversalWalk from a random spot). Room 04
+  // (the only pure-Shooter room — it has no chaser pre-pass to keep the
+  // player near spawn) was ~50% flaky as the direct result.
+  let gateTraversed =
     countLines(capture, GATE_TRAVERSED_PATTERN) > preTraversedCount;
   const gateUnlocked =
     countLines(capture, GATE_UNLOCKED_PATTERN) > preUnlockedCount;
@@ -547,24 +818,20 @@ export async function chaseAndClearKitingMobs(
       `(gateUnlocked=${gateUnlocked}, gateTraversed=${gateTraversed}).`
   );
 
-  // ---- Return-to-spawn step (ticket 86c9u1cy2 — Room 04 determinism) ----
-  //
-  // The chase roamed the player all over the room cornering the kiter, so
-  // the player ends at a non-deterministic position. If the chase did NOT
-  // drive `gate_traversed`, the caller falls back to `gateTraversalWalk`,
-  // which has a hard precondition: the player is near `DEFAULT_PLAYER_SPAWN
-  // = (240, 200)` (its W→N walk geometry is computed from that point). Pre-
-  // fix this step was absent — Room 04 (the only pure-Shooter room, whose
-  // `gateTraversalWalk` therefore runs straight from wherever the chase
-  // left the player) was ~50% flaky because the walk started from a random
-  // position. Steer the player back to spawn so the fallback walk is
-  // deterministic.
-  //
-  // Skip it when `gateTraversed` is true: the chase already drove the gate,
-  // the room counter advanced, and `Main._load_room_at_index` teleported
-  // the player to the NEXT room's spawn — steering now would fight the
-  // room load and the caller skips `gateTraversalWalk` anyway.
-  if (!gateTraversed) {
+  if (gateTraversed) {
+    // Case A — nothing to do.
+  } else if (gateUnlocked) {
+    // Case B — gate is UNLOCKED; finish the traversal ourselves.
+    gateTraversed = await finishTraversalFromUnlocked(
+      page,
+      capture,
+      roomLabel,
+      playerPosPattern,
+      preTraversedCount
+    );
+  } else {
+    // Case C — gate still OPEN; reposition the player at spawn so the
+    // caller's gateTraversalWalk has deterministic geometry.
     await returnToSpawn(page, capture, roomLabel, playerPosPattern);
   }
 
