@@ -54,6 +54,22 @@ func _load_room(scene_path: String) -> MultiMobRoom:
 	return room
 
 
+## Same as `_load_room` but also drains one process frame so the deferred
+## `_assemble_room_fixtures` pass (RoomGate + HealingFountain spawn + gate
+## registration — ticket 86c9tqvxx) has run. Use this when the test needs
+## to inspect `get_room_gate()` / `get_healing_fountain()`; `_load_room`
+## alone is sufficient for `get_spawned_mobs()` (populated synchronously
+## in `_ready` by `_build`).
+func _load_room_with_fixtures(scene_path: String) -> MultiMobRoom:
+	var room: MultiMobRoom = _load_room(scene_path)
+	# `call_deferred("_assemble_room_fixtures")` lands on the NEXT frame after
+	# `_ready` returns. Two process_frames is generous — mirrors the proven
+	# `_await_tutorial_wire` pattern in test_stratum1_room01_tutorial_flow.gd.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	return room
+
+
 # ---- 1. Each room loads cleanly -------------------------------------
 
 func test_room02_scene_loads() -> void:
@@ -142,8 +158,111 @@ func test_room04_is_lone_shooter() -> void:
 
 
 func test_room06_includes_healing_fountain() -> void:
-	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room06"])
+	# HealingFountain is spawned in the deferred `_assemble_room_fixtures`
+	# pass (ticket 86c9tqvxx) — drain a frame before asserting it exists.
+	var room: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s1_room06"])
 	assert_not_null(room.get_healing_fountain(), "room06 places a healing fountain (mid-stratum reward)")
+
+
+# ---- 2b. RoomGate registration — the AC4 blocker (ticket 86c9tqvxx) --
+
+func test_room02_gate_registers_both_grunts_after_deferred_pass() -> void:
+	# **The ticket 86c9tqvxx regression gate.** Drives the REAL MultiMobRoom
+	# build path (scene instantiate → `_ready` → deferred
+	# `_assemble_room_fixtures`) and asserts the RoomGate ends up tracking
+	# BOTH of Room02's grunts.
+	#
+	# Pre-fix: `_spawn_room_gate` + `_register_mobs_with_gate` ran
+	# synchronously inside `_ready`. In production that `_ready` runs inside a
+	# physics-flush window (room loaded from the prior room's `gate_traversed`
+	# body callback), so the RoomGate Area2D `add_child` panicked and the gate
+	# was never properly inserted — `register_mob` never effectively ran, the
+	# gate never tracked any mob, and traversal past Room02 was impossible.
+	#
+	# Post-fix: the gate spawn + registration are deferred out of the
+	# physics-flush window. After one drained frame the gate exists and
+	# `mobs_alive()` equals the room's grunt count.
+	#
+	# (GUT's `add_child` is not itself inside a physics flush, so this test
+	# can't reproduce the panic directly — but it pins the load-bearing
+	# post-condition: after the deferred pass, the gate tracks every spawned
+	# mob. The HTML5 release-build trace evidence in the Self-Test Report
+	# covers the physics-flush-window path that only manifests in-engine.)
+	var room: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s1_room02"])
+
+	var gate: RoomGate = room.get_room_gate()
+	assert_not_null(gate, "Room02 spawns a RoomGate (room_gate_position is non-zero)")
+
+	var mobs: Array[Node] = room.get_spawned_mobs()
+	assert_eq(mobs.size(), 2, "Room02 spawned its 2 grunts")
+	assert_eq(gate.mobs_alive(), 2,
+		"RoomGate registered BOTH grunts — mobs_alive must equal the spawned " +
+		"mob count after the deferred _assemble_room_fixtures pass (ticket 86c9tqvxx)")
+
+
+func test_all_gated_rooms_register_full_mob_roster() -> void:
+	# Generalises the regression across every gated room (02..08): the
+	# RoomGate's tracked-mob count must equal the room's spawned-mob count.
+	# A room whose gate registers a SUBSET (or none) of its mobs can never
+	# unlock — the silent-failure class ticket 86c9tqvxx fixes.
+	for room_id: StringName in ROOM_SCENES.keys():
+		var room: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[room_id])
+		var gate: RoomGate = room.get_room_gate()
+		assert_not_null(gate, "%s spawns a RoomGate" % String(room_id))
+		var expected: int = int(EXPECTED_MOB_COUNTS[room_id])
+		assert_eq(gate.mobs_alive(), expected,
+			"%s gate registered all %d spawned mobs" % [String(room_id), expected])
+
+
+func test_room08_gate_registers_mixed_mob_types() -> void:
+	# Edge probe (per testing bar): a room with a MIXED mob roster — Room08
+	# is 1 grunt + 1 charger + 2 shooters. All three archetypes emit a
+	# `mob_died` signal, so `register_mob` must accept and track every one
+	# regardless of type. A type-specific registration bug would surface
+	# here as a short count.
+	var room: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s1_room08"])
+	var gate: RoomGate = room.get_room_gate()
+	assert_not_null(gate, "Room08 spawns a RoomGate")
+
+	var mobs: Array[Node] = room.get_spawned_mobs()
+	assert_eq(mobs.size(), 4, "Room08 spawned its 4 mixed mobs")
+	# Confirm the roster really is mixed — guards the edge probe's premise.
+	var grunt_count: int = 0
+	var charger_count: int = 0
+	var shooter_count: int = 0
+	for m: Node in mobs:
+		if m is Grunt:
+			grunt_count += 1
+		elif m is Charger:
+			charger_count += 1
+		elif m is Shooter:
+			shooter_count += 1
+	assert_eq(grunt_count, 1, "Room08 roster includes 1 grunt")
+	assert_eq(charger_count, 1, "Room08 roster includes 1 charger")
+	assert_eq(shooter_count, 2, "Room08 roster includes 2 shooters")
+	assert_eq(gate.mobs_alive(), 4,
+		"RoomGate tracked all 4 mixed-type mobs (grunt + charger + 2 shooters)")
+
+
+func test_room_reentered_after_free_reregisters_cleanly() -> void:
+	# Edge probe (per testing bar): a room re-entered after being cleared.
+	# Production frees the old room node and instantiates a fresh one on
+	# re-entry (Main._load_room_at_index queue_frees the prior room). The
+	# fresh instance must run its own deferred fixture pass and register its
+	# own mob roster from scratch — no stale state, no double-count, no
+	# missed registration. Simulate by loading Room02, freeing it, then
+	# loading a brand-new Room02 instance.
+	var first: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s1_room02"])
+	assert_eq(first.get_room_gate().mobs_alive(), 2, "first Room02 instance registered 2 grunts")
+	first.queue_free()
+	await get_tree().process_frame
+
+	# Fresh instance — mirrors a re-entry after the player walks back.
+	var second: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s1_room02"])
+	var gate2: RoomGate = second.get_room_gate()
+	assert_not_null(gate2, "re-entered Room02 spawns its own fresh RoomGate")
+	assert_eq(gate2.mobs_alive(), 2,
+		"re-entered Room02 instance registered its own 2 grunts cleanly (no stale state)")
 
 
 func test_room08_pre_boss_density() -> void:

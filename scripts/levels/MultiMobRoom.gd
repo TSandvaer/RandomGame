@@ -96,7 +96,52 @@ func _ready() -> void:
 	if chunk_def == null:
 		push_error("MultiMobRoom: no chunk_def assigned")
 		return
+	# `_build()` stays synchronous: it spawns CharacterBody2D mobs (no Area2D
+	# monitoring mutation) and populates `_assembly.mobs` immediately, which
+	# `Main._wire_room_signals` reads via `get_spawned_mobs()` on the same
+	# tick the room is added. The mob spawn/parent pass MUST be complete
+	# before `_register_mobs_with_gate` runs — see `_assemble_room_fixtures`.
 	_build()
+	# Defer the Area2D-fixture pass (RoomGate + HealingFountain spawn) AND
+	# `_register_mobs_with_gate` out of the physics-flush window.
+	#
+	# Root cause (ticket 86c9tqvxx — the real AC4 blocker): Rooms 02..08 are
+	# loaded by `Main._load_room_at_index`, which for every room past Room 01
+	# runs inside a physics-flush window — the call chain is rooted in the
+	# PRIOR room's `RoomGate.gate_traversed` → `MultiMobRoom._on_room_gate_traversed`
+	# → `room_cleared` → `Main._on_room_cleared` → `_load_room_at_index` →
+	# `_world.add_child(room)` → `MultiMobRoom._ready()`, and `gate_traversed`
+	# itself emits from `RoomGate._on_body_entered` (a CharacterBody2D physics
+	# callback). `_spawn_room_gate()` does a synchronous `add_child` of a
+	# `RoomGate` — an Area2D — and adding an Area2D + activating its monitoring
+	# inside a physics flush panics with `USER ERROR: Can't change this state
+	# while flushing queries` (see `.claude/docs/combat-architecture.md`
+	# § "Physics-flush rule"). The C++ early-returns, leaving the gate
+	# improperly inserted: `RoomGate.is_inside_tree()` reads false, so the
+	# gate's `_combat_trace` shim no-ops (zero `[combat-trace] RoomGate.register_mob`
+	# lines ever emit — the empirical AC4 symptom) AND the gate's Area2D never
+	# monitors, so `body_entered` never fires, the gate never locks/unlocks,
+	# and traversal past Room 02 is impossible.
+	#
+	# Deferring lands `_spawn_room_gate` AFTER the physics flush completes —
+	# the Area2D `add_child` + monitoring activation then run on a clean tick.
+	# This mirrors the `Stratum1Room01._ready → call_deferred("_wire_tutorial_flow")`
+	# and `Stratum1BossRoom._ready → call_deferred("trigger_entry_sequence")`
+	# precedents (same `.claude/docs` § "Room-load triggers vs body_entered
+	# triggers" rule). `_spawn_healing_fountain` is folded into the deferred
+	# pass because it too does `add_child` from this physics-flush `_ready`.
+	call_deferred("_assemble_room_fixtures")
+
+
+## Deferred fixture pass — runs one frame after `_ready`, OUTSIDE the
+## physics-flush window that `Main._load_room_at_index` invokes `_ready`
+## inside. Spawns the RoomGate + HealingFountain Area2D-derived fixtures
+## and registers every spawned mob with the gate. Idempotent-safe: if the
+## room is freed before the deferred call lands, the `is_inside_tree`
+## guard bails cleanly.
+func _assemble_room_fixtures() -> void:
+	if not is_inside_tree():
+		return
 	_spawn_room_gate()
 	_spawn_healing_fountain()
 	_register_mobs_with_gate()
