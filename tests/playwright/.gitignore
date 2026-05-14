@@ -7,6 +7,9 @@ html5-build/
 test-results/
 playwright-report/
 playwright/.cache/
+# JSON reporter output (PLAYWRIGHT_JSON_OUTPUT_NAME — local debugging only)
+*-result.json
+*-results.json
 
 # Node
 node_modules/
