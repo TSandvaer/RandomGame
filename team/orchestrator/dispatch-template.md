@@ -134,6 +134,14 @@ Report back when done.
 
 Replace `<list of artifacts>`, `<NNN>`, and `<list of facts>` with task-specific values.
 
+## Doc-update reporting (mandatory in every dispatch)
+
+```markdown
+**Doc updates (`.claude/docs/`):** if your maintain-docs Stop hook ran and produced an update to any file under `.claude/docs/`, list those files + the rationale in your final report. Format: `Doc updates: <file> — <one-line rationale>`. If no docs were updated, state explicitly: `Doc updates: none (early-exit applied — <reason>).` Sponsor wants visibility into this mechanism firing.
+```
+
+This block is non-negotiable in every dispatch. The Stop hook already runs for sub-agents, but the orchestrator + Sponsor cannot see what happened unless the agent surfaces it.
+
 ## ClickUp queue (when MCP is down)
 
 ```markdown
