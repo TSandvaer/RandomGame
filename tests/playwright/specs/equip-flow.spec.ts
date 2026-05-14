@@ -49,6 +49,39 @@
  *
  * **Status: green — P0 86c9q96m8 fix landed; ticket 86c9qah0v fix in flight.**
  *
+ * **Phase 2.5 swing-after-Tab race fix (tickets 86c9qb7f3 + 86c9qah0f):**
+ * Phase 2.5 historically flaked on Windows headed Chromium (~1 in 3; on
+ * faster hardware, consistently). Two compounding harness bugs, both fixed
+ * inline in Phase 2.5 below:
+ *   (a) Closing the inventory after the grid-cell click failed. The click
+ *       lands on a `Button` (default `focus_mode=FOCUS_ALL`) which grabs
+ *       keyboard focus. From that point Godot's GUI input system consumes
+ *       BOTH `Tab` (the focus-traversal key) AND `Escape` (bound to the
+ *       built-in `ui_cancel` GUI action) before they reach
+ *       `InventoryPanel._unhandled_input`. The panel stays open,
+ *       `Engine.time_scale` stays at 0.10, and the facing-set runs in
+ *       slow-mo. (PR #187 round-1 swapped `Tab` → `Escape` — but `Escape`
+ *       is ALSO focus-consumed, so the panel stayed open in Devon's 0/5
+ *       headed reproduction.)
+ *       Fix: a test-only `InventoryPanel.force_close_for_test()` hook,
+ *       wired to the `test_force_close_inventory` input action (F9) handled
+ *       in `_input()`. `_input()` runs BEFORE the GUI focus system, so a
+ *       focused Button cannot swallow it. The hook closes the panel,
+ *       restores `Engine.time_scale`, and emits a `[combat-trace]
+ *       InventoryPanel.force_close_for_test | open=false time_scale=1` line
+ *       the spec POSITIVELY ASSERTS on before proceeding. The whole
+ *       focus-consumption class is sidestepped — no key-picking lottery.
+ *   (b) The post-equip swing used a fixed-NE facing + in-place click-spam,
+ *       assuming a grunt sat NE of the player. Drift from `clearRoom01Dummy`
+ *       + the room-advance teleport makes that false in headed mode. Fix: an
+ *       8-direction attack sweep (mirrors `clearRoom01Dummy`'s discipline) so
+ *       the post-equip hit lands regardless of where the grunt drifted.
+ * Neither is a game bug — focus-consumption and grunt-chase drift are both
+ * correct engine/gameplay behaviour; the spec was making timing assumptions
+ * that only held headless. The `force_close_for_test` hook is a test-only
+ * surface gated on `OS.has_feature("web")`, matching the existing
+ * `force_click_*_for_test` convention in `scripts/ui/InventoryPanel.gd`.
+ *
  * Coverage gap closed by this spec extension:
  *   - Tab → LMB-click equipped slot (unequip) → LMB-click grid cell (equip).
  *   - The `[combat-trace] Inventory.equip` shim now provides the
@@ -347,40 +380,161 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
       expect(damageAfter).toBe(preReloadDamageObserved);
     }
 
-    // Close Tab.
-    await page.keyboard.press("Tab");
-    await page.waitForTimeout(300);
+    // ---- Close the inventory panel — swing-after-Tab race fix (86c9qb7f3) ----
+    //
+    // ROOT CAUSE of the historical Phase 2.5 flake: the grid-cell click above
+    // lands on a `Button` (scripts/ui/InventoryPanel.gd) created with the
+    // default `focus_mode = FOCUS_ALL`, so the click grabs keyboard focus for
+    // that Button. From that point Godot's GUI input system consumes BOTH of
+    // the keys a spec might use to close the panel BEFORE they reach
+    // `InventoryPanel._unhandled_input`:
+    //   - `Tab` is the built-in UI focus-traversal key ("focus next
+    //     neighbour") — swallowed by the focus system.
+    //   - `Escape` is bound to the built-in `ui_cancel` GUI action — ALSO
+    //     swallowed when a Control holds focus.
+    // (PR #187 round-1 swapped `Tab` → `Escape`; Devon's peer review caught
+    // that `Escape` is equally focus-consumed — 0/5 headed runs closed the
+    // panel.) With the panel still open, `Engine.time_scale =
+    // TIME_SLOW_FACTOR (0.10)` stays in effect, so the facing-set below runs
+    // at 1/10th game speed and the swings fire in a stale direction.
+    //
+    // FIX: drive the test-only `InventoryPanel.force_close_for_test()` hook
+    // via the `test_force_close_inventory` input action (F9 — see
+    // project.godot). That action is handled in `InventoryPanel._input()`,
+    // which runs BEFORE the GUI focus system — a focused Button cannot
+    // swallow it. The hook closes the panel, restores `Engine.time_scale`,
+    // and emits a `[combat-trace] InventoryPanel.force_close_for_test`
+    // confirmation line. We POSITIVELY ASSERT that line (carrying
+    // `open=false time_scale=1`) before proceeding — no more "press a key
+    // and hope it closed". The hook is gated on `OS.has_feature("web")` so
+    // it is inert on desktop / headless GUT (matches the `combat_trace`
+    // gate in DebugFlags.gd). This sidesteps the entire focus-consumption
+    // class rather than picking yet another key and hoping.
+    const forceCloseLineCount = capture.getLines().length;
+    await page.keyboard.press("F9"); // test_force_close_inventory action
+    await page.waitForTimeout(500); // panel close + Engine.time_scale restore
+
+    // ---- ASSERTION: panel actually closed (the round-1 failure mode) ----
+    // The confirmation trace proves the close happened AND time_scale is back
+    // to 1.0. Without this, a swallowed keypress would leave the panel open
+    // and the rest of Phase 2.5 would run in 0.10 slow-mo — exactly the bug
+    // Devon's peer review reproduced 0/5.
+    const forceCloseTraceLine = capture
+      .getLines()
+      .slice(forceCloseLineCount)
+      .find((l) =>
+        /\[combat-trace\] InventoryPanel\.force_close_for_test/.test(l.text)
+      );
+    expect(
+      forceCloseTraceLine,
+      "Phase 2.5 (86c9qb7f3): no [combat-trace] InventoryPanel." +
+        "force_close_for_test line after pressing F9. The panel did NOT " +
+        "close — either the test_force_close_inventory action is unbound " +
+        "in project.godot, the InventoryPanel._input() handler regressed, " +
+        "or OS.has_feature('web') is false (this hook is HTML5-only). " +
+        "Without the close, Engine.time_scale stays at 0.10 and the rest " +
+        "of this phase runs in slow-mo — the round-1 failure shape."
+    ).toBeDefined();
+    const forceCloseMatch = forceCloseTraceLine!.text.match(
+      /open=(\S+) time_scale=(\S+)/
+    );
+    expect(
+      forceCloseMatch,
+      `force_close_for_test trace shape mismatch: "${forceCloseTraceLine!.text}". ` +
+        `Expected: ...| open=<bool> time_scale=<float>`
+    ).not.toBeNull();
+    if (forceCloseMatch) {
+      const [, openState, timeScaleStr] = forceCloseMatch;
+      // open MUST be false — the panel is closed.
+      expect(
+        openState,
+        `Phase 2.5: InventoryPanel.force_close_for_test reported open=${openState} ` +
+          `— the panel did not actually close. close() should have flipped _open false.`
+      ).toBe("false");
+      // time_scale MUST be restored to 1.0 — slow-mo is over.
+      const timeScale = parseFloat(timeScaleStr);
+      expect(
+        timeScale,
+        `Phase 2.5: Engine.time_scale=${timeScale} after force-close (expected 1.0). ` +
+          `The panel's close() did not restore the snapshot — the rest of the ` +
+          `phase would run in slow-mo. This is the load-bearing assertion that ` +
+          `the round-1 Escape-key fix could not make (the panel never closed).`
+      ).toBeCloseTo(1.0, 5);
+    }
 
     // ---- MAIN ASSERTION 2: post-LMB-equip swings still hit damage=6 ----
     // The dual-surface invariant: Player._equipped_weapon got refreshed by
     // the LMB-click path. Confirm by firing a swing and watching for
     // Hitbox.hit damage matching the pre-reload value.
-    await canvas.click(); // re-focus
+    await canvas.click(); // re-focus the canvas for swing input
     await page.waitForTimeout(300);
 
-    // Re-set facing NE (Tab+clicks may have lost focus).
-    await page.keyboard.down("w");
-    await page.keyboard.down("d");
-    await page.waitForTimeout(100);
-    await page.keyboard.up("w");
-    await page.keyboard.up("d");
-    await page.waitForTimeout(400);
+    // Drift-resilient post-equip swing: an 8-direction attack sweep, NOT a
+    // fixed-facing click-spam.
+    //
+    // WHY a sweep, not fixed-NE: the original spec set facing NE once and
+    // click-spammed in place, assuming a grunt was NE of the player. In headed
+    // Windows Chromium that assumption is false — `clearRoom01Dummy`'s own
+    // 8-direction sweep + the room-advance teleport leave the player at an
+    // unpredictable position relative to the Room02 grunts, and the grunts
+    // chase from every side (observed telegraph dirs span N/S/E/W). A
+    // fixed-NE swing wedge (28px reach + 18px radius = 46px range) then never
+    // overlaps a grunt and the spec hangs 30s with zero `Hitbox.hit |
+    // team=player` lines — even though every swing correctly fires damage=6.
+    // Headless timing happened to keep a grunt in the NE wedge, so the spec
+    // passed in CI; headed did not — the exact "Windows headed-Chromium flake"
+    // shape of tickets 86c9qb7f3 / 86c9qah0f.
+    //
+    // The fix mirrors the established `clearRoom01Dummy` discipline (see
+    // fixtures/room01-traversal.ts): cycle the facing through all 8 cardinal/
+    // diagonal directions and swing in each, so whichever side a grunt is on,
+    // one direction in the cycle lands the hit. Direction keys are released in
+    // REVERSE order so the last-resolved input tick carries the full chord.
+    const PHASE25_SWEEP: { keys: string[]; label: string }[] = [
+      { keys: ["w"], label: "N" },
+      { keys: ["w", "d"], label: "NE" },
+      { keys: ["d"], label: "E" },
+      { keys: ["s", "d"], label: "SE" },
+      { keys: ["s"], label: "S" },
+      { keys: ["s", "a"], label: "SW" },
+      { keys: ["a"], label: "W" },
+      { keys: ["w", "a"], label: "NW" },
+    ];
 
     const phase25SwingStart = Date.now();
     let postLmbEquipDamage: number | null = null;
-    while (Date.now() - phase25SwingStart < 30_000) {
-      await canvas.click({ position: { x: clickX, y: clickY } });
-      await page.waitForTimeout(ATTACK_INTERVAL_MS);
-      // Look for hits AFTER the trace line (so we don't pick up pre-Tab hits).
-      const recentLines = capture.getLines().slice(phase25LineCount);
-      const hitLine = recentLines.find((l) =>
-        /\[combat-trace\] Hitbox\.hit \| team=player.*damage=(\d+)/.test(l.text)
-      );
-      if (hitLine) {
-        const m = hitLine.text.match(/damage=(\d+)/);
-        if (m) {
-          postLmbEquipDamage = parseInt(m[1], 10);
-          break;
+    sweepLoop: while (Date.now() - phase25SwingStart < 30_000) {
+      for (const dir of PHASE25_SWEEP) {
+        // Set facing via direction-key chord. Hold 120ms so at least one
+        // `_physics_process` frame updates `Player._facing` at time_scale=1.0
+        // (the panel is closed — see the F9 force-close + asserted
+        // confirmation trace above — so we are NOT in the 0.10 slow-mo
+        // window here).
+        for (const k of dir.keys) await page.keyboard.down(k);
+        await page.waitForTimeout(120);
+        for (const k of [...dir.keys].reverse()) await page.keyboard.up(k);
+        await page.waitForTimeout(60);
+
+        // Two swings per direction — covers the LIGHT_RECOVERY (0.18s) gap.
+        for (let a = 0; a < 2; a++) {
+          if (Date.now() - phase25SwingStart >= 30_000) break sweepLoop;
+          await canvas.click({ position: { x: clickX, y: clickY } });
+          await page.waitForTimeout(ATTACK_INTERVAL_MS);
+          // Look for hits AFTER the marked buffer position so we don't pick
+          // up pre-Tab hits.
+          const recentLines = capture.getLines().slice(phase25LineCount);
+          const hitLine = recentLines.find((l) =>
+            /\[combat-trace\] Hitbox\.hit \| team=player.*damage=(\d+)/.test(
+              l.text
+            )
+          );
+          if (hitLine) {
+            const m = hitLine.text.match(/damage=(\d+)/);
+            if (m) {
+              postLmbEquipDamage = parseInt(m[1], 10);
+              break sweepLoop;
+            }
+          }
         }
       }
     }

@@ -49,6 +49,13 @@ const SAVE_SLOT: int = 0
 # Input action — `toggle_inventory` is mapped to Tab in project.godot.
 const ACTION_TOGGLE: StringName = &"toggle_inventory"
 
+# Test-only input action — mapped to F9 in project.godot. Drives
+# `force_close_for_test()` from the Playwright harness. See that method's
+# docstring for why a dedicated `_input()`-handled action is required (the
+# Godot GUI system consumes BOTH `Tab` and `Escape` when a focusable Control
+# holds keyboard focus, so neither reliably closes the panel from a spec).
+const ACTION_TEST_FORCE_CLOSE: StringName = &"test_force_close_inventory"
+
 # Grid sizing — Uma's spec.
 const GRID_COLS: int = 8
 const GRID_ROWS: int = 3
@@ -207,7 +214,70 @@ func force_hover_inventory_for_test(index: int) -> void:
 	_handle_inventory_hover(index, true)
 
 
+## Test-only — reliably close the panel and restore `Engine.time_scale`,
+## sidestepping the entire focus-consumption problem class.
+##
+## **Why this exists (ticket 86c9qb7f3 / 86c9qah0f).** The Playwright harness
+## drives the HTML5 build with real keyboard/mouse events and cannot call
+## GDScript methods directly. The equip-flow spec's Phase 2.5 clicks an
+## inventory grid cell — a `Button` with the default `focus_mode = FOCUS_ALL`
+## — which grabs keyboard focus. From that point Godot's GUI input system
+## **consumes both `Tab` and `Escape`** before they reach
+## `_unhandled_input`: `Tab` is the focus-traversal key, and `Escape` is
+## bound to the built-in `ui_cancel` GUI action. Neither keypress closes the
+## panel, so `Engine.time_scale` stays pinned at `TIME_SLOW_FACTOR (0.10)`
+## and every subsequent spec action runs at 1/10th game speed. Swapping one
+## focus-consumed key for another (the rejected PR #187 round-1 approach)
+## does not fix it.
+##
+## The reliable fix is a direct-close hook reachable from a spec. It is wired
+## to the `test_force_close_inventory` action (F9 in project.godot) which is
+## handled in `_input()` — `_input()` runs BEFORE the GUI focus system, so a
+## focused Button cannot swallow it — gated behind `OS.has_feature("web")`
+## (true only in the HTML5 export the harness runs against; desktop and
+## headless GUT never wire the action, mirroring the `combat_trace` gate in
+## `DebugFlags.gd`). Emits a `[combat-trace]` confirmation line carrying the
+## restored `Engine.time_scale` so the spec can positively assert the panel
+## actually closed. Idempotent — a no-op if already closed.
+func force_close_for_test() -> void:
+	close()
+	# Confirmation trace — the spec asserts on this line to prove the panel
+	# actually closed AND time-scale was restored (HTML5-only; quiet on
+	# desktop/headless via the combat_trace gate).
+	var df: Node = _debug_flags_node()
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(
+			"InventoryPanel.force_close_for_test",
+			"open=%s time_scale=%s" % [_open, Engine.time_scale]
+		)
+
+
 # ---- Input -----------------------------------------------------------
+
+## Handled BEFORE the GUI focus system (unlike `_unhandled_input`), so the
+## test-only force-close action reaches the panel even when a focusable grid
+## `Button` holds keyboard focus. Gated on `OS.has_feature("web")` — the
+## action is only ever acted on in the HTML5 export the Playwright harness
+## drives; desktop / headless GUT ignore it entirely (the F9 binding is inert
+## there). This mirrors the `DebugFlags.combat_trace` web-only gate.
+##
+## Matches the F9 key by `physical_keycode` directly (the proven pattern in
+## `DebugFlags._input` for Ctrl+Shift+X) rather than via `is_action_pressed`
+## — this removes the dependency on the `test_force_close_inventory` action
+## being present in the exported `project.godot`, so the hook works even if
+## the action map is stripped or the export preset filters it.
+func _input(event: InputEvent) -> void:
+	if not OS.has_feature("web"):
+		return
+	if not (event is InputEventKey):
+		return
+	var ke: InputEventKey = event as InputEventKey
+	if not ke.pressed or ke.echo:
+		return
+	if ke.physical_keycode == KEY_F9 or event.is_action_pressed(ACTION_TEST_FORCE_CLOSE):
+		get_viewport().set_input_as_handled()
+		force_close_for_test()
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Tab toggles regardless of open state. Esc only closes when open.
@@ -909,3 +979,13 @@ func _player_node() -> Node:
 	if nodes.is_empty():
 		return null
 	return nodes[0] as Node
+
+
+## DebugFlags autoload — used by `force_close_for_test` to emit the HTML5
+## `[combat-trace]` confirmation line. Returns null if the autoload is absent
+## (bare-instanced panel tests); callers must null-check.
+func _debug_flags_node() -> Node:
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return null
+	return loop.root.get_node_or_null("DebugFlags")
