@@ -8,7 +8,10 @@ name: Playwright E2E (HTML5 artifact)
 #   regen-smoke          — out-of-combat HP regen activates after 3s idle
 #   room-traversal-smoke — Room 1 combat + door-walk → Room 2 advance
 #
-# Artifact: embergrave-html5-<sha> (single-unzip post-PR-#152 format).
+# Artifact: embergrave-html5-<sha> (post-PR-#152 format: actions/upload-artifact
+# delivers the build/web/ directory directly — download-artifact extracts it
+# into a flat directory with no nested zip). The extract step handles both the
+# pre-unzipped directory (normal path) and a .zip file (legacy/tag-push path).
 # The artifact name is resolved from the upstream release-build conclusion event.
 #
 # Local run:
@@ -119,25 +122,56 @@ jobs:
           ls -la ./artifact-download/ || echo "(empty)"
           find ./artifact-download -type f | head -20
 
-      - name: Unzip HTML5 artifact
+      - name: Extract HTML5 artifact (idempotent — handles zip or pre-unzipped)
         id: unzip
         run: |
           set -euo pipefail
-          # Post-PR-#152 single-unzip format:
-          # artifact-download/ contains embergrave-html5-<sha>-<label>.zip
-          # Unzip once to get: index.html, index.js, index.wasm, index.pck, etc.
-          ZIP_FILE=$(find ./artifact-download -name "*.zip" | head -1)
-          if [ -z "${ZIP_FILE}" ]; then
-            echo "ERROR: No zip file found in artifact-download/"
-            ls -la ./artifact-download/
-            exit 1
-          fi
-          echo "Unzipping: ${ZIP_FILE}"
+          # PR-#152 changed the release-build artifact to a pre-unzipped
+          # single-directory format: `actions/upload-artifact` uploads
+          # `build/web/` directly, and `actions/download-artifact` delivers
+          # those files directly into `./artifact-download/` without a
+          # nested zip wrapper. This is the format for BOTH workflow_run
+          # (chain trigger) and workflow_dispatch (manual trigger) paths.
+          #
+          # However, some historical runs and future edge cases (e.g. a
+          # tag-push release zip staged as `release-zip`) may still deliver
+          # a `.zip` file. This step detects both and handles them:
+          #
+          #   Case A (pre-unzipped directory, post-PR-#152 normal path):
+          #     artifact-download/ contains index.html, index.js, etc. directly.
+          #     → cp -r into html5-build/ (idempotent copy, no unzip needed).
+          #
+          #   Case B (zip present, legacy or edge-case path):
+          #     artifact-download/ contains embergrave-html5-<sha>-<label>.zip
+          #     → unzip once into html5-build/.
+          #
+          # Detection order: check for index.html first (Case A); only fall
+          # back to zip detection if index.html is absent (Case B).
           mkdir -p ./html5-build
-          unzip -o "${ZIP_FILE}" -d ./html5-build
+          if [ -f "./artifact-download/index.html" ]; then
+            echo "Case A: pre-unzipped directory detected (index.html present in artifact-download/)"
+            echo "Copying files from artifact-download/ to html5-build/ ..."
+            cp -r ./artifact-download/. ./html5-build/
+          else
+            ZIP_FILE=$(find ./artifact-download -name "*.zip" | head -1)
+            if [ -n "${ZIP_FILE}" ]; then
+              echo "Case B: zip file detected: ${ZIP_FILE}"
+              echo "Unzipping into html5-build/ ..."
+              unzip -o "${ZIP_FILE}" -d ./html5-build
+            else
+              echo "ERROR: artifact-download/ contains neither index.html nor a .zip file."
+              echo "Expected one of:"
+              echo "  Case A: pre-unzipped directory (index.html present) — post-PR-#152 normal path"
+              echo "  Case B: a .zip file — legacy or tag-push release-zip path"
+              echo "=== Contents of artifact-download/ ==="
+              ls -la ./artifact-download/ || echo "(empty or missing)"
+              find ./artifact-download -type f | head -30 || true
+              exit 1
+            fi
+          fi
           echo "=== HTML5 build contents ==="
           ls -la ./html5-build/
-          # Verify expected files
+          # Verify the four required Godot HTML5 export files are present.
           test -f ./html5-build/index.html || (echo "ERROR: index.html missing" && exit 1)
           test -f ./html5-build/index.js   || (echo "ERROR: index.js missing"   && exit 1)
           test -f ./html5-build/index.wasm || (echo "ERROR: index.wasm missing" && exit 1)
