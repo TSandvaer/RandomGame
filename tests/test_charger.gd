@@ -561,3 +561,27 @@ func test_die_emits_combat_trace_die_line() -> void:
 	# Downstream consequence still holds (Tier 2 bar): the mob actually died.
 	assert_true(c.is_dead(), "lethal take_damage still kills the charger")
 	assert_eq(c.get_state(), Charger.STATE_DEAD)
+
+
+# ---- 20: take_damage emits the [combat-trace] Charger.take_damage line -
+#
+# infra(combat-trace) ticket 86c9u2383. Sibling of the _die trace gap closed
+# by 86c9tuh57 / PR #182: `Grunt.take_damage` emits a `[combat-trace]` line,
+# but `Charger.take_damage` did not — making console-based hit verification
+# harder for soak debugging. Same CombatTraceSpy injection pattern as
+# test_die_emits_combat_trace_die_line above.
+
+func test_take_damage_emits_combat_trace_line() -> void:
+	var c: Charger = _make_charger()  # 70 HP default
+	var spy: CombatTraceSpy = _install_combat_trace_spy()
+	# Non-lethal hit — proves the trace fires on a survivable take_damage,
+	# distinct from the lethal _die-trace path.
+	c.take_damage(10, Vector2.ZERO, null)
+	var captured: bool = spy.has_tag("Charger.take_damage")
+	_restore_debug_flags(spy)
+	assert_true(captured,
+		"Charger.take_damage must emit [combat-trace] Charger.take_damage — " +
+		"console-based hit verification greps on the <Mob>.take_damage line")
+	# Downstream consequence still holds (Tier 2 bar): HP actually dropped.
+	assert_eq(c.get_hp(), 60, "non-lethal take_damage still decrements HP (70 - 10)")
+	assert_false(c.is_dead())
