@@ -54,9 +54,9 @@
  *     transition; helper drives walk-in → walk-out → walk-in pattern).
  *
  * Per-room navigation strategy:
- *   - Room 01 (no gate): both grunts auto-advance the room counter on death
- *     via `_install_room01_clear_listener` (Main.gd). Player.facing NE,
- *     click-spam until 2 Grunt._die.
+ *   - Room 01 (no gate): the PR #169 practice_dummy auto-advances the room
+ *     counter on death via `_install_room01_clear_listener` (Main.gd).
+ *     Walk-NE then 4-direction attack-sweep until PracticeDummy._die.
  *   - Rooms 02-08 (RoomGate at (48,144), size (48,80)):
  *       a. Combat — kill all mobs via NE-facing click-spam. NO aim-sweep,
  *          NO direction-key holds, NO repositioning. Player stays within
@@ -69,6 +69,15 @@
  *   - Boss Room (after Room 08 traversal): player spawns at (240,200);
  *     Stratum1BossRoom._ready auto-fires the entry sequence; boss wakes
  *     after 1.8 s; spam attacks until boss_died emits.
+ *
+ * **CURRENT END-TO-END STATUS (origin/main `339a189`, PR #183 merged):**
+ * Rooms 01, 02, 03 clear + traverse end-to-end (PR #183 fixed the Room 02
+ * gate-registration blocker — verified). The spec then fails at **Room 04**
+ * — the only PURE-Shooter room. `clearRoomMobs` assumes mobs chase into
+ * melee; the Shooter KITES instead, so the near-spawn click-spam never
+ * lands a hit. See the `test.fail()` block's STATUS comment for the full
+ * analysis. The spec stays `test.fail()` until a Shooter-specific
+ * chase-then-return sub-helper is added (AC4 residue, ticket 86c9qckrd).
  *
  * Mob composition per room (from resources/level_chunks/s1_room0N.tres):
  *   Room 01: 2 grunts
@@ -138,52 +147,81 @@ const TOTAL_PRE_BOSS_MOBS =
   TOTAL_GATED_MOBS + ROOM_MOB_COUNTS[0];
 
 test.describe("AC4 — Stratum-1 boss reach + clear", () => {
-  // **STATUS: still test.fail() pending a new game-side investigation.**
+  // **STATUS: still test.fail() — but the blocker has MOVED. The Room 02
+  // gate bug is FIXED; the current blocker is the Room 04 pure-Shooter
+  // room. Re-armed against origin/main `339a189` (PR #183 merged).**
   //
-  // PR `tess/m2-w1-ac4-drift-fix` landed all the harness-drift fixes that
-  // Devon's PR #171 investigation prescribed:
-  //   - clearRoomMobs uses tight N+E facing alternation (no aim-sweep,
-  //     minimal direction-key holds) keeping the player near
-  //     DEFAULT_PLAYER_SPAWN.
-  //   - gateTraversalWalk accepts an `expectedSpawn` parameter and
-  //     asserts on `RoomGate._on_body_entered` (load-bearing positive
-  //     signal Devon added in PR #171) before checking gate_unlocked.
-  //   - Room01 phase walks NE then E then sweeps to kill the
-  //     PR #169 tutorial practice_dummy at world (368, 144).
+  // ---- What PR #183 fixed (verified — no longer the blocker) ----
   //
-  // Empirical run on origin/main 1c2438e (post-PR-#171) demonstrates the
-  // harness drift fix works as designed: Room01 dummy dies in ~12s,
-  // Room02 grunts die (cleared 2/2), and the gate's `_on_body_entered`
-  // trace fires reliably when the player walks from spawn-area into
-  // the trigger rect.
+  // The PRIOR `test.fail()` comment described a Room 02 blocker: the gate's
+  // `_mobs_alive` counter showed 1 after 2/2 grunt deaths, so `lock()`
+  // never auto-unlocked. Root cause turned out to be `MultiMobRoom.
+  // _spawn_room_gate()` doing a synchronous Area2D `add_child` from
+  // `_ready()` INSIDE a physics-flush window (Rooms 02..08 are loaded from
+  // the prior room's `gate_traversed` → ... → `_load_room_at_index` chain,
+  // rooted in a `body_entered` physics callback). The Area2D add panicked
+  // (`USER ERROR: Can't change this state while flushing queries`), the
+  // C++ early-returned, and the gate was left improperly inserted —
+  // `is_inside_tree()` false, monitoring never activated, zero
+  // `RoomGate.register_mob` traces. PR #183 (`d640330`, ticket 86c9tqvxx)
+  // deferred the Area2D-fixture pass (`_spawn_room_gate` +
+  // `_spawn_healing_fountain` + `_register_mobs_with_gate`) to
+  // `call_deferred("_assemble_room_fixtures")`, landing it after the flush.
   //
-  // **NEW BLOCKER (out of scope for this PR — needs game-side dispatch):**
-  // After clearing Room02, the gate's `_mobs_alive` counter shows 1, not
-  // 0. Trace evidence from the empirical run:
-  //   `[combat-trace] RoomGate._on_body_entered | body=CharacterBody2D
-  //    state=open mobs_alive=1`
-  // This blocks `lock()` from auto-unlocking (mobs_alive>0 keeps state
-  // LOCKED awaiting a mob_died decrement). The player walked into the
-  // trigger from drift-near-spawn (helper's discipline worked); both
-  // grunts emitted `Grunt._die` (clearRoomMobs's death counter saw 2/2);
-  // but the gate's count is desync'd at 1.
+  // **Empirical re-arm run on origin/main `339a189` (release-build
+  // artifact, run 25869366760) confirms PR #183 works as designed:**
+  //   - Room 01 practice_dummy dies (~12.5s).
+  //   - Room 02 — 2 grunts cleared 2/2; gate traversal complete
+  //     (body_entered=true, gate_unlocked=true, gate_traversed=true).
+  //   - Room 03 — grunt + charger cleared 2/2; gate traversal complete.
+  // The Room 02 gate-registration bug is genuinely gone — Rooms 02 AND 03
+  // (both chase-mob rooms) now traverse end-to-end.
   //
-  // Possible game-side root causes (Devon investigation candidates):
-  //   - One grunt's `mob_died` signal didn't connect to the gate's
-  //     `_on_mob_died` handler (race during MultiMobRoom's
-  //     `_register_mobs_with_gate` call order).
-  //   - The grunt got knocked into a wall corner where its `_die` chain
-  //     completed but `mob_died.emit` was queued AFTER node freeing.
-  //   - LevelAssembler.assemble_single appends mobs to `result.mobs`
-  //     AFTER `add_child`; if `_ready` synchronously fires anything
-  //     observable, registration timing could be off-by-one.
+  // ---- The CURRENT blocker: Room 04 pure-Shooter room ----
   //
-  // Until that's investigated and patched, this spec stays test.fail().
-  // The harness-side improvements are still landed because they are
-  // necessary regardless — the helper's failure messages now correctly
-  // distinguish "drift" (no body_entered) from "state-machine" (body_entered
-  // but no gate_unlocked) failures, which is what surfaced this game-side
-  // bug in the first place.
+  // The spec now fails at **Room 04**, not Room 02. Empirical signature
+  // from the `339a189` run:
+  //   `[ac4-boss] Room 04: only killed 0/1 mobs in 90000ms.
+  //    Combat broke down`
+  // with the trailing trace buffer showing the player click-spamming
+  // (`Player.try_attack | FIRED kind=light facing=(1.0,0.0)`) and the
+  // Shooter only emitting `Shooter._play_attack_telegraph` — never
+  // `Shooter._die`.
+  //
+  // Root cause is a **harness assumption that is false for the Shooter**,
+  // NOT a game bug. `clearRoomMobs` (Rooms 02-08) is built on the premise
+  // "all mobs chase, so even south/west spawns close to melee range" — true
+  // for Grunt and Charger, but the **Shooter actively KITES**: it walks
+  // AWAY from the player when the player closes below `KITE_RANGE` (see
+  // `scripts/mobs/Shooter.gd` § "Distance bands"). Room 04's only mob is a
+  // single Shooter at tile (12,3) — far NE. The player stands near
+  // `DEFAULT_PLAYER_SPAWN` doing NE-facing click-spam (the tight-combat
+  // discipline PR #171 mandates) and the Shooter simply maintains distance
+  // — the swing wedge never reaches it. Rooms 05-08 also contain Shooters
+  // but ALSO contain Grunts/Chargers that keep the player engaged near
+  // spawn; Room 04 is the only PURE-Shooter room, so it is the hard wall.
+  //
+  // This is a genuine harness tension, not a quick fix: the Shooter needs
+  // a CHASE phase to corner it, but PR #171's drift discipline forbids
+  // wandering during combat (drift breaks the subsequent gate-traversal
+  // walk). A correct fix needs a Shooter-specific sub-helper that chases
+  // the Shooter down THEN walks the player back to spawn-area before the
+  // gate walk — or projectile-dodge + corner-trap geometry. Out of scope
+  // for this re-arm PR (which only corrects the spec's status to reflect
+  // reality post-#183). Tracked as AC4 residue under ticket 86c9qckrd.
+  //
+  // ---- Why this spec STAYS test.fail() (not split into test()) ----
+  //
+  // The spec is a single monolithic sequential test (cold-boot → Room 01
+  // → ... → Room 08 → Boss). It cannot be cleanly split into a passing
+  // `test()` half and a failing `test.fail()` half — Room 04 is step 4 of
+  // 8 and everything after it depends on traversing it. Extracting
+  // "Rooms 01-03 pass" into its own `test()` would require a second cold
+  // boot and a partial-run harness the spec doesn't have. So the spec
+  // stays `test.fail()`, but the comment now accurately names the CURRENT
+  // blocker (Room 04 Shooter kiting) so the next person to fix the
+  // Shooter helper flips it green knowingly — and no FIXED bug (#183's
+  // Room 02 gate) is masked behind a stale annotation.
   test.fail(
     "AC4 — Stratum-1 boss reach + clear in ≤10min from cold start",
     async ({ page, context }) => {
@@ -233,7 +271,19 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       //   Room08 grunt + charger + shooters at (176,144), (240,80), (368,112), (400,208)
       //                                                        — W, N, NE, SE
       //
-      // All mobs chase, so even south/west spawns close to melee range.
+      // Grunt and Charger CHASE, so even south/west spawns close to melee
+      // range — the near-spawn N+E click-spam below kills them without the
+      // player wandering. **The Shooter does NOT chase — it KITES** (walks
+      // AWAY when the player closes below KITE_RANGE; see
+      // `scripts/mobs/Shooter.gd` § "Distance bands"). This helper therefore
+      // CANNOT clear a pure-Shooter room — most notably **Room 04**, whose
+      // only mob is one Shooter. Rooms 05-08 contain Shooters too, but their
+      // Grunts/Chargers keep the player engaged near spawn while the Shooter
+      // is incidentally caught in the wedge. Room 04 is the spec's current
+      // hard wall (see the `test.fail()` STATUS comment); fixing it needs a
+      // Shooter-specific chase-then-return sub-helper (AC4 residue,
+      // ticket 86c9qckrd).
+      //
       // Cycling between N and NE facing covers mobs approaching from
       // either direction without inducing significant player drift (the
       // direction key for facing is held only ~80ms per cycle).
