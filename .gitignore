@@ -57,3 +57,4 @@ venv/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 .claude/scheduled_tasks.json
+.claude/auto-status.state
