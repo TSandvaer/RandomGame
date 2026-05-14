@@ -275,7 +275,10 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	var clean_amount: int = max(0, amount)
 	var multiplier: float = RECOVERY_DAMAGE_MULTIPLIER if _state == STATE_RECOVERING else ARMORED_DAMAGE_MULTIPLIER
 	var final_amount: int = int(round(clean_amount * multiplier))
+	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - final_amount)
+	_combat_trace("Charger.take_damage",
+		"amount=%d hp=%d->%d" % [final_amount, hp_before, hp_current])
 	damaged.emit(final_amount, hp_current, source)
 	# Visual: white hit-flash on every actual-damage take_damage (Uma §2).
 	if final_amount > 0:

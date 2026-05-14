@@ -463,6 +463,30 @@ func test_die_emits_combat_trace_die_line() -> void:
 	assert_eq(s.get_state(), Shooter.STATE_DEAD)
 
 
+# ---- 19: take_damage emits the [combat-trace] Shooter.take_damage line -
+#
+# infra(combat-trace) ticket 86c9u2383. Sibling of the _die trace gap closed
+# by 86c9tuh57 / PR #182: `Grunt.take_damage` emits a `[combat-trace]` line,
+# but `Shooter.take_damage` did not — making console-based hit verification
+# harder for soak debugging. Same CombatTraceSpy injection pattern as
+# test_die_emits_combat_trace_die_line above.
+
+func test_take_damage_emits_combat_trace_line() -> void:
+	var s: Shooter = _make_shooter()  # 40 HP default
+	var spy: CombatTraceSpy = _install_combat_trace_spy()
+	# Non-lethal hit — proves the trace fires on a survivable take_damage,
+	# distinct from the lethal _die-trace path.
+	s.take_damage(10, Vector2.ZERO, null)
+	var captured: bool = spy.has_tag("Shooter.take_damage")
+	_restore_debug_flags(spy)
+	assert_true(captured,
+		"Shooter.take_damage must emit [combat-trace] Shooter.take_damage — " +
+		"console-based hit verification greps on the <Mob>.take_damage line")
+	# Downstream consequence still holds (Tier 2 bar): HP actually dropped.
+	assert_eq(s.get_hp(), 30, "non-lethal take_damage still decrements HP (40 - 10)")
+	assert_false(s.is_dead())
+
+
 # ---- Shooter.pos harness-observability trace (ticket 86c9tz7zg) -------
 #
 # The AC4 Shooter-chase sub-helper (tests/playwright/fixtures/kiting-mob-

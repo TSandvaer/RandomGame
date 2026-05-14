@@ -212,7 +212,10 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	if _is_dead:
 		return
 	var clean_amount: int = max(0, amount)
+	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - clean_amount)
+	_combat_trace("Shooter.take_damage",
+		"amount=%d hp=%d->%d" % [clean_amount, hp_before, hp_current])
 	damaged.emit(clean_amount, hp_current, source)
 	# Visual: white hit-flash on every actual-damage take_damage (Uma §2).
 	if clean_amount > 0:
