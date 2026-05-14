@@ -24,18 +24,32 @@
  *     would invalidate state assertions in other specs.
  *
  *   Test 2 — Room 01 has no gate (negative-assertion baseline):
- *     During Room 01 combat (which auto-advances via
+ *     While Room 01 is the live room (which auto-advances via
  *     `_install_room01_clear_listener`, NOT a RoomGate), zero
  *     `[combat-trace] RoomGate.*` traces should fire. Stratum1Room01 has
- *     no RoomGate per Main.gd:381. If a gate trace appears, room loading
+ *     no RoomGate — see `scenes/Main.gd::_wire_room_signals` ("Room01 ...
+ *     does NOT emit room_cleared — it has no RoomGate in its .tscn"). If a
+ *     gate trace appears while Room01 is live, room loading
  *     mis-instantiated a gate — a misconfiguration symptom.
  *
  *     **Stage 2b update (PR #169):** Room01's mob roster swapped from
  *     "2 grunts that chase" to "1 PracticeDummy that doesn't chase." The
- *     test now expects exactly 1 `PracticeDummy._die` trace and ZERO
- *     `Grunt._die` traces during Room01's life. The no-RoomGate invariant
- *     is unchanged — Room01 still uses `_install_room01_clear_listener` to
- *     auto-advance on the dummy's death.
+ *     test now expects exactly 1 `PracticeDummy._die` trace. The
+ *     no-RoomGate invariant is unchanged — Room01 still uses
+ *     `_install_room01_clear_listener` to auto-advance on the dummy's
+ *     death.
+ *
+ *     **Buffer-scope fix (ticket 86c9tqrt7):** the dummy's death triggers
+ *     the Room02 load, and Room02 IS a MultiMobRoom with a RoomGate that
+ *     registers its grunts. Because `clearRoom01Dummy`'s attack-sweep and
+ *     Main's deferred `_on_room_cleared` race, Room02's
+ *     `RoomGate.register_mob | mob=Grunt` traces land in the same console
+ *     buffer. The negative assertion (and the no-Grunt-deaths assertion)
+ *     are therefore scoped to the window strictly BEFORE the first
+ *     `PracticeDummy._die` trace — the unambiguous end of "Room01 is the
+ *     live room." A whole-buffer count mis-attributes Room02's gate to
+ *     Room01 (this spec went RED on origin/main, run 25852576132, for
+ *     exactly that reason).
  *
  *   Test 3 — gate_traversed never precedes gate_unlocked:
  *     Within any captured trace stream, EVERY `gate_traversed` line must
@@ -186,37 +200,70 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
     const dummyDeaths = capture
       .getLines()
       .filter((l) => /\[combat-trace\] PracticeDummy\._die/.test(l.text)).length;
-    const gruntDeaths = capture
-      .getLines()
-      .filter((l) => /\[combat-trace\] Grunt\._die/.test(l.text)).length;
     expect(
       dummyDeaths,
       `Stage 2b Room01: expected exactly 1 PracticeDummy._die trace; got ` +
         `${dummyDeaths}. Either the chunk_def reverted to grunts (regression) ` +
         `or the dummy didn't die (helper failure).`
     ).toBe(1);
+
+    // ---- Buffer-scope boundary: the Room01→Room02 handoff ----
+    // The dummy's death is what triggers the Room02 load: PracticeDummy._die
+    // → mob_died → Main._on_room01_mob_died → call_deferred("_on_room_cleared")
+    // → _load_room_at_index(1). So the FIRST `PracticeDummy._die` timestamp is
+    // the unambiguous end of "Room01 is the live room." Room02 is a
+    // MultiMobRoom: its _ready calls RoomGate.register_mob for its grunts,
+    // which fires `[combat-trace] RoomGate.register_mob | mob=Grunt ...`
+    // milliseconds later. clearRoom01Dummy()'s 8-direction attack-sweep keeps
+    // running (and the deferred room-load races) past the dummy's death, so by
+    // the time this spec snapshots the buffer, Room02's gate traces are
+    // already in it. Counting `RoomGate.*` or `Grunt._die` across the WHOLE
+    // buffer therefore mis-attributes Room02 activity to Room01 — the bug that
+    // surfaced this spec RED on origin/main (run 25852576132). Scope every
+    // Room01-invariant assertion to the pre-handoff window.
+    const room01Lines = capture.getLines();
+    const firstDummyDeath = room01Lines.find((l) =>
+      /\[combat-trace\] PracticeDummy\._die/.test(l.text)
+    );
+    // dummyDeaths === 1 was asserted above, so firstDummyDeath is defined; the
+    // guard keeps TS happy and degrades gracefully (no boundary → empty window).
+    const handoffTs = firstDummyDeath
+      ? firstDummyDeath.timestamp
+      : -Infinity;
+
+    const gruntDeaths = room01Lines.filter(
+      (l) =>
+        /\[combat-trace\] Grunt\._die/.test(l.text) &&
+        l.timestamp < handoffTs
+    ).length;
     expect(
       gruntDeaths,
-      `Stage 2b Room01: expected 0 Grunt._die traces during Room01's life; ` +
-        `got ${gruntDeaths}. Room01's chunk_def must NOT spawn grunts ` +
-        `(PR #169). If grunts died here, the chunk_def regressed OR Room02 ` +
-        `loaded faster than expected and we counted Room02 grunt deaths in ` +
-        `the same buffer scope.`
+      `Stage 2b Room01: expected 0 Grunt._die traces BEFORE the dummy-poof ` +
+        `handoff (t=${handoffTs}); got ${gruntDeaths}. Room01's chunk_def ` +
+        `must NOT spawn grunts (PR #169). Any Grunt._die at-or-after the ` +
+        `handoff belongs to Room02 and is correctly excluded by the scope ` +
+        `boundary.`
     ).toBe(0);
 
     // ---- THE NEGATIVE ASSERTION ----
-    // Stratum1Room01 has no RoomGate (Main.gd:381 docstring; .tscn ships no
-    // RoomGate child). During Room 01's life, ZERO RoomGate.* traces should
-    // appear. If they do, room loading mis-instantiated a gate.
-    const gateTraces = capture
-      .getLines()
-      .filter((l) => /\[combat-trace\] RoomGate\./.test(l.text));
+    // Stratum1Room01 has no RoomGate (scenes/Main.gd _wire_room_signals
+    // comment; .tscn ships no RoomGate child). While Room01 is the live room
+    // — i.e. strictly BEFORE the dummy-poof handoff timestamp — ZERO
+    // RoomGate.* traces should appear. If they do, room loading
+    // mis-instantiated a gate. Room02's RoomGate.register_mob traces (which
+    // fire after the handoff) are correctly excluded by the scope boundary.
+    const gateTraces = room01Lines.filter(
+      (l) =>
+        /\[combat-trace\] RoomGate\./.test(l.text) &&
+        l.timestamp < handoffTs
+    );
 
     expect(
       gateTraces.length,
-      `Stratum1Room01 has no RoomGate per Main.gd:381 docstring. ` +
-        `If a [combat-trace] RoomGate.* line fires here, room loading ` +
-        `mis-instantiated a gate. Got ${gateTraces.length} gate traces:\n` +
+      `Stratum1Room01 has no RoomGate (scenes/Main.gd _wire_room_signals). ` +
+        `If a [combat-trace] RoomGate.* line fires BEFORE the dummy-poof ` +
+        `handoff (t=${handoffTs}), room loading mis-instantiated a gate. ` +
+        `Got ${gateTraces.length} pre-handoff gate traces:\n` +
         gateTraces.map((l) => `  ${l.text}`).join("\n")
     ).toBe(0);
 
