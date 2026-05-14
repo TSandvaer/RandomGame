@@ -96,92 +96,49 @@ func _ready() -> void:
 	if chunk_def == null:
 		push_error("MultiMobRoom: no chunk_def assigned")
 		return
-	# `_build()` constructs the `LevelAssembler.AssemblyResult` synchronously —
-	# it instantiates the chunk geometry + every mob CharacterBody2D and
-	# parents them under the DETACHED `_assembly.root` Node2D (NOT the live
-	# scene tree). That part is physics-flush-safe: a node that is not inside
-	# the tree makes zero physics-server calls. Crucially `_assembly.mobs` is
-	# fully populated here, so `Main._wire_room_signals` can read
-	# `get_spawned_mobs()` and wire signals / `set_player` on the same tick
-	# the room is added — signal connections work on not-yet-in-tree nodes.
+	# `_build()` stays synchronous: it instantiates the chunk geometry +
+	# every mob CharacterBody2D and splices them into this room's tree, so
+	# `get_spawned_mobs()` / `get_bounds_px()` / the perimeter-wall geometry
+	# are all live the same tick the room is added — `Main._wire_room_signals`
+	# (and `test_room_boundary_walls.gd`) rely on that synchronous contract.
+	#
+	# This `_build()` `add_child` is physics-flush-safe ONLY because the
+	# next-room load no longer runs inside a physics-flush window — see the
+	# `CONNECT_DEFERRED` on `gate_traversed` in `_spawn_room_gate()` (ticket
+	# 86c9u1cx1). With that deferral, `Main._on_room_cleared → _load_room_at_index
+	# → _world.add_child(room) → MultiMobRoom._ready()` runs at end-of-frame,
+	# OUTSIDE `PhysicsServer2D.flush_queries()`, so the mob CharacterBody2D +
+	# CollisionShape2D inserts here land on a clean tick. Were `_build()` to
+	# run inside a flush, those inserts would panic with `USER ERROR: Can't
+	# change this state while flushing queries` (`body_set_shape_disabled` /
+	# `body_set_shape_as_one_way_collision`) and leave the mobs' shapes
+	# unregistered → un-hittable → room unbeatable (the Room 05 freeze).
 	_build()
-	# Defer the *tree-insertion* of `_assembly.root` (the chunk geometry +
-	# mobs) AND the Area2D-fixture pass (RoomGate + HealingFountain) AND
+	# Defer the Area2D-fixture pass (RoomGate + HealingFountain spawn) AND
 	# `_register_mobs_with_gate` out of the physics-flush window.
 	#
-	# Root cause (ticket 86c9tqvxx → 86c9u1cx1): Rooms 02..08 are loaded by
-	# `Main._load_room_at_index`, which for every room past Room 01 runs
-	# inside a physics-flush window — the call chain is rooted in the PRIOR
-	# room's `RoomGate.gate_traversed` → `MultiMobRoom._on_room_gate_traversed`
-	# → `room_cleared` → `Main._on_room_cleared` → `_load_room_at_index` →
-	# `_world.add_child(room)` → `MultiMobRoom._ready()`, and `gate_traversed`
-	# itself emits from `RoomGate._on_body_entered` (a physics `body_entered`
-	# callback, emitted synchronously inside `PhysicsServer2D.flush_queries()`).
-	#
-	# Two distinct physics-flush mutations live in this `_ready` path:
-	#
-	#   1. `add_child(_assembly.root)` — attaching the chunk subtree splices
-	#      every mob's `CollisionShape2D` into the physics server. Each shape
-	#      insertion calls `body_set_shape_disabled` +
-	#      `body_set_shape_as_one_way_collision` on the mob's CharacterBody2D —
-	#      and those panic with `USER ERROR: Can't change this state while
-	#      flushing queries` when run mid-`flush_queries()`. The C++ early-
-	#      returns, leaving the mob's collision shape NOT registered with the
-	#      server: the mob renders + AI-ticks fine, but the player's swing
-	#      `Hitbox` Area2D never detects it (`get_overlapping_bodies` /
-	#      `body_entered` see no shape), so the mob is un-hittable, never
-	#      dies, and the room can never clear. **This is the Room 05
-	#      3-concurrent-chaser freeze (86c9u1cx1).** PR #183's earlier comment
-	#      asserted `_build()` was safe because mobs are "CharacterBody2D, no
-	#      Area2D monitoring mutation" — that was wrong: the physics-flush rule
-	#      applies to `CollisionShape2D`-on-`PhysicsBody2D` adds too, not just
-	#      Area2D monitoring. See `.claude/docs/combat-architecture.md`
-	#      § "Physics-flush rule".
-	#   2. `_spawn_room_gate()` — a synchronous `add_child` of a `RoomGate`
-	#      Area2D + its CollisionShape2D + monitoring activation; same panic
-	#      class (86c9tqvxx).
-	#
-	# Deferring lands BOTH after the physics flush completes — the mob-shape
-	# inserts AND the Area2D add + monitoring activation run on a clean tick.
-	# This mirrors the `Stratum1Room01._ready → call_deferred("_wire_tutorial_flow")`
-	# and `Stratum1BossRoom._ready → call_deferred("trigger_entry_sequence")`
-	# precedents (same `.claude/docs` § "Room-load triggers vs body_entered
-	# triggers" rule).
+	# Root cause (ticket 86c9tqvxx): `_spawn_room_gate()` does an `add_child`
+	# of a `RoomGate` Area2D + activates its monitoring. Even with the
+	# `gate_traversed` `CONNECT_DEFERRED` above making the *next-room* load
+	# flush-safe, deferring this pass is kept belt-and-suspenders: it also
+	# covers the FIRST room's load and mirrors the
+	# `Stratum1Room01._ready → call_deferred("_wire_tutorial_flow")` and
+	# `Stratum1BossRoom._ready → call_deferred("trigger_entry_sequence")`
+	# precedents. `_spawn_healing_fountain` is folded in because it too does
+	# an `add_child` of a fixture node.
 	call_deferred("_assemble_room_fixtures")
 
 
-## Deferred fixture pass — runs one frame after `_ready`, OUTSIDE the
-## physics-flush window that `Main._load_room_at_index` invokes `_ready`
-## inside. Splices the assembled chunk subtree (geometry + mob
-## CharacterBody2Ds) into the live tree, then spawns the RoomGate +
-## HealingFountain Area2D-derived fixtures and registers every spawned mob
+## Deferred fixture pass — runs one frame after `_ready`. Spawns the RoomGate
+## + HealingFountain Area2D-derived fixtures and registers every spawned mob
 ## with the gate. Idempotent-safe: if the room is freed before the deferred
 ## call lands, the `is_inside_tree` guard bails cleanly.
-##
-## Ordering is load-bearing: `_attach_assembly()` MUST run first so the
-## mobs are inside the tree before `_register_mobs_with_gate` connects their
-## `mob_died` signals and before the RoomGate's `body_entered` can fire.
 func _assemble_room_fixtures() -> void:
 	if not is_inside_tree():
 		return
-	_attach_assembly()
 	_spawn_room_gate()
 	_spawn_healing_fountain()
 	_register_mobs_with_gate()
-
-
-## Deferred tree-insertion of the assembled chunk subtree. Splits the
-## physics-flush-UNSAFE `add_child(_assembly.root)` out of `_build()` (which
-## runs synchronously inside the prior room's `body_entered` flush) into this
-## deferred pass. See `_ready()` for the full panic rationale (86c9u1cx1).
-## Idempotent: guards against a double-attach if the deferred call is somehow
-## queued twice.
-func _attach_assembly() -> void:
-	if _assembly == null or _assembly.root == null:
-		return
-	if _assembly.root.is_inside_tree():
-		return
-	add_child(_assembly.root)
 
 
 # ---- Public API ------------------------------------------------------
@@ -218,25 +175,20 @@ func get_room_id() -> StringName:
 
 # ---- Build ---------------------------------------------------------
 
-## Construct the chunk assembly (geometry + mob CharacterBody2Ds) under the
-## DETACHED `_assembly.root`. Does NOT splice the subtree into the live tree —
-## that is `_attach_assembly()`'s job, deferred out of the physics-flush
-## window (see `_ready()` / ticket 86c9u1cx1). `LevelAssembler.assemble_single`
-## parents geometry + mobs under its own freshly-`new()`'d `result.root`, so
-## every `add_child` it does is on a not-yet-in-tree node and makes zero
-## physics-server calls. `_assembly.mobs` is fully populated on return, so
-## `Main._wire_room_signals` can wire signals + `set_player` synchronously.
+## Construct the chunk assembly (geometry + mob CharacterBody2Ds) and splice
+## it into this room's tree. Synchronous by design — `Main._wire_room_signals`
+## and `test_room_boundary_walls.gd` read `get_spawned_mobs()` / the perimeter
+## geometry the same tick the room is added. This `add_child(_assembly.root)`
+## is physics-flush-safe ONLY because the next-room load is deferred out of
+## the flush via the `gate_traversed` `CONNECT_DEFERRED` (ticket 86c9u1cx1) —
+## see `_ready()` for the full rationale.
 func _build() -> void:
 	var assembler: LevelAssembler = LevelAssembler.new()
 	var spawner: Callable = Callable(self, "_spawn_mob")
 	_assembly = assembler.assemble_single(chunk_def, spawner)
 	if _assembly == null:
 		return
-	# NOTE: `add_child(_assembly.root)` is intentionally NOT called here — it
-	# is deferred into `_attach_assembly()` (called from `_assemble_room_fixtures`)
-	# because `_ready` runs inside the prior room's `body_entered` physics-flush
-	# window and splicing the mobs' CollisionShape2Ds into the physics server
-	# mid-flush panics + leaves the mobs un-hittable. See `_ready()` docstring.
+	add_child(_assembly.root)
 
 
 func _spawn_room_gate() -> void:
