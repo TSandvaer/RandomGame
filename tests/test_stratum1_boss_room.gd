@@ -40,11 +40,72 @@ func test_boss_room_scene_loads() -> void:
 
 func test_room_has_door_trigger_and_boss() -> void:
 	var room: Stratum1BossRoom = _make_room()
-	assert_not_null(room.get_door_trigger(), "door trigger Area2D exists")
-	assert_not_null(room.get_boss(), "boss spawned at room ready")
+	# `_spawn_boss` stays synchronous in `_ready`, so the boss is available
+	# immediately. The door trigger is built in the deferred `_assemble_room_fixtures`
+	# pass (ticket 86c9tv8uf physics-flush fix) — drain a frame for it.
+	assert_not_null(room.get_boss(), "boss spawned at room ready (synchronous)")
+	await get_tree().process_frame
+	assert_not_null(room.get_door_trigger(), "door trigger Area2D exists after deferred fixture pass")
 	var boss: Stratum1Boss = room.get_boss()
 	# Boss starts DORMANT — Uma BI-19 (no attack during intro).
 	assert_true(boss.is_dormant(), "boss starts dormant — wakes at end of intro")
+
+
+# ---- 1b. Physics-flush fix — door trigger enters tree + monitors ----
+#
+# **The ticket 86c9tv8uf regression gate.** Drives the REAL Stratum1BossRoom
+# build path (scene instantiate → `_ready` → deferred `_assemble_room_fixtures`)
+# and asserts the door-trigger Area2D ends up correctly inserted in the tree
+# AND monitoring.
+#
+# Pre-fix: `_build_door_trigger` ran synchronously inside `_ready`. In
+# production that `_ready` runs inside a physics-flush window — the boss room
+# is loaded by `Main._load_room_at_index(8)` from Room 08's `gate_traversed`
+# body callback. Adding the door-trigger Area2D + activating its monitoring
+# inside that flush panics (`USER ERROR: Can't change this state while
+# flushing queries`); the C++ early-returns, leaving the Area2D improperly
+# inserted — it never monitors, `body_entered` never fires, and the player
+# can never leave the boss room.
+#
+# Post-fix: `_build_door_trigger` + `_spawn_stratum_exit` are deferred out of
+# the physics-flush window via `call_deferred("_assemble_room_fixtures")`.
+# After one drained frame the door trigger exists, is inside the tree, and
+# has monitoring active.
+#
+# (GUT's `add_child` is not itself inside a physics flush, so this test can't
+# reproduce the panic directly — but it pins the load-bearing post-condition:
+# after the deferred pass, the door trigger is a properly-monitoring Area2D
+# in the tree. The HTML5 release-build trace evidence in the Self-Test Report
+# covers the actual physics-flush-window path.)
+
+func test_door_trigger_enters_tree_and_monitors_after_deferred_pass() -> void:
+	var room: Stratum1BossRoom = _make_room()
+	# Pre-drain: the deferred fixture pass has NOT landed yet, so the door
+	# trigger does not exist.
+	assert_null(room.get_door_trigger(),
+		"door trigger is NOT built synchronously in _ready (deferred out of physics-flush window)")
+	await get_tree().process_frame
+	# Post-drain: the deferred `_assemble_room_fixtures` pass has run.
+	var trigger: Area2D = room.get_door_trigger()
+	assert_not_null(trigger, "REGRESSION-86c9tv8uf: door trigger Area2D built in deferred fixture pass")
+	assert_true(trigger.is_inside_tree(),
+		"REGRESSION-86c9tv8uf: door trigger Area2D is inserted in the scene tree")
+	assert_eq(trigger.get_parent(), room,
+		"door trigger is parented under the boss room")
+	assert_true(trigger.monitoring,
+		"REGRESSION-86c9tv8uf: door trigger Area2D has monitoring ACTIVE — " +
+		"body_entered can fire so the player can exit the boss room")
+	# The trigger must still carry a CollisionShape2D child (the rect that
+	# defines the overlap zone) — a monitoring Area2D with no shape is inert.
+	var has_shape: bool = false
+	for c: Node in trigger.get_children():
+		if c is CollisionShape2D:
+			has_shape = true
+	assert_true(has_shape, "door trigger Area2D carries its CollisionShape2D")
+	# StratumExit (which builds its own Area2D interaction area on _ready) is
+	# also spawned in the deferred pass — confirm it landed.
+	assert_not_null(room.get_stratum_exit(),
+		"REGRESSION-86c9tv8uf: StratumExit spawned in the deferred fixture pass")
 
 
 # ---- 2: door trigger fires entry sequence ---------------------------

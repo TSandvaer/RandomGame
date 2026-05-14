@@ -96,8 +96,61 @@ var _stratum_exit: StratumExit = null
 func _ready() -> void:
 	_loot_spawner = MobLootSpawner.new()
 	_loot_spawner.set_parent_for_pickups(self)
-	_build_door_trigger()
+	# `_spawn_boss()` stays synchronous: the boss is a CharacterBody2D (no
+	# Area2D monitoring mutation on tree-entry), and `Main._wire_room_signals`
+	# reads `get_boss()` on the SAME tick the room is added to the tree (see
+	# `scenes/Main.gd::_wire_room_signals`, the `index == BOSS_ROOM_INDEX`
+	# branch). Deferring the boss spawn would make `get_boss()` return null at
+	# wire time and the boss would never get its XP / loot wiring.
 	_spawn_boss()
+	# Defer the Area2D-fixture pass (door-trigger build + StratumExit spawn)
+	# AND the entry-sequence trigger out of the physics-flush window.
+	#
+	# Root cause (ticket 86c9tv8uf — the follow-up flagged in PR #183): the
+	# boss room is loaded by `Main._load_room_at_index(8)`, which runs inside
+	# a physics-flush window — the call chain is rooted in Room 08's
+	# `RoomGate.gate_traversed` → `MultiMobRoom._on_room_gate_traversed` →
+	# `room_cleared` → `Main._on_room_cleared` → `_load_room_at_index` →
+	# `_world.add_child(room)` → `Stratum1BossRoom._ready()`, and
+	# `gate_traversed` itself emits from `RoomGate._on_body_entered` (a
+	# CharacterBody2D physics callback). `_build_door_trigger()` does a
+	# synchronous `add_child` of an `Area2D` (the door trigger); `_spawn_stratum_exit()`
+	# adds a `StratumExit` whose own `_ready` builds an `Area2D` interaction
+	# area. Adding an Area2D + activating its monitoring inside a physics flush
+	# panics with `USER ERROR: Can't change this state while flushing queries`
+	# (see `.claude/docs/combat-architecture.md` § "Physics-flush rule"). The
+	# C++ early-returns, leaving the Area2D improperly inserted: it never
+	# monitors, so `body_entered` never fires and the player can never leave
+	# the boss room. This is the SAME bug class as `MultiMobRoom._spawn_room_gate`
+	# (fixed in PR #183) — the old combat-architecture.md claim that the boss
+	# room's `_build_door_trigger` had "zero panic risk because it spawns from
+	# `_ready`, not a physics-tick path" was wrong: `_ready` of a room past
+	# Room 01 IS a physics-flush context.
+	#
+	# Deferring lands `_assemble_room_fixtures` AFTER the physics flush closes,
+	# so the Area2D `add_child` + monitoring activation run on a clean tick.
+	# This mirrors the `MultiMobRoom._ready → call_deferred("_assemble_room_fixtures")`
+	# and `Stratum1Room01._ready → call_deferred("_wire_tutorial_flow")`
+	# precedents (same `.claude/docs` § "Room-load triggers vs body_entered
+	# triggers" rule).
+	#
+	# The deferred call also lands AFTER `Main._load_room_at_index` re-parents
+	# the player into the room, so by the time the 1.8 s entry-sequence timer
+	# fires the player is correctly placed (the original M2 W1 P0 `86c9q96fv`
+	# / `86c9q96ht` reason for deferring `trigger_entry_sequence`).
+	call_deferred("_assemble_room_fixtures")
+
+
+## Deferred fixture pass — runs one frame after `_ready`, OUTSIDE the
+## physics-flush window that `Main._load_room_at_index` invokes `_ready`
+## inside. Builds the door-trigger Area2D, spawns the StratumExit (which
+## builds its own Area2D interaction area), then auto-fires the boss entry
+## sequence. Idempotent-safe: if the room is freed before the deferred call
+## lands, the `is_inside_tree` guard bails cleanly.
+func _assemble_room_fixtures() -> void:
+	if not is_inside_tree():
+		return
+	_build_door_trigger()
 	_spawn_stratum_exit()
 	# M2 W1 P0 fix (`86c9q96fv` + `86c9q96ht`): the boss starts STATE_DORMANT
 	# and only wakes via `trigger_entry_sequence()` → 1.8 s timer → `wake()`.
@@ -106,13 +159,10 @@ func _ready() -> void:
 	# which TELEPORTS the player to (240, 200) without any physics overlap event.
 	# Player Y=200 sits ABOVE the trigger Y=250, so `body_entered` never fires.
 	# Result: boss stays dormant indefinitely → `take_damage` is rejected during
-	# DORMANT (Stratum1Boss.gd:332-333) AND `_physics_process` skips all AI
-	# (Stratum1Boss.gd:361-365). Both Sponsor-reported P0s ("boss does not take
-	# damage" + "boss does not attack") collapse to this single root cause.
+	# DORMANT AND `_physics_process` skips all AI. Both Sponsor-reported P0s
+	# ("boss does not take damage" + "boss does not attack") collapse to this
+	# single root cause.
 	#
-	# Fix: schedule a deferred entry-sequence trigger from `_ready`. The deferred
-	# call lands AFTER `Main._load_room_at_index` re-parents the player into the
-	# room, so by the time the 1.8 s timer fires the player is correctly placed.
 	# `trigger_entry_sequence` is idempotent (guards on `_entry_sequence_active`
 	# / `_entry_sequence_completed`), so the door-trigger fallback path remains
 	# safe — if a future code path teleports the player onto the trigger, the
@@ -130,7 +180,7 @@ func _ready() -> void:
 	# production scene always has `boss_scene_path` set, so production gets the
 	# auto-fire as designed.
 	if _boss != null:
-		call_deferred("trigger_entry_sequence")
+		trigger_entry_sequence()
 
 
 # ---- Public API -------------------------------------------------------
@@ -198,7 +248,11 @@ func _build_door_trigger() -> void:
 	# (monitoring=true, which is Area2D's default), not to BE detected.
 	# This is the same receiver-side encapsulation pattern used for Hitbox and
 	# Projectile (_init: monitorable=false) — see combat-architecture.md.
-	# Built from _ready (not a physics-tick path) so set_deferred is not required.
+	# Physics-flush safety (ticket 86c9tv8uf): this Area2D `add_child` is NOT
+	# called directly from `_ready` — `_ready` defers it via
+	# `call_deferred("_assemble_room_fixtures")`, which lands AFTER the
+	# physics-flush window that `Main._load_room_at_index` invokes `_ready`
+	# inside. Mutating monitoring state here is therefore on a clean tick.
 	_door_trigger.monitorable = false
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	var rect: RectangleShape2D = RectangleShape2D.new()

@@ -269,9 +269,12 @@ func test_boss_room_door_trigger_is_not_monitorable() -> void:
 	boss_room.boss_mob_def_path = ""
 	boss_room.stratum_exit_scene_path = ""
 	add_child_autofree(boss_room)
-	# _ready has fired. Retrieve the door trigger.
+	# Physics-flush fix (ticket 86c9tv8uf): `_build_door_trigger` is now
+	# deferred via `_ready → call_deferred("_assemble_room_fixtures")`, so the
+	# door trigger lands next-frame. Drain a frame before retrieving it.
+	await get_tree().process_frame
 	var trigger: Area2D = boss_room.get_door_trigger()
-	assert_not_null(trigger, "door trigger must exist after _ready")
+	assert_not_null(trigger, "door trigger must exist after deferred fixture pass")
 	assert_false(trigger.monitorable,
 		"Bug 1 harmonization: BossRoom door trigger must be non-monitorable " +
 		"so Area2D neighbors cannot receive area_entered from it")
@@ -285,6 +288,9 @@ func test_boss_room_door_trigger_area_entered_ignored_does_not_start_entry_seque
 	boss_room.boss_mob_def_path = ""
 	boss_room.stratum_exit_scene_path = ""
 	add_child_autofree(boss_room)
+	# Deferred fixture pass (ticket 86c9tv8uf) — drain a frame so the door
+	# trigger + its area_entered connection exist before we exercise them.
+	await get_tree().process_frame
 	watch_signals(boss_room)
 
 	# Invoke the area_entered no-op handler directly.
@@ -305,6 +311,9 @@ func test_boss_room_door_trigger_non_characterbody_ignored() -> void:
 	boss_room.boss_mob_def_path = ""
 	boss_room.stratum_exit_scene_path = ""
 	add_child_autofree(boss_room)
+	# Deferred fixture pass (ticket 86c9tv8uf) — drain a frame so the door
+	# trigger exists before we exercise its body_entered handler.
+	await get_tree().process_frame
 	watch_signals(boss_room)
 
 	# Invoke body_entered with a bare Node2D — not a CharacterBody2D.
