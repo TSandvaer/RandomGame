@@ -357,11 +357,6 @@ func test_t3_badge_plate_and_text_colors() -> void:
 	# Plate is 92% alpha (matches InventoryPanel chrome alpha).
 	assert_almost_eq(plate.color.a, 0.92, 0.005,
 		"plate alpha = 92% (transient-but-real chrome)")
-	# AC-CB1 — badge plate is 72 × 12 px (grew from 60 to accommodate the
-	# checkmark glyph prefix at font size 9, ticket `86c9qah1q`).
-	# Assert the actual built node, not a constant, per the design spec test bar.
-	assert_eq(plate.size, Vector2(72, 12),
-		"badge plate width is 72 px to accommodate ✓ prefix (AC-CB1)")
 	# AC-CB1 / AC-CB6 — badge label text reads "✓ EQUIPPED" (U+2713 prefix).
 	# Replaces the prior "EQUIPPED" assertion per Uma's M2 W2 Addendum § Test bar.
 	# The checkmark is the color-blind secondary cue — a non-color shape that
@@ -370,6 +365,33 @@ func test_t3_badge_plate_and_text_colors() -> void:
 	assert_not_null(label, "badge label exists")
 	assert_eq(label.text, "✓ EQUIPPED",
 		"badge text reads ✓ EQUIPPED — checkmark glyph is the CVD secondary cue (AC-CB1, AC-CB6)")
+	# AC-CB2 / AC-CB5 — the badge text must FIT INSIDE the plate. This is the
+	# exact gap that let PR #179's first cut ship a clipped, illegible badge
+	# past green CI: the old test only asserted `text ==` and a hardcoded
+	# `plate.size ==`, never that the rendered glyph string fits the rect.
+	# The label is PRESET_FULL_RECT, so if its real minimum size exceeds the
+	# plate, the content overflows + clips against the dark cell behind it.
+	# Assert the plate is at least as large as the label's measured minimum
+	# size on BOTH axes — this is renderer/font-agnostic and catches overflow
+	# by construction.
+	var label_min: Vector2 = label.get_minimum_size()
+	assert_true(plate.size.x >= label_min.x,
+		"badge plate width %.1f >= label min width %.1f — ✓ EQUIPPED fits horizontally (AC-CB2)"
+			% [plate.size.x, label_min.x])
+	assert_true(plate.size.y >= label_min.y,
+		"badge plate height %.1f >= label min height %.1f — ✓ EQUIPPED fits vertically, no spill below plate (AC-CB5)"
+			% [plate.size.y, label_min.y])
+	# The plate must also stay inside its 96 px host Button (position is pinned
+	# at x=2) so the badge never overhangs the cell edge.
+	assert_true(plate.position.x + plate.size.x <= 96.0,
+		"badge plate right edge %.1f within the 96 px equipped-cell button"
+			% [plate.position.x + plate.size.x])
+	# And it must not reach down into the centered button-text region: the
+	# plate is pinned at y=2; keep its bottom comfortably in the top quarter
+	# of the 96 px cell so the ✓ glyph never overlaps the item-name glyph.
+	assert_true(plate.position.y + plate.size.y <= 24.0,
+		"badge plate bottom edge %.1f stays in the cell's top quarter, clear of the centered item text"
+			% [plate.position.y + plate.size.y])
 
 
 # AC3.1 / AC3.4 — Tier 2 integration: real Inventory.equip flips outlines on.

@@ -76,6 +76,11 @@ const COLOR_CELL_EMPTY: Color = Color(0.2274509804, 0.2078431373, 0.2509803922, 
 const COLOR_EQUIPPED_INDICATOR: Color = Color(0.478, 0.780, 0.451, 1.0)  # #7AC773
 const COLOR_EQUIPPED_BADGE_PLATE: Color = Color(0.478, 0.780, 0.451, 0.92)  # #7AC773 @92%
 const COLOR_EQUIPPED_BADGE_TEXT: Color = Color(0.10588235, 0.10196078, 0.12156863, 1.0)  # #1B1A1F
+# Symmetric padding (px) added on each side of the badge label's measured
+# minimum size to derive the BadgePlate rect. Keeps the `✓ EQUIPPED` glyph
+# string fully inside the plate with breathing room — no hardcoded plate
+# size that can drift out of sync with the font / string (ticket 86c9qah1q).
+const BADGE_PLATE_PADDING: Vector2 = Vector2(4, 2)
 
 # Tier colors (Uma palette.md).
 const TIER_COLORS: Dictionary = {
@@ -564,8 +569,10 @@ func _build_equipped_row() -> void:
 		# default-hidden; `_set_equipped_indicator` flips them on when the
 		# slot has an item. Per Uma's design § "Visual spec (locked)":
 		#   - 2 px green outline on all 4 sides, color #7AC773
-		#   - 60 × 12 px EQUIPPED badge at top-left, font color #1B1A1F on
-		#     #7AC773 plate (high-contrast for color-blind readers)
+		#   - "✓ EQUIPPED" badge at top-left, font color #1B1A1F on #7AC773
+		#     plate (high-contrast + ✓ shape cue for color-blind readers).
+		#     Plate is auto-sized to the label's measured minimum size +
+		#     BADGE_PLATE_PADDING so the glyph string always fits (86c9qah1q).
 		# All ColorRects + Label render identically in `gl_compatibility`
 		# (HTML5) and `forward_plus` (desktop) — zero Polygon2D, all colors
 		# strictly sub-1.0 per channel.
@@ -583,8 +590,8 @@ func _build_equipped_row() -> void:
 ##   - bottom edge: ColorRect at (0, 96)   size (96, 2)
 ##   - left   edge: ColorRect at (-2, -2)  size (2, 100)
 ##   - right  edge: ColorRect at (96, -2)  size (2, 100)
-##   - badge  plate: ColorRect at (2, 2)   size (60, 12)
-##   - badge  text:  Label  text="EQUIPPED" centered on plate
+##   - badge  plate: ColorRect at (2, 2)   size = label min size + BADGE_PLATE_PADDING*2
+##   - badge  text:  Label  text="✓ EQUIPPED" centered on plate (✓ = CVD secondary cue)
 ##
 ## All children have `mouse_filter = MOUSE_FILTER_IGNORE` so they don't
 ## intercept clicks on the Button. Default `z_index = 0`; the Button paints
@@ -609,12 +616,13 @@ func _build_equipped_indicators_for_slot(btn: Button) -> void:
 	var right_edge: ColorRect = _make_outline_edge(Vector2(96, -2), Vector2(2, 100))
 	right_edge.name = "OutlineRight"
 	btn.add_child(right_edge)
-	# Badge plate
+	# Badge plate. Size is computed from the label's real minimum size below
+	# (NOT a hardcoded constant) — see the sizing block after the label is
+	# built. Position stays pinned at top-left (2, 2).
 	var plate: ColorRect = ColorRect.new()
 	plate.name = "BadgePlate"
 	plate.color = COLOR_EQUIPPED_BADGE_PLATE
 	plate.position = Vector2(2, 2)
-	plate.size = Vector2(72, 12)
 	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	plate.visible = false
 	btn.add_child(plate)
@@ -622,8 +630,7 @@ func _build_equipped_indicators_for_slot(btn: Button) -> void:
 	# layout ever shifts. U+2713 (✓) prefix is the color-blind secondary cue
 	# (ticket `86c9qah1q`): a shape-based glyph that survives all CVD types +
 	# monochrome. Renders via Godot's Label font pipeline — identical across
-	# `gl_compatibility` (HTML5) and `forward_plus` (desktop). Plate grows
-	# 60 → 72 px to accommodate the glyph at font size 9.
+	# `gl_compatibility` (HTML5) and `forward_plus` (desktop).
 	var badge_label: Label = Label.new()
 	badge_label.name = "BadgeLabel"
 	badge_label.text = "✓ EQUIPPED"
@@ -634,6 +641,22 @@ func _build_equipped_indicators_for_slot(btn: Button) -> void:
 	badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	badge_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	plate.add_child(badge_label)
+	# Size the plate to the label's *actual* rendered minimum size + symmetric
+	# padding. PR #179's original 72 × 12 hardcode overflowed: the prior fix
+	# widened 60 → 72 px but left height at 12 px, while `✓ EQUIPPED` at font
+	# size 9 in the default-theme font needs both more width AND a ~13-14 px
+	# line box. Under `PRESET_FULL_RECT` the label content then spilled below
+	# the plate and clipped against the dark cell behind it — illegible even
+	# before CVD simulation, defeating AC-CB2/AC-CB5. Deriving the plate size
+	# from `get_minimum_size()` makes the fit correct by construction across
+	# every font / renderer, with no magic numbers to drift out of sync.
+	# `get_minimum_size()` resolves here because `_build_equipped_row` runs
+	# from `_ready` with the panel already in the tree, so the Label has a
+	# resolved theme + font. BADGE_PLATE_PADDING is applied on each side.
+	var label_min: Vector2 = badge_label.get_minimum_size()
+	plate.size = Vector2(
+		ceil(label_min.x) + BADGE_PLATE_PADDING.x * 2.0,
+		ceil(label_min.y) + BADGE_PLATE_PADDING.y * 2.0)
 
 
 ## Helper — build one outline-edge ColorRect at the given position/size with
