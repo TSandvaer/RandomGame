@@ -493,3 +493,71 @@ func test_telegraph_signal_carries_direction() -> void:
 	var dir: Vector2 = args[0]
 	assert_almost_eq(dir.x, 0.0, 0.001)
 	assert_almost_eq(dir.y, 1.0, 0.001, "telegraph direction toward player")
+
+
+# ---- 19: _die emits the [combat-trace] Charger._die line -------------
+#
+# infra(combat-trace) ticket 86c9tuh57. `Grunt._die` / `PracticeDummy._die`
+# emit `[combat-trace] <Mob>._die`; pre-fix `Charger._die` emitted NO `_die`
+# trace line, breaking harness kill-counting + Sponsor-soak console greps
+# that count kills uniformly across all five mob types.
+#
+# Why a spy node, not an output-text assertion: `DebugFlags.combat_trace`
+# is HTML5-only by design (`OS.has_feature("web")`), so the real shim is a
+# no-op in headless GUT and the line text never reaches stdout here. The
+# `_combat_trace` helper on each mob resolves `DebugFlags` from the tree
+# root by name, so we temporarily rename the real autoload, slot in a
+# recording spy under the same name, drive `_die()`, assert the spy
+# captured the `Charger._die` tag, then restore the autoload. This proves
+# the emit *happens* — stronger than the no-op-safety pattern in
+# test_inventory_equip_source_enum.gd, which is what this ticket asks for.
+
+class CombatTraceSpy:
+	extends Node
+	var calls: Array = []  # Array of [tag, msg]
+	func combat_trace(tag: String, msg: String = "") -> void:
+		calls.append([tag, msg])
+	func has_tag(tag: String) -> bool:
+		for c: Array in calls:
+			if c[0] == tag:
+				return true
+		return false
+
+
+## Swap the real DebugFlags autoload for a recording spy for the duration
+## of `body`-equivalent work. Returns the spy; caller restores via
+## `_restore_debug_flags`.
+func _install_combat_trace_spy() -> CombatTraceSpy:
+	var root: Node = get_tree().root
+	var real: Node = root.get_node_or_null("DebugFlags")
+	assert_not_null(real, "DebugFlags autoload must exist to swap for the spy")
+	real.name = "DebugFlags__real_parked"
+	var spy: CombatTraceSpy = CombatTraceSpy.new()
+	spy.name = "DebugFlags"
+	root.add_child(spy)
+	return spy
+
+
+func _restore_debug_flags(spy: CombatTraceSpy) -> void:
+	var root: Node = get_tree().root
+	root.remove_child(spy)
+	spy.free()
+	var parked: Node = root.get_node_or_null("DebugFlags__real_parked")
+	if parked != null:
+		parked.name = "DebugFlags"
+
+
+func test_die_emits_combat_trace_die_line() -> void:
+	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 20})
+	var c: Charger = _make_charger_with_def(def)
+	var spy: CombatTraceSpy = _install_combat_trace_spy()
+	# Drive the death path the same way real combat does — lethal take_damage.
+	c.take_damage(20, Vector2.ZERO, null)
+	var captured: bool = spy.has_tag("Charger._die")
+	_restore_debug_flags(spy)
+	assert_true(captured,
+		"Charger._die must emit [combat-trace] Charger._die — harness kill-" +
+		"counting greps on the <Mob>._die line for uniform kill counts")
+	# Downstream consequence still holds (Tier 2 bar): the mob actually died.
+	assert_true(c.is_dead(), "lethal take_damage still kills the charger")
+	assert_eq(c.get_state(), Charger.STATE_DEAD)

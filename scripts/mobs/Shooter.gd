@@ -451,6 +451,7 @@ func _die() -> void:
 	if _is_dead:
 		return
 	_is_dead = true
+	_combat_trace("Shooter._die", "starting death sequence")
 	_aim_left = 0.0
 	_post_fire_recovery_left = 0.0
 	_spotted_hold_left = 0.0
