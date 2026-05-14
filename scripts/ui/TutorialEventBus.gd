@@ -85,7 +85,13 @@ const BEAT_TEXTS: Dictionary = {
 ## handles the visual side, but the bus does NOT dedupe). Drew's room
 ## script should latch on first-emission (e.g. via a one-shot
 ## connection or a `_emitted_beats` set).
+##
+## Emits a `[combat-trace]` line (HTML5 only — see DebugFlags.combat_trace)
+## so Playwright specs and Sponsor soaks can grep DevTools console to confirm
+## tutorial beats fire in order on Room01 boot.
+## Line shape: `[combat-trace] TutorialEventBus.request_beat | beat=<id> anchor=<n>`
 func request_beat(beat_id: StringName, anchor: int = 0) -> void:
+	DebugFlags.combat_trace("TutorialEventBus.request_beat", "beat=%s anchor=%d" % [beat_id, anchor])
 	tutorial_beat_requested.emit(beat_id, anchor)
 
 
