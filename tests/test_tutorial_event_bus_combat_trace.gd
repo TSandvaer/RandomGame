@@ -7,10 +7,20 @@ extends GutTest
 ## `tutorial_beat_requested`. The GUT suite runs headless (not `OS.has_feature("web")`),
 ## so the trace line is a no-op — `DebugFlags.combat_trace_enabled()` returns false.
 ## These tests verify the method still:
-##   1. Emits `tutorial_beat_requested` correctly after the trace call.
-##   2. Does NOT crash / push_error / throw when DebugFlags is present.
-##   3. Passes the correct beat_id and anchor through to the signal payload.
-##   4. Works for all four reserved beat IDs (the Stage 2b set).
+##   1. Emits `tutorial_beat_requested` correctly after the trace call (wasd beat).
+##   2. Passes beat_id and anchor through to the signal payload — per beat:
+##      dodge, lmb_strike, rmb_heavy.
+##   3. Default anchor (= 0) works correctly.
+##   4. DebugFlags autoload is accessible from the bus context.
+##   5. No push_error / push_warning fires across all four beats.
+##
+## **Why separate test functions per beat:**
+## GUT's `get_signal_parameters(node, signal, index)` returns the emission at
+## `index` within the current watch session. Calling `watch_signals` once and
+## then emitting multiple beats accumulates all emissions under index 0, 1, 2…
+## but there is no API to reset the accumulator without ending the watch session.
+## Using a separate test function per beat guarantees a fresh watch session and
+## a stable index-0 assertion for each beat.
 ##
 ## **Why no print-output assertions here:**
 ## The `[combat-trace] TutorialEventBus.request_beat | beat=X anchor=N` line
@@ -38,9 +48,9 @@ func _bus() -> Node:
 	return n
 
 
-# ---- 1: request_beat emits signal after trace call (no crash) -----------
+# ---- 1: wasd beat — primary regression guard ---------------------------
 
-func test_request_beat_emits_signal_with_trace_wired() -> void:
+func test_request_beat_wasd_emits_signal_with_trace_wired() -> void:
 	## Primary regression guard for ticket 86c9qbmer:
 	## Adding the DebugFlags.combat_trace() call before emit must NOT break the
 	## signal emission. The trace is a no-op in headless GUT; the signal must
@@ -59,41 +69,58 @@ func test_request_beat_emits_signal_with_trace_wired() -> void:
 		"signal payload anchor = 0 (trace must not alter the anchor)")
 
 
-# ---- 2: beat_id flows through correctly for all four reserved beats -----
+# ---- 2: dodge beat payload -----------------------------------------------
 
-func test_all_four_reserved_beats_emit_correctly_after_trace_wired() -> void:
-	## Verify the DebugFlags.combat_trace call does NOT alter beat_id or anchor
-	## for any of the four Stage 2b reserved IDs. The trace formats the
-	## beat_id as a String before passing to combat_trace — ensure the
-	## implicit StringName→String conversion doesn't mutate the original
-	## signal payload.
+func test_request_beat_dodge_payload_correct_after_trace_wired() -> void:
+	## Verify the trace call does NOT alter the &"dodge" beat_id or anchor.
+	## Fresh watch_signals session guarantees index 0 is this beat's emission.
 	var bus: Node = _bus()
-	var expected_beats: Array = [
-		[&"wasd",       2, "WASD to move."],
-		[&"dodge",      2, "Space to dodge-roll."],
-		[&"lmb_strike", 2, "LMB to strike."],
-		[&"rmb_heavy",  2, "RMB for heavy strike."],
-	]
-	for entry: Array in expected_beats:
-		var beat_id: StringName = entry[0]
-		var anchor: int = entry[1]
-		var expected_text: String = entry[2]
-		watch_signals(bus)
-		bus.request_beat(beat_id, anchor)
-		assert_signal_emitted(bus, "tutorial_beat_requested",
-			"request_beat(&'%s', %d) must emit the signal" % [beat_id, anchor])
-		var params: Array = get_signal_parameters(bus, "tutorial_beat_requested", 0)
-		assert_eq(params[0], beat_id,
-			"signal payload beat_id must equal &'%s' (trace must not mutate it)" % beat_id)
-		assert_eq(params[1], anchor,
-			"signal payload anchor must equal %d" % anchor)
-		# Verify the bus resolves the beat_id to the expected text — this
-		# ensures the dictionary surface is intact after the trace refactor.
-		assert_eq(bus.resolve_beat_text(beat_id), expected_text,
-			"resolve_beat_text(&'%s') must return '%s'" % [beat_id, expected_text])
+	watch_signals(bus)
+	bus.request_beat(&"dodge", 2)
+	assert_signal_emitted(bus, "tutorial_beat_requested",
+		"request_beat(&'dodge', 2) must emit tutorial_beat_requested")
+	var params: Array = get_signal_parameters(bus, "tutorial_beat_requested", 0)
+	assert_eq(params[0], &"dodge",
+		"signal payload beat_id = &'dodge' (trace StringName->String must not mutate it)")
+	assert_eq(params[1], 2,
+		"signal payload anchor = 2 (unchanged through trace call)")
+	assert_eq(bus.resolve_beat_text(&"dodge"), "Space to dodge-roll.",
+		"resolve_beat_text(&'dodge') returns the Uma Beat 4 text")
 
 
-# ---- 3: default anchor (= 0) works correctly ----------------------------
+# ---- 3: lmb_strike beat payload ------------------------------------------
+
+func test_request_beat_lmb_strike_payload_correct_after_trace_wired() -> void:
+	var bus: Node = _bus()
+	watch_signals(bus)
+	bus.request_beat(&"lmb_strike", 2)
+	assert_signal_emitted(bus, "tutorial_beat_requested",
+		"request_beat(&'lmb_strike', 2) must emit tutorial_beat_requested")
+	var params: Array = get_signal_parameters(bus, "tutorial_beat_requested", 0)
+	assert_eq(params[0], &"lmb_strike",
+		"signal payload beat_id = &'lmb_strike' (trace must not mutate it)")
+	assert_eq(params[1], 2, "signal payload anchor = 2")
+	assert_eq(bus.resolve_beat_text(&"lmb_strike"), "LMB to strike.",
+		"resolve_beat_text(&'lmb_strike') returns the Uma Beat 4 text")
+
+
+# ---- 4: rmb_heavy beat payload -------------------------------------------
+
+func test_request_beat_rmb_heavy_payload_correct_after_trace_wired() -> void:
+	var bus: Node = _bus()
+	watch_signals(bus)
+	bus.request_beat(&"rmb_heavy", 2)
+	assert_signal_emitted(bus, "tutorial_beat_requested",
+		"request_beat(&'rmb_heavy', 2) must emit tutorial_beat_requested")
+	var params: Array = get_signal_parameters(bus, "tutorial_beat_requested", 0)
+	assert_eq(params[0], &"rmb_heavy",
+		"signal payload beat_id = &'rmb_heavy' (trace must not mutate it)")
+	assert_eq(params[1], 2, "signal payload anchor = 2")
+	assert_eq(bus.resolve_beat_text(&"rmb_heavy"), "RMB for heavy strike.",
+		"resolve_beat_text(&'rmb_heavy') returns the Uma Beat 5 text")
+
+
+# ---- 5: default anchor (= 0) works correctly ----------------------------
 
 func test_request_beat_default_anchor_with_trace_wired() -> void:
 	## request_beat has `anchor: int = 0` default. Verify the default path
@@ -108,7 +135,7 @@ func test_request_beat_default_anchor_with_trace_wired() -> void:
 		"default anchor = 0 must flow through to the signal payload unchanged")
 
 
-# ---- 4: DebugFlags autoload reachable from bus context ------------------
+# ---- 6: DebugFlags autoload reachable from bus context ------------------
 
 func test_debugflags_autoload_is_accessible() -> void:
 	## Belt-and-suspenders: verify DebugFlags is registered as an autoload.
@@ -129,7 +156,7 @@ func test_debugflags_autoload_is_accessible() -> void:
 		"If this fails, the OS.has_feature('web') gate in DebugFlags regressed.")
 
 
-# ---- 5: trace call does not push_error or push_warning ------------------
+# ---- 7: trace call does not push_error or push_warning ------------------
 
 func test_request_beat_produces_no_errors_or_warnings() -> void:
 	## Regression guard: the trace call inside request_beat must not produce
