@@ -614,15 +614,19 @@ func _build_equipped_indicators_for_slot(btn: Button) -> void:
 	plate.name = "BadgePlate"
 	plate.color = COLOR_EQUIPPED_BADGE_PLATE
 	plate.position = Vector2(2, 2)
-	plate.size = Vector2(60, 12)
+	plate.size = Vector2(72, 12)
 	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	plate.visible = false
 	btn.add_child(plate)
 	# Badge text — Label child of the plate so it scrolls with the plate if
-	# layout ever shifts.
+	# layout ever shifts. U+2713 (✓) prefix is the color-blind secondary cue
+	# (ticket `86c9qah1q`): a shape-based glyph that survives all CVD types +
+	# monochrome. Renders via Godot's Label font pipeline — identical across
+	# `gl_compatibility` (HTML5) and `forward_plus` (desktop). Plate grows
+	# 60 → 72 px to accommodate the glyph at font size 9.
 	var badge_label: Label = Label.new()
 	badge_label.name = "BadgeLabel"
-	badge_label.text = "EQUIPPED"
+	badge_label.text = "✓ EQUIPPED"
 	badge_label.add_theme_color_override("font_color", COLOR_EQUIPPED_BADGE_TEXT)
 	badge_label.add_theme_font_size_override("font_size", 9)
 	badge_label.set_anchors_preset(Control.PRESET_FULL_RECT)

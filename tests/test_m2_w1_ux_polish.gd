@@ -357,10 +357,19 @@ func test_t3_badge_plate_and_text_colors() -> void:
 	# Plate is 92% alpha (matches InventoryPanel chrome alpha).
 	assert_almost_eq(plate.color.a, 0.92, 0.005,
 		"plate alpha = 92% (transient-but-real chrome)")
-	# Badge label text reads "EQUIPPED".
+	# AC-CB1 — badge plate is 72 × 12 px (grew from 60 to accommodate the
+	# checkmark glyph prefix at font size 9, ticket `86c9qah1q`).
+	# Assert the actual built node, not a constant, per the design spec test bar.
+	assert_eq(plate.size, Vector2(72, 12),
+		"badge plate width is 72 px to accommodate ✓ prefix (AC-CB1)")
+	# AC-CB1 / AC-CB6 — badge label text reads "✓ EQUIPPED" (U+2713 prefix).
+	# Replaces the prior "EQUIPPED" assertion per Uma's M2 W2 Addendum § Test bar.
+	# The checkmark is the color-blind secondary cue — a non-color shape that
+	# survives protanopia/deuteranopia/tritanopia and monochrome rendering.
 	var label: Label = plate.get_node("BadgeLabel") as Label
 	assert_not_null(label, "badge label exists")
-	assert_eq(label.text, "EQUIPPED", "badge text reads EQUIPPED")
+	assert_eq(label.text, "✓ EQUIPPED",
+		"badge text reads ✓ EQUIPPED — checkmark glyph is the CVD secondary cue (AC-CB1, AC-CB6)")
 
 
 # AC3.1 / AC3.4 — Tier 2 integration: real Inventory.equip flips outlines on.
