@@ -209,7 +209,7 @@ Until orchestrator approves the game-script change, the spec runs at production 
 **What they check:** Per `.claude/docs/combat-architecture.md` § "State-change signals vs. progression triggers" — that state-change signals do NOT short-circuit to progression triggers (PR #155 cautionary tale).
 
 - **Test 1:** `[Main] M1 play-loop ready` fires exactly once; `[Inventory] starter iron_sword auto-equipped` fires at most once (PR #146 regression guard).
-- **Test 2:** Stratum1Room01 has no RoomGate per Main.gd:381; ZERO `[combat-trace] RoomGate.*` traces should fire during Room 01 combat.
+- **Test 2:** Stratum1Room01 has no RoomGate (see `scenes/Main.gd::_wire_room_signals`); ZERO `[combat-trace] RoomGate.*` traces should fire while Room 01 is the live room. The assertion is scoped to the window before the first `PracticeDummy._die` trace — the dummy's death triggers the Room02 load, and Room02's RoomGate registers its grunts into the same console buffer (ticket 86c9tqrt7 buffer-scope fix).
 - **Test 3:** Static causality invariant: every `gate_traversed` line in the trace stream must have a preceding `gate_unlocked emitting` line. Within a same-tick window (200ms), `gate_traversed` must NOT chain auto-emit from `gate_unlocked`.
 
 **Known gap (Shooter STATE_POST_FIRE_RECOVERY):** Per `combat-architecture.md`, "absence of state X means Y" is the anti-pattern this sweep targets. The current Shooter code does NOT emit an explicit `[combat-trace] Shooter.set_state | post_fire_recovery (entered)` line — only a `_process_post_fire | closing gap...` line that recurs while in that state. Adding the explicit ledger trace is a recommended follow-up for Drew/Devon; once that lands, a fourth test in this spec can assert the trace fires when expected.
