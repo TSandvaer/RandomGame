@@ -81,12 +81,13 @@ Tier 1 invariant from `team/TESTING_BAR.md`: visual-primitive tests must assert 
 
 ## `[combat-trace]` diagnostic shim
 
-[`scripts/util/DebugFlags.gd`](scripts/util/DebugFlags.gd) — `DebugFlags.combat_trace(tag, msg)` emits `[combat-trace]` console lines only when `OS.has_feature("web") == true`. Wired into:
+[`scripts/debug/DebugFlags.gd`](scripts/debug/DebugFlags.gd) — `DebugFlags.combat_trace(tag, msg)` emits `[combat-trace]` console lines only when `OS.has_feature("web") == true`. Wired into:
 
 - `Player.try_attack / swing_wedge / swing_flash`
 - `Hitbox.hit`
 - Per-mob `take_damage`, `_play_hit_flash`, `_die`, `_play_death_tween`, `_on_death_tween_finished`, `_force_queue_free`
 - `Inventory.equip` (P0 86c9q96m8 + ticket 86c9qah0v) — `[combat-trace] Inventory.equip | item=<id> slot=<weapon|armor> source=lmb_click|auto_starter damage_after=<N>` fires on every successful `equip()` call. `source` is a `StringName` enum: `lmb_click` (default) tags user-driven equips via `InventoryPanel._handle_inventory_click`; `auto_starter` tags system-driven equips via `equip_starter_weapon_if_needed` (boot-time auto-equip). `restore_from_save` still bypasses `equip()` entirely — so save-restore (F5 reload, save-load) does NOT fire this line at all. The scoping rule grew from binary (lmb_click vs no-trace-on-save-restore) to ternary (lmb_click vs auto_starter vs no-trace-on-save-restore). Future system-driven equip paths must add their own `source` tag rather than overloading `lmb_click`. The `damage_after` field reads from `Damage.compute_player_damage(Player.get_equipped_weapon(), Player.get_edge(), &"light")` — proves both Inventory and Player surfaces stayed in lockstep at the moment of equip.
+- `TutorialEventBus.request_beat` (ticket `86c9qbmer`) — `[combat-trace] TutorialEventBus.request_beat | beat=<beat_id> anchor=<n>` fires at the top of every `request_beat()` call (before `tutorial_beat_requested.emit`). In Stage 2b (PR #169) the four beats fire in this order during Room01: `wasd` (room-entry deferred wire, player-independent) → `dodge` (player velocity > MOVEMENT_THRESHOLD_SQ) → `lmb_strike` (Player.iframes_started on dodge roll) → `rmb_heavy` (PracticeDummy.mob_died on dummy death). The trace is a no-op in headless GUT (not `OS.has_feature("web")`); `tests/playwright/specs/tutorial-beat-trace.spec.ts` is the binding HTML5 coverage.
 
 `Stratum1Boss.take_damage` distinguishes the three rejection cases explicitly (M2 W1 P0 fix `86c9q96fv`): `IGNORED already_dead`, `IGNORED dormant ... (boss still in entry sequence)`, `IGNORED phase_transition ... (stagger-immune window)`. The `dormant` case is the load-bearing diagnostic — it's how Sponsor-soak debugging tells "hit didn't register at the physics layer" (Hitbox layer/mask issue) apart from "hit was rejected at the controller" (boss never woke up). Format on a successful hit: `Stratum1Boss.take_damage | amount=6 hp=600->594 phase=1`.
 
