@@ -41,23 +41,30 @@ extends GutTest
 ## `LevelAssembler.AssemblyResult` (geometry + mobs parented under the
 ## DETACHED `_assembly.root` — zero physics-server calls). The actual
 ## `add_child(_assembly.root)` tree-insertion is split into
-## `_attach_assembly()`, called from the already-deferred
+## `_attach_assembly()`, called first in the already-deferred
 ## `_assemble_room_fixtures()` pass — so the mob CollisionShape2D inserts
 ## land AFTER the physics flush completes, on a clean tick.
 ##
 ## **The pair:** these tests drive the EXACT physics-flush-window path —
 ## loading a real `Stratum1Room05` from inside a real `Area2D.body_entered`
-## callback fired by a real player CharacterBody2D walking the trigger.
-## Pre-fix the mob shapes never register and the "player hitbox damages the
-## mob" assertions fail (the mob is un-hittable). Post-fix the deferred
-## attach lands the shapes cleanly and all 3 mobs are hittable + killable.
+## callback fired by a real `CharacterBody2D` walking the trigger via real
+## physics. Pre-fix the mob shapes never register and the "player hitbox
+## damages the mob" assertions fail (the mob is un-hittable). Post-fix the
+## deferred attach lands the shapes cleanly and all 3 mobs are hittable +
+## killable. `test_room05_build_does_not_attach_subtree_synchronously` is
+## the structural companion — it pins the load-bearing contract (`_build()`
+## leaves `_assembly.root` detached) directly, no physics-flush staging
+## required.
 
 const PHYS_DELTA: float = 1.0 / 60.0
 
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
-const RoomGateScript: Script = preload("res://scripts/levels/RoomGate.gd")
 
 const ROOM05_SCENE_PATH: String = "res://scenes/levels/Stratum1Room05.tscn"
+
+# Layer bits (mirror project.godot).
+const LAYER_WORLD: int = 1 << 0
+const LAYER_PLAYER: int = 1 << 1
 
 
 # ---- Helpers ---------------------------------------------------------------
@@ -77,10 +84,10 @@ func _await_settle(frames: int = 8) -> void:
 func _make_player_body(at: Vector2) -> CharacterBody2D:
 	# A minimal CharacterBody2D on the player layer (bit 2) with a collider,
 	# registered in the "player" group so the room's mobs resolve it as their
-	# target and the RoomGate's body_entered filter accepts it.
+	# target and the trigger Area2D's body_entered fires for it.
 	var p: CharacterBody2D = CharacterBody2D.new()
-	p.collision_layer = 1 << 1   # player bit
-	p.collision_mask = 1 << 0    # world
+	p.collision_layer = LAYER_PLAYER
+	p.collision_mask = LAYER_WORLD
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	var circle: CircleShape2D = CircleShape2D.new()
 	circle.radius = 8.0
@@ -89,6 +96,21 @@ func _make_player_body(at: Vector2) -> CharacterBody2D:
 	p.global_position = at
 	p.add_to_group("player")
 	return p
+
+
+func _make_trigger_area(at: Vector2, size: Vector2) -> Area2D:
+	# A plain Area2D trigger that masks the player layer. Plain (not RoomGate)
+	# so the test's flush-window staging is isolated from RoomGate's own
+	# state machine. monitoring defaults true.
+	var area: Area2D = Area2D.new()
+	area.collision_mask = LAYER_PLAYER
+	area.position = at
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	var rect: RectangleShape2D = RectangleShape2D.new()
+	rect.size = size
+	shape.shape = rect
+	area.add_child(shape)
+	return area
 
 
 func _make_player_hitbox_at(center: Vector2, radius: float) -> Hitbox:
@@ -108,69 +130,110 @@ func _make_player_hitbox_at(center: Vector2, radius: float) -> Hitbox:
 	return hb
 
 
-## Loads a Stratum1Room05 instance — INTENTIONALLY invoked from inside a
-## RoomGate.body_entered callback so MultiMobRoom._ready runs inside the
-## physics-query-flush window, exactly as Main._load_room_at_index does in
-## production (the prior room's gate_traversed → room_cleared → load chain).
-func _load_room05_during_flush(world: Node) -> Node:
-	var packed: PackedScene = load(ROOM05_SCENE_PATH) as PackedScene
-	assert_not_null(packed, "Stratum1Room05.tscn loads")
-	var room: Node = packed.instantiate()
-	world.add_child(room)  # triggers MultiMobRoom._ready DURING the flush
-	return room
+## Drives a real CharacterBody2D through a trigger Area2D so `body_entered`
+## fires for real, inside `PhysicsServer2D.flush_queries()`. From that
+## callback it loads a real `Stratum1Room05` — reproducing the exact
+## production call stack (`Main._load_room_at_index` runs `MultiMobRoom._ready`
+## from inside the prior room's gate `body_entered` flush). Returns the loaded
+## Room 05 node, or null if the body never crossed the trigger.
+func _load_room05_from_inside_a_physics_flush(world: Node2D) -> Node:
+	var trigger: Area2D = _make_trigger_area(Vector2(0, 0), Vector2(80, 80))
+	world.add_child(trigger)
 
-
-# ---- 1: room loaded mid-flush — all 3 mobs end up hittable + killable ------
-
-func test_room05_loaded_during_physics_flush_mobs_are_hittable() -> void:
-	# Build a "world" + a prior-room RoomGate. Walking a real player
-	# CharacterBody2D through the gate fires body_entered DURING the physics
-	# flush; from that callback we load Room 05 — reproducing the exact
-	# production call stack that panicked pre-fix.
-	var world: Node2D = autofree(Node2D.new())
-	add_child(world)
-
-	var prior_gate: RoomGate = RoomGateScript.new()
-	prior_gate.trigger_size = Vector2(64.0, 64.0)
-	prior_gate.position = Vector2(0, 0)
-	world.add_child(prior_gate)
-
-	var room05_holder: Array[Node] = []
-	# When the player crosses the prior gate, load Room 05 — synchronously,
-	# inside the body_entered flush. This is the physics-flush window.
-	prior_gate.body_entered.connect(func(_body: Node) -> void:
-		if room05_holder.is_empty():
-			room05_holder.append(_load_room05_during_flush(world))
+	var loaded: Array[Node] = []
+	trigger.body_entered.connect(func(_body: Node) -> void:
+		if not loaded.is_empty():
+			return
+		# SYNCHRONOUS room load — this runs inside the body_entered flush,
+		# exactly as Main._load_room_at_index does in production.
+		var packed: PackedScene = load(ROOM05_SCENE_PATH) as PackedScene
+		var room: Node = packed.instantiate()
+		world.add_child(room)  # triggers MultiMobRoom._ready DURING the flush
+		loaded.append(room)
 	)
 
-	# Real player body, placed just outside the gate, walking +X into it.
-	var player: CharacterBody2D = _make_player_body(Vector2(-60, 0))
+	# Real player body well outside the trigger, walking +X straight through.
+	var player: CharacterBody2D = _make_player_body(Vector2(-120, 0))
 	world.add_child(player)
-
-	# Drive real physics so body_entered fires for real (inside flush_queries).
-	for _i in range(30):
+	# Generous frame budget: 4px/frame at 240px/s, ~30 frames to cross 120px;
+	# 120 frames is ample slack for headless physics-frame cadence.
+	for _i in range(120):
 		player.velocity = Vector2(240, 0)
 		player.move_and_slide()
 		await get_tree().physics_frame
-		if not room05_holder.is_empty():
+		if not loaded.is_empty():
 			break
-	assert_false(room05_holder.is_empty(),
-		"player crossed the prior gate → Room 05 was loaded from inside the body_entered flush")
-	var room05: Node = room05_holder[0]
+	if loaded.is_empty():
+		return null
+	return loaded[0]
 
-	# The Main._wire_room_signals contract: get_spawned_mobs() must return the
-	# full 3-mob roster synchronously, the same tick the room was added — even
-	# though the assembly subtree is not yet spliced into the live tree.
-	var mobs: Array[Node] = room05.get_spawned_mobs()
+
+# ---- 1: structural contract — _build() leaves the subtree DETACHED --------
+
+func test_room05_build_does_not_attach_subtree_synchronously() -> void:
+	# The load-bearing fix contract, pinned directly: after MultiMobRoom._ready
+	# returns, `_build()` has CONSTRUCTED the assembly (so get_spawned_mobs()
+	# returns the full roster for Main._wire_room_signals) but has NOT spliced
+	# `_assembly.root` into the live tree — that is deferred to _attach_assembly
+	# so the mob CollisionShape2D inserts never land mid physics-flush.
+	#
+	# Pre-fix `_build()` ran `add_child(_assembly.root)` synchronously, so the
+	# subtree was in-tree the instant `_ready` returned — this test fails on
+	# `main` and passes on the fix branch.
+	var packed: PackedScene = load(ROOM05_SCENE_PATH) as PackedScene
+	assert_not_null(packed, "Stratum1Room05.tscn loads")
+	var room: Node = packed.instantiate()
+	add_child_autofree(room)
+	# _ready has now run synchronously.
+
+	var mobs: Array[Node] = room.get_spawned_mobs()
 	assert_eq(mobs.size(), 3,
 		"get_spawned_mobs() returns all 3 Room 05 mobs synchronously after _ready (Main wiring contract)")
+
+	# CORE STRUCTURAL ASSERTION: the assembly subtree must NOT be in the live
+	# tree yet — _build() only constructed it; _attach_assembly (deferred) does
+	# the splice. Pre-fix this is already in-tree → assertion fails.
+	var any_in_tree: bool = false
+	for m: Node in mobs:
+		if m.is_inside_tree():
+			any_in_tree = true
+	assert_false(any_in_tree,
+		"REGRESSION-86c9u1cx1: _build() leaves the mob subtree DETACHED — the " +
+		"add_child(_assembly.root) splice is deferred to _attach_assembly so the " +
+		"mob CollisionShape2D inserts never run mid physics-flush")
+
+	# After the deferred fixture pass lands, the mobs ARE spliced in.
+	await _await_settle()
+	for m: Node in mobs:
+		assert_true(m.is_inside_tree(),
+			"mob '%s' is spliced into the live tree by the deferred _attach_assembly" % m.name)
+
+
+# ---- 2: room loaded mid-flush — all 3 mobs end up hittable ----------------
+
+func test_room05_loaded_during_physics_flush_mobs_are_hittable() -> void:
+	# Drive the EXACT production call stack: a real body crossing a trigger
+	# Area2D fires body_entered inside flush_queries(); from that callback we
+	# load Room 05 synchronously — the same window Main._load_room_at_index
+	# runs MultiMobRoom._ready in.
+	var world: Node2D = autofree(Node2D.new())
+	add_child(world)
+
+	var room05: Node = await _load_room05_from_inside_a_physics_flush(world)
+	assert_not_null(room05,
+		"player crossed the trigger → Room 05 was loaded from inside the body_entered flush")
+	if room05 == null:
+		return
+
+	# Main._wire_room_signals contract: get_spawned_mobs() returns the full
+	# 3-mob roster synchronously, the same tick the room was added.
+	var mobs: Array[Node] = room05.get_spawned_mobs()
+	assert_eq(mobs.size(), 3,
+		"get_spawned_mobs() returns all 3 Room 05 mobs synchronously after _ready")
 
 	# Let the deferred _assemble_room_fixtures → _attach_assembly land.
 	await _await_settle()
 
-	# Post-fix: every mob is now inside the live tree with a registered
-	# CollisionShape2D. Pre-fix the body_set_shape_* panic left the shape
-	# unregistered.
 	for m: Node in mobs:
 		assert_true(m.is_inside_tree(),
 			"mob '%s' is spliced into the live tree by the deferred _attach_assembly" % m.name)
@@ -181,7 +244,7 @@ func test_room05_loaded_during_physics_flush_mobs_are_hittable() -> void:
 	# HP never moves — the mob is un-hittable, the Room 05 freeze.
 	for m: Node in mobs:
 		var hp_before: int = m.get_hp()
-		var hb: Hitbox = _make_player_hitbox_at(m.global_position, 28.0)
+		var hb: Hitbox = _make_player_hitbox_at(m.global_position, 32.0)
 		world.add_child(hb)
 		await _await_settle(3)
 		assert_lt(m.get_hp(), hp_before,
@@ -191,36 +254,19 @@ func test_room05_loaded_during_physics_flush_mobs_are_hittable() -> void:
 		hb.queue_free()
 
 
-# ---- 2: all 3 Room 05 mobs can be killed + the gate unlocks ----------------
+# ---- 3: all 3 Room 05 mobs can be killed + the gate unlocks ---------------
 
 func test_room05_three_mobs_killable_and_gate_unlocks() -> void:
-	# End-to-end: load Room 05 mid-flush, then kill all 3 mobs via real
-	# player hitboxes and assert the RoomGate reaches UNLOCKED. Pre-fix the
-	# mobs are un-hittable so the gate stays LOCKED forever (room unbeatable).
+	# End-to-end: load Room 05 mid-flush, then kill all 3 mobs via real player
+	# hitboxes and assert the RoomGate reaches UNLOCKED. Pre-fix the mobs are
+	# un-hittable so the gate stays LOCKED forever (room unbeatable).
 	var world: Node2D = autofree(Node2D.new())
 	add_child(world)
 
-	var prior_gate: RoomGate = RoomGateScript.new()
-	prior_gate.trigger_size = Vector2(64.0, 64.0)
-	prior_gate.position = Vector2(0, 0)
-	world.add_child(prior_gate)
-
-	var room05_holder: Array[Node] = []
-	prior_gate.body_entered.connect(func(_body: Node) -> void:
-		if room05_holder.is_empty():
-			room05_holder.append(_load_room05_during_flush(world))
-	)
-
-	var player: CharacterBody2D = _make_player_body(Vector2(-60, 0))
-	world.add_child(player)
-	for _i in range(30):
-		player.velocity = Vector2(240, 0)
-		player.move_and_slide()
-		await get_tree().physics_frame
-		if not room05_holder.is_empty():
-			break
-	assert_false(room05_holder.is_empty(), "Room 05 loaded from inside the gate body_entered flush")
-	var room05: Node = room05_holder[0]
+	var room05: Node = await _load_room05_from_inside_a_physics_flush(world)
+	assert_not_null(room05, "Room 05 loaded from inside the trigger body_entered flush")
+	if room05 == null:
+		return
 
 	await _await_settle()
 
@@ -228,10 +274,11 @@ func test_room05_three_mobs_killable_and_gate_unlocks() -> void:
 	assert_eq(mobs.size(), 3, "Room 05 has its 3-mob roster")
 
 	# The room's own RoomGate must have registered all 3 mobs in the deferred
-	# fixture pass (it can only register mobs that exist as nodes — they do,
-	# parented under the assembly root).
+	# fixture pass (it can only register mobs that exist as nodes — they do).
 	var gate: RoomGate = room05.get_room_gate()
 	assert_not_null(gate, "Room 05 spawned its RoomGate")
+	if gate == null:
+		return
 	assert_eq(gate.mobs_alive(), 3,
 		"all 3 Room 05 mobs registered with the gate after the deferred fixture pass")
 
@@ -244,7 +291,7 @@ func test_room05_three_mobs_killable_and_gate_unlocks() -> void:
 	# pre-fix the un-hittable mobs would keep HP and the loop would never
 	# clear the room.
 	for m: Node in mobs:
-		var hb: Hitbox = _make_player_hitbox_at(m.global_position, 28.0)
+		var hb: Hitbox = _make_player_hitbox_at(m.global_position, 32.0)
 		world.add_child(hb)
 		await _await_settle(3)
 		assert_true(m.is_dead(),

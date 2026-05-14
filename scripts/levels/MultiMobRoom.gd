@@ -267,7 +267,24 @@ func _spawn_room_gate() -> void:
 	# Disconnecting the old gate_unlocked → room_cleared path and replacing it
 	# with gate_traversed → room_cleared is the entire P0 #1 fix.
 	_room_gate.gate_unlocked.connect(_on_room_gate_unlocked)
-	_room_gate.gate_traversed.connect(_on_room_gate_traversed)
+	# CONNECT_DEFERRED (ticket 86c9u1cx1 — load-bearing): `gate_traversed` is
+	# emitted from `RoomGate._on_body_entered`, a `body_entered` physics
+	# callback that runs synchronously inside `PhysicsServer2D.flush_queries()`.
+	# A SYNCHRONOUS connection would run `_on_room_gate_traversed → room_cleared
+	# → Main._on_room_cleared → _load_room_at_index` entirely inside that flush
+	# window — and `_load_room_at_index` does `_world.add_child(next_room)` +
+	# `next_room.add_child(_player)`, splicing CharacterBody2D + CollisionShape2D
+	# subtrees into the physics server mid-flush. That panics with `USER ERROR:
+	# Can't change this state while flushing queries` (`body_set_shape_disabled`
+	# / `body_set_shape_as_one_way_collision`), leaving the next room's mobs'
+	# collision shapes UNREGISTERED — the mobs render + AI-tick but are
+	# un-hittable, never die, and the room can never clear. This was the Room 05
+	# 3-concurrent-chaser freeze. CONNECT_DEFERRED queues the entire next-room
+	# load to end-of-frame, OUTSIDE the flush, so every body/shape splice in the
+	# load chain runs on a clean tick. Mirrors PR #173's `mob_died`
+	# CONNECT_DEFERRED on RoomGate.register_mob (same physics-flush race class).
+	# See `.claude/docs/combat-architecture.md` § "Physics-flush rule".
+	_room_gate.gate_traversed.connect(_on_room_gate_traversed, CONNECT_DEFERRED)
 
 
 func _spawn_healing_fountain() -> void:
