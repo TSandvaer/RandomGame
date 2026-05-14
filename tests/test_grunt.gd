@@ -482,3 +482,89 @@ func test_grunt_knockback_does_not_persist_into_recovery() -> void:
 	g._physics_process(0.016)
 	assert_eq(g.velocity, Vector2.ZERO,
 		"recovery handler zeros knockback velocity that lands during recovery")
+
+
+# ---- Grunt.pos harness-observability trace (ticket 86c9u05d7) --------
+#
+# The AC4 spec's `clearRoomMobs` chaser path parks the player at a fixed
+# position and click-spams; with a 3-chaser room (Room 05: 2 Grunts + 1
+# Charger) one body routinely overshoots / circles out of the swing wedge and
+# the spam abandons it. The harness drift-recovery step
+# (`recloseToNearestChaser` in tests/playwright/fixtures/kiting-mob-chase.ts)
+# re-closes the gap by position-steering off this throttled `[combat-trace]
+# Grunt.pos` line.
+#
+# Why a spy node, not an output-text assertion: `DebugFlags.combat_trace` is
+# HTML5-only by design (`OS.has_feature("web")`), so the real shim is a no-op
+# in headless GUT and the line text never reaches stdout here. The
+# `_combat_trace` helper resolves `DebugFlags` from the tree root by name, so
+# we temporarily rename the real autoload, slot in a recording spy under the
+# same name, drive physics frames directly, assert the spy captured the
+# `Grunt.pos` tag + payload, then restore the autoload. Same pattern as
+# test_charger.gd / test_shooter.gd. Paired with the trace emit in
+# Grunt._physics_process.
+
+class CombatTraceSpy:
+	extends Node
+	var calls: Array = []  # Array of [tag, msg]
+	func combat_trace(tag: String, msg: String = "") -> void:
+		calls.append([tag, msg])
+	func has_tag(tag: String) -> bool:
+		for entry: Array in calls:
+			if entry[0] == tag:
+				return true
+		return false
+
+
+## Swap the real DebugFlags autoload for a recording spy. Returns the spy;
+## caller restores via `_restore_debug_flags`.
+func _install_combat_trace_spy() -> CombatTraceSpy:
+	var root: Node = get_tree().root
+	var real: Node = root.get_node_or_null("DebugFlags")
+	assert_not_null(real, "DebugFlags autoload must exist to swap for the spy")
+	real.name = "DebugFlags__real_parked"
+	var spy: CombatTraceSpy = CombatTraceSpy.new()
+	spy.name = "DebugFlags"
+	root.add_child(spy)
+	return spy
+
+
+func _restore_debug_flags(spy: CombatTraceSpy) -> void:
+	var root: Node = get_tree().root
+	root.remove_child(spy)
+	spy.free()
+	var parked: Node = root.get_node_or_null("DebugFlags__real_parked")
+	if parked != null:
+		parked.name = "DebugFlags"
+
+
+func test_pos_trace_emits_after_throttle_interval() -> void:
+	var g: Grunt = _make_grunt()
+	# Place at a known world position so the trace payload is predictable.
+	g.global_position = Vector2(208, 80)
+	var spy: CombatTraceSpy = _install_combat_trace_spy()
+	# One physics frame just under the throttle interval — no emit yet.
+	g._physics_process(Grunt.POS_TRACE_INTERVAL - 0.01)
+	var emitted_early: bool = spy.has_tag("Grunt.pos")
+	# A second frame pushes the accumulator past POS_TRACE_INTERVAL — emit.
+	g._physics_process(0.02)
+	var emitted_after: bool = spy.has_tag("Grunt.pos")
+	# Capture the payload of the emitted line before restoring DebugFlags.
+	var pos_msg: String = ""
+	for entry: Array in spy.calls:
+		if entry[0] == "Grunt.pos":
+			pos_msg = entry[1]
+			break
+	_restore_debug_flags(spy)
+	assert_false(emitted_early,
+		"Grunt.pos must NOT emit before POS_TRACE_INTERVAL elapses — the " +
+		"trace is throttled so it is a cheap no-op on perf")
+	assert_true(emitted_after,
+		"Grunt.pos must emit once the throttle accumulator passes " +
+		"POS_TRACE_INTERVAL — the AC4 drift-recovery step steers off this line")
+	# Downstream consequence (Tier 2 bar): the payload carries the world
+	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/.
+	assert_string_contains(pos_msg, "pos=(208,80)",
+		"Grunt.pos payload must carry the parseable world-coord tuple")
+	assert_string_contains(pos_msg, "dist_to_player=",
+		"Grunt.pos payload must carry dist_to_player for the drift-recovery step")

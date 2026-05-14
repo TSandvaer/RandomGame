@@ -415,3 +415,253 @@ export async function chaseAndClearKitingMobs(
     durationMs: Date.now() - t0,
   };
 }
+
+// ===========================================================================
+// Drift-recovery for CHASER rooms (ticket 86c9u05d7 — Room 05 blocker)
+// ===========================================================================
+//
+// **Why this exists:** the AC4 spec's `clearRoomMobs` chaser path parks the
+// player at a fixed canvas position and click-spams a N/E facing cycle. That
+// premise — "every chaser closes into the swing wedge and stays there" — holds
+// for a 1–2 chaser room but is fragile for **Room 05** (2 Grunts + 1 Charger):
+// with 3 bodies converging, one routinely overshoots the player, circles, or
+// gets knocked past the wedge and never re-enters it. The fixed-position spam
+// then kills 2/3 and burns the whole 90 s budget on the third —
+// `[ac4-boss] Room 05: only killed 2/3 chaser mob(s) in 90000ms`.
+//
+// **The fix mirrors the kiting-Shooter chase above:** when the chaser loop
+// detects a stall (no new kill within a window), it calls
+// `recloseToNearestChaser`, which reads the throttled `Grunt.pos` /
+// `Charger.pos` traces (added game-side alongside this helper), finds the
+// nearest *live, drifted* chaser, and position-steers the player back onto it
+// — exactly the `keysToward` pursuit the kiting helper uses, just triggered
+// reactively instead of as a pre-pass. A chaser that walks toward the player
+// but overshoots/circles gets re-closed rather than abandoned.
+
+/** Max age (ms) for a `<Mob>.pos` reading to count as "this mob is alive". */
+const CHASER_POS_FRESH_MS = 700;
+
+/**
+ * Duration of one drift-recovery movement-key hold. Matches the kiting
+ * helper's `PURSUIT_BURST_MS` rationale — long enough to make ground at
+ * WALK_SPEED 120 px/s, short enough to re-read positions and re-steer.
+ */
+const RECLOSE_BURST_MS = 300;
+
+/** Settle after a recovery burst (lets STATE_ATTACK / velocity clear). */
+const RECLOSE_SETTLE_MS = 70;
+
+/** A live-chaser position reading with its parsed source line index + time. */
+interface ChaserReading {
+  x: number;
+  y: number;
+  dist: number;
+  /** Capture-buffer timestamp of the line this reading came from. */
+  timestamp: number;
+  /** "Grunt" | "Charger" — for log readability only. */
+  kind: string;
+}
+
+const CHASER_POS_PATTERN =
+  /\[combat-trace\] (Grunt|Charger)\.pos \| pos=\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\).*?dist_to_player=(-?\d+)/;
+
+/**
+ * Scan the capture buffer for every `Grunt.pos` / `Charger.pos` reading newer
+ * than `CHASER_POS_FRESH_MS`. A dead mob stops emitting its throttled trace,
+ * so a *fresh* reading is a reliable "this body is still alive" signal. There
+ * is no per-mob instance id in the trace, so readings are de-duplicated by
+ * rounded position — two distinct chasers a few px apart still register as
+ * two, and the same chaser's repeated readings collapse to its latest.
+ */
+function freshChaserReadings(capture: ConsoleCapture): ChaserReading[] {
+  const now = Date.now();
+  const lines = capture.getLines();
+  // Map keyed by a coarse position bucket → latest reading in that bucket.
+  const byBucket = new Map<string, ChaserReading>();
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (now - line.timestamp > CHASER_POS_FRESH_MS) break; // buffer is time-ordered
+    const m = line.text.match(CHASER_POS_PATTERN);
+    if (!m) continue;
+    const x = parseInt(m[2], 10);
+    const y = parseInt(m[3], 10);
+    // 24 px bucket ≈ one mob body diameter — keeps two real chasers distinct
+    // while collapsing one chaser's jittering readings.
+    const bucket = `${Math.round(x / 24)},${Math.round(y / 24)}`;
+    if (byBucket.has(bucket)) continue; // already have this bucket's latest
+    byBucket.set(bucket, {
+      x,
+      y,
+      dist: parseInt(m[4], 10),
+      timestamp: line.timestamp,
+      kind: m[1],
+    });
+  }
+  return [...byBucket.values()];
+}
+
+/**
+ * Result of one `recloseToNearestChaser` invocation.
+ */
+export interface RecloseResult {
+  /** True if a drifted chaser was found and pursued. */
+  pursued: boolean;
+  /** True if, after the recovery bursts, a chaser is within `engageRange`. */
+  inRange: boolean;
+  /** The post-recovery distance to the targeted chaser, or -1 if none found. */
+  finalDist: number;
+  /** Count of chaser death traces observed DURING this recovery pass. */
+  killsDuringRecovery: number;
+}
+
+/**
+ * Reactive drift-recovery step for the chaser-clearing path. Reads the fresh
+ * `Grunt.pos` / `Charger.pos` traces, picks the **nearest live chaser that is
+ * outside `engageRange`** (the one the fixed-position click-spam is failing to
+ * reach — and the cheapest to re-close), position-steers the player onto its
+ * live position, then jams onto it with held steer keys + click-spam (the same
+ * pursue-then-engage shape as `chaseAndClearKitingMobs`). Loops until a chaser
+ * is killed during the pass, all live chasers are back within `engageRange`,
+ * or the burst budget is spent.
+ *
+ * It deliberately targets the *nearest* drifted chaser rather than the
+ * furthest: re-closing the nearest one fastest restores the "chaser crowds the
+ * player" geometry that lets the normal click-spam finish the rest. The
+ * held-steer engage burst keeps the player pressed against the chaser AND
+ * keeps `_facing` pointed at it, so the swings land regardless of the caller's
+ * N/E facing cycle.
+ *
+ * Preconditions:
+ *   - Canvas has keyboard focus; no movement keys currently held.
+ *   - The build emits `Player.pos` + `Grunt.pos` / `Charger.pos` traces (HTML5
+ *     release build — no-ops in headless GUT).
+ *
+ * Postconditions:
+ *   - Player has been steered toward (and, when reached, swung at) the
+ *     targeted chaser. Movement keys are released on return.
+ *   - `RecloseResult` reports whether a chaser is now in range and how many
+ *     chaser kills landed during the pass — the caller resumes its click-spam
+ *     either way; an unconverged recovery just means the next stall triggers
+ *     another recovery pass.
+ *
+ * @param page         Playwright page.
+ * @param canvas       The game canvas locator (swing-click target).
+ * @param capture      ConsoleCapture instance (already attached).
+ * @param roomLabel    Log prefix, e.g. "Room 05".
+ * @param clickX       Canvas-relative click X (swing origin).
+ * @param clickY       Canvas-relative click Y (swing origin).
+ * @param engageRange  Distance (px) at/below which a chaser is "reachable" by
+ *                     click-spam — drifted chasers are those beyond it.
+ * @param maxBursts    Burst budget for one recovery pass (caps wall-clock).
+ */
+export async function recloseToNearestChaser(
+  page: Page,
+  canvas: Locator,
+  capture: ConsoleCapture,
+  roomLabel: string,
+  clickX: number,
+  clickY: number,
+  engageRange: number = ENGAGE_RANGE,
+  maxBursts: number = 10
+): Promise<RecloseResult> {
+  const playerPosPattern = /\[combat-trace\] Player\.pos /;
+  const chaserDeathPattern =
+    /\[combat-trace\] (Grunt|Charger)\._die/;
+
+  const preDeathCount = countLines(capture, chaserDeathPattern);
+  const killsDuringRecovery = (): number =>
+    countLines(capture, chaserDeathPattern) - preDeathCount;
+
+  let lastDist = -1;
+  let pursued = false;
+
+  for (let burst = 0; burst < maxBursts; burst++) {
+    if (killsDuringRecovery() > 0) {
+      // A kill landed — the drift is resolved (or at least progress is
+      // unblocked). Hand back to the caller's click-spam loop.
+      break;
+    }
+
+    const chasers = freshChaserReadings(capture);
+    const player = latestPos(capture, playerPosPattern);
+
+    if (chasers.length === 0 || player === null) {
+      // No fresh chaser trace (all dead, or none emitted yet) / no player
+      // trace — nothing to recover toward.
+      break;
+    }
+
+    // Nearest chaser that is OUTSIDE engage range — the one click-spam is
+    // failing to reach. If every live chaser is already in range, the stall
+    // is not a drift problem; let the caller's click-spam continue.
+    const drifted = chasers
+      .filter((c) => c.dist > engageRange)
+      .sort((a, b) => a.dist - b.dist)[0];
+
+    if (drifted === undefined) {
+      const nearest = chasers.sort((a, b) => a.dist - b.dist)[0];
+      lastDist = nearest ? nearest.dist : -1;
+      break;
+    }
+
+    pursued = true;
+    lastDist = drifted.dist;
+
+    const dx = drifted.x - player.x;
+    const dy = drifted.y - player.y;
+    const steerKeys = keysToward(dx, dy);
+
+    console.log(
+      `[chaser-recover] ${roomLabel}: burst ${burst + 1}/${maxBursts} ` +
+        `player=(${player.x},${player.y}) ${drifted.kind}=(${drifted.x},` +
+        `${drifted.y}) dist=${drifted.dist} steer=[${steerKeys.join("+")}] ` +
+        `liveChasers=${chasers.length}`
+    );
+
+    if (drifted.dist > engageRange) {
+      // ---- Pursuit burst — close the gap toward the chaser's position ----
+      await holdKeys(page, steerKeys, RECLOSE_BURST_MS);
+      await page.waitForTimeout(RECLOSE_SETTLE_MS);
+    }
+
+    // ---- Engage burst — jam onto the chaser (held steer keys keep the
+    // player pressed against it AND keep `_facing` pointed at it) while
+    // click-spamming. Even if the pursuit burst above didn't fully close the
+    // gap, a couple of swings here are cheap and land the moment the chaser
+    // (which is ALSO closing — it chases) crosses into wedge range.
+    for (const k of steerKeys) await page.keyboard.down(k);
+    for (let s = 0; s < ENGAGE_SWINGS; s++) {
+      await canvas.click({ position: { x: clickX, y: clickY } });
+      await page.waitForTimeout(ATTACK_INTERVAL_MS);
+      if (killsDuringRecovery() > 0) break;
+    }
+    for (const k of [...steerKeys].reverse()) await page.keyboard.up(k);
+    await page.waitForTimeout(RECLOSE_SETTLE_MS);
+
+    // Re-read: where is the nearest live chaser now?
+    const after = freshChaserReadings(capture);
+    const nearestAfter = after.sort((a, b) => a.dist - b.dist)[0];
+    if (nearestAfter !== undefined) {
+      lastDist = nearestAfter.dist;
+      if (nearestAfter.dist <= engageRange) {
+        console.log(
+          `[chaser-recover] ${roomLabel}: chaser back in range ` +
+            `(dist=${nearestAfter.dist}) after ${burst + 1} burst(s).`
+        );
+        return {
+          pursued,
+          inRange: true,
+          finalDist: nearestAfter.dist,
+          killsDuringRecovery: killsDuringRecovery(),
+        };
+      }
+    }
+  }
+
+  return {
+    pursued,
+    inRange: lastDist >= 0 && lastDist <= engageRange,
+    finalDist: lastDist,
+    killsDuringRecovery: killsDuringRecovery(),
+  };
+}

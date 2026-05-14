@@ -561,3 +561,48 @@ func test_die_emits_combat_trace_die_line() -> void:
 	# Downstream consequence still holds (Tier 2 bar): the mob actually died.
 	assert_true(c.is_dead(), "lethal take_damage still kills the charger")
 	assert_eq(c.get_state(), Charger.STATE_DEAD)
+
+
+# ---- Charger.pos harness-observability trace (ticket 86c9u05d7) -------
+#
+# The AC4 spec's `clearRoomMobs` chaser path parks the player at a fixed
+# position and click-spams; with a 3-chaser room (Room 05: 2 Grunts + 1
+# Charger) one body routinely overshoots / circles out of the swing wedge and
+# the spam abandons it. The harness drift-recovery step
+# (`recloseToNearestChaser` in tests/playwright/fixtures/kiting-mob-chase.ts)
+# re-closes the gap by position-steering off this throttled `[combat-trace]
+# Charger.pos` line. Same spy pattern as test_die_emits_combat_trace_die_line:
+# the real shim is HTML5-only, so we slot a recording spy under the
+# DebugFlags name and drive physics frames directly. Paired with the trace
+# emit in Charger._physics_process.
+
+func test_pos_trace_emits_after_throttle_interval() -> void:
+	var c: Charger = _make_charger()
+	# Place at a known world position so the trace payload is predictable.
+	c.global_position = Vector2(272, 208)
+	var spy: CombatTraceSpy = _install_combat_trace_spy()
+	# One physics frame just under the throttle interval — no emit yet.
+	c._physics_process(Charger.POS_TRACE_INTERVAL - 0.01)
+	var emitted_early: bool = spy.has_tag("Charger.pos")
+	# A second frame pushes the accumulator past POS_TRACE_INTERVAL — emit.
+	c._physics_process(0.02)
+	var emitted_after: bool = spy.has_tag("Charger.pos")
+	# Capture the payload of the emitted line before restoring DebugFlags.
+	var pos_msg: String = ""
+	for entry: Array in spy.calls:
+		if entry[0] == "Charger.pos":
+			pos_msg = entry[1]
+			break
+	_restore_debug_flags(spy)
+	assert_false(emitted_early,
+		"Charger.pos must NOT emit before POS_TRACE_INTERVAL elapses — the " +
+		"trace is throttled so it is a cheap no-op on perf")
+	assert_true(emitted_after,
+		"Charger.pos must emit once the throttle accumulator passes " +
+		"POS_TRACE_INTERVAL — the AC4 drift-recovery step steers off this line")
+	# Downstream consequence (Tier 2 bar): the payload carries the world
+	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/.
+	assert_string_contains(pos_msg, "pos=(272,208)",
+		"Charger.pos payload must carry the parseable world-coord tuple")
+	assert_string_contains(pos_msg, "dist_to_player=",
+		"Charger.pos payload must carry dist_to_player for the drift-recovery step")

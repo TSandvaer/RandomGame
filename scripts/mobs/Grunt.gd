@@ -193,6 +193,20 @@ var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
 @export var player_node_path: NodePath
 var _player: Node2D = null
 
+# Throttle accumulator for the HTML5-only `Grunt.pos` harness-observability
+# trace (see `_physics_process`). The Grunt CHASES — so a browser-driven spec
+# can usually kill it by fixed-position click-spam — but a chaser that
+# overshoots / circles the player can drift OUT of the swing wedge and stall
+# the AC4 spec's `clearRoomMobs` loop (Room 05's 3-chaser pack is the
+# cautionary case, ticket 86c9u05d7). This throttled world-coord trace lets
+# the harness's drift-recovery step re-close the gap on a chaser that has
+# wandered out of range. Mirrors `Shooter.pos` / `Player.pos`.
+var _pos_trace_accum: float = 0.0
+## How often the `Grunt.pos` trace emits — see `Player.POS_TRACE_INTERVAL`
+## for the rationale (fine enough to steer a drift-recovery pursuit, cheap
+## enough to be a no-op on perf; combat_trace is HTML5-only).
+const POS_TRACE_INTERVAL: float = 0.25
+
 
 func _ready() -> void:
 	_apply_mob_def()
@@ -277,6 +291,22 @@ func _physics_process(delta: float) -> void:
 	if _is_dead:
 		return
 	_tick_timers(delta)
+
+	# Harness-observability trace (HTML5-only via the combat_trace shim).
+	# Throttled world-coord + distance readback so the AC4 `clearRoomMobs`
+	# drift-recovery step can re-close the gap on a chaser that overshot /
+	# circled out of the swing wedge (ticket 86c9u05d7). No-op on headless
+	# GUT / desktop (combat_trace gates on `OS.has_feature("web")`).
+	_pos_trace_accum += delta
+	if _pos_trace_accum >= POS_TRACE_INTERVAL:
+		_pos_trace_accum = 0.0
+		var dist_to_player: float = -1.0
+		if _player != null:
+			dist_to_player = (_player.global_position - global_position).length()
+		_combat_trace("Grunt.pos",
+			"pos=(%.0f,%.0f) state=%s hp=%d dist_to_player=%.0f" % [
+				global_position.x, global_position.y, _state, hp_current, dist_to_player
+			])
 
 	match _state:
 		STATE_IDLE, STATE_CHASING:

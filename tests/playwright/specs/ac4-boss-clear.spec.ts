@@ -112,7 +112,10 @@
 import { test, expect } from "@playwright/test";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import { gateTraversalWalk } from "../fixtures/gate-traversal";
-import { chaseAndClearKitingMobs } from "../fixtures/kiting-mob-chase";
+import {
+  chaseAndClearKitingMobs,
+  recloseToNearestChaser,
+} from "../fixtures/kiting-mob-chase";
 
 const BOOT_TIMEOUT_MS = 30_000;
 /** Per-room combat budget — enough to kill 4 mobs at production HP. */
@@ -299,14 +302,24 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       // range — the near-spawn N+E click-spam below kills them without the
       // player wandering. **The Shooter does NOT chase — it KITES** (walks
       // AWAY when the player closes below KITE_RANGE; see
-      // `scripts/mobs/Shooter.gd` § "Distance bands"). This helper therefore
-      // CANNOT clear a pure-Shooter room — most notably **Room 04**, whose
-      // only mob is one Shooter. Rooms 05-08 contain Shooters too, but their
-      // Grunts/Chargers keep the player engaged near spawn while the Shooter
-      // is incidentally caught in the wedge. Room 04 is the spec's current
-      // hard wall (see the `test.fail()` STATUS comment); fixing it needs a
-      // Shooter-specific chase-then-return sub-helper (AC4 residue,
-      // ticket 86c9qckrd).
+      // `scripts/mobs/Shooter.gd` § "Distance bands"). The Shooter is
+      // therefore handled by a separate `chaseAndClearKitingMobs` pre-pass
+      // (ticket 86c9tz7zg, PR #186) — see the Shooter-aware pre-pass block
+      // below — not by the chaser click-spam loop.
+      //
+      // **Chaser drift-recovery (ticket 86c9u05d7, this PR):** the
+      // fixed-position click-spam assumes every chaser stays crowded in the
+      // swing wedge. That premise held for 1-2 chaser rooms but is fragile
+      // for **Room 05** (2 Grunts + 1 Charger): with 3 bodies converging,
+      // one routinely overshoots / circles / gets knocked past the wedge and
+      // the spam kills 2/3, burning the whole budget on the third
+      // (`[ac4-boss] Room 05: only killed 2/3 chaser mob(s) in 90000ms`).
+      // The chaser loop now detects that stall (no new kill within STALL_MS)
+      // and calls `recloseToNearestChaser`, which reads the throttled
+      // `Grunt.pos` / `Charger.pos` traces and position-steers the player
+      // back onto the drifted chaser — the same pursue-then-engage shape the
+      // kiting-Shooter helper uses, just triggered reactively. A chaser that
+      // walks toward the player but overshoots is now PURSUED, not abandoned.
       //
       // Cycling between N and NE facing covers mobs approaching from
       // either direction without inducing significant player drift (the
@@ -406,6 +419,32 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         ];
         const ATTACKS_PER_FACING = 6;
 
+        // ---- Drift-recovery state (ticket 86c9u05d7 — Room 05 blocker) ----
+        //
+        // The fixed-position N/E click-spam above assumes every chaser stays
+        // crowded in the swing wedge. For a 3-chaser room (Room 05: 2 Grunts
+        // + 1 Charger) one body routinely overshoots / circles / gets knocked
+        // past the wedge and the spam kills 2/3, burning the whole budget on
+        // the third. We detect that stall — no new kill within STALL_MS — and
+        // run `recloseToNearestChaser`, which reads the `Grunt.pos` /
+        // `Charger.pos` traces and position-steers the player back onto the
+        // drifted chaser before resuming the spam. A chaser that walks toward
+        // the player but overshoots is now PURSUED, not abandoned.
+        let lastRoomKills = 0;
+        let lastProgressTime = roomStart;
+        // No-kill-progress window that trips a recovery pass. Generous enough
+        // that a normally-crowding chaser room never invokes recovery (a
+        // chaser at production HP dies in ~1.5 s of connecting swings), tight
+        // enough that a drifted chaser is re-closed with budget to spare.
+        const STALL_MS = 6_000;
+
+        const roomKillsNow = (): number =>
+          capture
+            .getLines()
+            .filter((l) =>
+              /\[combat-trace\] (Grunt|Charger|Shooter)\._die/.test(l.text)
+            ).length - preDeathLines;
+
         while (Date.now() - roomStart < PER_ROOM_TIMEOUT_MS) {
           // Set facing for this cycle. Hold the direction key for 30ms
           // (~2 physics ticks at 60Hz) — long enough to register on
@@ -426,12 +465,7 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
             await canvas.click({ position: { x: clickX, y: clickY } });
             await page.waitForTimeout(ATTACK_INTERVAL_MS);
 
-            const deathsNow = capture
-              .getLines()
-              .filter((l) =>
-                /\[combat-trace\] (Grunt|Charger|Shooter)\._die/.test(l.text)
-              ).length;
-            const roomKills = deathsNow - preDeathLines;
+            const roomKills = roomKillsNow();
             if (roomKills >= chaserMobs) {
               console.log(
                 `[ac4-boss] ${roomLabel}: cleared ${roomKills}/${chaserMobs} ` +
@@ -439,6 +473,57 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
                   `(+${shooterCount} Shooter(s) cleared by chase pre-pass).`
               );
               return { chaseTraversedGate };
+            }
+          }
+
+          // ---- Stall detection + drift recovery ----
+          //
+          // Re-read kill count after this facing-cycle's attack burst. If a
+          // kill landed, reset the progress clock. If kill progress has
+          // stalled past STALL_MS, a chaser has drifted out of the wedge —
+          // pursue it with position-steered bursts, then resume the spam.
+          const killsThisCycle = roomKillsNow();
+          if (killsThisCycle > lastRoomKills) {
+            lastRoomKills = killsThisCycle;
+            lastProgressTime = Date.now();
+          } else if (Date.now() - lastProgressTime >= STALL_MS) {
+            console.log(
+              `[ac4-boss] ${roomLabel}: kill progress stalled at ` +
+                `${killsThisCycle}/${chaserMobs} for ` +
+                `${Date.now() - lastProgressTime}ms — running drift-recovery ` +
+                `pursuit.`
+            );
+            const recover = await recloseToNearestChaser(
+              page,
+              canvas,
+              capture,
+              roomLabel,
+              clickX,
+              clickY
+            );
+            console.log(
+              `[ac4-boss] ${roomLabel}: drift-recovery done ` +
+                `(pursued=${recover.pursued}, inRange=${recover.inRange}, ` +
+                `finalDist=${recover.finalDist}).`
+            );
+            // Reset the progress clock so the recovery pass gets a fresh
+            // STALL_MS window to land hits before another pursuit fires.
+            lastProgressTime = Date.now();
+            // Re-check immediately: the pursuit may have walked the player
+            // onto a chaser that the resumed spam will finish next cycle —
+            // but a kill could also have landed during the pursuit bursts.
+            const killsAfterRecover = roomKillsNow();
+            if (killsAfterRecover >= chaserMobs) {
+              console.log(
+                `[ac4-boss] ${roomLabel}: cleared ` +
+                  `${killsAfterRecover}/${chaserMobs} chaser mob(s) at ` +
+                  `t=${Date.now() - roomStart}ms (drift-recovery landed the ` +
+                  `final kill).`
+              );
+              return { chaseTraversedGate };
+            }
+            if (killsAfterRecover > lastRoomKills) {
+              lastRoomKills = killsAfterRecover;
             }
           }
         }
