@@ -277,6 +277,19 @@ The PR #170 AC4 spec saw zero `RoomGate.*` traces because **the player drifted d
 
 **Lightweight ongoing trace:** `_on_body_entered` keeps a small `_combat_trace("RoomGate._on_body_entered", "body=... state=... mobs_alive=...")` line at function entry — HTML5-only via the existing `combat_trace` shim. This survives the diagnostic strip-down because it costs nothing in headless GUT and gives Playwright specs a "did the gate ever see a body?" datapoint when traversal fails. Use it to tell "gate never reached" (no trace) from "gate reached but state wrong" (trace fires, state machine diverges) — the same Case A vs Case B distinction the investigation used.
 
+## GUI focus-consumption vs. Playwright keypresses — close a focus-holding panel with a test-only hook
+
+A class of harness flake surfaced by `equip-flow.spec.ts` Phase 2.5 (tickets `86c9qb7f3` / `86c9qah0f`): **Godot's GUI input system consumes more keys than just `Tab`.** When a focusable `Control` (e.g. an inventory grid `Button` with the default `focus_mode = FOCUS_ALL`) holds keyboard focus, the GUI system intercepts UI-action keys *before* they reach `_unhandled_input`:
+
+- `Tab` — the built-in focus-traversal key ("focus next neighbour").
+- `Escape` — bound to the built-in `ui_cancel` GUI action.
+
+Both are swallowed by the focus system while a Control is focused. A spec that clicks an inventory grid cell (grabbing focus on that Button) and then presses `Tab` *or* `Escape` to close the panel will find the panel **stays open** — the keypress never reaches `InventoryPanel._unhandled_input`'s toggle/close handler. The panel staying open means `Engine.time_scale = TIME_SLOW_FACTOR (0.10)` stays in effect and every subsequent spec action runs in 1/10th-speed slow-mo. **Picking a different key does not fix this** — `equip-flow.spec.ts` round-1 swapped `Tab → Escape` and reproduced the panel-stays-open failure 0/5 headed (Devon's peer review).
+
+**The reliable pattern: a test-only direct-close hook handled in `_input()`.** `_input()` runs *before* the GUI focus system (unlike `_unhandled_input()`), so a focused Button cannot swallow the event. `InventoryPanel.force_close_for_test()` (in `scripts/ui/InventoryPanel.gd`, matching the existing `force_click_*_for_test` convention) closes the panel + restores `Engine.time_scale` directly, sidestepping the entire focus-consumption class. It is wired to **F9**, matched by `physical_keycode` in `InventoryPanel._input()` (the proven `DebugFlags._input` Ctrl+Shift+X pattern), with a `test_force_close_inventory` action as a secondary path. The whole handler is gated on `OS.has_feature("web")` — inert on desktop / headless GUT, mirroring the `DebugFlags.combat_trace` web-only gate. The hook emits a `[combat-trace] InventoryPanel.force_close_for_test | open=false time_scale=1` confirmation line so the spec can **positively assert the panel actually closed** (and `Engine.time_scale` was restored) before proceeding — never "press a key and hope it closed".
+
+**Generalised rule:** any Playwright spec that needs to close (or otherwise dismiss) a focus-holding panel after a click landed on a focusable child Control must NOT rely on `Tab`/`Escape`/any GUI-action key reaching `_unhandled_input`. Add a test-only direct-action method on the panel, wire it to a dedicated key handled in `_input()` (gated on `OS.has_feature("web")`), and have the spec assert a confirmation trace. Pattern check: does the spec press a key to dismiss UI immediately after clicking a focusable Control? If yes, it needs the `_input()`-handled hook, not a key-picking lottery.
+
 ## Cross-references
 
 - HTML5-renderer-specific quirks (HDR clamp, Polygon2D, service worker cache): `.claude/docs/html5-export.md`

@@ -195,6 +195,47 @@ func test_esc_closes_panel() -> void:
 
 
 # =======================================================================
+# Test 8.5 — force_close_for_test reliably closes the panel + restores time
+# =======================================================================
+#
+# Ticket 86c9qb7f3 / 86c9qah0f: the Playwright harness cannot close the panel
+# via `Tab` or `Escape` once a focusable grid Button holds keyboard focus —
+# Godot's GUI input system consumes both keys before `_unhandled_input` sees
+# them. `force_close_for_test()` is the test-only direct-close hook the
+# equip-flow spec drives (via the F9 `test_force_close_inventory` action,
+# handled in `_input()` which runs before the GUI focus system). This paired
+# test guards the hook's core contract: it closes the panel and restores
+# `Engine.time_scale` regardless of focus state. The `_input()` action-routing
+# is HTML5-only (gated on `OS.has_feature("web")`) so it is not exercised
+# under headless GUT — but the method it routes to IS, which is the
+# load-bearing behaviour.
+
+func test_force_close_for_test_closes_and_restores_time_scale() -> void:
+	var panel: InventoryPanel = _make_panel()
+	panel.open()
+	assert_true(panel.is_open(), "panel open before force_close_for_test")
+	assert_eq(Engine.time_scale, panel.get_time_slow_factor(),
+		"time-slow active while open")
+	panel.force_close_for_test()
+	assert_false(panel.is_open(),
+		"force_close_for_test closes the panel — sidesteps focus-consumption")
+	assert_eq(Engine.time_scale, 1.0,
+		"force_close_for_test restores Engine.time_scale (the load-bearing " +
+		"contract — a swallowed keypress would leave it pinned at 0.10)")
+
+
+func test_force_close_for_test_is_idempotent_when_already_closed() -> void:
+	var panel: InventoryPanel = _make_panel()
+	# Panel starts closed (visible=false, _open=false after _ready).
+	assert_false(panel.is_open(), "panel closed at start")
+	# Calling force-close on an already-closed panel must be a safe no-op —
+	# the F9 action could fire when the panel is not open.
+	panel.force_close_for_test()
+	assert_false(panel.is_open(), "still closed — idempotent")
+	assert_eq(Engine.time_scale, 1.0, "time scale untouched on no-op close")
+
+
+# =======================================================================
 # Bonus probe — armor item equips into armor slot (right slot routing)
 # =======================================================================
 
