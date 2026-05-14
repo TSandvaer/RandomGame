@@ -76,11 +76,20 @@ const COLOR_CELL_EMPTY: Color = Color(0.2274509804, 0.2078431373, 0.2509803922, 
 const COLOR_EQUIPPED_INDICATOR: Color = Color(0.478, 0.780, 0.451, 1.0)  # #7AC773
 const COLOR_EQUIPPED_BADGE_PLATE: Color = Color(0.478, 0.780, 0.451, 0.92)  # #7AC773 @92%
 const COLOR_EQUIPPED_BADGE_TEXT: Color = Color(0.10588235, 0.10196078, 0.12156863, 1.0)  # #1B1A1F
-# Symmetric padding (px) added on each side of the badge content to derive
-# the BadgePlate rect. Keeps the checkmark + "EQUIPPED" content fully inside
-# the plate with breathing room — no hardcoded plate size that can drift out
-# of sync with the font / string (ticket 86c9qah1q).
-const BADGE_PLATE_PADDING: Vector2 = Vector2(4, 2)
+# Horizontal padding (px) added on each side of the badge content to derive
+# the BadgePlate WIDTH. Width is the axis that overflowed in PR #179 — it is
+# derived from the label's measured minimum WIDTH + checkmark area + this pad,
+# so it can never drift out of sync with the font / string (ticket 86c9qah1q).
+const BADGE_PLATE_H_PADDING: float = 4.0
+# Fixed plate HEIGHT (px). NOT derived from `Label.get_minimum_size().y`:
+# that returns the font's full line-box height (~27 px for the default theme
+# font at size 9 — ascent + descent + leading), which would make the plate
+# absurdly tall and push it down into the centered item-name text. The visible
+# glyph cap-height at font size 9 is far smaller; the pre-`✓` `main` build
+# shipped a 12 px plate that rendered "EQUIPPED" cleanly (vertical_alignment
+# CENTER draws the glyphs centred regardless of the line-box metric). 14 px
+# keeps that proven fit and gives the 9 px checkmark shape breathing room.
+const BADGE_PLATE_HEIGHT: float = 14.0
 # The checkmark secondary cue is drawn as a SHAPE (two rotated ColorRect
 # strokes), not a font glyph — the Godot 4.3 `gl_compatibility` (HTML5)
 # default font has no U+2713 "✓" glyph and renders it as notdef "tofu".
@@ -651,7 +660,7 @@ func _build_equipped_indicators_for_slot(btn: Button) -> void:
 	# ColorRect for simple shapes" rule (see .claude/docs/html5-export.md).
 	var check: Control = _make_badge_checkmark()
 	check.name = "BadgeCheck"
-	check.position = Vector2(BADGE_PLATE_PADDING.x, 0)  # vertical centre set after plate sized
+	check.position = Vector2(BADGE_PLATE_H_PADDING, 0)  # vertical centre set after plate sized
 	plate.add_child(check)
 	# Badge text — Label child of the plate so it scrolls with the plate if
 	# layout ever shifts. Reads plain "EQUIPPED" (font-safe ASCII — always
@@ -666,34 +675,32 @@ func _build_equipped_indicators_for_slot(btn: Button) -> void:
 	badge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	badge_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	plate.add_child(badge_label)
-	# Size the plate to the label's *actual* rendered minimum size + the fixed
-	# checkmark area + symmetric padding. PR #179's original 72 × 12 hardcode
-	# overflowed: the prior fix widened 60 → 72 px but left height at 12 px,
-	# while the badge content at font size 9 in the default-theme font needs
-	# both more width AND a ~13-14 px line box — the label content spilled
-	# below the plate and clipped against the dark cell behind it, illegible
-	# even before CVD simulation, defeating AC-CB2/AC-CB5. Deriving the plate
-	# size from `get_minimum_size()` makes the fit correct by construction
-	# across every font / renderer, with no magic numbers to drift out of sync.
-	# `get_minimum_size()` resolves here because `_build_equipped_row` runs
-	# from `_ready` with the panel already in the tree, so the Label has a
-	# resolved theme + font.
+	# Size the plate. WIDTH is derived from the label's *actual* rendered
+	# minimum width + the fixed checkmark area + horizontal padding — PR #179's
+	# 72 px hardcode was too narrow for "✓ EQUIPPED" at font size 9 and the
+	# label content overflowed + clipped against the dark cell. Deriving the
+	# width from `get_minimum_size().x` makes the horizontal fit correct by
+	# construction across every font, with no magic number to drift out of
+	# sync. `get_minimum_size()` resolves here because `_build_equipped_row`
+	# runs from `_ready` with the panel already in the tree, so the Label has
+	# a resolved theme + font. HEIGHT is the fixed BADGE_PLATE_HEIGHT — see
+	# that constant for why `get_minimum_size().y` is the WRONG height source
+	# (it returns the ~27 px full line box, not the visible glyph height).
 	var label_min: Vector2 = badge_label.get_minimum_size()
-	var content_h: float = max(ceil(label_min.y), BADGE_CHECK_SIZE.y)
 	plate.size = Vector2(
-		BADGE_PLATE_PADDING.x          # left pad
-		+ BADGE_CHECK_SIZE.x           # checkmark glyph area
+		BADGE_PLATE_H_PADDING          # left pad
+		+ BADGE_CHECK_SIZE.x           # checkmark shape area
 		+ BADGE_CHECK_TEXT_GAP         # gap between check and text
 		+ ceil(label_min.x)            # measured label width
-		+ BADGE_PLATE_PADDING.x,       # right pad
-		content_h + BADGE_PLATE_PADDING.y * 2.0)
-	# Position the label after the checkmark area; vertically fill the plate so
-	# its own centre-alignment handles the rest.
+		+ BADGE_PLATE_H_PADDING,       # right pad
+		BADGE_PLATE_HEIGHT)
+	# Position the label after the checkmark area; give it the plate's height
+	# so its own vertical-centre alignment draws the glyphs centred.
 	badge_label.position = Vector2(
-		BADGE_PLATE_PADDING.x + BADGE_CHECK_SIZE.x + BADGE_CHECK_TEXT_GAP,
+		BADGE_PLATE_H_PADDING + BADGE_CHECK_SIZE.x + BADGE_CHECK_TEXT_GAP,
 		0)
 	badge_label.size = Vector2(ceil(label_min.x), plate.size.y)
-	# Centre the checkmark vertically within the now-sized plate.
+	# Centre the checkmark vertically within the plate.
 	check.position.y = (plate.size.y - BADGE_CHECK_SIZE.y) * 0.5
 
 

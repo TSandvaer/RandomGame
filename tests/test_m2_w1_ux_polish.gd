@@ -392,19 +392,32 @@ func test_t3_badge_plate_and_text_colors() -> void:
 	# the exact gap that let PR #179's first cut ship a clipped, illegible
 	# badge past green CI: the old test only asserted `text ==` and a
 	# hardcoded `plate.size ==`, never that the rendered content fits the rect.
-	# Assert the plate is at least as large as the label's measured minimum
-	# size on BOTH axes, AND that the label's own rect sits fully inside the
-	# plate — renderer/font-agnostic, catches overflow by construction.
+	#
+	# WIDTH was the overflow axis on PR #179 ("✓ EQUIPPED" too wide for the
+	# 72 px plate). Assert the label's own rect — positioned after the
+	# checkmark area — sits fully inside the plate width. This is the
+	# renderer/font-agnostic invariant: it scales with the real measured
+	# `get_minimum_size().x`, so a wider font can never silently overflow.
 	var label_min: Vector2 = label.get_minimum_size()
 	assert_true(label.position.x + label_min.x <= plate.size.x + 0.01,
 		"badge label right edge %.1f fits within plate width %.1f — EQUIPPED + ✓ shape fit horizontally (AC-CB2)"
 			% [label.position.x + label_min.x, plate.size.x])
-	assert_true(plate.size.y >= label_min.y,
-		"badge plate height %.1f >= label min height %.1f — EQUIPPED fits vertically, no spill below plate (AC-CB5)"
-			% [plate.size.y, label_min.y])
+	# The checkmark shape must also fit inside the plate width, sitting before
+	# the label with the configured gap.
+	assert_true(check.position.x + check.size.x <= label.position.x + 0.01,
+		"checkmark shape right edge %.1f clears the label start %.1f (no overlap)"
+			% [check.position.x + check.size.x, label.position.x])
+	# HEIGHT — the plate must be tall enough for the checkmark shape, and the
+	# checkmark must sit fully within it (vertically centred). NOT asserted
+	# against `label.get_minimum_size().y`: that is the font's full ~27 px
+	# line box, not the visible glyph height — the label is vertically
+	# centre-aligned and draws the glyphs centred within the shorter plate.
 	assert_true(plate.size.y >= EXPECTED_BADGE_CHECK_SIZE.y,
 		"badge plate height %.1f >= checkmark height %.1f — ✓ shape fits vertically"
 			% [plate.size.y, EXPECTED_BADGE_CHECK_SIZE.y])
+	assert_true(check.position.y >= -0.01 and check.position.y + check.size.y <= plate.size.y + 0.01,
+		"checkmark shape (y %.1f, h %.1f) sits fully within the %.1f px plate"
+			% [check.position.y, check.size.y, plate.size.y])
 	# The plate must also stay inside its 96 px host Button (position is pinned
 	# at x=2) so the badge never overhangs the cell edge.
 	assert_true(plate.position.x + plate.size.x <= 96.0,
