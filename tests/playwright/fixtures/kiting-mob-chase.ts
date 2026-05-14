@@ -1,5 +1,5 @@
 /**
- * kiting-mob-chase.ts — Shooter-aware "chase-then-return" combat sub-helper
+ * kiting-mob-chase.ts — Shooter-aware combat sub-helper
  *
  * **Why this fixture exists (AC4 Room 04 blocker, ticket 86c9tz7zg):**
  *
@@ -13,8 +13,8 @@
  * = &"ranged_kiter"`). Its distance bands:
  *
  *   - `dist < KITE_RANGE` (120 px) → `STATE_KITING`: the Shooter walks
- *     *directly away from the player* at `move_speed` (60 px/s) until
- *     distance is restored above `KITE_RANGE + 16`.
+ *     *directly away from the player's current position* at `move_speed`
+ *     (60 px/s) until distance is restored above `KITE_RANGE + 16`.
  *   - `KITE_RANGE .. AIM_RANGE` (120..300 px) → the "sweet spot": the
  *     Shooter STANDS STILL and shoots — it does NOT close the gap.
  *   - `dist > AIM_RANGE` (300 px) → the Shooter walks *toward* the player
@@ -31,61 +31,60 @@
  * by luck of geometry as the chasers crowd in. Room 04 has no chaser to
  * provide that cover, so the harness gap is exposed.
  *
- * **Why a blind directional pursuit does NOT work:**
+ * **Why the pursuit must be POSITION-STEERED:**
  *
  * The Shooter does not retreat to a *fixed* corner — it kites *directly
- * away from the player's current position*, dynamically. A "just walk NE"
+ * away from the player's current position*, dynamically. A blind "walk NE"
  * pursuit was empirically observed (diag build, `diag/shooter-chase-
- * positions`) to overshoot: the player jammed into the NE corner at
- * (438, 42) while the Shooter — now SOUTH of the player — calmly kited to
- * (364, 180) and sat there at full HP. The pursuit direction has to TRACK
- * the Shooter, which means the harness needs to know where the Shooter
- * actually is.
+ * positions`) to overshoot: the player jammed into one corner while the
+ * Shooter calmly kited to the opposite side of the room at full HP. The
+ * pursuit has to TRACK the Shooter, which means the harness must know where
+ * the Shooter actually is — and the Playwright harness has no JS bridge into
+ * Godot. So `Player.gd` and `Shooter.gd` emit a throttled, HTML5-only
+ * `[combat-trace] <Node>.pos | pos=(x,y) ...` line every 0.25 s. This helper
+ * parses those, computes the vector player→Shooter, picks the WASD keys
+ * that match it, and steers AT the kiter's *live* position — closing in
+ * because the room is a closed box and the player (120 px/s) is 2× the
+ * Shooter's kite speed.
  *
- * **The fix — position-steered pursuit (`Player.pos` + `Shooter.pos`):**
+ * **Why the chase TRAVERSES the gate (and why that is correct):**
  *
- * `Player.gd` and `Shooter.gd` now emit a throttled, HTML5-only
- * `[combat-trace] <Node>.pos | pos=(x,y) ...` line every 0.25 s (the
- * Playwright harness has no JS bridge into Godot — this trace is the only
- * way a browser-driven spec can read world-coords). This helper:
+ * A kiting Shooter retreats *wherever* the player is not — including into
+ * the room's west end, right through the RoomGate trigger rect. The chase
+ * therefore *cannot* avoid the gate region: cornering the Shooter often
+ * means following it there. Empirically the Shooter will wall-pin itself
+ * inside the gate trigger if the player only ever approaches from the east.
  *
- *   1. Parses the latest `Player.pos` and `Shooter.pos` from the capture
- *      buffer.
- *   2. Computes the vector player→Shooter and picks the 1–2 WASD keys that
- *      best match it.
- *   3. **Pursuit burst** — holds those keys to close the gap (player
- *      120 px/s vs Shooter 60 px/s kite, so the gap always shrinks; held
- *      input also overrides projectile knockback every tick).
- *   4. When the Shooter trace reports `dist_to_player` within
- *      `ENGAGE_RANGE`, **engage burst** — hold the steer keys (jamming the
- *      player onto the Shooter, facing it) WHILE click-spamming.
- *   5. Re-reads positions every cycle and re-steers — so when the Shooter
- *      kites to a new heading, the pursuit follows.
+ * So the chase does NOT try to dodge the gate. It pursues the Shooter
+ * freely, and as the player moves through the room — entering the room
+ * (locks the gate), killing the Shooter (the gate auto-unlocks: it was
+ * LOCKED and `mobs_alive` hit 0), and walking back out — it naturally
+ * drives the gate's full `OPEN → LOCKED → UNLOCKED → traversed` sequence.
+ * That is a *valid, causally-ordered* traversal — exactly what a real
+ * player does in a Shooter room: kill the kiter while roaming, then walk
+ * out the door. The helper detects whether `gate_traversed` fired during
+ * the chase and reports it in `KitingChaseResult.gateTraversed`; the
+ * calling spec (`ac4-boss-clear.spec.ts`) uses that to SKIP its own
+ * `gateTraversalWalk` for the room — the chase already did it — while
+ * still asserting the chase produced the correct gate trace sequence.
  *
- * The pursuit converges because the room is a closed 416×192 box and the
- * player is 2× faster: the Shooter cannot open distance indefinitely, and
- * a player that always steers at the Shooter's *current* position closes
- * in regardless of which way it flees.
+ * If the chase happens to clear the Shooter *without* ever entering the
+ * gate trigger, `gateTraversed` is false and the spec falls back to the
+ * normal `gateTraversalWalk` (the gate is still OPEN with `mobs_alive == 0`
+ * — the kill-first precondition that helper expects).
  *
  * **Generality:** parameterised by the mob's `posPattern` / `deathPattern`
  * regexes — it handles *any* mob that emits a `.pos` trace, not just Room
  * 04's Shooter. It is invoked by `clearRoomMobs` for every room whose
  * composition includes a Shooter (Rooms 04, 06, 07, 08).
  *
- * **Chase-then-return:** after the kiter dies, the helper walks the player
- * back toward `DEFAULT_PLAYER_SPAWN` — position-steered, same as the
- * pursuit — so the subsequent `gateTraversalWalk` starts from the
- * predictable near-spawn geometry it assumes (see `gate-traversal.ts`
- * preconditions). Without the return leg the player would be left
- * wherever the kill happened and the gate walk would miss the trigger.
- *
  * References:
  *   - scripts/mobs/Shooter.gd — KITE_RANGE / AIM_RANGE / move_speed bands
  *     + the `Shooter.pos` harness trace
  *   - scripts/player/Player.gd — the `Player.pos` harness trace
+ *   - scripts/levels/RoomGate.gd — the gate state machine the chase drives
  *   - tests/playwright/specs/ac4-boss-clear.spec.ts — the calling spec
- *   - tests/playwright/fixtures/gate-traversal.ts — the post-combat walk
- *     that depends on the player being near spawn (chase-then-return)
+ *   - tests/playwright/fixtures/gate-traversal.ts — the fallback walk
  *   - .claude/docs/combat-architecture.md §"[combat-trace] diagnostic shim"
  */
 
@@ -106,32 +105,23 @@ const ENGAGE_RANGE = 70;
 
 /**
  * Duration of one pursuit-burst movement-key hold. At WALK_SPEED 120 px/s a
- * 450 ms hold covers ~54 px (single axis) / ~38 px per axis (diagonal).
+ * 350 ms hold covers ~42 px (single axis) / ~30 px per axis (diagonal).
  * Short enough to re-read positions and re-steer often as the Shooter
  * kites; long enough to make real ground against the 60 px/s kite speed.
  */
-const PURSUIT_BURST_MS = 450;
+const PURSUIT_BURST_MS = 350;
 
 /** Settle after a movement burst (lets STATE_ATTACK / velocity clear). */
-const SETTLE_MS = 90;
+const SETTLE_MS = 80;
 
 /**
  * Swings per engage burst. The Shooter has 40 HP and the iron sword deals
- * 6/hit → ~7 connecting swings kill it. 5 swings/burst plus the re-steer
- * loop means a Shooter is typically down in 2 engage bursts.
+ * 6/hit → ~7 connecting swings kill it. 4 swings/burst plus the re-steer
+ * loop means a Shooter is typically down in ~2-3 engage bursts, and the
+ * burst stays short enough (~0.9 s) that the helper re-reads the kiter's
+ * position frequently as it repositions.
  */
-const ENGAGE_SWINGS = 5;
-
-/**
- * Max wall-clock for the post-clear return-to-spawn walk. The return is
- * position-steered and exits early once the player is within
- * `RETURN_ARRIVE_RANGE` of spawn; this cap stops a stuck-against-wall
- * player from burning the rest of the room budget.
- */
-const RETURN_MAX_MS = 6_000;
-
-/** Distance (px) from spawn at which the return walk is "close enough". */
-const RETURN_ARRIVE_RANGE = 60;
+const ENGAGE_SWINGS = 4;
 
 /**
  * Result of a `chaseAndClearKitingMobs` invocation.
@@ -141,6 +131,21 @@ export interface KitingChaseResult {
   cleared: boolean;
   /** Count of matching death traces observed during the chase. */
   kills: number;
+  /**
+   * Whether a `RoomGate.gate_traversed` trace fired during the chase. The
+   * chase roams the room freely to corner the kiter, which routinely drives
+   * the gate's full OPEN→LOCKED→UNLOCKED→traversed sequence. When true, the
+   * calling spec SKIPS its own `gateTraversalWalk` for the room (the chase
+   * already traversed it) — see `ac4-boss-clear.spec.ts`.
+   */
+  gateTraversed: boolean;
+  /**
+   * Whether a `RoomGate._unlock | gate_unlocked` trace fired during the
+   * chase. Always true alongside `gateTraversed` (the gate auto-unlocks
+   * when the last registered mob dies while LOCKED); exposed separately so
+   * the spec can assert the causal ordering `gate_unlocked` → `gate_traversed`.
+   */
+  gateUnlocked: boolean;
   /** Wall-clock duration of the helper invocation, in ms. */
   durationMs: number;
 }
@@ -165,12 +170,6 @@ export interface KitingChaseOptions {
    * `[combat-trace] Player.pos | pos=(x,y) ...`.
    */
   playerPosPattern?: RegExp;
-  /**
-   * Where to walk the player back to after the last kiter dies — the
-   * caller's `gateTraversalWalk` assumes the player is near here. Default:
-   * `[240, 200]` (`DEFAULT_PLAYER_SPAWN`).
-   */
-  returnTo?: [number, number];
   /** Per-room combat budget in ms. Default: 90_000 (matches the spec). */
   budgetMs?: number;
 }
@@ -220,11 +219,11 @@ function keysToward(dx: number, dy: number): string[] {
   const ay = Math.abs(dy);
   if (ax < 4 && ay < 4) return keys;
   const major = Math.max(ax, ay);
-  // Include the horizontal key if x is at least ~40% of the dominant axis.
-  if (ax >= major * 0.4) keys.push(dx > 0 ? "d" : "a");
-  // Include the vertical key if y is at least ~40% of the dominant axis.
+  // Include the horizontal key if x is at least ~35% of the dominant axis.
+  if (ax >= major * 0.35) keys.push(dx > 0 ? "d" : "a");
+  // Include the vertical key if y is at least ~35% of the dominant axis.
   // Godot screen-space: +y is SOUTH ("s"), -y is NORTH ("w").
-  if (ay >= major * 0.4) keys.push(dy > 0 ? "s" : "w");
+  if (ay >= major * 0.35) keys.push(dy > 0 ? "s" : "w");
   return keys;
 }
 
@@ -243,16 +242,24 @@ async function holdKeys(
   for (const k of [...keys].reverse()) await page.keyboard.up(k);
 }
 
+/** Count capture-buffer lines matching `pattern`. */
+function countLines(capture: ConsoleCapture, pattern: RegExp): number {
+  return capture.getLines().filter((l) => pattern.test(l.text)).length;
+}
+
+const GATE_TRAVERSED_PATTERN = /\[combat-trace\] RoomGate\.gate_traversed/;
+const GATE_UNLOCKED_PATTERN =
+  /\[combat-trace\] RoomGate\._unlock \| gate_unlocked emitting/;
+
 /**
  * Pursues and kills one or more kiting mobs (Shooters) by position-steered
- * pursuit, then walks the player back toward `DEFAULT_PLAYER_SPAWN`.
- *
- * Unlike a fixed-position click-spam, this helper reads the mob's throttled
- * `.pos` trace each cycle and steers the player AT the mob's current
- * location — so it converges on a kiter no matter which way it flees.
+ * pursuit. Roams the room freely — cornering a kiter routinely means
+ * following it through the RoomGate trigger, which drives the gate's
+ * OPEN→LOCKED→UNLOCKED→traversed sequence; the helper detects that and
+ * reports it (see `KitingChaseResult.gateTraversed`) so the caller can
+ * skip a redundant `gateTraversalWalk`.
  *
  * Preconditions:
- *   - Player is at (or near) `DEFAULT_PLAYER_SPAWN = (240, 200)`.
  *   - Canvas has keyboard focus (a prior `canvas.click()` was issued).
  *   - No movement keys are currently held.
  *   - The build emits `Player.pos` / `Shooter.pos` traces (HTML5 release
@@ -261,8 +268,8 @@ async function holdKeys(
  * Postconditions:
  *   - `expectedMobs` matching death traces observed (or the helper throws
  *     with the last 30 trace lines on budget exhaustion).
- *   - Player has been walked back toward `returnTo`, so the caller's
- *     `gateTraversalWalk` starts from predictable geometry.
+ *   - `KitingChaseResult.gateTraversed` reflects whether the chase drove
+ *     the room's gate all the way to `gate_traversed`.
  *
  * @param page          Playwright page.
  * @param canvas        The game canvas locator.
@@ -271,7 +278,7 @@ async function holdKeys(
  * @param expectedMobs  Number of kiting mobs to clear in this room.
  * @param clickX        Canvas-relative click X (swing origin).
  * @param clickY        Canvas-relative click Y (swing origin).
- * @param options       Pattern / return / budget tuning.
+ * @param options       Pattern / budget tuning.
  */
 export async function chaseAndClearKitingMobs(
   page: Page,
@@ -288,17 +295,15 @@ export async function chaseAndClearKitingMobs(
   const deathPattern = options.deathPattern ?? /\[combat-trace\] Shooter\._die/;
   const playerPosPattern =
     options.playerPosPattern ?? /\[combat-trace\] Player\.pos /;
-  const returnTo = options.returnTo ?? [240, 200];
   const budgetMs = options.budgetMs ?? 90_000;
 
-  // Count any matching death traces already in the buffer so we only credit
-  // kills that happen during THIS room's chase.
-  const preDeathCount = capture
-    .getLines()
-    .filter((l) => deathPattern.test(l.text)).length;
+  // Snapshot trace counts so we only credit kills + gate events that happen
+  // during THIS room's chase.
+  const preDeathCount = countLines(capture, deathPattern);
+  const preTraversedCount = countLines(capture, GATE_TRAVERSED_PATTERN);
+  const preUnlockedCount = countLines(capture, GATE_UNLOCKED_PATTERN);
   const killsSoFar = (): number =>
-    capture.getLines().filter((l) => deathPattern.test(l.text)).length -
-    preDeathCount;
+    countLines(capture, deathPattern) - preDeathCount;
 
   console.log(
     `[kiting-chase] ${roomLabel}: position-steered pursuit of ` +
@@ -334,7 +339,7 @@ export async function chaseAndClearKitingMobs(
     lastDist = dist;
     const steerKeys = keysToward(dx, dy);
 
-    if (cycle === 1 || cycle % 6 === 0) {
+    if (cycle === 1 || cycle % 8 === 0) {
       console.log(
         `[kiting-chase] ${roomLabel}: cycle ${cycle} t=${Date.now() - t0}ms ` +
           `player=(${player.x},${player.y}) mob=(${mob.x},${mob.y}) ` +
@@ -381,41 +386,32 @@ export async function chaseAndClearKitingMobs(
     );
   }
 
+  // ---- Detect whether the chase drove the room's gate to traversal ----
+  //
+  // Cornering a kiting Shooter routinely means following it through the
+  // RoomGate trigger rect — which locks the gate (player entered the room),
+  // and once the Shooter dies while LOCKED the gate auto-unlocks. If the
+  // player then crosses the trigger again it fires `gate_traversed`. That
+  // is a valid traversal; the caller skips its own `gateTraversalWalk` when
+  // this is true. If the chase cleared the kiter without ever entering the
+  // trigger, the gate is still OPEN with `mobs_alive == 0` and the caller
+  // falls back to the normal walk.
+  const gateTraversed =
+    countLines(capture, GATE_TRAVERSED_PATTERN) > preTraversedCount;
+  const gateUnlocked =
+    countLines(capture, GATE_UNLOCKED_PATTERN) > preUnlockedCount;
+
   console.log(
     `[kiting-chase] ${roomLabel}: cleared ${kills}/${expectedMobs} kiting ` +
-      `mob(s) at t=${Date.now() - t0}ms after ${cycle} cycle(s). ` +
-      `Returning toward spawn (${returnTo[0]},${returnTo[1]}) for the ` +
-      `gate-traversal walk.`
+      `mob(s) at t=${Date.now() - t0}ms after ${cycle} cycle(s) ` +
+      `(gateUnlocked=${gateUnlocked}, gateTraversed=${gateTraversed}).`
   );
-
-  // ---- Chase-then-RETURN — position-steered walk back toward spawn ----
-  // The pursuit left the player wherever the kill happened.
-  // gateTraversalWalk assumes the player is near DEFAULT_PLAYER_SPAWN — walk
-  // back, steering by the same `Player.pos` trace, exiting early once close.
-  const returnStart = Date.now();
-  while (Date.now() - returnStart < RETURN_MAX_MS) {
-    const player = latestPos(capture, playerPosPattern);
-    if (player === null) {
-      await page.waitForTimeout(150);
-      continue;
-    }
-    const dx = returnTo[0] - player.x;
-    const dy = returnTo[1] - player.y;
-    const dist = Math.round(Math.hypot(dx, dy));
-    if (dist <= RETURN_ARRIVE_RANGE) {
-      console.log(
-        `[kiting-chase] ${roomLabel}: back near spawn ` +
-          `(player=(${player.x},${player.y}), dist=${dist}).`
-      );
-      break;
-    }
-    await holdKeys(page, keysToward(dx, dy), PURSUIT_BURST_MS);
-    await page.waitForTimeout(SETTLE_MS);
-  }
 
   return {
     cleared: true,
     kills,
+    gateTraversed,
+    gateUnlocked,
     durationMs: Date.now() - t0,
   };
 }
