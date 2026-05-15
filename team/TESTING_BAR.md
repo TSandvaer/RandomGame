@@ -105,6 +105,35 @@ func test_grunt_hit_flash_applied_to_visible_sprite_not_parent_body():
 
 ---
 
+## Final-report shape — TIGHT (orchestrator-bound reports)
+
+Every sub-agent's task-completion message back to the orchestrator MUST be tight. ≤200 words. Required content only:
+
+- **PR URL** (1 line)
+- **Verdict** (1 line — `APPROVE` / `blocked-on-X` / `partial — see follow-up #...`)
+- **Blockers or follow-ups** (1-3 lines max — only what the orchestrator needs to act on this turn)
+- **Doc updates** (1 line — `Doc updates: <file> — <one-line>` or `Doc updates: none`)
+
+Detailed content goes in artifacts the orchestrator can read on-demand, NOT in the orchestrator-bound message:
+
+| Detail surface | Where it goes |
+|---|---|
+| Empirical evidence / trace excerpts | PR body |
+| Per-AC verification + AC walkthrough | Self-Test Report comment on the PR |
+| Non-obvious findings | PR body "Non-obvious findings" section |
+| Cross-lane integration check | Self-Test Report on the PR |
+| Sponsor-input items | PR body section |
+| 8-run sweep evidence (sample-size discipline) | PR body / Self-Test Report |
+| Diagnostic trace dumps | PR body or `team/log/` artifact |
+
+**Why this rule exists:** the M2 W3 mid-retro investigation (2026-05-15) found that verbose sub-agent final reports flowing back into the orchestrator's main conversation window was the dominant context-bloat surface — separate from static file loads (`.claude/docs/`, MEMORY.md, etc.). Static loads are actually LARGER in MARIAN-TUTOR than Embergrave (4× docs, 3× memory). The bloat differential is in main-window narrative, not in disk. Tightened reports preserve orchestrator-window context for the work that requires it.
+
+**Enforcement:** Tess flags non-tight reports in PR review by reading the agent's final-report message + comparing against the PR body / Self-Test Report. If detailed content is duplicated in both places, the orchestrator-bound message is over-budget. The persona files in `.claude/agents/{role}.md` reinforce the rule per-role.
+
+Reference: orchestrator memory `tightened-final-report-contract.md`.
+
+---
+
 ## What changes for each role
 
 ### Tess
