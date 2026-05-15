@@ -120,6 +120,7 @@ import { gateTraversalWalk } from "../fixtures/gate-traversal";
 import {
   chaseAndClearKitingMobs,
   chaseAndClearMultiChaserRoom,
+  returnPlayerToSpawn,
 } from "../fixtures/kiting-mob-chase";
 import { clearRoom01Dummy } from "../fixtures/room01-traversal";
 
@@ -467,6 +468,50 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         // `expectedMobs`, or a room with Shooters would never satisfy the
         // exit condition.
         const chaserMobs = expectedMobs - shooterCount;
+
+        // ---- Return-to-spawn between chase pre-pass and chaser loop ----
+        //
+        // Ticket 86c9u9neq: in mixed Shooter+Chaser rooms (Room 06: 1
+        // Shooter + 2 Chargers, Room 07: 2+2, Room 08: 1+1+2 grunt+charger
+        // mix), the kiting-Shooter chase pre-pass roams the player wherever
+        // the Shooter retreats — frequently ending in a corner 100+px from
+        // `DEFAULT_PLAYER_SPAWN`. The fixed-position chaser loop below
+        // assumes the player is near spawn so the click-spam wedge covers
+        // the chargers as they crowd in; from a drifted corner position the
+        // chargers' spawn locations (Room 06: (208,80), (272,208)) sit
+        // OUTSIDE the player's swing wedge for the entire 90s budget,
+        // producing the 0/2 chargers-killed failure shape the ticket
+        // describes.
+        //
+        // **Extends PR #190's `chaseAndClearKitingMobs` return-to-spawn
+        // pattern** to the SPEC's follow-on phase. The chase helper's own
+        // case C `returnToSpawn` already fires when the chase did not drive
+        // the gate — which is the always-taken branch in mixed rooms with
+        // chargers alive (chargers register with the RoomGate and keep it
+        // LOCKED through the Shooter kill until all chargers die). So this
+        // spec-level call is normally idempotent. But it is belt-and-
+        // suspenders coverage against any future chase path that bypasses
+        // case C (e.g. case A / case B in a hypothetical mix where the gate
+        // unexpectedly resolves while chasers are alive); the redundant
+        // call costs only a few ms when the player is already at spawn.
+        //
+        // We also reset the player's facing by issuing the same N + E key
+        // cycle the chaser loop expects — `returnPlayerToSpawn` ends with
+        // movement keys released, which is exactly the precondition the
+        // chaser loop's `page.keyboard.down(facing.key)` requires.
+        //
+        // Why only on `chaseTraversedGate === false`: when the chase DID
+        // drive the gate, the room counter has advanced and the player has
+        // been teleported to the next room's spawn — there's nothing to
+        // return. (Also, in that branch the caller returns above without
+        // running the chaser loop anyway.)
+        if (shooterCount > 0 && !chaseTraversedGate) {
+          console.log(
+            `[ac4-boss] ${roomLabel}: returning player to spawn after ` +
+              `Shooter chase pre-pass (Option A — ticket 86c9u9neq).`
+          );
+          await returnPlayerToSpawn(page, capture, roomLabel);
+        }
 
         // ---- 3-chaser rooms: position-steered pursuit (ticket 86c9u05d7) --
         //
