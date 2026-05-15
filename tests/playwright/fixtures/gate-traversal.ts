@@ -6,6 +6,51 @@
  * to let specs traverse Rooms 02..08 (which all use a RoomGate at
  * world-position (48, 144) with size (48, 80)) end-to-end.
  *
+ * **HARNESS COVERAGE GAP — phase boundaries vs gameplay event ordering
+ * (ticket 86c9ugfzv, PR #221's surfacing finding):** prior to this fix, the
+ * helper assumed the gate was always OPEN with `mobs_alive == 0` when invoked
+ * — phase 3's walk-in would fire `body_entered #1` → `lock()` →
+ * `_unlock()` synchronously (because `_mobs_alive == 0` triggers the
+ * short-circuit). That precondition holds for the "kill mobs first AT spawn,
+ * THEN walk to gate" pattern.
+ *
+ * **It does NOT hold when combat happens NEAR the gate trigger.** In Room 03
+ * (the Grunt + Charger chase-combat room), the spawning chasers crowd the
+ * player and knockback drifts the player INTO the gate trigger BEFORE the
+ * last mob dies. Sequence observed empirically in release-build sweeps:
+ *   1. `body_entered #1` fires DURING combat at the spec's clearRoomMobs phase
+ *      → state OPEN → `lock()` → state LOCKED (mobs_alive>0, no unlock).
+ *   2. Mobs die one-by-one via the deferred `_on_mob_died` decrement chain.
+ *   3. When the last mob's decrement lands and `_mobs_alive == 0` with state
+ *      == LOCKED, the gate starts its 650ms DEATH_TWEEN_WAIT and then fires
+ *      `_unlock()` → state UNLOCKED, `gate_unlocked` emits.
+ *   4. `gateTraversalWalk` is then invoked from the spec, but its phase-3
+ *      logic assumes the gate is OPEN — it walks into the trigger, sees no
+ *      new `gate_unlocked` event (already fired at step 3), and throws.
+ *
+ * **Symptom:** misleading error "phase 3 fired _on_body_entered but
+ * gate_unlocked did NOT follow" — the body_entered seen is actually Room
+ * 04's gate firing on the newly-spawned Shooter (because Room 03's gate
+ * actually traversed silently when phase 4's east-walk produced a re-entry
+ * into the still-UNLOCKED trigger). Not a state-machine regression — the
+ * helper just doesn't account for cross-phase `_unlock` events that landed
+ * during the spec's preceding combat phase.
+ *
+ * **The fix (this PR — Drew, ticket 86c9ugfzv):** accept an optional
+ * `preRoomLineCount` snapshot from the caller (line count BEFORE
+ * clearRoomMobs began) and resolve the room's gate state by scanning the
+ * combat-phase trace lines for `_unlock` / `gate_traversed` events. Three
+ * outcomes mirror the kiting-mob-chase fixture's case A/B/C resolution:
+ *   - Case A: `gate_traversed` already fired during combat → return early
+ *     (room counter has advanced; the spec MUST NOT call this helper again
+ *     for the same room).
+ *   - Case B: `gate_unlocked` fired but no `gate_traversed` → steer
+ *     EAST-of-trigger, then walk pure-WEST to fire body_entered →
+ *     gate_traversed. Skip the lock-induction phase entirely.
+ *   - Case C: neither fired → existing phase 3-5 walk (the open-gate path).
+ * See `.claude/docs/combat-architecture.md § "Harness coverage gap —
+ * phase boundaries vs gameplay event ordering"` for the broader pattern.
+ *
  * **HISTORY — body_entered hypothesis was overturned by Devon's investigation
  * (PR #171, ticket 86c9qbhm5):** Tess PR #170 conjectured that body_entered
  * was not firing under Playwright + Chromium HTML5. Devon's regression canary
@@ -249,9 +294,17 @@ export const PHASE_SETTLE_MS = 200;
  * but it's returned for advanced use (timing analysis, retry logic).
  */
 export interface GateTraversalResult {
-  /** Whether the gate_unlocked trace was observed during the walk. */
+  /**
+   * Whether a `gate_unlocked` trace was observed for this room's gate. This
+   * is `true` if the unlock landed EITHER during the prior combat phase
+   * (case A/B — observed in the `preRoomLineCount..helper-entry` slice) OR
+   * during the helper's phase-3 walk-in (case C — observed in the
+   * phase3Lines slice). Specs asserting causal ordering should compare this
+   * against `gateTraversed` AND check the room-scoped trace order via
+   * `preRoomUnlockedCount` / `preRoomTraversedCount`.
+   */
   gateUnlocked: boolean;
-  /** Whether the gate_traversed trace was observed during the walk. */
+  /** Whether a `gate_traversed` trace was observed for this room's gate. */
   gateTraversed: boolean;
   /**
    * Whether the `RoomGate._on_body_entered` trace fired during phase 3.
@@ -259,8 +312,24 @@ export interface GateTraversalResult {
    * "gate never reached" from "gate reached but state-machine wrong"
    * failures. If false, the prior combat phase likely drifted the player
    * away from `DEFAULT_PLAYER_SPAWN` so the W→N walk missed the trigger.
+   *
+   * Case A/B (cross-phase _unlock detected) callers should NOT assert this
+   * is true — the helper short-circuits before phase 3 runs in those cases.
+   * Use `resolutionCase` to discriminate.
    */
   bodyEnteredFiredOnPhase3: boolean;
+  /**
+   * Which case the helper resolved to (ticket 86c9ugfzv):
+   *   - `"already-traversed"` (case A): combat-phase auto-unlock AND
+   *     auto-traversal observed; helper returned without walking.
+   *   - `"unlocked-finish"` (case B): combat-phase auto-unlock observed,
+   *     helper steered EAST-of-trigger then walked west to traverse.
+   *   - `"open-walk"` (case C): no combat-phase auto-unlock; helper ran
+   *     the normal phase 3-5 two-part walk.
+   * Defaults to `"open-walk"` when the caller omits `preRoomLineCount`
+   * (legacy spec compatibility — see the GateTraversalOptions docstring).
+   */
+  resolutionCase: "already-traversed" | "unlocked-finish" | "open-walk";
   /** Total wall-clock duration of the helper invocation, in ms. */
   durationMs: number;
 }
@@ -283,6 +352,31 @@ export interface GateTraversalOptions {
    * self-explanatory; omit for legacy callers.
    */
   expectedSpawn?: [number, number];
+  /**
+   * Trace-buffer line count BEFORE the room's combat phase began (i.e.
+   * before `clearRoomMobs` was called for this room). When provided, the
+   * helper scans the slice `[preRoomLineCount, preHelperLineCount)` for
+   * `[combat-trace] RoomGate._unlock | gate_unlocked emitting` and
+   * `[combat-trace] RoomGate.gate_traversed` events that fired during
+   * combat — and routes to one of three cases (A/B/C — see
+   * `GateTraversalResult.resolutionCase`).
+   *
+   * **When to pass this:** rooms where combat happens close enough to the
+   * gate trigger that knockback / chase paths can push the player into the
+   * trigger zone DURING combat — Room 03 (Grunt + Charger near-spawn melee
+   * combat, chaser knockback drifts west into trigger), and defensively
+   * any chase-combat room. Pass the spec's `preRoomLineCount` snapshot
+   * (captured before `clearRoomMobs` call) and the helper does the rest.
+   *
+   * **When to omit:** rooms where the combat phase is far from the gate
+   * trigger AND can never approach it. The omitted value defaults the
+   * helper to its pre-86c9ugfzv behavior (resolutionCase = "open-walk")
+   * which assumes case C unconditionally. Legacy callers (pre-86c9ugfzv)
+   * keep working without modification.
+   *
+   * Ticket: 86c9ugfzv (Drew, M2 W3 — AC4 white-whale closer).
+   */
+  preRoomLineCount?: number;
 }
 
 /**
@@ -332,6 +426,104 @@ export async function gateTraversalWalk(
   // Snapshot the trace buffer position so we only consider lines emitted
   // by THIS gate's traversal (not stale lines from a prior room).
   const preLineCount = capture.getLines().length;
+
+  // ---- Case A/B/C resolution (ticket 86c9ugfzv) ----
+  //
+  // If the caller passed `preRoomLineCount`, scan the combat-phase slice
+  // `[preRoomLineCount, preLineCount)` for cross-phase `_unlock` /
+  // `gate_traversed` events that landed during combat. Three outcomes:
+  //
+  //   A. Already TRAVERSED — `gate_traversed` fired during combat. Return
+  //      immediately. The spec MUST guard against double-traversal (the
+  //      room counter has advanced; calling this helper would operate on
+  //      the NEXT room's still-LOCKED gate).
+  //   B. UNLOCKED but not traversed — `gate_unlocked` fired during combat
+  //      but no `gate_traversed`. Steer EAST-of-trigger (the player may be
+  //      inside the trigger right now, or anywhere — we normalise position
+  //      via key bursts), then walk pure-west to fire body_entered →
+  //      gate_traversed on the UNLOCKED gate.
+  //   C. Still OPEN — neither fired during combat. Take the existing
+  //      phase 3-5 walk (the open-gate path).
+  //
+  // **Why this resolution lives in the helper, not the spec:** the helper is
+  // the single point of truth for "how to make Room N traverse." Every
+  // future spec that drives Rooms 02..08 inherits the fix transparently;
+  // the spec just passes its `preRoomLineCount` snapshot. Putting case
+  // resolution at the spec level would require every future AC spec to
+  // re-implement the same A/B/C ladder. See the module header for
+  // rationale.
+  //
+  // **Compatibility:** when `preRoomLineCount` is omitted (legacy callers),
+  // the resolution scan is skipped and the helper falls through to the
+  // existing phase 3-5 path — preserving pre-86c9ugfzv behavior for any
+  // spec that hasn't been migrated.
+  if (options.preRoomLineCount !== undefined) {
+    const combatPhaseSlice = capture
+      .getLines()
+      .slice(options.preRoomLineCount, preLineCount);
+    const combatPhaseUnlocked = combatPhaseSlice.some((l) =>
+      /\[combat-trace\] RoomGate\._unlock \| gate_unlocked emitting/.test(
+        l.text
+      )
+    );
+    const combatPhaseTraversed = combatPhaseSlice.some((l) =>
+      /\[combat-trace\] RoomGate\.gate_traversed/.test(l.text)
+    );
+
+    if (combatPhaseTraversed) {
+      // ---- Case A: already-traversed ----
+      // The chase / knockback path drove the player through the trigger
+      // BOTH lock-and-unlock AND traverse during combat. Room counter has
+      // advanced. Return immediately so the spec can `continue` its loop.
+      console.log(
+        `[gate-traversal] ${roomLabel}: case A — gate_unlocked + ` +
+          `gate_traversed both fired during combat phase. Room counter ` +
+          `has advanced. Returning early (no walk required).`
+      );
+      return {
+        gateUnlocked: true,
+        gateTraversed: true,
+        bodyEnteredFiredOnPhase3: false,
+        resolutionCase: "already-traversed",
+        durationMs: Date.now() - t0,
+      };
+    }
+
+    if (combatPhaseUnlocked) {
+      // ---- Case B: unlocked-finish ----
+      // Gate is UNLOCKED but not traversed — typically because player
+      // drifted into the trigger during combat (firing body_entered #1 →
+      // lock()), the last mob died while LOCKED (firing _unlock 650ms
+      // later), and the player either stayed inside the trigger or
+      // wandered out without re-crossing it. The helper's phase 3 path
+      // (assumes OPEN gate, asserts gate_unlocked fires during walk-in)
+      // would throw against this state. Instead, steer EAST-of-trigger
+      // then walk pure-west across to fire body_entered → gate_traversed.
+      console.log(
+        `[gate-traversal] ${roomLabel}: case B — gate_unlocked fired ` +
+          `during combat phase but gate_traversed did NOT. Steering ` +
+          `EAST-of-trigger then walking WEST in to finish traversal.`
+      );
+      const traversed = await finishTraversalFromUnlocked(
+        page,
+        capture,
+        roomLabel
+      );
+      return {
+        gateUnlocked: true,
+        gateTraversed: traversed,
+        bodyEnteredFiredOnPhase3: false,
+        resolutionCase: "unlocked-finish",
+        durationMs: Date.now() - t0,
+      };
+    }
+
+    // Fall through to case C: no combat-phase unlock observed.
+    console.log(
+      `[gate-traversal] ${roomLabel}: case C — no combat-phase ` +
+        `gate_unlocked observed. Running the normal phase 3-5 two-part walk.`
+    );
+  }
 
   // ---- Phase 3: walk into gate trigger (body_entered #1) ----
   //
@@ -533,6 +725,126 @@ export async function gateTraversalWalk(
     gateUnlocked,
     gateTraversed,
     bodyEnteredFiredOnPhase3,
+    resolutionCase: "open-walk",
     durationMs,
   };
+}
+
+// ---- Case B helper: finish traversal on already-UNLOCKED gate ----
+//
+// Mirrors `kiting-mob-chase.ts`'s `finishTraversalFromUnlocked` but inlined
+// here so this fixture is self-contained and the kiting-chase fixture stays
+// private. The behaviour is intentionally identical — the staging point,
+// walk geometry, and timeout match — so the two fixtures resolve the same
+// state in the same way, just from different invocation contexts.
+//
+// **Geometry recap** (matches the module header's gate trigger description):
+//   - Gate trigger: world `X ∈ [24, 72]`, `Y ∈ [104, 184]`.
+//   - Staging point: `(120, 144)` — 48px east of the trigger east edge,
+//     vertically centred in the Y-band. Far enough outside the trigger
+//     that the player is GUARANTEED to be in the non-overlap state before
+//     the walk begins (so `body_entered` fires fresh on the next entry).
+//   - Walk: pure WEST for 1100ms → covers ~132px → player crosses the
+//     trigger east edge (X=72) at ~t=400ms, firing body_entered →
+//     gate_traversed on the UNLOCKED gate.
+//
+// **Why we don't use position-steering from kiting-mob-chase.ts:** that
+// helper needs `Player.pos` traces (HTML5-only, throttled at 0.25s). For
+// this case-B path we can rely on a simpler east-walk burst because the
+// player's starting position is unknown but bounded — they're somewhere
+// in/near the trigger after combat-phase drift. A pure-east burst with
+// generous duration drives them past the staging X regardless of starting
+// position, and any wall collision pins them against the room east wall
+// (X ≈ 304) — well outside the trigger, ready for the pure-west walk-in.
+
+/**
+ * East-walk duration to clear the player out of the trigger rect before the
+ * traversal walk-in. Generous overshoot: 1500ms at 120px/s = 180px, more
+ * than the full ~48-72px westward distance the player could be from the
+ * room's east wall after combat. Walls clamp the position so overshoot is
+ * harmless (the player ends pinned against X≈304 either way). Mirrors the
+ * `WALK_EAST_OUT_OF_GATE_MS` constant in spirit (also east-walk to clear
+ * the trigger) but longer because the starting X is less predictable.
+ */
+const FINISH_STAGE_EAST_WALK_MS = 1_500;
+
+/**
+ * Pure-west walk duration for the finish-traversal re-entry. From the
+ * staging area (X≈120-304), walking west at 120px/s for 1500ms covers
+ * ~180px — the player crosses the trigger's east edge (X=72) en route to
+ * X≈0 (clamped against west wall). `body_entered` fires mid-walk →
+ * `gate_traversed` emits on the UNLOCKED gate.
+ *
+ * We deliberately use a generous duration here vs. the
+ * `WALK_WEST_BACK_INTO_GATE_MS = 1100ms` from phase 5: phase 5 starts from
+ * the helper-controlled (X≈132, Y≈104) position; case B starts from
+ * wherever the spec's combat phase left the player, so we need more
+ * margin to guarantee crossing the trigger east edge regardless of
+ * starting X.
+ */
+const FINISH_STAGE_WEST_WALK_MS = 1_500;
+
+/**
+ * Brief settle between the east-burst and the west-walk. Lets the player's
+ * STATE_ATTACK recovery (if any) clear and the body_exited signal land
+ * before the next body_entered transition.
+ */
+const FINISH_STAGE_SETTLE_MS = 300;
+
+async function finishTraversalFromUnlocked(
+  page: Page,
+  capture: ConsoleCapture,
+  roomLabel: string
+): Promise<boolean> {
+  // Step 1: clear the player OUT of the trigger to the east. Generous
+  // overshoot is fine — the room east wall pins the player at X≈304.
+  console.log(
+    `[gate-traversal] ${roomLabel}: case B step 1 — walk EAST ` +
+      `(${FINISH_STAGE_EAST_WALK_MS}ms) to clear player out of trigger ` +
+      `before re-entry. Wall-pinning at X≈304 is expected.`
+  );
+  await page.keyboard.down("d");
+  await page.waitForTimeout(FINISH_STAGE_EAST_WALK_MS);
+  await page.keyboard.up("d");
+  await page.waitForTimeout(FINISH_STAGE_SETTLE_MS);
+
+  // Step 2: pure-WEST walk into trigger. body_entered fires when the player
+  // crosses the trigger east edge (X=72). The UNLOCKED gate emits
+  // gate_traversed on this single transition (no need for a second walk).
+  console.log(
+    `[gate-traversal] ${roomLabel}: case B step 2 — walk WEST ` +
+      `(${FINISH_STAGE_WEST_WALK_MS}ms) across trigger east edge to fire ` +
+      `body_entered → gate_traversed on UNLOCKED gate.`
+  );
+  await page.keyboard.down("a");
+  await page.waitForTimeout(FINISH_STAGE_WEST_WALK_MS);
+  await page.keyboard.up("a");
+
+  // Wait for gate_traversed trace. Typical observed latency: 50-200ms
+  // after the walk completes.
+  try {
+    await capture.waitForLine(
+      /\[combat-trace\] RoomGate\.gate_traversed/,
+      5_000
+    );
+    console.log(
+      `[gate-traversal] ${roomLabel}: case B complete — gate_traversed observed.`
+    );
+    return true;
+  } catch {
+    const recent = capture
+      .getLines()
+      .slice(-30)
+      .map((l) => `  ${l.text}`)
+      .join("\n");
+    console.warn(
+      `[gate-traversal] ${roomLabel}: case B finish-traversal did NOT produce ` +
+        `a gate_traversed trace within 5s. The east-walk-then-west pattern ` +
+        `should reliably cross the trigger. Possible causes: wall geometry ` +
+        `regressed, gate state machine regressed, or the player was already ` +
+        `past the trigger west edge before the west-walk began.\n\n` +
+        `Last 30 trace lines:\n${recent}`
+    );
+    return false;
+  }
 }

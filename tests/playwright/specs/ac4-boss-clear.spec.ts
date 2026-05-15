@@ -705,6 +705,16 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       for (let i = 1; i < 8; i++) {
         const roomLabel = `Room 0${i + 1}`;
 
+        // Snapshot the FULL trace-buffer line count BEFORE the room's
+        // combat phase begins. Passed to `gateTraversalWalk` as
+        // `preRoomLineCount` so the helper can detect cross-phase gate
+        // events (Case A/B/C resolution — ticket 86c9ugfzv). This solves
+        // the Room 03 race where chaser knockback drifts the player into
+        // the gate trigger DURING combat: the gate locks-and-unlocks
+        // before the helper is called, and the helper's phase-3 assertion
+        // (gate_unlocked must fire during walk-in) would otherwise throw.
+        const preRoomLineCount = capture.getLines().length;
+
         // Snapshot gate-trace counts BEFORE clearing the room, so the
         // post-clear assertions are scoped to THIS room's gate lifecycle.
         const preRoomTraversedCount = capture
@@ -831,54 +841,87 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         // own internal assertions for _on_body_entered + gate_unlocked +
         // gate_traversed and throws with explicit drift diagnostics if the
         // walk fails to reach the trigger.
+        //
+        // **Case A/B/C resolution (ticket 86c9ugfzv):** the helper now
+        // accepts a `preRoomLineCount` snapshot and resolves the gate's
+        // state by scanning the combat-phase slice. Three outcomes:
+        //   - Case A: gate auto-traversed during combat (chase + knockback
+        //     drove the player through the trigger twice). Helper returns
+        //     early; the spec asserts the causal sequence + skips the
+        //     two-part walk.
+        //   - Case B: gate auto-unlocked during combat but not traversed
+        //     (chase drifted player into trigger once + last mob died);
+        //     helper steers EAST-of-trigger then walks WEST to traverse.
+        //   - Case C: neither — normal phase 3-5 two-part walk.
+        // The case distinguishes via `result.resolutionCase`; the
+        // `bodyEnteredFiredOnPhase3` assertion only applies to case C
+        // (cases A/B don't run phase 3).
         const result = await gateTraversalWalk(
           page,
           canvas,
           capture,
           roomLabel,
-          { expectedSpawn: [240, 200] }
+          { expectedSpawn: [240, 200], preRoomLineCount }
+        );
+
+        console.log(
+          `[ac4-boss] ${roomLabel}: gateTraversalWalk resolved as ` +
+            `case "${result.resolutionCase}" (gateUnlocked=${result.gateUnlocked}, ` +
+            `gateTraversed=${result.gateTraversed}).`
         );
 
         // Devon PR #171 load-bearing positive signal: _on_body_entered must
-        // have fired during phase 3 to prove the trigger was reached. This
-        // is the assertion that distinguishes "harness drifted away from
-        // spawn" from "state-machine regression".
-        expect(
-          result.bodyEnteredFiredOnPhase3,
-          `${roomLabel}: gateTraversalWalk should have fired ` +
-            `RoomGate._on_body_entered during phase 3 (load-bearing positive ` +
-            `signal that the trigger rect was reached). If false, prior ` +
-            `combat likely drifted player away from DEFAULT_PLAYER_SPAWN.`
-        ).toBe(true);
+        // have fired during phase 3 to prove the trigger was reached —
+        // but only in case C ("open-walk"). Case A/B short-circuited before
+        // phase 3 because the gate was already (partially) resolved during
+        // combat.
+        if (result.resolutionCase === "open-walk") {
+          expect(
+            result.bodyEnteredFiredOnPhase3,
+            `${roomLabel}: gateTraversalWalk should have fired ` +
+              `RoomGate._on_body_entered during phase 3 (load-bearing positive ` +
+              `signal that the trigger rect was reached). If false, prior ` +
+              `combat likely drifted player away from DEFAULT_PLAYER_SPAWN.`
+          ).toBe(true);
+        }
 
         // Causality assertion: gate_unlocked + gate_traversed both observed.
+        // (Applies to all three cases — even case A/B observed both events
+        // during combat / case B's finish walk.)
         expect(
           result.gateUnlocked,
-          `${roomLabel}: gateTraversalWalk should have fired gate_unlocked ` +
-            `during phase 3 (body_entered #1).`
+          `${roomLabel}: gateTraversalWalk should have observed gate_unlocked ` +
+            `for this room's gate (case ${result.resolutionCase}).`
         ).toBe(true);
         expect(
           result.gateTraversed,
-          `${roomLabel}: gateTraversalWalk should have fired gate_traversed ` +
-            `during phase 5 (body_entered #2).`
+          `${roomLabel}: gateTraversalWalk should have observed gate_traversed ` +
+            `for this room's gate (case ${result.resolutionCase}).`
         ).toBe(true);
 
-        // body_entered must have fired AT LEAST twice during this room's
-        // traversal (phase 3 lock-and-unlock + phase 5 traverse). The exact
-        // count depends on whether the player crossed the trigger boundary
-        // during phase 4's east-walk-out; >= 2 is the load-bearing invariant.
+        // body_entered count assertion: applies only to the normal
+        // open-walk path. Cases A/B have different body_entered counts:
+        //   - Case A: body_entered fired at least twice during combat
+        //     (lock-and-unlock + traverse), already counted in
+        //     preRoomBodyEnteredCount's room-scoped delta below.
+        //   - Case B: body_entered fired once during combat (lock-only)
+        //     plus once during the finish-walk = 2 minimum.
+        //   - Case C: phase 3 #1 + phase 5 #2 = 2 minimum.
+        // So `>= 2` holds across all cases when measured against the FULL
+        // room delta (preRoomBodyEnteredCount, not preWalkBodyEnteredCount).
         const postWalkBodyEnteredCount = capture
           .getLines()
           .filter((l) =>
             /\[combat-trace\] RoomGate\._on_body_entered/.test(l.text)
           ).length;
         const bodyEnteredDelta =
-          postWalkBodyEnteredCount - preWalkBodyEnteredCount;
+          postWalkBodyEnteredCount - preRoomBodyEnteredCount;
         expect(
           bodyEnteredDelta,
-          `${roomLabel}: expected at least 2 _on_body_entered traces ` +
-            `(phase 3 #1 + phase 5 #2); got ${bodyEnteredDelta}. ` +
-            `If less than 2, the two-part walk pattern is breaking down.`
+          `${roomLabel}: expected at least 2 _on_body_entered traces for ` +
+            `this room's gate (case ${result.resolutionCase}); got ` +
+            `${bodyEnteredDelta}. If less than 2, the gate didn't see ` +
+            `BOTH a lock-event AND a traversal-event.`
         ).toBeGreaterThanOrEqual(2);
 
         // Negative assertion: gate_traversed count increased by exactly 1
