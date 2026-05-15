@@ -177,6 +177,23 @@ var _is_dead: bool = false
 var _last_position: Vector2 = Vector2.ZERO
 var _player: Node2D = null
 
+# Throttle accumulator for the HTML5-only `Charger.pos` harness-observability
+# trace (see `_physics_process`). The Charger CHASES (telegraph → charge), so
+# a browser-driven spec *can* kill it by near-spawn click-spam when it is the
+# only mob crowding the player — but in a 3-mob room (Rooms 05-08) chasers
+# drift out of the fixed-position swing wedge and the click-spam-from-spawn
+# path clears the room only 0/3–2/3 of the time (ticket 86c9u05d7). The AC4
+# multi-chaser clear sub-helper (tests/playwright/fixtures/kiting-mob-chase.ts)
+# fixes that by position-steered pursuit, which needs to know where each
+# chaser is. This throttled world-coord + distance trace is that readback.
+# Mirrors `Grunt.pos` / `Shooter.pos` / `Player.pos`; no-op on headless GUT /
+# desktop (combat_trace gates on `OS.has_feature("web")`).
+var _pos_trace_accum: float = 0.0
+## How often the `Charger.pos` trace emits — see `Player.POS_TRACE_INTERVAL`
+## for the rationale (fine enough to steer a pursuit, cheap enough to be a
+## no-op on perf; combat_trace is HTML5-only).
+const POS_TRACE_INTERVAL: float = 0.25
+
 ## Counter for consecutive sub-epsilon-displacement charging frames. Reset on
 ## charge start (`_begin_charge`) and on any frame where displacement clears
 ## the epsilon. When it reaches WALL_STOP_FRAMES_REQUIRED, _end_charge_into_wall
@@ -298,6 +315,24 @@ func _physics_process(delta: float) -> void:
 	if _is_dead:
 		return
 	_tick_timers(delta)
+
+	# Harness-observability trace (HTML5-only via the combat_trace shim).
+	# Throttled world-coord + distance readback so the AC4 multi-chaser clear
+	# sub-helper can pursue this chaser when it drifts out of the player's
+	# fixed-position swing wedge — see the `_pos_trace_accum` declaration above
+	# and `Grunt.pos` / `Shooter.pos` / `Player.pos` for the full rationale.
+	# No-op on headless GUT / desktop (combat_trace gates on
+	# `OS.has_feature("web")`).
+	_pos_trace_accum += delta
+	if _pos_trace_accum >= POS_TRACE_INTERVAL:
+		_pos_trace_accum = 0.0
+		var dist_to_player: float = -1.0
+		if _player != null:
+			dist_to_player = (_player.global_position - global_position).length()
+		_combat_trace("Charger.pos",
+			"pos=(%.0f,%.0f) state=%s hp=%d dist_to_player=%.0f" % [
+				global_position.x, global_position.y, _state, hp_current, dist_to_player
+			])
 
 	# Snapshot the entry state so we know whether CHARGING was already active
 	# coming into this tick. Same-tick transitions (telegraph -> charging) must

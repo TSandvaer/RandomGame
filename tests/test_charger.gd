@@ -619,3 +619,57 @@ func test_take_damage_on_dead_charger_emits_ignored_already_dead() -> void:
 		"soak console greps distinguish corpse-hits from unregistered hits")
 	# Downstream consequence (Tier 2 bar): the rejected hit changed nothing.
 	assert_eq(c.get_hp(), 0, "rejected take_damage does not decrement HP further")
+
+
+# ---- 22: Charger.pos harness-observability trace (ticket 86c9u05d7) ----
+#
+# The AC4 multi-chaser clear sub-helper (tests/playwright/fixtures/kiting-
+# mob-chase.ts) cannot reliably clear a 3-mob chaser room by fixed-position
+# click-spam — a chaser drifts out of the player's swing wedge. The helper
+# instead PURSUES, steering off each chaser's throttled `[combat-trace]
+# <Mob>.pos` line. `Shooter.pos` already existed (ticket 86c9tz7zg); this
+# closes the sibling gap for `Charger.pos`. Same CombatTraceSpy injection +
+# direct-physics-frame pattern as test_shooter.gd's pos-trace test.
+
+func test_pos_trace_emits_after_throttle_interval() -> void:
+	var c: Charger = _make_charger()
+	# Place at a known world position so the trace payload is predictable,
+	# and set a player ref so the payload carries a real dist_to_player.
+	c.global_position = Vector2(352, 128)
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	p.global_position = Vector2(240, 200)
+	c.set_player(p)
+	var spy: CombatTraceSpy = _install_combat_trace_spy()
+	# One physics frame just under the throttle interval — no emit yet.
+	c._physics_process(Charger.POS_TRACE_INTERVAL - 0.01)
+	var emitted_early: bool = spy.has_tag("Charger.pos")
+	# A second frame pushes the accumulator past POS_TRACE_INTERVAL — emit.
+	c._physics_process(0.02)
+	var emitted_after: bool = spy.has_tag("Charger.pos")
+	# Capture the payload of the emitted line before restoring DebugFlags.
+	var pos_msg: String = ""
+	for call: Array in spy.calls:
+		if call[0] == "Charger.pos":
+			pos_msg = call[1]
+			break
+	_restore_debug_flags(spy)
+	assert_false(emitted_early,
+		"Charger.pos must NOT emit before POS_TRACE_INTERVAL elapses — the " +
+		"trace is throttled so it is a cheap no-op on perf")
+	assert_true(emitted_after,
+		"Charger.pos must emit once the throttle accumulator passes " +
+		"POS_TRACE_INTERVAL — the AC4 multi-chaser clear helper steers off it")
+	# Downstream consequence (Tier 2 bar): the payload carries the world
+	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/. Position
+	# may have drifted ±1px from the seeded value if the engine auto-ticked
+	# (defensive — `_make_charger` disables auto-physics, but assert on the
+	# regex shape rather than the exact coords for robustness alongside the
+	# matching test in test_grunt.gd, which CAN drift).
+	var pos_match := RegEx.new()
+	pos_match.compile("pos=\\(-?\\d+,-?\\d+\\)")
+	assert_true(pos_match.search(pos_msg) != null,
+		"Charger.pos payload must carry the parseable world-coord tuple " +
+		"(harness parses /pos=\\((-?\\d+),(-?\\d+)\\)/); got: " + pos_msg)
+	assert_string_contains(pos_msg, "dist_to_player=",
+		"Charger.pos payload must carry dist_to_player for the chase helper")
