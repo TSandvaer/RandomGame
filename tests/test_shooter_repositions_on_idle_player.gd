@@ -84,12 +84,14 @@ func test_shooter_moves_toward_player_when_aiming_and_player_too_far() -> void:
 
 
 func test_shooter_holds_position_when_aiming_in_sweet_spot() -> void:
-	# Sanity: in the sweet-spot (KITE_RANGE..AIM_RANGE), velocity should
-	# remain ZERO — the Shooter stands and aims, consistent with the original
-	# design intent for the sweet-spot band.
+	# Sanity: in the sweet-spot (KITE_RANGE..SHOOT_RANGE), velocity should
+	# remain ZERO — the Shooter stands and aims, consistent with the design
+	# intent for the sweet-spot band. Ticket 86c9uehaq tightened the sweet
+	# spot from KITE_RANGE..AIM_RANGE (120..300) to KITE_RANGE..SHOOT_RANGE
+	# (120..144) so the band matches actual projectile reach.
 	var shooter: Shooter = _make_shooter(Vector2.ZERO)
-	var player: FakePlayer = _make_player(Vector2(200.0, 0.0))
-	# 200 px: inside AIM_RANGE (300) and outside KITE_RANGE (120) = sweet-spot.
+	# 130 px: inside SHOOT_RANGE (144) and outside KITE_RANGE (120) = sweet-spot.
+	var player: FakePlayer = _make_player(Vector2(130.0, 0.0))
 	shooter.set_player(player)
 	shooter._aim_left = Shooter.AIM_DURATION
 	shooter._last_aim_dir = Vector2.RIGHT
@@ -99,7 +101,139 @@ func test_shooter_holds_position_when_aiming_in_sweet_spot() -> void:
 	shooter._process_aiming(1.0 / 60.0)
 
 	assert_eq(shooter.velocity, Vector2.ZERO,
-		"Shooter must hold position in sweet-spot (KITE_RANGE..AIM_RANGE)")
+		"Shooter must hold position in sweet-spot (KITE_RANGE..SHOOT_RANGE)")
+
+
+# Regression guard for ticket 86c9uehaq Sponsor failure mode 3 ("out-of-range
+# = no pursuit"). Pre-fix the close-the-gap threshold was AIM_RANGE (300 px),
+# so a player standing at dist 200 — past projectile reach (144 px) but inside
+# the old "sweet spot" — saw the shooter stand still firing un-reaching
+# projectiles. Post-fix the threshold is SHOOT_RANGE (PROJECTILE_SPEED ×
+# PROJECTILE_LIFETIME = 144 px) so any out-of-projectile-range player is
+# actively pursued.
+func test_shooter_pursues_when_player_past_projectile_reach() -> void:
+	var shooter: Shooter = _make_shooter(Vector2.ZERO)
+	# 200 px: past SHOOT_RANGE (144) but well inside AIM_RANGE (300).
+	# Pre-fix this was "sweet spot, stand and fire un-reaching projectiles."
+	# Post-fix this is "out of effective range, walk toward player."
+	var player: FakePlayer = _make_player(Vector2(200.0, 0.0))
+	shooter.set_player(player)
+	shooter._aim_left = Shooter.AIM_DURATION
+	shooter._last_aim_dir = Vector2.RIGHT
+	shooter._set_state(Shooter.STATE_AIMING)
+	shooter._is_dead = false
+
+	shooter._process_aiming(1.0 / 60.0)
+
+	assert_gt(shooter.velocity.x, 0.0,
+		"REGRESSION CHECK (86c9uehaq Sponsor failure mode 3): Shooter must " +
+		"close the gap (velocity.x > 0) when player is past SHOOT_RANGE but " +
+		"inside the old AIM_RANGE — pre-fix stood still firing un-reaching shots.")
+	assert_eq(shooter.velocity.length(), shooter.move_speed,
+		"Pursuit speed must equal move_speed (no fractional)")
+
+
+# Regression guard for ticket 86c9uehaq Sponsor failure mode 2 ("cornered =
+# idle"). Pre-fix the kite state had no exit when wall-blocked and player
+# still close — shooter stayed in KITING forever, velocity set every frame
+# but move_and_slide produced no net motion. Post-fix two consecutive
+# is_on_wall() ticks while still inside KITE_RANGE promote KITING -> AIMING
+# with a short windup so the shooter fires in place.
+func test_shooter_cornered_promotes_kiting_to_aiming() -> void:
+	# Headless GUT can't wall-collide a CharacterBody2D, so we drive the
+	# extracted `_promote_cornered_to_aiming` helper directly. The is_on_wall()
+	# detection + tick-counter accumulation lives in `_process_kiting`; this
+	# test pins the PROMOTION payload (state -> AIMING, aim_left shortened to
+	# CORNERED_AIM_DURATION, attack-telegraph fired, aim_started signal emit).
+	var shooter: Shooter = _make_shooter(Vector2.ZERO)
+	# Player at 80px — inside KITE_RANGE (120).
+	var player: FakePlayer = _make_player(Vector2(80.0, 0.0))
+	shooter.set_player(player)
+	shooter._set_state(Shooter.STATE_KITING)
+	shooter._is_dead = false
+	shooter._cornered_kite_ticks = Shooter.CORNERED_KITE_TICKS_TO_FIRE
+
+	watch_signals(shooter)
+	shooter._promote_cornered_to_aiming(80.0)
+
+	assert_eq(shooter.get_state(), Shooter.STATE_AIMING,
+		"REGRESSION CHECK (86c9uehaq Sponsor failure mode 2): cornered kite " +
+		"promotion must transition to AIMING — pre-fix kiting had no exit " +
+		"when wall-blocked + player close, so shooter froze indefinitely.")
+	assert_almost_eq(shooter._aim_left, Shooter.CORNERED_AIM_DURATION, 0.001,
+		"Cornered windup uses CORNERED_AIM_DURATION (fast) not AIM_DURATION " +
+		"(normal) — player is right there, normal 0.55s windup feels idle.")
+	assert_eq(shooter._cornered_kite_ticks, 0,
+		"Cornered-tick counter must reset on promotion.")
+	assert_eq(shooter.velocity, Vector2.ZERO,
+		"Cornered AIMING starts with zero velocity — shooter is wall-blocked, " +
+		"don't keep trying to retreat.")
+	assert_signal_emitted(shooter, "aim_started",
+		"Cornered promotion must emit aim_started so visual hooks fire the " +
+		"telegraph (red glow on Sprite). Without this the cornered fallback " +
+		"looks identical to standing idle.")
+
+
+# Regression guard for ticket 86c9uehaq Sponsor failure mode 2 (cornered
+# constants discipline). CORNERED_KITE_TICKS_TO_FIRE controls how fast the
+# fallback fires; CORNERED_AIM_DURATION controls how long the windup is.
+# Tune drift in either direction makes the fallback either spam-prone (too
+# fast) or invisible (too slow).
+func test_shooter_cornered_constants_are_balanced() -> void:
+	assert_eq(Shooter.CORNERED_KITE_TICKS_TO_FIRE, 2,
+		"Cornered promotion must fire fast — 2 ticks ≈ 33 ms at 60 Hz keeps " +
+		"the shooter from looking idle for more than a single visible frame.")
+	assert_lt(Shooter.CORNERED_AIM_DURATION, Shooter.AIM_DURATION,
+		"Cornered windup must be shorter than the normal aim windup — the " +
+		"player is right there; a 0.55 s telegraph would feel like the shooter " +
+		"is still idle.")
+	assert_gt(Shooter.CORNERED_AIM_DURATION, 0.0,
+		"Cornered windup must be > 0 so the player has SOME telegraph window " +
+		"to react/dodge — zero-windup point-blank fire is unfair.")
+
+
+# Regression guard for ticket 86c9uehaq Sponsor failure mode 2 (counter logic).
+# When kiting succeeds (non-blocked tick), the cornered-tick counter must
+# reset so a momentary single-tick wall graze does not accumulate toward
+# false-positive cornered promotion.
+func test_shooter_cornered_counter_resets_on_unblocked_kite_tick() -> void:
+	var shooter: Shooter = _make_shooter(Vector2.ZERO)
+	var player: FakePlayer = _make_player(Vector2(80.0, 0.0))
+	shooter.set_player(player)
+	shooter._set_state(Shooter.STATE_KITING)
+	shooter._is_dead = false
+	# Pre-condition: counter already accumulated some blocked ticks.
+	shooter._cornered_kite_ticks = 1
+
+	# Drive _process_kiting once. Without a real wall, is_on_wall() returns
+	# false in headless GUT — the else-branch fires, resetting the counter.
+	shooter._process_kiting(1.0 / 60.0)
+
+	assert_eq(shooter._cornered_kite_ticks, 0,
+		"Cornered-tick counter must reset on any non-blocked kite tick.")
+	# And kiting velocity is set (away from player).
+	assert_lt(shooter.velocity.x, 0.0,
+		"Unblocked kite tick still sets retreat velocity.")
+
+
+# Regression guard for ticket 86c9uehaq SHOOT_RANGE derivation. The constant
+# must equal PROJECTILE_SPEED × PROJECTILE_LIFETIME so the sweet spot matches
+# actual projectile reach. If a future tune changes projectile speed/lifetime,
+# SHOOT_RANGE auto-tracks — but if someone hard-codes SHOOT_RANGE to a literal
+# this test catches the divergence.
+func test_shoot_range_equals_projectile_reach() -> void:
+	var expected: float = Shooter.PROJECTILE_SPEED * Shooter.PROJECTILE_LIFETIME
+	assert_almost_eq(Shooter.SHOOT_RANGE, expected, 0.001,
+		"SHOOT_RANGE must equal PROJECTILE_SPEED × PROJECTILE_LIFETIME so the " +
+		"sweet spot matches actual projectile reach (ticket 86c9uehaq).")
+	# And SHOOT_RANGE must be < AIM_RANGE (sweet spot is narrower than aggro).
+	assert_lt(Shooter.SHOOT_RANGE, Shooter.AIM_RANGE,
+		"SHOOT_RANGE must be tighter than AIM_RANGE — otherwise no close-the-gap " +
+		"region exists.")
+	# And SHOOT_RANGE must be > KITE_RANGE so a non-empty sweet spot exists.
+	assert_gt(Shooter.SHOOT_RANGE, Shooter.KITE_RANGE,
+		"SHOOT_RANGE must be greater than KITE_RANGE — otherwise the sweet spot " +
+		"is empty and the shooter can never stand and fire.")
 
 
 func test_shooter_still_kites_when_player_too_close_during_aiming() -> void:

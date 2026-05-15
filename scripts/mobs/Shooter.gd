@@ -60,8 +60,8 @@ const STATE_DEAD: StringName = &"dead"
 const AGGRO_RADIUS: float = 480.0
 ## Inside this range the shooter starts kiting away from the player.
 const KITE_RANGE: float = 120.0
-## Outside this range the shooter walks toward the player to close into the
-## sweet spot (KITE_RANGE..AIM_RANGE).
+## Outer aggro band — beyond this the shooter loses interest (post-fire recovery
+## drops back to IDLE). NOT the close-the-gap threshold; see `SHOOT_RANGE`.
 const AIM_RANGE: float = 300.0
 
 ## Brief "I see you" pause before aiming — same UX rationale as Charger.
@@ -80,6 +80,33 @@ const PROJECTILE_SPEED: float = 90.0
 ## but doesn't fly across an entire room.
 const PROJECTILE_LIFETIME: float = 1.6
 const PROJECTILE_KNOCKBACK: float = 80.0
+
+## Effective firing range — the maximum distance at which a projectile can
+## actually reach the player. The "sweet spot" where the shooter stands and
+## fires is `KITE_RANGE..SHOOT_RANGE`; outside SHOOT_RANGE the shooter must
+## CLOSE THE GAP, not stand and fire un-reaching projectiles.
+##
+## Ticket 86c9uehaq (Sponsor M2 RC soak): pre-fix the shooter used AIM_RANGE
+## (300 px) as the close-the-gap threshold, so for a player at dist 150–300
+## the shooter stood still firing projectiles whose 144 px reach fell short
+## — Sponsor's "shoots from distance not able to reach the player" report.
+## Aligning the sweet spot to projectile reach fixes the "out-of-range = no
+## pursuit" failure mode.
+const SHOOT_RANGE: float = PROJECTILE_SPEED * PROJECTILE_LIFETIME  # 144 px
+
+## "Cornered" detection threshold (ticket 86c9uehaq, Sponsor M2 RC soak):
+## when kiting, if the shooter is wall-blocked (move_and_slide produced no
+## motion) AND the player is still inside KITE_RANGE, the kite is a no-op —
+## the shooter stays stuck in the corner looking idle. Two consecutive stuck
+## kite ticks promote the state to AIMING (with a shortened windup) so the
+## shooter fires in place instead of standing frozen. Two ticks (≈33 ms at
+## 60 Hz) is enough to filter transient single-tick velocity dips (e.g. just
+## after entering KITING when the prior state's velocity hadn't been zeroed
+## yet) without making the cornered fallback feel sluggish.
+const CORNERED_KITE_TICKS_TO_FIRE: int = 2
+## Shortened aim windup when promoted out of a cornered kite — fire fast so
+## the player feels the shooter is fighting back, not standing idle.
+const CORNERED_AIM_DURATION: float = 0.25
 
 ## Visual-feedback timings (per `team/uma-ux/combat-visual-feedback.md` §2 + §3).
 ## Same rule as Grunt/Charger — 80ms hit-flash, 200ms death-tween, 6 particles.
@@ -119,6 +146,12 @@ var _post_fire_recovery_left: float = 0.0
 var _is_dead: bool = false
 var _last_aim_dir: Vector2 = Vector2.RIGHT
 var _player: Node2D = null
+
+## Cornered-kite tick counter (ticket 86c9uehaq). Increments each tick where
+## KITING is wall-blocked AND player is still inside KITE_RANGE; resets on
+## any non-blocked kite tick or on state exit. Promotes to AIMING when it
+## reaches CORNERED_KITE_TICKS_TO_FIRE.
+var _cornered_kite_ticks: int = 0
 
 # Throttle accumulator for the HTML5-only `Shooter.pos` harness-observability
 # trace (see `_physics_process`). The Shooter KITES — it walks away from the
@@ -288,31 +321,34 @@ func _process_spotted(_delta: float) -> void:
 
 
 func _process_aiming(_delta: float) -> void:
-	# Hold position while aiming — UNLESS the player is further than AIM_RANGE,
-	# in which case the shooter walks toward the player to close the gap (Bug 3
-	# fix, ticket 86c9q7xha). Without this close-the-gap path, the Shooter
-	# corner-camps: after POST_FIRE_RECOVERY _pick_post_recovery_state() re-enters
-	# AIMING when dist > KITE_RANGE, but the AIMING handler held zero velocity,
-	# so a player past AIM_RANGE (300 px) was outside projectile max-range
-	# (90 px/s × 1.6 s = 144 px) and could stand idle while the Shooter
-	# fired harmlessly. The fix: walk toward the player at move_speed when
-	# dist > AIM_RANGE; hold position in the sweet-spot (KITE_RANGE..AIM_RANGE).
-	# The kite-interrupt check still wins if the player closes in below KITE_RANGE.
+	# Hold position while aiming — UNLESS the player is further than SHOOT_RANGE
+	# (effective projectile reach, NOT the wider AIM_RANGE aggro band). Without
+	# this close-the-gap path, the Shooter corner-camps: after POST_FIRE_RECOVERY
+	# _pick_post_recovery_state() re-enters AIMING when dist > KITE_RANGE, but
+	# pre-86c9uehaq the AIMING handler used AIM_RANGE (300 px) as the close-the-
+	# gap threshold, leaving the shooter stationary at dist 150–300 firing
+	# projectiles whose 144 px reach fell short — Sponsor's "shoots from distance
+	# not able to reach the player" report. The fix: walk toward the player when
+	# dist > SHOOT_RANGE; hold position only inside the actually-reachable sweet
+	# spot (KITE_RANGE..SHOOT_RANGE). The kite-interrupt check still wins if the
+	# player closes in below KITE_RANGE.
 	if _player != null:
 		var dist: float = (_player.global_position - global_position).length()
 		if dist < KITE_RANGE:
 			_enter_kite()
 			return
 		_last_aim_dir = _vec_to_player_dir()
-		if dist > AIM_RANGE:
-			# Outside sweet-spot — close the gap while still tracking aim direction.
-			# Walk at base move_speed toward the player. The aim timer still ticks
-			# (see _tick_timers) so the shot eventually fires even while walking;
-			# if we reach AIM_RANGE before the timer expires, velocity drops to
-			# ZERO on the next tick and the remaining windup completes standing still.
+		if dist > SHOOT_RANGE:
+			# Outside effective firing range — close the gap while still tracking
+			# aim direction. Walk at base move_speed toward the player. The aim
+			# timer still ticks (see _tick_timers) so the shot fires when the
+			# timer expires even while walking; if we reach SHOOT_RANGE before
+			# the timer expires, velocity drops to ZERO on the next tick and
+			# the remaining windup completes standing still — and now the
+			# projectile actually has a chance to reach the player.
 			velocity = _vec_to_player_dir() * move_speed
 			_combat_trace("Shooter._process_aiming",
-				"dist=%.0f > AIM_RANGE=%.0f, velocity=(%.0f,%.0f)" % [dist, AIM_RANGE, velocity.x, velocity.y])
+				"dist=%.0f > SHOOT_RANGE=%.0f, velocity=(%.0f,%.0f)" % [dist, SHOOT_RANGE, velocity.x, velocity.y])
 		else:
 			velocity = Vector2.ZERO
 	else:
@@ -332,23 +368,24 @@ func _process_firing(_delta: float) -> void:
 
 
 func _process_post_fire(_delta: float) -> void:
-	# P0 #2 fix (ticket 86c9q7p4j): during POST_FIRE_RECOVERY, continue walking
-	# toward the player if dist > AIM_RANGE. Previously velocity=ZERO here, so
-	# the Shooter only closed the gap during the 0.55s AIMING window (gaining
-	# ~33px/cycle at 60px/s). With a 0.65s recovery window also zeroed, the
-	# effective close-the-gap speed was only ~27px/s averaged over the full
-	# aim+recovery cycle, meaning a player standing idle at 384px (Room 4 initial
-	# distance) was never reliably reached before the Sponsor stopped waiting.
-	# Fix: mirror the AIMING close-the-gap logic here. The Shooter walks toward
-	# the player at full move_speed during recovery when out of the sweet spot,
-	# exactly as it does while aiming. Kite interrupts still apply from AIMING.
+	# Ticket 86c9q7p4j + 86c9uehaq: during POST_FIRE_RECOVERY, continue walking
+	# toward the player when dist > SHOOT_RANGE (effective projectile reach).
+	# Previously velocity=ZERO here, so the Shooter only closed the gap during
+	# the 0.55s AIMING window (gaining ~33px/cycle at 60px/s). With a 0.65s
+	# recovery window also zeroed, the effective close-the-gap speed was only
+	# ~27px/s averaged over the full aim+recovery cycle, meaning a player
+	# standing idle at 384px (Room 4 initial distance) was never reliably
+	# reached. Mirrors _process_aiming's close-the-gap threshold (SHOOT_RANGE
+	# = projectile reach, not the wider AIM_RANGE aggro band) so the shooter
+	# pursues until projectiles can actually reach. Kite interrupts apply
+	# from AIMING (not here).
 	if _player != null:
 		var dist: float = (_player.global_position - global_position).length()
-		if dist > AIM_RANGE:
-			# Still out of sweet spot — keep closing the gap during recovery.
+		if dist > SHOOT_RANGE:
+			# Still out of effective firing range — keep closing during recovery.
 			velocity = _vec_to_player_dir() * move_speed
 			_combat_trace("Shooter._process_post_fire",
-				"dist=%.0f > AIM_RANGE=%.0f, closing gap at move_speed=%.0f" % [dist, AIM_RANGE, move_speed])
+				"dist=%.0f > SHOOT_RANGE=%.0f, closing gap at move_speed=%.0f" % [dist, SHOOT_RANGE, move_speed])
 		else:
 			velocity = Vector2.ZERO
 	else:
@@ -358,10 +395,14 @@ func _process_post_fire(_delta: float) -> void:
 
 
 func _process_kiting(_delta: float) -> void:
-	# Walk away from the player at base move speed. Once we're back inside
-	# AIM_RANGE band, re-enter aiming.
+	# Walk away from the player at base move speed. Once distance is restored
+	# above KITE_RANGE, re-enter aiming. If wall-blocked while the player is
+	# still close (cornered case — ticket 86c9uehaq, Sponsor M2 RC soak), fall
+	# back to AIMING with a shortened windup so the shooter fires in place
+	# instead of standing frozen in the corner ("cornered = idle").
 	if _player == null:
 		velocity = Vector2.ZERO
+		_cornered_kite_ticks = 0
 		_set_state(STATE_IDLE)
 		return
 	var to_player: Vector2 = _player.global_position - global_position
@@ -369,6 +410,7 @@ func _process_kiting(_delta: float) -> void:
 	# Exit kite when we've recovered comfortable distance — choose a value
 	# slightly above KITE_RANGE so we don't oscillate on the boundary.
 	if dist > KITE_RANGE + 16.0:
+		_cornered_kite_ticks = 0
 		_aim_left = AIM_DURATION
 		_last_aim_dir = _vec_to_player_dir()
 		_set_state(STATE_AIMING)
@@ -378,9 +420,45 @@ func _process_kiting(_delta: float) -> void:
 		return
 	if dist < 0.0001:
 		velocity = Vector2.ZERO
+		_cornered_kite_ticks = 0
 		return
+	# Cornered detection (ticket 86c9uehaq): wall-blocked kiting + close player =
+	# stuck. Promote to AIMING with a fast windup after CORNERED_KITE_TICKS_TO_FIRE
+	# consecutive blocked ticks. is_on_wall() reads the wall-touch flag set by
+	# the prior move_and_slide call, so it reflects "was blocked last tick" —
+	# combined with "still inside kite range" this catches the corner-camped
+	# stuck state without false-positives on momentary single-tick wall grazes.
+	if is_on_wall():
+		_cornered_kite_ticks += 1
+		if _cornered_kite_ticks >= CORNERED_KITE_TICKS_TO_FIRE:
+			_promote_cornered_to_aiming(dist)
+			return
+	else:
+		_cornered_kite_ticks = 0
 	# Walk away (negate the direction toward player).
 	velocity = (-to_player.normalized()) * move_speed
+
+
+## Cornered fallback (ticket 86c9uehaq): the shooter has been wall-blocked
+## while kiting for CORNERED_KITE_TICKS_TO_FIRE consecutive ticks with the
+## player still inside KITE_RANGE — promote to AIMING with a fast windup so
+## the shooter fires in place instead of standing frozen. Extracted as a
+## helper so unit tests can drive the promotion path directly (headless GUT
+## cannot simulate a CharacterBody2D wall collision without a populated
+## physics world). The wall-detection + counter logic lives in
+## `_process_kiting`; this helper only owns the state-transition payload.
+func _promote_cornered_to_aiming(dist: float) -> void:
+	_cornered_kite_ticks = 0
+	_aim_left = CORNERED_AIM_DURATION
+	_last_aim_dir = _vec_to_player_dir()
+	_combat_trace("Shooter._promote_cornered_to_aiming",
+		"CORNERED dist=%.0f wall-blocked, promote to AIMING (windup=%.2fs)" % [dist, CORNERED_AIM_DURATION])
+	_set_state(STATE_AIMING)
+	aim_started.emit(_last_aim_dir)
+	_play_attack_telegraph()
+	# Zero velocity so the aim windup is a clean stand-and-fire (the shooter
+	# is wall-blocked anyway; this keeps move_and_slide a no-op).
+	velocity = Vector2.ZERO
 
 
 # ---- Decision helpers ------------------------------------------------
@@ -424,6 +502,7 @@ func _pick_post_recovery_state() -> void:
 func _enter_kite() -> void:
 	# Cancel any pending aim — kiting interrupts.
 	_aim_left = 0.0
+	_cornered_kite_ticks = 0
 	_set_state(STATE_KITING)
 	# Apply kite velocity immediately on the transition tick. Otherwise the
 	# match block has already run the prior state's branch (e.g. AIMING) and
@@ -488,6 +567,7 @@ func _die() -> void:
 	_aim_left = 0.0
 	_post_fire_recovery_left = 0.0
 	_spotted_hold_left = 0.0
+	_cornered_kite_ticks = 0
 	velocity = Vector2.ZERO
 	_cancel_attack_telegraph_tween()
 	_set_state(STATE_DEAD)

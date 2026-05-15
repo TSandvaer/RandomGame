@@ -109,8 +109,11 @@ func test_full_state_path_in_sweet_spot() -> void:
 	var p: FakePlayer = FakePlayer.new()
 	add_child_autofree(p)
 	s.global_position = Vector2.ZERO
-	# Sweet spot — KITE_RANGE (120) < dist < AIM_RANGE (300).
-	p.global_position = Vector2(200.0, 0.0)
+	# Sweet spot post-86c9uehaq — KITE_RANGE (120) < dist < SHOOT_RANGE (144).
+	# Pre-fix this used dist=200 inside the old AIM_RANGE-bound sweet spot;
+	# post-fix that's outside SHOOT_RANGE so the shooter would walk toward
+	# the player instead of holding-and-firing. Use 130 (mid-sweet-spot).
+	p.global_position = Vector2(130.0, 0.0)
 	s.set_player(p)
 
 	# Idle -> Spotted.

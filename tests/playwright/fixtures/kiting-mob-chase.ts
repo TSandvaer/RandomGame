@@ -10,15 +10,24 @@
  * the **Shooter**.
  *
  * The Shooter is a ranged kiter (`scripts/mobs/Shooter.gd`, `ai_behavior_tag
- * = &"ranged_kiter"`). Its distance bands:
+ * = &"ranged_kiter"`). Its distance bands (post-86c9uehaq AI engagement fix):
  *
  *   - `dist < KITE_RANGE` (120 px) → `STATE_KITING`: the Shooter walks
  *     *directly away from the player's current position* at `move_speed`
- *     (60 px/s) until distance is restored above `KITE_RANGE + 16`.
- *   - `KITE_RANGE .. AIM_RANGE` (120..300 px) → the "sweet spot": the
- *     Shooter STANDS STILL and shoots — it does NOT close the gap.
- *   - `dist > AIM_RANGE` (300 px) → the Shooter walks *toward* the player
- *     to re-enter the sweet spot.
+ *     (60 px/s) until distance is restored above `KITE_RANGE + 16`. If
+ *     wall-blocked while the player is still inside KITE_RANGE for 2+
+ *     consecutive ticks, the Shooter is "cornered" and promotes to AIMING
+ *     with a fast windup (CORNERED_AIM_DURATION) — fires in place rather
+ *     than freezing.
+ *   - `KITE_RANGE .. SHOOT_RANGE` (120..144 px) → the "sweet spot": the
+ *     Shooter STANDS STILL and shoots — projectiles (90 px/s × 1.6 s reach
+ *     = 144 px) can actually reach the player in this band.
+ *   - `dist > SHOOT_RANGE` (144 px) → the Shooter walks *toward* the player
+ *     at `move_speed` during both AIMING and POST_FIRE_RECOVERY until it
+ *     re-enters the sweet spot. Pre-86c9uehaq the threshold was the wider
+ *     AIM_RANGE (300 px), so the Shooter stood still at dist 144–300
+ *     firing un-reaching projectiles — Sponsor's "shoots from distance not
+ *     able to reach the player" report.
  *
  * Room 04 is the only pure-Shooter room. Its single Shooter spawns at tile
  * (12, 3) = world (384, 96) — ~178 px from player spawn (240, 200), inside
