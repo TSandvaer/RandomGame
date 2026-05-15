@@ -241,3 +241,55 @@ func test_total_mob_count_in_reasonable_bounds() -> void:
 		total += c.mob_spawns.size()
 	assert_gte(total, 4, "S2 W3 R02-R03 mob count >= 4 floor")
 	assert_lte(total, 12, "S2 W3 R02-R03 mob count <= 12 ceiling")
+
+
+# ---- 8. Re-entry cleanliness (edge probe) -------------------------
+
+func test_room_reentered_after_free_reregisters_cleanly() -> void:
+	# Edge probe (per testing bar): a room re-entered after being cleared.
+	# Production frees the old room node and instantiates a fresh one on
+	# re-entry (Main._load_room_at_index queue_frees the prior room). The
+	# fresh instance must run its own deferred fixture pass and register
+	# its own mob roster from scratch — no stale state. Mirrors
+	# test_stratum1_rooms.gd::test_room_reentered_after_free_reregisters_cleanly.
+	var first: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s2_room02"])
+	var expected: int = int(EXPECTED_MOB_COUNTS[&"s2_room02"])
+	assert_eq(first.get_room_gate().mobs_alive(), expected,
+		"first Room02 instance registered %d mobs" % expected)
+	first.queue_free()
+	await get_tree().process_frame
+
+	var second: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s2_room02"])
+	var gate2: RoomGate = second.get_room_gate()
+	assert_not_null(gate2, "re-entered Room02 spawns its own fresh RoomGate")
+	assert_eq(gate2.mobs_alive(), expected,
+		"re-entered Room02 instance registered its own %d mobs cleanly (no stale state)" % expected)
+
+
+func test_room03_mixed_roster_gate_registers_all_archetypes() -> void:
+	# Edge probe: Room03's roster is a MIXED-archetype set (grunt + charger
+	# + shooter). All three archetypes emit `mob_died` and must be tracked
+	# by the gate equally — a type-specific registration bug would surface
+	# as a short count here. Mirrors
+	# test_stratum1_rooms.gd::test_room08_gate_registers_mixed_mob_types.
+	var room: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s2_room03"])
+	var gate: RoomGate = room.get_room_gate()
+	assert_not_null(gate, "Room03 spawns a RoomGate")
+
+	var mobs: Array[Node] = room.get_spawned_mobs()
+	assert_eq(mobs.size(), 3, "Room03 spawned its 3 mixed mobs")
+	var grunt_count: int = 0
+	var charger_count: int = 0
+	var shooter_count: int = 0
+	for m: Node in mobs:
+		if m is Grunt:
+			grunt_count += 1
+		elif m is Charger:
+			charger_count += 1
+		elif m is Shooter:
+			shooter_count += 1
+	assert_eq(grunt_count, 1, "Room03 roster includes 1 Stoker")
+	assert_eq(charger_count, 1, "Room03 roster includes 1 Charger")
+	assert_eq(shooter_count, 1, "Room03 roster includes 1 Shooter")
+	assert_eq(gate.mobs_alive(), 3,
+		"RoomGate tracked all 3 mixed-archetype mobs (grunt + charger + shooter)")
