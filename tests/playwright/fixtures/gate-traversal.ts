@@ -509,6 +509,17 @@ export async function gateTraversalWalk(
       /\[combat-trace\] RoomGate\.gate_traversed/.test(l.text)
     );
 
+    // Diagnostic: dump every RoomGate.* trace in the scan slice so future
+    // failures can correlate the gate state-machine transitions empirically
+    // against the chosen resolution case (ticket 86c9ugfzv N=3 sweep).
+    const gateTraceLines = combatPhaseSlice
+      .filter((l) => /\[combat-trace\] RoomGate\./.test(l.text))
+      .map((l, idx) => `    [${idx}] ${l.text}`)
+      .join("\n");
+    console.log(
+      `[gate-traversal] ${roomLabel}: scan-slice RoomGate.* traces:\n${gateTraceLines || "    (none)"}`
+    );
+
     if (combatPhaseTraversed) {
       // ---- Case A: already-traversed ----
       // The chase / knockback path drove the player through the trigger
@@ -539,16 +550,9 @@ export async function gateTraversalWalk(
       // would throw against this state. Instead, steer EAST-of-trigger
       // then walk pure-west across to fire body_entered → gate_traversed.
       //
-      // Diagnostic: log the count of gate transitions in the scan slice
-      // so future failures can correlate state-machine activity against
-      // the chosen resolution case.
-      const gateTraceCount = combatPhaseSlice.filter((l) =>
-        /\[combat-trace\] RoomGate\./.test(l.text)
-      ).length;
       console.log(
         `[gate-traversal] ${roomLabel}: case B — gate_unlocked fired ` +
           `before helper entry but gate_traversed did NOT. ` +
-          `${gateTraceCount} RoomGate.* trace(s) in scan slice. ` +
           `Steering EAST-of-trigger then walking WEST in to finish traversal.`
       );
       const traversed = await finishTraversalFromUnlocked(
@@ -838,11 +842,49 @@ const FINISH_STAGE_WEST_WALK_MS = 1_500;
  */
 const FINISH_STAGE_SETTLE_MS = 300;
 
+/**
+ * Wait for a NEW line matching `pattern` to appear in the capture buffer
+ * AFTER `baselineIndex`. Distinct from `ConsoleCapture.waitForLine` which
+ * scans the FULL buffer and would return immediately on a stale match.
+ *
+ * **Why this is load-bearing in case B (ticket 86c9ugfzv):** the previous
+ * room's `gate_traversed` line stays in the buffer permanently. Plain
+ * `waitForLine(/gate_traversed/)` would match the stale Room N-1 line
+ * and falsely report case-B traversal success even when the helper's
+ * west-walk didn't actually fire body_entered on THIS room's gate.
+ */
+async function waitForNewLine(
+  capture: ConsoleCapture,
+  pattern: RegExp,
+  baselineIndex: number,
+  timeoutMs: number
+): Promise<string | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const lines = capture.getLines();
+    for (let i = baselineIndex; i < lines.length; i++) {
+      if (pattern.test(lines[i].text)) {
+        return lines[i].text;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return null;
+}
+
 async function finishTraversalFromUnlocked(
   page: Page,
   capture: ConsoleCapture,
   roomLabel: string
 ): Promise<boolean> {
+  // Snapshot the buffer position BEFORE the walk so we can distinguish a
+  // fresh gate_traversed (from this room's gate) from stale traces (from
+  // the previous room's gate, which persist in the buffer for the rest
+  // of the spec's lifetime). See `waitForNewLine` for the reason this
+  // matters — `capture.waitForLine` looks at the full buffer and would
+  // match a stale line immediately.
+  const preWalkIndex = capture.getLines().length;
+
   // Step 1: clear the player OUT of the trigger to the east. Generous
   // overshoot is fine — the room east wall pins the player at X≈304.
   console.log(
@@ -867,31 +909,35 @@ async function finishTraversalFromUnlocked(
   await page.waitForTimeout(FINISH_STAGE_WEST_WALK_MS);
   await page.keyboard.up("a");
 
-  // Wait for gate_traversed trace. Typical observed latency: 50-200ms
-  // after the walk completes.
-  try {
-    await capture.waitForLine(
-      /\[combat-trace\] RoomGate\.gate_traversed/,
-      5_000
-    );
+  // Wait for a NEW gate_traversed trace (not the stale one from the
+  // previous room's gate). Typical observed latency: 50-200ms after
+  // the walk completes.
+  const newTraversal = await waitForNewLine(
+    capture,
+    /\[combat-trace\] RoomGate\.gate_traversed/,
+    preWalkIndex,
+    5_000
+  );
+
+  if (newTraversal !== null) {
     console.log(
-      `[gate-traversal] ${roomLabel}: case B complete — gate_traversed observed.`
+      `[gate-traversal] ${roomLabel}: case B complete — NEW gate_traversed observed.`
     );
     return true;
-  } catch {
-    const recent = capture
-      .getLines()
-      .slice(-30)
-      .map((l) => `  ${l.text}`)
-      .join("\n");
-    console.warn(
-      `[gate-traversal] ${roomLabel}: case B finish-traversal did NOT produce ` +
-        `a gate_traversed trace within 5s. The east-walk-then-west pattern ` +
-        `should reliably cross the trigger. Possible causes: wall geometry ` +
-        `regressed, gate state machine regressed, or the player was already ` +
-        `past the trigger west edge before the west-walk began.\n\n` +
-        `Last 30 trace lines:\n${recent}`
-    );
-    return false;
   }
+
+  const recent = capture
+    .getLines()
+    .slice(-30)
+    .map((l) => `  ${l.text}`)
+    .join("\n");
+  console.warn(
+    `[gate-traversal] ${roomLabel}: case B finish-traversal did NOT produce ` +
+      `a NEW gate_traversed trace within 5s (baseline index ${preWalkIndex}). ` +
+      `The east-walk-then-west pattern should reliably cross the trigger. ` +
+      `Possible causes: wall geometry regressed, gate state machine regressed, ` +
+      `or the player was already past the trigger west edge before the ` +
+      `west-walk began.\n\nLast 30 trace lines:\n${recent}`
+  );
+  return false;
 }
