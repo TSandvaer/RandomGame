@@ -53,12 +53,27 @@ func set_parent_for_pickups(n: Node) -> void:
 func on_mob_died(_mob: Node, death_pos: Vector2, mob_def: MobDef) -> Array[Node]:
 	var spawned: Array[Node] = []
 	if mob_def == null or mob_def.loot_table == null:
+		_emit_trace("on_mob_died",
+			"SKIPPED no_loot mob_def=%s loot_table=%s" % [
+				str(mob_def), str(null if mob_def == null else mob_def.loot_table)])
 		return spawned
 	var rolls: Array[ItemInstance] = roller.roll(mob_def.loot_table)
 	if rolls.is_empty():
+		_emit_trace("on_mob_died",
+			"SKIPPED empty_roll mob_def_id=%s" % str(mob_def.id))
 		return spawned
 	# Spread pickups in a small ring so they don't all stack on one pixel.
 	var angle_step: float = TAU / max(1, rolls.size())
+	# Diagnostic trace (ticket `86c9uemdg`): emit before spawning so Sponsor's
+	# HTML5 soak captures (mob_id, roll_count, parent) at the entry point —
+	# the dual-spawn bug (boss-room had its own loot spawner producing the
+	# same drops Main was already spawning) showed up as TWO `on_mob_died`
+	# lines per boss death. Future regressions in that family will surface the
+	# same way: two lines for the same mob_id within the same frame.
+	var parent_name: String = "<null>" if parent_for_pickups == null else str(parent_for_pickups)
+	_emit_trace("on_mob_died",
+		"SPAWNING mob_id=%s rolls=%d parent=%s pos=(%.0f,%.0f)" % [
+			str(mob_def.id), rolls.size(), parent_name, death_pos.x, death_pos.y])
 	for i in rolls.size():
 		var item: ItemInstance = rolls[i]
 		var offset: Vector2 = Vector2.RIGHT.rotated(angle_step * float(i)) * 12.0
@@ -72,3 +87,21 @@ func on_mob_died(_mob: Node, death_pos: Vector2, mob_def: MobDef) -> Array[Node]
 			parent_for_pickups.call_deferred("add_child", pickup)
 		spawned.append(pickup)
 	return spawned
+
+
+## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
+## MobLootSpawner is a RefCounted so we need a SceneTree handle to reach the
+## autoload — pull it from `parent_for_pickups` if available, else fall back
+## to `Engine.get_main_loop()`. Same no-op-on-desktop semantics as other
+## combat-trace shims (only fires when `OS.has_feature("web")`).
+func _emit_trace(tag: String, msg: String) -> void:
+	var loop: SceneTree = null
+	if parent_for_pickups != null and parent_for_pickups.is_inside_tree():
+		loop = parent_for_pickups.get_tree()
+	else:
+		loop = Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return
+	var df: Node = loop.root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace("MobLootSpawner." + tag, msg)

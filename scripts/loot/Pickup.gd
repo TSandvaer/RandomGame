@@ -78,6 +78,17 @@ func _ready() -> void:
 	#      computed overlaps for the just-added Area2D — the check has to wait
 	#      one physics step.
 	call_deferred("_activate_and_check_initial_overlap")
+	# Diagnostic trace (ticket `86c9uemdg`): emit at spawn so Sponsor's HTML5
+	# soak captures the pickup-chain entry point. The item id + position lets
+	# the trace stream pair Pickup events with the boss-loot drop. HTML5-only
+	# via the existing combat-trace shim (no-op on desktop / headless GUT).
+	var item_id: String = "<null>"
+	if item != null and item.def != null:
+		item_id = String(item.def.id)
+	_combat_trace("Pickup._ready", "item=%s pos=(%.0f,%.0f) layer=%d mask=%d" % [
+		item_id, global_position.x, global_position.y,
+		collision_layer, collision_mask,
+	])
 
 
 ## Re-enable monitoring (the encapsulated-monitoring pattern's `_ready`-side
@@ -93,6 +104,18 @@ func _activate_and_check_initial_overlap() -> void:
 	# `get_overlapping_bodies` returns anything.
 	monitoring = true
 	monitorable = true
+	# Diagnostic trace (ticket `86c9uemdg`): emit when monitoring activates so
+	# Sponsor's HTML5 soak can confirm the Pickup transitioned into a state
+	# where `body_entered` can fire. Distinguishes "pickup never spawned" (no
+	# `Pickup._ready` trace) from "pickup spawned but never armed" (no
+	# `Pickup._activate_and_check_initial_overlap` trace).
+	var initial_overlaps: int = 0
+	if item != null:
+		for b in get_overlapping_bodies():
+			if b != null and b.is_in_group("player"):
+				initial_overlaps += 1
+	_combat_trace("Pickup._activate_and_check_initial_overlap",
+		"monitoring=true initial_overlap_player_count=%d" % initial_overlaps)
 	if item == null:
 		return
 	for body in get_overlapping_bodies():
@@ -108,6 +131,22 @@ func configure(p_item: ItemInstance) -> void:
 
 
 func _on_body_entered(body: Node) -> void:
+	# Diagnostic trace (ticket `86c9uemdg`): emit at the top of the handler,
+	# BEFORE any early-return guards, so Sponsor's HTML5 soak captures "body
+	# overlap fired" datapoints even when the handler short-circuits. The
+	# `collected`, `is_player`, and `item` fields disambiguate the early-return
+	# branches: `collected=true` means the latch tripped (double-fire defense
+	# worked), `is_player=false` means a non-player body somehow reached us
+	# (collision_mask is supposed to filter to bit 2 = player only), `item=<null>`
+	# means the Pickup was misconfigured.
+	var item_id: String = "<null>"
+	if item != null and item.def != null:
+		item_id = String(item.def.id)
+	_combat_trace("Pickup._on_body_entered",
+		"body=%s is_player=%s collected=%s item=%s listener_count=%d" % [
+			str(body), str(body != null and body.is_in_group("player")),
+			str(_collected), item_id, picked_up.get_connections().size(),
+		])
 	if _collected:
 		# Already collected this frame (initial-overlap pass + a body_entered
 		# event, or two overlapping bodies) — do not double-emit.
@@ -153,3 +192,15 @@ func _clear_collected_latch_if_alive() -> void:
 	if is_queued_for_deletion() or not is_inside_tree():
 		return
 	_collected = false
+
+
+## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
+## Same pattern as RoomGate._combat_trace and the mob `_combat_trace` helpers.
+## Added in ticket `86c9uemdg` to instrument the pickup chain for Sponsor's
+## HTML5 soak diagnosis (boss-room-loot-uncollectable investigation).
+func _combat_trace(tag: String, msg: String = "") -> void:
+	var df: Node = null
+	if is_inside_tree():
+		df = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(tag, msg)

@@ -108,18 +108,28 @@ func _ready() -> void:
 ## Add an item to the first empty inventory slot. Returns true on success;
 ## false if `item` is null or the inventory is full. Capacity overflow
 ## emits `add_rejected(item, REASON_FULL)`.
+##
+## **Combat-trace (ticket `86c9uemdg`):** emits a single `[combat-trace]
+## Inventory.add` line per call summarising the outcome (added | rejected_null
+## | rejected_full) and the post-add inventory size. HTML5-only via the
+## DebugFlags shim; Sponsor's soak captures every Pickup→Inventory hop so a
+## broken auto-collect chain (Sponsor M2 RC: "boss room 8 cannot loot dropped
+## items") is observable in the console without instrumenting every call site.
 func add(item: ItemInstance) -> bool:
 	if item == null:
 		add_rejected.emit(null, REASON_NULL)
 		push_warning("[Inventory] add: null item rejected")
+		_emit_add_trace(null, "rejected_null", _items.size())
 		return false
 	if _items.size() >= CAPACITY:
 		add_rejected.emit(item, REASON_FULL)
 		push_warning("[Inventory] add: capacity %d reached, item rejected" % CAPACITY)
+		_emit_add_trace(item, "rejected_full", _items.size())
 		return false
 	_items.append(item)
 	item_added.emit(item)
 	inventory_changed.emit(_items.duplicate())
+	_emit_add_trace(item, "added", _items.size())
 	return true
 
 
@@ -532,6 +542,31 @@ func _find_player() -> Node:
 ##
 ## Mirror format with Player.try_attack's "POST damage=N" line: same
 ## `<tag> | <key>=<val>` style for grep parity.
+## Emit an `Inventory.add` combat-trace line. HTML5-only via the DebugFlags
+## shim (no-op on desktop / headless GUT). Format mirrors `Inventory.equip`:
+##   [combat-trace] Inventory.add | item=<id> outcome=<added|rejected_null|rejected_full> size=<N>
+##
+## Added in ticket `86c9uemdg` to instrument the Pickup→Inventory.add hop for
+## Sponsor's soak diagnostic — the boss-room loot bug surfaced when this
+## handshake silently rejected items (full grid) OR was never wired (the
+## Stratum1BossRoom dual-spawn produced un-listened-to Pickups). Combined with
+## the `Pickup._on_body_entered | listener_count=N` trace, Sponsor can tell
+## "Pickup fired but nobody listened" (listener_count=0) from "Pickup fired and
+## was rejected" (listener_count>=1 + this line carrying rejected_*).
+func _emit_add_trace(item: ItemInstance, outcome: String, post_size: int) -> void:
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return
+	var df: Node = loop.root.get_node_or_null("DebugFlags")
+	if df == null or not df.has_method("combat_trace"):
+		return
+	var item_id: String = "<null>"
+	if item != null and item.def != null:
+		item_id = String(item.def.id)
+	df.combat_trace("Inventory.add",
+		"item=%s outcome=%s size=%d" % [item_id, outcome, post_size])
+
+
 func _emit_equip_trace(item: ItemInstance, slot: StringName, source: StringName) -> void:
 	var loop: SceneTree = Engine.get_main_loop() as SceneTree
 	if loop == null:

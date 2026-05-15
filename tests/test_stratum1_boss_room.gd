@@ -204,9 +204,23 @@ func test_boss_death_unlocks_stratum_exit() -> void:
 	assert_true(room.is_stratum_exit_unlocked())
 
 
-func test_boss_death_drops_loot_into_room() -> void:
-	# When the boss dies in the room, loot pickups are children of the room
-	# (via MobLootSpawner.set_parent_for_pickups(self)).
+## REGRESSION-86c9uemdg — boss-room single-loot-pipeline rule.
+##
+## **Pre-fix:** Stratum1BossRoom owned its own `MobLootSpawner` and called
+## `on_mob_died(boss, ...)` from `_on_boss_died`. Main also subscribed to
+## `boss_died` via `_wire_mob` and called its OWN spawner — producing TWO
+## independent roll() sets per boss death. Main's set was wired via
+## `Inventory.auto_collect_pickups` (player walking over them adds to
+## inventory); BossRoom's set had no listener on `picked_up` so the player
+## walking over them produced no effect — Sponsor reported "boss room 8
+## cannot loot dropped items" (M2 RC soak build 5bef197).
+##
+## **Post-fix:** Stratum1BossRoom no longer owns a `_loot_spawner`. Main is
+## the single source of boss loot. This test pins the new contract — running
+## the room standalone produces ZERO Pickup children (no loot drop happens
+## without Main's wiring). The Main-driven boss-loot path is covered by
+## `tests/integration/test_boss_loot_integration.gd`.
+func test_standalone_boss_death_drops_NO_loot_from_room_self() -> void:
 	var room: Stratum1BossRoom = _make_room()
 	var boss: Stratum1Boss = room.get_boss()
 	room.trigger_entry_sequence()
@@ -219,14 +233,14 @@ func test_boss_death_drops_loot_into_room() -> void:
 	boss.take_damage(198, Vector2.ZERO, null)
 	assert_true(boss.is_dead())
 	# Pickup add_child is deferred (physics-flush safety per `_die` P0
-	# fix run-002). Await one frame for the deferred call to land.
+	# fix run-002). Await one frame for any deferred call to land.
 	await get_tree().process_frame
-	# At least one Pickup child under the room.
 	var pickup_count: int = 0
 	for c: Node in room.get_children():
 		if c is Pickup:
 			pickup_count += 1
-	assert_gt(pickup_count, 0, "boss death drops at least one Pickup into the room")
+	assert_eq(pickup_count, 0,
+		"REGRESSION-86c9uemdg: boss room does NOT spawn its own loot — Main owns the boss-loot pipeline")
 
 
 # ---- Bounds + content sanity ----------------------------------------

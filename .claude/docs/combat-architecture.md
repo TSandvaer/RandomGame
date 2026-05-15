@@ -50,6 +50,42 @@ When a mob's HP reaches 0, the synchronous chain is:
 
 `MobLootSpawner.on_mob_died` calls `parent_for_pickups.call_deferred("add_child", pickup)` (PR #142 fix) — Pickup root is an Area2D, and adding it during physics flush triggers the same `USER ERROR: Can't change this state while flushing queries` panic. The `_spawn_death_particles` adds in each of 4 mob types also use `room.call_deferred("add_child", burst)` defensively.
 
+### Single MobLootSpawner per mob death — load-bearing rule (ticket `86c9uemdg`)
+
+**Exactly ONE `MobLootSpawner` instance must process each mob_died/boss_died event.** Multiple spawners running in parallel each roll the loot table independently AND each produce their own set of `Pickup` Area2Ds — the resulting Pickup sets are spatially identical (same `death_pos + ring_offset(i)` arithmetic, with independent RNG only inside the roll) but **scenically distinct** Area2Ds. Critically, **only the spawner whose Array[Node] return value is fed into `Inventory.auto_collect_pickups` produces collectable pickups** — every other spawner's set has zero `picked_up` listeners and the player walking over them does nothing.
+
+**The Stratum1BossRoom dual-spawn bug (Sponsor M2 RC, build `5bef197`).** Pre-fix, `Stratum1BossRoom._on_boss_died` owned its own `MobLootSpawner` and called `on_mob_died(boss, ...)` directly, discarding the return value. `Main._wire_mob` ALSO connected the boss's `boss_died` to `Main._on_mob_died`, which calls Main's `_loot_spawner.on_mob_died(...)` AND `Inventory.auto_collect_pickups(pickups)` on its return value. So **two pickup sets spawned per boss death** — Main's set was collectable; the BossRoom's set was a phantom litter of un-listened-to Area2Ds. Sponsor's user-visible report was "boss room 8 cannot loot dropped items" — half their attempts hit phantom pickups and produced no inventory delta. Headless GUT had a `test_boss_death_drops_loot_into_room` asserting `pickup_count > 0` — green. Headless tests had no integration coverage asserting `picked_up.get_connections().size() > 0` per pickup OR `pickup_count == loot_table.entries.size()` (the dual-spawn produced exactly 2x, but `> 0` is satisfied by 2x too). **Fix:** delete the BossRoom's `_loot_spawner` entirely; Main is the single boss-loot pipeline.
+
+**Pattern check for any future loot-drop site.** Whenever a room script, mob script, or controller subscribes its OWN listener to `mob_died` / `boss_died` for loot purposes, audit whether `Main._wire_mob` already wires that signal. The current production audit:
+
+- `Grunt.mob_died` / `Charger.mob_died` / `Shooter.mob_died` / `Stratum1Boss.boss_died` → wired by `Main._wire_mob` → `Main._on_mob_died` → Main's `_loot_spawner.on_mob_died` + `Inventory.auto_collect_pickups`. **All standard mob loot flows through this path.**
+- `PracticeDummy.mob_died` → emits `mob_def == null`, so Main's `_on_mob_died` short-circuits (no loot rolled). `PracticeDummy._spawn_iron_sword_pickup` is a CUSTOM spawn path that wires `Pickup.picked_up` directly to `Inventory.on_pickup_collected`. **Bypasses MobLootSpawner entirely; collectability is intentional and load-bearing for the Stage-2b onboarding gate.**
+- `Stratum1BossRoom` → post-fix: NO loot spawn. Boss loot rides on Main's `boss_died` subscription. The BossRoom only owns the StratumExit activation flip.
+
+**Pickup-collectability test bar** (integration class, complement to the single-spawn rule above). Headless GUT must assert at least one of these per loot-spawn surface:
+
+1. `pickup.picked_up.get_connections().size() > 0` after spawn — proves a listener is wired.
+2. `pickup.is_connected("picked_up", Inventory.on_pickup_collected)` — proves the specific production listener is the one wired.
+3. Drive `Pickup._on_body_entered(player)` and assert `Inventory.get_items()` grew OR `Inventory.get_equipped(&"weapon") != null` — proves end-to-end collectability.
+
+`pickup_count > 0` is **NOT sufficient** — the dual-spawn produced a positive count of uncollectable pickups. See `tests/integration/test_boss_loot_integration.gd` (REGRESSION-86c9uemdg) for the canonical structural shape.
+
+### Every loot-table item must be in `ContentRegistry.STARTER_ITEM_PATHS` (ticket `86c9uemdg` sibling)
+
+**Inclusion rule:** any item appearing in `resources/loot_tables/*.tres` entries (i.e. an item that can land in a save via a live drop) must be listed in `ContentRegistry.STARTER_ITEM_PATHS`. The recursive + `KNOWN_ITEM_SUBDIRS` scans are best-effort in HTML5 / `gl_compatibility` packed builds (the DirAccess `current_is_dir()` quirk + `list_dir_begin()` behavior on .pck resources is unreliable — see `.claude/docs/html5-export.md` § "Resource enumeration on packed `.pck` resources"). Direct `load()` of a packed res:// path always works because it reads from the resource cache, not DirAccess.
+
+Pre-fix only `iron_sword.tres` was direct-loaded; Sponsor's M2 RC soak (build `5bef197`) surfaced `USER WARNING: ItemInstance.from_save_dict: unknown item id 'leather_vest'` on boot because the previous run had picked up a `leather_vest` (a guaranteed drop from `boss_drops.tres` + 0.30 cumulative weight on `grunt_drops.tres`) into the save, and this run's HTML5 build failed to register it via DirAccess. **Fix:** added `leather_vest.tres` to `STARTER_ITEM_PATHS`. Future T2/T3 loot expansions must extend this list as new items ship.
+
+The id-collision-from-different-instance guard in `_on_item_resource_found` lets the same item be registered multiple times across the three scan passes (recursive + subdir + STARTER_ITEM_PATHS direct-load) without warning — same-instance re-registration is a no-op because Godot's resource cache hands out the same `ItemDef` instance for the same path.
+
+**Test bar.** Every item added to `STARTER_ITEM_PATHS` needs a paired drift-detector test in `tests/test_save_restore_resolver_ready.gd`:
+
+1. `test_load_all_resolves_<item>_via_starter_paths` — registry resolves the item after `load_all()`.
+2. `test_starter_item_paths_includes_<item>_drift_detector` — `STARTER_ITEM_PATHS.has("res://.../<item>.tres")` — surfaces a regression if someone removes the path thinking DirAccess covers it.
+3. `test_restore_from_save_<item>_in_stash_resolves_silently` — save-roundtrip with the item in stash produces a non-null `ItemInstance.def`.
+
+See `iron_sword` (ticket 86c9qah1f) + `leather_vest` (ticket 86c9uemdg) for the precedent.
+
 **RoomGate uses `CONNECT_DEFERRED` for `mob_died` listeners** (ticket 86c9qcf9z). `RoomGate.register_mob` connects with `mob.mob_died.connect(_on_mob_died, CONNECT_DEFERRED)` so the `_mobs_alive` decrement queues to end-of-frame instead of running inside the mob's synchronous emit chain. **Why this matters:** `MultiMobRoom._register_mobs_with_gate` runs from `MultiMobRoom._ready`, which itself runs during a physics-flush window when `Main._load_room_at_index` is called from a previous room's `gate_traversed → _on_room_gate_traversed → room_cleared → _on_room_cleared` chain (rooted in a CharacterBody2D `body_entered` callback). Subsequent `mob_died.emit` calls reach the gate via this connection, and prior to the deferred fix the gate's decrement competed with other physics-flush mutations (Pickup adds, particle adds, room transitions). Tess's PR #172 AC4 trace empirically observed two grunts emitting `Grunt._die` but only ONE decrement landing on the gate, leaving `_mobs_alive=1, state=open` and blocking the gate from ever transitioning to UNLOCKED. CONNECT_DEFERRED sidesteps the entire race class — every mob_died emission queues an end-of-frame decrement that runs outside the flush window.
 
 **Cross-tree signal-connection discipline (load-bearing).** Any signal-handler that:
