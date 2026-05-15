@@ -206,17 +206,35 @@ func get_last_ambient_path() -> String:
 
 ## Test-only: deterministically tear down the fade tweens + snap each player
 ## to its target state. Lets tests assert end-state without wall-clock waits.
+##
+## Crucial subtlety: `Tween.kill()` does NOT fire the tween's `finished`
+## signal. The crossfade's role-swap is wired to `finished` (so the canonical
+## `_bgm_player` reference points at the new track after the fade). If a
+## test kills the crossfade tween without manually triggering the swap, the
+## role-swap never happens and the test asserts a stale state. We solve that
+## by snapping volumes first, then manually invoking the finalize callback
+## if a crossfade tween was in flight — same end-state as letting the tween
+## complete naturally, but deterministic for headless tests.
 func complete_pending_fades_for_test() -> void:
+	var had_crossfade_in_flight: bool = (
+		_bgm_crossfade_tween != null and _bgm_crossfade_tween.is_valid()
+	)
 	if _bgm_fade_tween != null and _bgm_fade_tween.is_valid():
 		_bgm_fade_tween.kill()
 	if _bgm_crossfade_tween != null and _bgm_crossfade_tween.is_valid():
 		_bgm_crossfade_tween.kill()
 	if _ambient_fade_tween != null and _ambient_fade_tween.is_valid():
 		_ambient_fade_tween.kill()
+	# Snap volumes to the target before swap so the finalize observes the
+	# expected end-state.
 	if _bgm_player != null and _bgm_player.playing:
 		_bgm_player.volume_db = FULL_DB
 	if _ambient_player != null and _ambient_player.playing:
 		_ambient_player.volume_db = FULL_DB
+	if had_crossfade_in_flight and _bgm_crossfade_player != null \
+			and _bgm_crossfade_player.playing:
+		_bgm_crossfade_player.volume_db = FULL_DB
+		_finalize_crossfade()
 
 
 # ---- Internal --------------------------------------------------------
