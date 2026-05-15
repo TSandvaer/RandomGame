@@ -454,6 +454,44 @@ The PR #170 AC4 spec saw zero `RoomGate.*` traces because **the player drifted d
 
 **Lightweight ongoing trace:** `_on_body_entered` keeps a small `_combat_trace("RoomGate._on_body_entered", "body=... state=... mobs_alive=...")` line at function entry — HTML5-only via the existing `combat_trace` shim. This survives the diagnostic strip-down because it costs nothing in headless GUT and gives Playwright specs a "did the gate ever see a body?" datapoint when traversal fails. Use it to tell "gate never reached" (no trace) from "gate reached but state wrong" (trace fires, state machine diverges) — the same Case A vs Case B distinction the investigation used.
 
+## Harness coverage gap — phase boundaries vs gameplay event ordering (ticket 86c9ugfzv)
+
+A sibling-class harness gotcha to "body_entered semantics — single-event continuous-walk" above: **gameplay events can fire BEFORE the harness phase that's structured to detect them.** PR #221's surfacing finding + the 86c9ugfzv 8-run-sweep diagnostics empirically pinpointed the failure mode in Room 03 (the Grunt + Charger near-spawn chase-combat room):
+
+**The sequence (release-build, deterministic across 8 runs):**
+
+1. **Room-load / settle window** (between Room N-1's `gate_traversed` and Room N's first `clearRoomMobs` call): Room N loads, mobs spawn near the gate, the player's teleport-to-spawn combined with chase-knockback drifts the player INTO the trigger → `body_entered #1` fires → `_on_body_entered` traces `state=open mobs_alive=N` → `lock()` runs → gate state transitions to LOCKED.
+2. **Combat phase** (`clearRoomMobs` running): mobs die one by one via `mob_died.emit` → deferred `RoomGate._on_mob_died` decrements `_mobs_alive` → when it hits 0 with state==LOCKED, the gate starts a 650ms `DEATH_TWEEN_WAIT` → fires `_unlock()` → gate state UNLOCKED, `gate_unlocked` emits.
+3. **Helper entry**: `gateTraversalWalk` is invoked from the spec, but **the gate already went OPEN→LOCKED→UNLOCKED before the helper ran.**
+
+**Why the old helper failed:** the pre-fix `gateTraversalWalk` snapshotted `preLineCount` at helper-entry and scanned only NEW lines (`[preLineCount, ...)`) for `gate_unlocked` events. The unlock trace was at index `< preLineCount` — outside the scan window. Phase 3's walk-in then fired `body_entered #2` against the already-UNLOCKED gate, immediately emitting `gate_traversed` — but the helper's assertion was structured as "phase 3 should fire gate_unlocked" (looking for the lock-and-unlock event during the walk). The unlock had already fired during combat, so the assertion threw with the misleading message "phase 3 fired _on_body_entered but gate_unlocked did NOT follow."
+
+**The fix shape — case A/B/C resolution from caller's room-snapshot:** the helper now accepts `options.preRoomLineCount` (the trace-buffer line count captured BEFORE the spec's combat phase began). The helper expands the scan window to `[lastPreviousTraversedIndex + 1, preLineCount)` — covering both the room-load / settle period AND combat — and routes to one of three cases:
+
+- **Case A (`already-traversed`):** scan slice contains a `gate_traversed` event → the gate fully transitioned during combat (chase + knockback drove the player through the trigger twice). Helper returns early; spec asserts the causal sequence and skips the two-part walk.
+- **Case B (`unlocked-finish`):** scan slice contains `_unlock` but no `gate_traversed` → gate is UNLOCKED. Helper uses position-steered (`Player.pos`-trace-driven) movement to steer the player to staging point `(120, 144)` (just east of trigger, vertically centred in the Y-band), then walks pure-WEST 1100ms across the trigger east edge → `body_entered` fires → `gate_traversed` emits on the UNLOCKED gate.
+- **Case C (`open-walk`):** scan slice contains neither → existing phase 3-5 two-part walk (the open-gate path).
+
+The case is exposed on `GateTraversalResult.resolutionCase` so the spec can scope assertions per-case (the phase-3 `bodyEnteredFiredOnPhase3` assertion only applies to case C; cases A/B short-circuit before phase 3 runs).
+
+**Two harness mechanism notes from the implementation:**
+
+1. **`waitForLine` matches stale buffer entries** — `ConsoleCapture.waitForLine(/gate_traversed/)` scans the FULL buffer and returns immediately if ANY line matches, including stale `gate_traversed` events from previous rooms. Case B's helper uses an inline `waitForNewLine(capture, pattern, baselineIndex, timeout)` that polls only indices `>= baselineIndex` — distinguishes a fresh traversal from a stale one. Pattern check: any helper that asserts "X event fired after my action" must capture a baseline buffer index before the action and wait only for NEW matches above that index.
+
+2. **Position-steered staging is required for case B** — the blind east-burst-then-west-walk approach (used in the first cut of the fix) failed when the player's Y position after combat was outside the trigger Y-band `[104, 184]`. Walking pure-west from a Y outside the band never crosses the trigger rect. Position-steering via `Player.pos` traces gets the player to a known staging point first — guaranteeing Y is inside the band before the west-walk.
+
+**Generalisation: harness coverage gaps come in pairs.** This is the second body_entered-family gap (the first was "single-event continuous-walk" above — fixed by the two-part walk pattern in case C; this one is "events fire before the harness phase that scans for them" — fixed by the case A/B/C resolution). Future harness fixtures that scan for gameplay events should:
+
+1. **Snapshot a baseline buffer index** at the START of the room-scoped lifecycle (not at helper entry), so events fired during room-load / settle windows are captured.
+2. **Look back as well as forward** — at minimum, use the previous gate's `gate_traversed` index as the scan-start lower bound. Room-scoped events can fire in either direction relative to the helper invocation.
+3. **Match new events only** when asserting "this action caused this event" — never match stale buffer entries.
+
+References:
+- `tests/playwright/fixtures/gate-traversal.ts` § module header — full sequence diagram + case A/B/C semantics
+- `tests/playwright/fixtures/kiting-mob-chase.ts` § "Post-chase gate resolution" — sibling fixture's case A/B/C resolution (predates this gate-traversal one; the mechanism is identical)
+- `tests/playwright/fixtures/console-capture.ts` § `waitForLine` — the documented stale-match gotcha
+- ticket 86c9ugfzv (Drew, M2 W3) — the empirical surfacing PR; 8-run-sweep diagnostics are the canonical evidence
+
 ## GUI focus-consumption vs. Playwright keypresses — close a focus-holding panel with a test-only hook
 
 A class of harness flake surfaced by `equip-flow.spec.ts` Phase 2.5 (tickets `86c9qb7f3` / `86c9qah0f`): **Godot's GUI input system consumes more keys than just `Tab`.** When a focusable `Control` (e.g. an inventory grid `Button` with the default `focus_mode = FOCUS_ALL`) holds keyboard focus, the GUI system intercepts UI-action keys *before* they reach `_unhandled_input`:
