@@ -179,13 +179,80 @@ jobs:
           # runs upload structured per-test data. The XML is only useful
           # when tests fail, so it is uploaded conditionally below. Path
           # is pre-created because GUT does not create parent dirs.
+          #
+          # Drew 2026-05-15 (#86c9u2w6y) — tee the full GUT stdout+stderr
+          # into test-reports/gut-output.log. The GUT exit code alone is
+          # NOT trustworthy: a test_*.gd file with a GDScript parse error
+          # is silently dropped by GUT (Godot's loader returns null, GUT
+          # logs a WARNING and skips it) yet GUT still exits 0 — CI goes
+          # green while a headline test never ran (PR #194 / Tess QA). The
+          # "Gate: GUT parse-failure scan" step below greps this log for
+          # the parse-failure signal lines and fails the build if any are
+          # present. `2>&1` is required — the "SCRIPT ERROR: Parse Error"
+          # and "Failed to load script" lines go to stderr, only GUT's
+          # "Ignoring script ..." WARNING goes to stdout.
           mkdir -p test-reports
           godot --headless \
                 -s addons/gut/gut_cmdln.gd \
                 -gdir=res://tests \
                 -ginclude_subdirs \
                 -gjunit_xml_file=test-reports/gut-results.xml \
-                -gexit
+                -gexit 2>&1 | tee test-reports/gut-output.log
+
+      # Drew 2026-05-15 (#86c9u2w6y) — close the "green CI masks a
+      # parse-failed test file" hole. GUT silently drops any test_*.gd
+      # that fails to compile and STILL exits 0, so the GUT exit code
+      # checked by the step above is not a sufficient gate. This step is
+      # the real gate: it scans the captured GUT output for the three
+      # parse-failure signal lines and fails the build (exit 1) if any
+      # appear. Exact strings observed in PR #194's broken run:
+      #   SCRIPT ERROR: Parse Error: <detail>            (Godot compiler, stderr)
+      #   ERROR: Failed to load script "res://..." with error "Parse error".  (Godot loader, stderr)
+      #   [WARNING]: Ignoring script res://... because it does not extend GutTest  (GUT, stdout)
+      # The "does not extend GutTest" line also fires for a genuinely
+      # non-GutTest script, but every test_*.gd in tests/ DOES extend
+      # GutTest (the factories/ helper is not test_*.gd and is not
+      # discovered by -gdir), so in this repo that line is unambiguously
+      # a parse/load failure signal.
+      #
+      # Second guard: GUT prints "Scripts   N" in its summary — the count
+      # of test scripts it actually loaded. A silently-dropped file shows
+      # up as N lower than the number of test_*.gd files on disk. We
+      # assert the two match exactly. tests/factories/content_factory.gd
+      # is intentionally excluded — it is a helper, not test_*.gd, so GUT
+      # never counts it.
+      - name: Gate - GUT parse-failure scan
+        run: |
+          set -euo pipefail
+          log=test-reports/gut-output.log
+          test -f "$log" || { echo "::error::GUT output log missing — the Run GUT tests step did not produce $log"; exit 1; }
+
+          # --- Guard 1: parse-failure signal lines -------------------------
+          # grep -E over the three known signal patterns. grep exits 1 when
+          # there are no matches, which is the GREEN path — guard it so
+          # `set -e` does not abort on the (expected) no-match case.
+          if matches=$(grep -nE 'Parse Error:|Failed to load script .* with error "Parse error"|Ignoring script .* because it does not extend GutTest' "$log"); then
+            echo "::error::GUT parse-failure signal detected — a test file failed to compile and was silently skipped. GUT's exit code does not catch this (see #86c9u2w6y)."
+            echo "Offending log lines:"
+            echo "$matches"
+            exit 1
+          fi
+          echo "OK: no parse-failure signal lines in GUT output."
+
+          # --- Guard 2: loaded-script-count regression ---------------------
+          # GUT summary line shape: "Scripts           76"
+          disk_count=$(find tests -name 'test_*.gd' -type f | wc -l | tr -d ' ')
+          gut_count=$(grep -E '^Scripts[[:space:]]+[0-9]+' "$log" | grep -oE '[0-9]+' | tail -n1 || true)
+          if [ -z "$gut_count" ]; then
+            echo "::error::Could not find the 'Scripts <N>' summary line in GUT output — GUT may not have run to completion."
+            exit 1
+          fi
+          echo "Test files on disk (test_*.gd): $disk_count    Scripts loaded by GUT: $gut_count"
+          if [ "$disk_count" -ne "$gut_count" ]; then
+            echo "::error::Test-script count mismatch: $disk_count test_*.gd files on disk but GUT loaded $gut_count. A test file was silently dropped (parse error / discovery gap). See #86c9u2w6y."
+            exit 1
+          fi
+          echo "OK: GUT loaded all $disk_count test files."
 
       # Devon ci-hardening 2026-05-02 — on a failed run, upload the GUT
       # JUnit XML plus build_info.txt so the next agent (Tess / Devon) can
@@ -203,5 +270,9 @@ jobs:
           path: |
             test-reports/
             build_info.txt
+          # test-reports/ now also carries gut-output.log (Drew #86c9u2w6y) —
+          # the full GUT stdout+stderr capture the parse-failure gate scans.
+          # On a red run that log is the fastest way to see which file
+          # failed to compile without re-running CI.
           retention-days: 7
           if-no-files-found: ignore
