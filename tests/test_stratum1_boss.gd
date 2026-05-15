@@ -593,15 +593,18 @@ func test_boss_melee_hitbox_has_correct_layer_and_mask() -> void:
 	p.global_position = Vector2(20.0, 0.0)  # within MELEE_RANGE
 	b.set_player(p)
 	# Capture the hitbox emitted by swing_spawned.
-	var spawned_hitbox: Hitbox = null
+	# Array-wrapper pattern: typed outer var cannot be written by a lambda in
+	# GDScript 4 (lambda updates its own local binding, not the outer var).
+	var captured: Array = [null]
 	b.swing_spawned.connect(func(kind: StringName, hb: Node) -> void:
 		if kind == Stratum1Boss.SWING_KIND_MELEE:
-			spawned_hitbox = hb as Hitbox
+			captured[0] = hb
 	)
 	# Advance into telegraphing then fire.
 	b._physics_process(0.016)  # → STATE_TELEGRAPHING_MELEE
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.01)  # → swing fires
-	assert_not_null(spawned_hitbox, "boss melee swing produced a Hitbox node")
+	assert_not_null(captured[0], "boss melee swing produced a Hitbox node")
+	var spawned_hitbox: Hitbox = captured[0] as Hitbox
 	# Layer/mask checks — see DECISIONS.md 2026-05-01.
 	# enemy_hitbox layer: bit 5 = 1<<4 = 16.
 	assert_eq(spawned_hitbox.collision_layer, 1 << 4,
@@ -635,16 +638,19 @@ func test_boss_wake_enables_hit_detection_on_player() -> void:
 	add_child_autofree(fp)
 	# We need a duck-typed take_damage. Use an inner-class player on the boss test.
 	# Instead, directly drive _try_apply_hit via the spawned hitbox:
-	var spawned_hitbox: Hitbox = null
+	# Array-wrapper pattern: typed outer var cannot be written by a lambda in
+	# GDScript 4 (lambda updates its own local binding, not the outer var).
+	var captured: Array = [null]
 	b.swing_spawned.connect(func(kind: StringName, hb: Node) -> void:
 		if kind == Stratum1Boss.SWING_KIND_MELEE:
-			spawned_hitbox = hb as Hitbox
+			captured[0] = hb
 	)
 	b.global_position = Vector2.ZERO
 	b.set_player(fp)
 	b._physics_process(0.016)
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.01)
-	assert_not_null(spawned_hitbox, "hitbox spawned")
+	assert_not_null(captured[0], "hitbox spawned")
+	var spawned_hitbox: Hitbox = captured[0] as Hitbox
 	# Confirm hitbox damage is > 0 (boss does deal damage on hit).
 	assert_gt(spawned_hitbox.damage, 0,
 		"REGRESSION-86c9ujq8d: boss melee hitbox carries positive damage — " +
