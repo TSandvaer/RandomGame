@@ -61,6 +61,28 @@ should be connected with `CONNECT_DEFERRED`. The synchronous-emit alternative is
 
 **Test-side consequence.** GUT tests that fire `mob_died` synchronously and then immediately inspect `gate.mobs_alive()` / `gate.is_unlocked()` must `await get_tree().process_frame` between the emit and the assertion. The pre-existing `test_room_gate.gd` / `test_room_advance_only_on_door_walk.gd` / `test_room_transition_requires_door_walk.gd` tests were updated alongside the CONNECT_DEFERRED migration to drain a frame between every `m.die()` call and the next assertion.
 
+### `Player._die` + `Main.apply_death_rule` diagnostic-trace pair (ticket 86c9u397c)
+
+`Player._die` (`scripts/player/Player.gd`) and `Main.apply_death_rule` (`scenes/Main.gd`) both emit `[combat-trace]` lines (HTML5-only via the existing shim). **These two lines are load-bearing for any future "mob freeze" investigation** — without them, a Player-death + M1-death-rule room reload presents the *exact same* trace shape as a sibling-mob `_physics_process` freeze:
+
+| Symptom | Player-death + reload (real cause) | Sibling-mob `_physics_process` freeze (hypothetical) |
+| --- | --- | --- |
+| Mob `.pos` traces stop within 1-2 frames of a sibling `_die` | YES — mobs are freed by the room reload | YES — `_physics_process` literally stops |
+| `Player.try_attack` traces continue uninterrupted | YES — Player respawned in Room 01 | YES — Player still in original room |
+| `Player.pos` jumps to `(240, 200)` (`DEFAULT_PLAYER_SPAWN`) | YES — respawn teleport | NO — Player stays put |
+| TutorialEventBus `wasd`/`dodge` beats fire | YES — Room 01 tutorial reset | NO |
+| `RoomGate.register_mob` burst for the SAME room | YES — fresh room load | NO |
+| `[combat-trace] Player._die` line in stream | **YES — diagnostic** | NO |
+| `[combat-trace] Main.apply_death_rule` line | **YES — diagnostic** | NO |
+
+The 86c9u397c bug brief is the cautionary tale: Devon's PR #198 instrumentation observed mob `.pos` going silent after a sibling `_die` in Room 05 (8/8 release-build runs) and the orchestrator hypothesised a death-path physics-flush sibling-freeze analogous to PR #191's load-path fix. Empirical investigation against a release build of `40a8a7d` proved the actual cause was **the Player dying** — Room 05's three concurrent chasers (2 grunts + 1 charger) deal damage faster than the harness's near-spawn click-spam can clear them, the M1 death rule reloads Room 01, and the surviving mobs are freed by the room transition. The hypothesis was unfalsifiable from the pre-fix trace stream because Player.gd's `_die` and Main.gd's `apply_death_rule` had no `[combat-trace]` lines — Player death was completely invisible, and the Player.pos teleport to `DEFAULT_PLAYER_SPAWN` was indistinguishable from "Player at center of Room N" to a harness scanning the stream.
+
+The trace lines emit at the START of each function so they precede the cascade. `Player._die`'s line carries `hp=0 pos=(x,y)` so investigators can correlate against room geometry; `Main.apply_death_rule`'s line carries the death-rule semantics summary so the room-reload event is annotated.
+
+**Pattern check for future "mob freeze" bug reports:** before declaring a physics-flush sibling-freeze hypothesis, grep the trace stream for `Player._die` and `Main.apply_death_rule`. If either line appears within ~3s of the suspected freeze frame, the cause is Player death — not a physics-flush mutation. Only if BOTH lines are absent does the physics-flush hypothesis warrant investigation. This rule is the harness-side of the harness's own diagnostic logic in `tests/playwright/fixtures/kiting-mob-chase.ts::chaseAndClearMultiChaserRoom` (the failure-path reframes "GAME-side freeze" as "PLAYER DIED" when the trace pair is present).
+
+Paired tests: `tests/test_player_die_combat_trace.gd` (Player._die emit + one-shot + ordering) + `tests/integration/test_apply_death_rule_combat_trace.gd` (apply_death_rule emit + payload). Both pin the diagnostic contract — if the lines are removed in a future refactor, the tests fail before CI green and the misdiagnosis class re-opens.
+
 ## Mob hit-flash (PR #140 fix)
 
 Each mob type ([`scripts/mobs/Grunt.gd`](scripts/mobs/Grunt.gd), `Charger.gd`, `Shooter.gd`, `Stratum1Boss.gd`) has `_play_hit_flash`. The current implementation:

@@ -1267,17 +1267,54 @@ export async function chaseAndClearMultiChaserRoom(
       chaserPosLines.length > 0
         ? nowTs - chaserPosLines[chaserPosLines.length - 1].timestamp
         : -1;
+    // ---- Player-death detection (ticket 86c9u397c — Drew investigation) ----
+    //
+    // The original "GAME-side freeze" message below was empirically WRONG for
+    // Room 05: the apparent freeze was a Player-death + M1-death-rule reload
+    // to Room 01 (the multi-chaser pursuit puts the Player in the swing wedge
+    // while 3 mobs deal damage faster than the player can survive them; the
+    // helper's `clickX,clickY` swing-spam keeps re-engaging without dodging).
+    // After respawn the mobs were freed (Room 5 destroyed), the Player keeps
+    // swinging in Room 01, and the harness's "kills > 0 && mobPosLast10s == 0"
+    // heuristic mis-fires "physics_process STOPPED".
+    //
+    // The fix is a paired diagnostic: `Player._die` + `Main.apply_death_rule`
+    // emit `[combat-trace]` lines now (`scripts/player/Player.gd::_die`,
+    // `scenes/Main.gd::apply_death_rule`). Detect those here and re-frame
+    // the failure correctly so future investigations don't chase a non-bug.
+    const playerDieLines = capture
+      .getLines()
+      .filter((l) => /\[combat-trace\] Player\._die /.test(l.text));
+    const respawnLines = capture
+      .getLines()
+      .filter((l) =>
+        /\[combat-trace\] Main\.apply_death_rule /.test(l.text)
+      );
+    const playerDied = playerDieLines.length > 0;
+
     throw new Error(
       `[multi-chaser] ${roomLabel}: only killed ${kills}/${expectedMobs} ` +
         `chaser mob(s) in ${budgetMs}ms (last measured dist=${lastDist}, ` +
         `${cycle} cycles, ${mobPosCount} total chaser '.pos' traces seen; ` +
         `${mobPosLast10s} in the last 10s; newest chaser '.pos' is ` +
         `${newestMobPosAgeMs}ms old). ` +
-        (kills > 0 && mobPosLast10s === 0
-          ? `>>> A live mob remains but NO chaser '.pos' traces in the last ` +
-            `10s — the surviving mob's _physics_process STOPPED. This is a ` +
-            `GAME-side freeze (a live mob emits '.pos' every 0.25 game-sec ` +
-            `unconditionally), not a harness-steering failure. <<<\n`
+        (playerDied
+          ? `>>> PLAYER DIED in this room (${playerDieLines.length} ` +
+            `Player._die trace${playerDieLines.length > 1 ? "s" : ""}, ` +
+            `${respawnLines.length} apply_death_rule trace${respawnLines.length === 1 ? "" : "s"}). ` +
+            `Surviving mobs went silent because they were FREED by the M1 death-rule ` +
+            `room reload (${roomLabel} → Room 01 respawn). This is NOT a ` +
+            `physics-flush sibling-freeze; it's a balance/harness-skill ceiling — ` +
+            `near-spawn click-spam doesn't dodge, and 3 concurrent chasers deal ` +
+            `damage faster than iron-sword swings can clear them. ` +
+            `Last Player._die trace: '${playerDieLines[playerDieLines.length - 1].text.slice(-150)}'. <<<\n`
+          : kills > 0 && mobPosLast10s === 0
+          ? `>>> A live mob remains but NO chaser '.pos' traces in the last 10s ` +
+            `AND no Player._die trace — the surviving mob's _physics_process STOPPED ` +
+            `without an obvious cause. Candidate GAME-side freeze (a live mob emits ` +
+            `'.pos' every 0.25 game-sec unconditionally). Investigate: scan for USER ` +
+            `ERROR / push_error around the mob class' last trace; check the dying ` +
+            `mob's _die chain for non-deferred Area2D mutations. <<<\n`
           : "") +
         `The position-steered pursuit did not converge — check that the ` +
         `build emits the chaser '.pos' traces (Grunt.pos / Charger.pos) and ` +

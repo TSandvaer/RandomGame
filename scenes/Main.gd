@@ -280,6 +280,17 @@ func apply_death_rule() -> void:
 	#   - keep: level, equipped, V/F/E (PlayerStats), unspent stat points.
 	#   - lose: unequipped inventory items, cleared-rooms progression, in-progress XP.
 	# Levels.set_state(level, 0) zeroes mid-level XP without changing level.
+	#
+	# **Diagnostic trace (ticket 86c9u397c — Drew investigation, 2026-05-15).**
+	# Pairs with the `[combat-trace] Player._die` line in `Player._die` so the
+	# entire death → respawn sequence is unambiguous in the trace stream. This
+	# is what disambiguates a Player-death-driven "mob freeze" (the mobs were
+	# freed when Room N was destroyed by the room reload) from a real
+	# physics-flush sibling-freeze. See `Player._die` for the full rationale.
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace("Main.apply_death_rule",
+			"reloading Room 01 — death rule: keep level/equipped/stats, lose unequipped+progression+xp")
 	var levels: Node = _levels()
 	if levels != null:
 		levels.set_state(levels.current_level(), 0)

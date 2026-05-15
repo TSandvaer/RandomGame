@@ -606,6 +606,19 @@ func is_dead() -> bool:
 ## Internal: drive the death-transition. Idempotent — emits player_died
 ## exactly once even under multi-hit collapse (if two enemy hitboxes
 ## land in the same frame, the second is short-circuited by `_is_dead`).
+##
+## **Diagnostic trace (ticket 86c9u397c — Drew investigation, 2026-05-15).**
+## A `[combat-trace] Player._die` line is emitted at the start of the
+## death-transition. **Without this line, a Player death + M1-death-rule
+## room reload presents the EXACT same trace shape as a "mob freeze"** —
+## mob `.pos` traces stop (because the mobs were freed by the room reload),
+## the Player keeps swinging (because they respawned in Room 01 and the
+## harness keeps clicking), and the player's pos jumps to `DEFAULT_PLAYER_SPAWN
+## = (240, 200)` (the room-load teleport). The 86c9u397c brief mistook
+## exactly this signature for a death-path physics-flush sibling-freeze
+## bug because there was no Player-died trace to disambiguate. With this
+## line, any future "mobs froze in Room N" investigation can rule out
+## Player death in 1 second by grepping the trace stream for `Player._die`.
 func _die() -> void:
 	if _is_dead:
 		return
@@ -619,6 +632,10 @@ func _die() -> void:
 	if _is_invulnerable:
 		_exit_iframes()
 	velocity = Vector2.ZERO
+	_combat_trace("Player._die",
+		"hp=0 pos=(%.0f,%.0f) — emitting player_died; M1 death rule will respawn in Room 01" % [
+			global_position.x, global_position.y
+		])
 	player_died.emit(global_position)
 
 
