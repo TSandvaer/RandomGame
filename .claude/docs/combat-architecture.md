@@ -159,6 +159,38 @@ Tier 1 invariant from `team/TESTING_BAR.md`: visual-primitive tests must assert 
 
 **Tier 1 corollary — tween kill-and-restart pattern.** For any "second-event-during-active-tween-kills-and-restarts" pattern (hit-flash interrupted by a second hit, save-toast retriggered before fade-out completes, etc.), tests MUST assert **reference change** (`assert_ne(old_tween, new_tween)`), NOT `is_valid()` flip. Godot 4.3's `Tween.kill()` leaves the tween object in a valid-but-stopped state; `is_valid()` does not flip to false synchronously. Precedent: `tests/test_combat_visuals.gd::test_grunt_second_hit_during_flash_restarts_tween` and `tests/test_m2_w1_ux_polish.gd::test_t2_toast_throttle_reuses_single_widget` (PR #160 CI bounce — initial commit asserted `is_valid()` flip and CI flagged it; reference-change is the load-bearing invariant).
 
+## Shooter state machine — engagement bands + cornered fallback (ticket 86c9uehaq)
+
+[`scripts/mobs/Shooter.gd`](scripts/mobs/Shooter.gd) is the only Stratum-1 RANGED mob (Grunt + Charger + Stratum1Boss are melee). Its distance bands and engagement transitions encode a kiter-with-pursuit-and-cornered-fallback design that took two iterations to reach correctness — the constants are tightly coupled to projectile reach, and getting either band wrong manifests as one of three Sponsor-visible failure modes.
+
+**The three bands (post-86c9uehaq):**
+
+- `dist < KITE_RANGE` (120 px) → `STATE_KITING`: walk directly away from the player at `move_speed` (60 px/s).
+- `KITE_RANGE..SHOOT_RANGE` (120..144 px) → the **sweet spot**: stand still, aim, fire. The band is intentionally narrow — its upper bound is **`SHOOT_RANGE = PROJECTILE_SPEED × PROJECTILE_LIFETIME`** (the effective projectile reach), so any projectile fired from inside the band can reach the player.
+- `dist > SHOOT_RANGE` (144 px) → **close the gap**: walk toward the player at `move_speed` during both AIMING and POST_FIRE_RECOVERY. The aim timer still ticks during the walk so the shot fires when it expires.
+
+**`AIM_RANGE` (300 px) is the outer AGGRO BOUND, not the close-the-gap threshold.** Pre-86c9uehaq, `AIM_RANGE` was BOTH (kept simple by design). Sponsor's M2 RC manual-soak surfaced three Room 04 failure modes that traced back to that conflation:
+
+| Failure mode (Sponsor verbatim) | Root cause |
+| --- | --- |
+| "only fleeing, never chasing" | Folds out of the next two — once the shooter pursues out of range AND fires-when-cornered, the only-flee shape disappears. |
+| "shoots from distance not able to reach the player" | Close-the-gap threshold was AIM_RANGE (300 px). For a player at dist 150–300, the shooter stood still firing projectiles whose 144 px reach fell 6–156 px short. **Sweet spot must equal projectile reach.** |
+| "if back into a corner, doesnt attack when user is too close" | `_process_kiting` had no exit when the shooter was wall-blocked AND the player was still inside KITE_RANGE. `move_and_slide` produced zero net motion against a wall; STATE_KITING stayed forever. |
+
+**The fix shape (ticket 86c9uehaq):**
+
+1. **Introduce `SHOOT_RANGE = PROJECTILE_SPEED * PROJECTILE_LIFETIME`** (derived, not hard-coded — auto-tracks projectile tunings). Use SHOOT_RANGE as the close-the-gap threshold in `_process_aiming` and `_process_post_fire`; retain AIM_RANGE as the outer aggro band (post-fire recovery drops to IDLE beyond it). Sweet spot tightens from `120..300` to `120..144`.
+2. **Cornered-kite fallback.** Two consecutive `is_on_wall()` ticks while the player is inside KITE_RANGE promote KITING → AIMING via `_promote_cornered_to_aiming` with a fast windup (`CORNERED_AIM_DURATION = 0.25 s` vs the normal `AIM_DURATION = 0.55 s`). Extracted as a helper so unit tests can pin the promotion payload (state, aim_left, velocity, telegraph emit) without simulating a CharacterBody2D wall collision in headless GUT.
+3. **Diagnostic instrumentation:** every `_set_state` transition emits a `[combat-trace] Shooter._set_state | old -> new dist=N pos=(x,y)` line (HTML5-only via the existing combat_trace shim). Lets soak runs characterise the AI state at every transition, not just the throttled 0.25 s `Shooter.pos` pulse.
+
+**Sweet-spot derivation rule (load-bearing):** any future tune to `PROJECTILE_SPEED` or `PROJECTILE_LIFETIME` automatically updates `SHOOT_RANGE`. The drift-detector test `tests/test_shooter_repositions_on_idle_player.gd::test_shoot_range_equals_projectile_reach` catches a hard-coded SHOOT_RANGE divergence. The corollary invariant — `SHOOT_RANGE > KITE_RANGE` so a non-empty sweet spot exists, and `SHOOT_RANGE < AIM_RANGE` so a non-empty close-the-gap region exists — is also pinned.
+
+**Cornered constants discipline:** `CORNERED_KITE_TICKS_TO_FIRE = 2` (≈33 ms at 60 Hz) so the fallback fires within a single visible frame of the player cornering the kiter; `CORNERED_AIM_DURATION = 0.25 s` so the windup is shorter than normal AIM_DURATION but non-zero (a zero-windup point-blank fire is unfair). Tune-drift pinned by `test_shooter_cornered_constants_are_balanced`.
+
+**Harness contract preserved:** the `Shooter.pos` trace shape (`pos=(x,y) state=... dist_to_player=...`) is unchanged. The Playwright `kiting-mob-chase` fixture still steers off it. The new bands DO mean a chase that previously had to roam (kiter stationary at dist 200) now sees the kiter converge toward the player — making the chase typically faster and cleaner.
+
+**Pattern check for any future ranged-mob class:** the band-vs-reach invariant generalises. If a future mob's projectile reach is `R`, its sweet spot must be `(0, R]` (with whatever lower bound for kiting); its close-the-gap threshold must be `R`. Using a separate "aggro range" constant for both bands AND pursuit is the failure shape — the conflation is what bit Room 04.
+
 ## `[combat-trace]` diagnostic shim
 
 [`scripts/debug/DebugFlags.gd`](scripts/debug/DebugFlags.gd) — `DebugFlags.combat_trace(tag, msg)` emits `[combat-trace]` console lines only when `OS.has_feature("web") == true`. Wired into:
