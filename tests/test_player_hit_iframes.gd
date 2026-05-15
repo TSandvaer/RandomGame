@@ -209,7 +209,10 @@ func test_dodge_started_during_hit_iframes_does_not_clobber_dodge() -> void:
 		"be vulnerable while still visually dodging — a feel + correctness bug " +
 		"flagged in Uma's design §3.B 'Dodge takes precedence'.")
 	# 4. Tick dodge to completion — dodge's own _exit_iframes clears the flag.
-	p._tick_timers(Player.DODGE_DURATION + 0.01)
+	#    We forced `_dodge_time_left = 10.0` above to keep dodge robustly
+	#    active across the hit-iframe-timer firing; now drain it manually so
+	#    `_process_dodge` calls `_exit_dodge` → `_exit_iframes`.
+	p._dodge_time_left = 0.0
 	p._process_dodge(0.0)
 	assert_false(p.is_invulnerable(),
 		"dodge-end clears iframes (the dodge owns the clear in this ordering)")
