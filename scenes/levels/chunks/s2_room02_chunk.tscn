@@ -1,0 +1,115 @@
+[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_s2room02_chunk"]
+
+; Cinder Vaults — Mining Cart Bay (s2_room02 chunk geometry).
+; Hex-block placeholder geometry per §2 authoritative palette in
+; team/uma-ux/palette-stratum-2.md. Soft-retint sprite variants from W3-T3
+; replace these ColorRect placeholders later — the chunk_def TRES does not
+; reference any sprite atlas, only this scene's geometry.
+;
+; Decoration beats (palette-stratum-2.md §3 beats 1 + 3):
+;   - Beat 1: Ash-glow vein band on the WEST wall, mid `#C25A1F`. Static
+;     placeholder — the 6 fps 8-frame pulse anim ships with the W3-T3 sprite
+;     pass.
+;   - Beat 3: Two collapsed mining-cart silhouettes in the floor plane,
+;     darker burnt-rust silhouette over the floor base. Pure decoration —
+;     no collision, no Area2D.
+;
+; Walls match the s1_room01_chunk pattern (4 StaticBody2D walls with
+; RectangleShape2D collision) so MultiMobRoom + RoomGate physics behave
+; identically across strata.
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_h"]
+size = Vector2(480, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_v"]
+size = Vector2(32, 256)
+
+[node name="S2Room02Chunk" type="Node2D"]
+
+; Floor — burnt earth `#3F1E1A` (palette-stratum-2.md §2 floor base).
+[node name="Floor" type="ColorRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 256.0
+color = Color(0.247, 0.118, 0.102, 1)
+
+; Walls — collapsed mining stone `#2A1410` (§2 wall base).
+[node name="WallNorth" type="StaticBody2D" parent="."]
+position = Vector2(240, 16)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallNorth"]
+shape = SubResource("RectangleShape2D_wall_h")
+
+[node name="Sprite" type="ColorRect" parent="WallNorth"]
+offset_left = -240.0
+offset_top = -16.0
+offset_right = 240.0
+offset_bottom = 16.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+[node name="WallSouth" type="StaticBody2D" parent="."]
+position = Vector2(240, 240)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallSouth"]
+shape = SubResource("RectangleShape2D_wall_h")
+
+[node name="Sprite" type="ColorRect" parent="WallSouth"]
+offset_left = -240.0
+offset_top = -16.0
+offset_right = 240.0
+offset_bottom = 16.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+[node name="WallWest" type="StaticBody2D" parent="."]
+position = Vector2(16, 128)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallWest"]
+shape = SubResource("RectangleShape2D_wall_v")
+
+[node name="Sprite" type="ColorRect" parent="WallWest"]
+offset_left = -16.0
+offset_top = -128.0
+offset_right = 16.0
+offset_bottom = 128.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+[node name="WallEast" type="StaticBody2D" parent="."]
+position = Vector2(464, 128)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallEast"]
+shape = SubResource("RectangleShape2D_wall_v")
+
+[node name="Sprite" type="ColorRect" parent="WallEast"]
+offset_left = -16.0
+offset_top = -128.0
+offset_right = 16.0
+offset_bottom = 128.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+; Decoration — Beat 1: ash-glow vein band on WEST wall (decorative only).
+; Vein-mid `#C25A1F`, runs vertically along the wall trim. No collision.
+[node name="AshGlowVeinWest" type="ColorRect" parent="."]
+offset_left = 32.0
+offset_top = 64.0
+offset_right = 36.0
+offset_bottom = 192.0
+color = Color(0.761, 0.353, 0.122, 1)
+
+; Decoration — Beat 3: collapsed mining-cart silhouette #1 (mid-floor).
+; Tipped cart, dark burnt-rust `#1F0F0C` floor-deep silhouette over the
+; burnt-earth floor. Pure decoration in background plane.
+[node name="MiningCartSilhouette1" type="ColorRect" parent="."]
+offset_left = 144.0
+offset_top = 168.0
+offset_right = 192.0
+offset_bottom = 200.0
+color = Color(0.122, 0.059, 0.047, 1)
+
+; Decoration — Beat 3: collapsed mining-cart silhouette #2 (south-east).
+[node name="MiningCartSilhouette2" type="ColorRect" parent="."]
+offset_left = 320.0
+offset_top = 192.0
+offset_right = 372.0
+offset_bottom = 224.0
+color = Color(0.122, 0.059, 0.047, 1)

@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_stratum2_room03"]
+
+[ext_resource type="Script" path="res://scripts/levels/MultiMobRoom.gd" id="1_room"]
+[ext_resource type="Resource" path="res://resources/level_chunks/s2_room03.tres" id="2_chunk_def"]
+
+[node name="Stratum2Room03" type="Node2D"]
+script = ExtResource("1_room")
+chunk_def = ExtResource("2_chunk_def")
+grunt_scene_path = "res://scenes/mobs/Grunt.tscn"
+charger_scene_path = "res://scenes/mobs/Charger.tscn"
+shooter_scene_path = "res://scenes/mobs/Shooter.tscn"
+room_gate_position = Vector2(48, 144)
+room_gate_size = Vector2(48, 80)
+place_healing_fountain = false
