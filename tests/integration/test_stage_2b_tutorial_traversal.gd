@@ -99,10 +99,23 @@ func _first_dummy(room: Node) -> PracticeDummy:
 # Recursively search a node subtree for the first Pickup. The dummy adds its
 # iron_sword Pickup (deferred) to its own parent — a child of the Room01 node
 # — so a recursive walk is the robust way to find it.
+#
+# `is_instance_valid` guards are load-bearing: on the success path the Pickup
+# is collected + `queue_free()`'d during the Step 4 pin loop, but a just-freed
+# node can still surface in `get_parent().get_children()` for the remainder of
+# the frame. Recursing into that freed instance throws a typed-arg SCRIPT ERROR
+# ("previously freed ... not a subclass of the expected argument class").
+# Skipping invalid nodes keeps the walk quiet whether or not the Pickup is still
+# alive — a null return simply means "already collected", which the caller
+# already treats as the success path (outcome (b)).
 func _find_pickup(node: Node) -> Pickup:
+	if not is_instance_valid(node):
+		return null
 	if node is Pickup:
 		return node as Pickup
 	for child in node.get_children():
+		if not is_instance_valid(child):
+			continue
 		var found: Pickup = _find_pickup(child)
 		if found != null:
 			return found
