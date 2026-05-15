@@ -594,9 +594,9 @@ func test_boss_melee_hitbox_has_correct_layer_and_mask() -> void:
 	b.set_player(p)
 	# Capture the hitbox emitted by swing_spawned.
 	var spawned_hitbox: Hitbox = null
-	b.swing_spawned.connect(func(kind: StringName, hb: Hitbox) -> void:
+	b.swing_spawned.connect(func(kind: StringName, hb: Node) -> void:
 		if kind == Stratum1Boss.SWING_KIND_MELEE:
-			spawned_hitbox = hb
+			spawned_hitbox = hb as Hitbox
 	)
 	# Advance into telegraphing then fire.
 	b._physics_process(0.016)  # → STATE_TELEGRAPHING_MELEE
@@ -636,9 +636,9 @@ func test_boss_wake_enables_hit_detection_on_player() -> void:
 	# We need a duck-typed take_damage. Use an inner-class player on the boss test.
 	# Instead, directly drive _try_apply_hit via the spawned hitbox:
 	var spawned_hitbox: Hitbox = null
-	b.swing_spawned.connect(func(kind: StringName, hb: Hitbox) -> void:
+	b.swing_spawned.connect(func(kind: StringName, hb: Node) -> void:
 		if kind == Stratum1Boss.SWING_KIND_MELEE:
-			spawned_hitbox = hb
+			spawned_hitbox = hb as Hitbox
 	)
 	b.global_position = Vector2.ZERO
 	b.set_player(fp)

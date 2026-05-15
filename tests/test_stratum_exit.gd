@@ -247,6 +247,10 @@ func test_room_activates_exit_on_boss_death() -> void:
 	boss._physics_process(Stratum1Boss.PHASE_TRANSITION_DURATION + 0.01)
 	boss.take_damage(198, Vector2.ZERO, null)  # 198 → 0 (death)
 	assert_true(boss.is_dead())
+	# REGRESSION-86c9ujq8d: StratumExit.activate() is now called via
+	# call_deferred() from _on_boss_died to avoid the physics-flush ERR_FAIL_COND.
+	# Drain one process frame so the deferred activate() lands before asserting.
+	await get_tree().process_frame
 	assert_true(exit.is_active(),
 		"exit ACTIVE after boss_died propagates through room → exit.activate()")
 
