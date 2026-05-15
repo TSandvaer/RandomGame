@@ -73,11 +73,31 @@ const KNOWN_ITEM_SUBDIRS: Array[String] = [
 
 ## Critical content paths preloaded directly via `load()` regardless of
 ## DirAccess behavior. These are the items the save-restore path absolutely
-## must resolve on every boot — primarily the starter weapon (iron_sword) so
-## a save with iron_sword equipped never push_warnings on F5 reload. Add new
-## entries when a new save-critical item ships.
+## must resolve on every boot. Add new entries when a new save-critical item
+## ships.
+##
+## **Why every item in a live loot table must be listed here (ticket `86c9uemdg`
+## sibling — Sponsor M2 RC soak):** any item that can land in a save (via a
+## live loot-table drop) needs a direct-load fallback. The recursive +
+## KNOWN_ITEM_SUBDIRS scans are best-effort in HTML5 / `gl_compatibility`
+## packed builds (the DirAccess `current_is_dir()` quirk + `list_dir_begin()`
+## behavior on .pck resources is unreliable). Direct `load()` of a packed
+## res:// path always works because it reads from the resource cache, not
+## DirAccess. Pre-fix only `iron_sword.tres` was direct-loaded; Sponsor's
+## M2 RC soak (build `5bef197`) surfaced `USER WARNING:
+## ItemInstance.from_save_dict: unknown item id 'leather_vest'` on boot
+## because the previous run had picked up a leather_vest (a guaranteed drop
+## from the boss + a 0.30 cumulative weight on the grunt_drops table) into
+## the save, and this run's HTML5 build failed to register it via DirAccess.
+##
+## **Inclusion rule:** any item appearing in `resources/loot_tables/*.tres`
+## entries must be listed here. Future T2/T3 loot expansions need to extend
+## this list as new items ship. The id-collision-from-different-instance
+## guard in `_on_item_resource_found` lets the same item be registered
+## multiple times by the three scan passes without warning.
 const STARTER_ITEM_PATHS: Array[String] = [
 	"res://resources/items/weapons/iron_sword.tres",
+	"res://resources/items/armors/leather_vest.tres",
 ]
 
 var _items: Dictionary = {}    # StringName -> ItemDef

@@ -94,6 +94,73 @@ func test_load_all_starter_paths_register_even_if_diraccess_fails() -> void:
 
 
 # =======================================================================
+# AC1b — REGRESSION-86c9uemdg: leather_vest also direct-loaded
+# =======================================================================
+# Sponsor M2 RC soak (build `5bef197`) surfaced:
+#   USER WARNING: ItemInstance.from_save_dict: unknown item id 'leather_vest'
+# fires once at boot. Root cause: same DirAccess subdir-recursion quirk as the
+# iron_sword case (ticket 86c9qah1f) but for the `armors/` subdir instead of
+# `weapons/`. Pre-fix only iron_sword was direct-loaded via STARTER_ITEM_PATHS;
+# leather_vest relied on the DirAccess scan which silently failed in HTML5.
+# `leather_vest` is in `boss_drops.tres` (guaranteed boss drop) AND
+# `grunt_drops.tres` (0.30 cumulative weight) — so once it lands in a save,
+# every subsequent boot push_warnings unless the registry direct-loads it.
+
+func test_load_all_resolves_leather_vest_via_starter_paths() -> void:
+	var reg: ContentRegistry = ContentRegistry.new()
+	reg.load_all()
+	var def: ItemDef = reg.resolve_item(&"leather_vest")
+	assert_not_null(def,
+		"REGRESSION-86c9uemdg: leather_vest MUST resolve via ContentRegistry after load_all() — " +
+		"if null, save-restore push_warnings on every boot of a save containing leather_vest")
+	assert_eq(def.id, &"leather_vest", "resolved item id matches lookup key")
+
+
+func test_starter_item_paths_includes_leather_vest_drift_detector() -> void:
+	# Drift detector mirror of the iron_sword test: if someone removes
+	# leather_vest from STARTER_ITEM_PATHS thinking DirAccess covers it, this
+	# fails and surfaces the regression. Any item that can land in a save (via
+	# a live loot table) MUST be in STARTER_ITEM_PATHS — see the inclusion
+	# rule in ContentRegistry.STARTER_ITEM_PATHS docstring.
+	assert_true(
+		ContentRegistry.STARTER_ITEM_PATHS.has("res://resources/items/armors/leather_vest.tres"),
+		"REGRESSION-86c9uemdg: STARTER_ITEM_PATHS must include leather_vest.tres — " +
+		"load-bearing for HTML5 save-restore of saves containing leather_vest. " +
+		"Do NOT remove without verifying DirAccess subdir-recursion works for armors/ in HTML5.")
+
+
+func test_restore_from_save_leather_vest_in_stash_resolves_silently() -> void:
+	# Reproduces the Sponsor M2 RC soak symptom shape: save dict contains a
+	# leather_vest entry, restore_from_save must NOT push_warning, and the
+	# Inventory must contain the resolved ItemInstance.
+	var save_data: Dictionary = {
+		"equipped": {},
+		"stash": [
+			{
+				"id": "leather_vest",
+				"tier": 1,  # boss_drops.tres ships leather_vest at tier_modifier=1 (T2)
+				"rolled_affixes": [],
+				"stack_count": 1,
+			},
+		],
+	}
+	var registry: ContentRegistry = ContentRegistry.new().load_all()
+	_inv().restore_from_save(
+		save_data,
+		registry.item_resolver_callable(),
+		registry.affix_resolver_callable(),
+	)
+	var items: Array = _inv().get_items()
+	assert_eq(items.size(), 1,
+		"REGRESSION-86c9uemdg: stash with one leather_vest must produce one ItemInstance after restore")
+	var inst: ItemInstance = items[0] as ItemInstance
+	assert_not_null(inst.def,
+		"restored leather_vest ItemInstance has non-null def (resolver returned non-null)")
+	assert_eq(inst.def.id, &"leather_vest",
+		"restored stash item is the leather_vest from the save dict")
+
+
+# =======================================================================
 # AC2 — is_resolved() flips false → true across load_all()
 # =======================================================================
 

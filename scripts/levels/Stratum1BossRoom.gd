@@ -17,8 +17,40 @@ extends Node2D
 ##   3. The boss starts in STATE_DORMANT — it cannot attack or take damage
 ##      during the entry sequence (Uma BI-19: boss does NOT attack during
 ##      Beats 1–4).
-##   4. On `boss_died`, the controller drops loot via `MobLootSpawner` and
-##      flips `stratum_exit_unlocked = true`, emitting `stratum_exit_unlocked`.
+##   4. On `boss_died`, the controller activates the StratumExit and flips
+##      `stratum_exit_unlocked = true`, emitting `stratum_exit_unlocked`.
+##      **Loot is NOT spawned here — Main owns the boss-loot drop via its
+##      own MobLootSpawner subscribed to `boss_died` through `_wire_mob`.**
+##      See "Boss loot single-pipeline rule" below.
+##
+## **Boss loot single-pipeline rule (ticket `86c9uemdg` — Sponsor M2 RC soak).**
+## Pre-fix, this controller owned its own `MobLootSpawner` and called
+## `on_mob_died(boss, ...)` from `_on_boss_died`. Main also subscribes to the
+## boss's `boss_died` signal in `_wire_mob` (boss has `boss_died` not
+## `mob_died`, but Main's `_on_mob_died` forwards from both signals) — so
+## **TWO `MobLootSpawner.on_mob_died` calls fired per boss death**, producing
+## TWO independent roller.roll(loot_table) result sets, each spawning a full
+## set of Pickup nodes.
+##
+## Main's set was wired via `Inventory.auto_collect_pickups(pickups)` — the
+## return value of `_loot_spawner.on_mob_died(...)` is fed to
+## `Inventory.auto_collect_pickups` which connects each Pickup's `picked_up`
+## signal to `Inventory.on_pickup_collected`. The player walking over Main's
+## Pickups triggers `body_entered → picked_up → on_pickup_collected → add()`.
+##
+## **The Stratum1BossRoom's set was NOT wired** — `_on_boss_died` discarded
+## the return value of `_loot_spawner.on_mob_died(...)` so those Pickups had
+## zero subscribers on their `picked_up` signal. The player walking over them
+## fired `body_entered`, the Pickup emitted `picked_up`, the signal reached
+## no one, and the Pickup stayed alive on the ground forever (the
+## `_clear_collected_latch_if_alive` deferred call re-armed the latch since
+## nobody called `consume_after_pickup`). Sponsor reported "boss room 8
+## cannot loot dropped items" — Main's set was being collected, BossRoom's
+## set was uncollectable.
+##
+## **Fix:** delete the Stratum1BossRoom's `_loot_spawner` entirely. Main is
+## the single boss-loot pipeline. `_on_boss_died` now only activates the
+## StratumExit + emits closure signals; loot is Main's responsibility.
 ##
 ## The camera/audio/vignette wiring is decoupled: Devon (or the test
 ## harness) connects to the `entry_sequence_started` and
@@ -89,13 +121,15 @@ var _entry_sequence_completed: bool = false
 var _entry_started_time_ms: int = 0
 var _entry_completed_time_ms: int = 0
 var _stratum_exit_unlocked: bool = false
-var _loot_spawner: MobLootSpawner = null
 var _stratum_exit: StratumExit = null
 
 
 func _ready() -> void:
-	_loot_spawner = MobLootSpawner.new()
-	_loot_spawner.set_parent_for_pickups(self)
+	# Boss loot is owned by Main's MobLootSpawner (subscribed to `boss_died` via
+	# `_wire_mob`) — see "Boss loot single-pipeline rule" in the docstring above.
+	# Stratum1BossRoom NO LONGER owns its own loot spawner; the old dual-spawn
+	# path (ticket `86c9uemdg`) produced uncollectable pickups because this
+	# controller's set was never wired to `Inventory.auto_collect_pickups`.
 	# `_spawn_boss()` stays synchronous: the boss is a CharacterBody2D (no
 	# Area2D monitoring mutation on tree-entry), and `Main._wire_room_signals`
 	# reads `get_boss()` on the SAME tick the room is added to the tree (see
@@ -342,13 +376,14 @@ func _complete_entry_sequence() -> void:
 		_boss.wake()
 
 
-func _on_boss_died(boss: Stratum1Boss, death_position: Vector2, mob_def: MobDef) -> void:
-	# Drop loot via the standard spawner so the boss reuses the same
-	# pipeline as Grunt's drops. boss_drops.tres ships with guaranteed-drop
-	# entries (weight = 1.0 with T2/T3 tier modifiers per Uma's "climax
-	# loot moment").
-	if _loot_spawner != null and mob_def != null:
-		_loot_spawner.on_mob_died(boss, death_position, mob_def)
+func _on_boss_died(boss: Stratum1Boss, death_position: Vector2, _mob_def: MobDef) -> void:
+	# Loot is dropped by Main's `MobLootSpawner` (subscribed to `boss_died` via
+	# `_wire_mob` in `scenes/Main.gd`). Main also wires the dropped Pickups via
+	# `Inventory.auto_collect_pickups` so the player can collect them.
+	# Stratum1BossRoom NO LONGER spawns its own loot — the pre-fix dual-spawn
+	# (ticket `86c9uemdg`) produced uncollectable pickups because this
+	# controller's set was never wired to `picked_up` listeners. See the
+	# "Boss loot single-pipeline rule" in the class docstring above.
 	# Flip the exit-unlocked state and emit. Cinematic layer subscribes
 	# separately to the boss's own `boss_died` signal for the time-freeze
 	# + ember dissolve; we don't drive those visuals from here.
