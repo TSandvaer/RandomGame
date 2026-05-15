@@ -54,6 +54,7 @@ For deep-dive reference, see the topic files in `.claude/docs/`:
 - [Orchestration Overview](.claude/docs/orchestration-overview.md) — orchestrator + team topology, named-agent roster, worktree pattern, dispatch conventions, hard gates, cron rules, sub-agent doc-reading pointer
 - [Combat Architecture](.claude/docs/combat-architecture.md) — Player swing flow, Hitbox / Projectile encapsulated-monitoring pattern, mob `_die` death pipeline, hit-flash / death-tween, `[combat-trace]` shim, Godot 4 physics-flush rule
 - [HTML5 Export](.claude/docs/html5-export.md) — `gl_compatibility` quirks (HDR clamp, Polygon2D, z-index), service-worker cache trap, BuildInfo SHA verification, visual-verification gate, release-build + artifact handoff pattern, diagnostic-build pattern, Sponsor soak ritual
+- [Audio Architecture](.claude/docs/audio-architecture.md) — 5-bus layout (`default_bus_layout.tres`), `AudioDirector` autoload with BGM/Ambient/crossfade players, S1→S2 entry-trigger wiring, boss-room crossfade pattern, HTML5 audio-playback gate (AudioContext user-gesture requirement)
 
 ## Key references outside `.claude/docs/`
 

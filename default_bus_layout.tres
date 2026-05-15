@@ -1,0 +1,63 @@
+[gd_resource type="AudioBusLayout" format=3]
+
+; Embergrave audio bus baseline — 5-bus structure per
+; `team/uma-ux/audio-direction.md` §3 ("Mixing & ducking rules"). All non-
+; Master buses default-send to Master, and the dB values match Uma's spec:
+;
+;   Master   ·  0 dB        · final output
+;   BGM      · -12 dB        · all mus-* cues (S1/S2 BGM, boss music)
+;   Ambient  · -18 dB        · all amb-* cues (S1/S2 room beds, torch loops)
+;   SFX      ·  -6 dB        · all sfx-* combat / item / world cues (NOT UI)
+;   UI       · -10 dB        · UI clicks, save toast, tab open/close, ticks
+;
+; Voice bus is reserved for M2+ per `audio-direction.md §3` — intentionally NOT
+; provisioned here. Adding it now would create an unused bus on every player's
+; AudioServer with no consumers; the sourcing pass for voice content has not
+; landed and the duck rule that targets Voice is M2+ only. We add Voice the
+; same day the first voice cue ships.
+;
+; Sidechain ducking (SFX→BGM, SFX→Ambient, panel-open duck) is intentionally
+; deferred to a follow-up PR — this baseline establishes the buses so cue
+; consumers can target by name; the AudioEffectCompressor wiring lands as a
+; second pass once we have audible content to tune against.
+;
+; W3-T9 ClickUp `86c9uf6hh` — Devon's follow-up to Uma's PR #210 (S2 audio
+; sourcing). This is the first audio bus layout in the repo; before this
+; commit, every AudioStreamPlayer routed to a single implicit "Master" with
+; default 0 dB.
+
+[resource]
+bus/0/name = &"Master"
+bus/0/solo = false
+bus/0/mute = false
+bus/0/bypass_fx = false
+bus/0/volume_db = 0.0
+bus/0/send = &""
+
+bus/1/name = &"BGM"
+bus/1/solo = false
+bus/1/mute = false
+bus/1/bypass_fx = false
+bus/1/volume_db = -12.0
+bus/1/send = &"Master"
+
+bus/2/name = &"Ambient"
+bus/2/solo = false
+bus/2/mute = false
+bus/2/bypass_fx = false
+bus/2/volume_db = -18.0
+bus/2/send = &"Master"
+
+bus/3/name = &"SFX"
+bus/3/solo = false
+bus/3/mute = false
+bus/3/bypass_fx = false
+bus/3/volume_db = -6.0
+bus/3/send = &"Master"
+
+bus/4/name = &"UI"
+bus/4/solo = false
+bus/4/mute = false
+bus/4/bypass_fx = false
+bus/4/volume_db = -10.0
+bus/4/send = &"Master"
