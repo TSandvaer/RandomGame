@@ -908,19 +908,18 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         // LOCKED→UNLOCKED→TRAVERSED. The body_entered count is redundant
         // proof in those cases.
         //
-        // **Why we don't assert >= 2 across all cases:** the
-        // `[combat-trace] RoomGate._on_body_entered` shim fires from the
-        // gate's `_combat_trace` wrapper, which checks `is_inside_tree()`
-        // before routing through DebugFlags. The 86c9ugfzv 8-run sweep
-        // showed that case B's combat-phase `_on_body_entered` traces are
-        // sometimes NOT in the buffer even though the gate's `gate_unlocked`
-        // trace IS in the buffer (an inconsistency that suggests the
-        // body_entered trace is fired but lost across the room-transition
-        // tree-mutation window, or that the gate's `register_mob` →
-        // `_on_mob_died` → `_unlock` chain is firing without an
-        // `_on_body_entered` in between). Either way, the `gateUnlocked`
-        // check above already proves the gate transitioned, so this
-        // assertion is removed for cases A/B.
+        // **Why we don't assert >= 2 across all cases (ticket 86c9ugfzv
+        // N=2 sweep finding):** in case B specifically, the
+        // `_on_body_entered → lock()` event fires DURING the room-load /
+        // settle window between the previous room's `gate_traversed` and
+        // this room's `preRoomBodyEnteredCount` snapshot — i.e. BEFORE the
+        // spec's count baseline. So the body_entered count delta measured
+        // from `preRoomBodyEnteredCount → postWalkBodyEnteredCount` is
+        // legitimately 0 even when the gate fully transitioned (the trace
+        // exists, but is in `[0, preRoomBodyEnteredCount)`, not in the
+        // measured window). The `result.gateUnlocked` + `result.gateTraversed`
+        // assertions above already prove the transition occurred; the
+        // body_entered count assertion is redundant for cases A/B.
         if (result.resolutionCase === "open-walk") {
           const postWalkBodyEnteredCount = capture
             .getLines()

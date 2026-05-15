@@ -15,11 +15,16 @@
  * THEN walk to gate" pattern.
  *
  * **It does NOT hold when combat happens NEAR the gate trigger.** In Room 03
- * (the Grunt + Charger chase-combat room), the spawning chasers crowd the
- * player and knockback drifts the player INTO the gate trigger BEFORE the
- * last mob dies. Sequence observed empirically in release-build sweeps:
- *   1. `body_entered #1` fires DURING combat at the spec's clearRoomMobs phase
- *      → state OPEN → `lock()` → state LOCKED (mobs_alive>0, no unlock).
+ * (the Grunt + Charger chase-combat room), the player drifts INTO the
+ * trigger BEFORE the last mob dies. The 86c9ugfzv 8-run sweep empirically
+ * confirmed the sequence (every Room 03 trace shows `state=locked` on the
+ * very first `_on_mob_died` line — i.e. `lock()` ran before any decrement):
+ *   1. **During the room-load / settle window (between Room N-1's
+ *      `gate_traversed` and Room N's first `clearRoomMobs` call):** Room N
+ *      loads, mobs spawn near the gate, the player's teleport-to-spawn
+ *      combined with chase-knockback drifts the player INTO the trigger
+ *      → `body_entered #1` fires → state OPEN → `lock()` → state LOCKED
+ *      (mobs_alive>0, no unlock yet).
  *   2. Mobs die one-by-one via the deferred `_on_mob_died` decrement chain.
  *   3. When the last mob's decrement lands and `_mobs_alive == 0` with state
  *      == LOCKED, the gate starts its 650ms DEATH_TWEEN_WAIT and then fires
@@ -429,38 +434,72 @@ export async function gateTraversalWalk(
 
   // ---- Case A/B/C resolution (ticket 86c9ugfzv) ----
   //
-  // If the caller passed `preRoomLineCount`, scan the combat-phase slice
-  // `[preRoomLineCount, preLineCount)` for cross-phase `_unlock` /
-  // `gate_traversed` events that landed during combat. Three outcomes:
+  // When the caller passed `preRoomLineCount`, scan the room-scoped slice
+  // for cross-phase `_unlock` / `gate_traversed` events. Three outcomes:
   //
-  //   A. Already TRAVERSED — `gate_traversed` fired during combat. Return
-  //      immediately. The spec MUST guard against double-traversal (the
-  //      room counter has advanced; calling this helper would operate on
-  //      the NEXT room's still-LOCKED gate).
-  //   B. UNLOCKED but not traversed — `gate_unlocked` fired during combat
-  //      but no `gate_traversed`. Steer EAST-of-trigger (the player may be
-  //      inside the trigger right now, or anywhere — we normalise position
-  //      via key bursts), then walk pure-west to fire body_entered →
-  //      gate_traversed on the UNLOCKED gate.
-  //   C. Still OPEN — neither fired during combat. Take the existing
+  //   A. Already TRAVERSED — `gate_traversed` fired before the helper was
+  //      called. Return immediately. The spec MUST guard against
+  //      double-traversal (the room counter has advanced; calling this
+  //      helper would operate on the NEXT room's still-LOCKED gate).
+  //   B. UNLOCKED but not traversed — `gate_unlocked` fired before the
+  //      helper was called but no `gate_traversed`. Steer EAST-of-trigger
+  //      (the player may be inside the trigger right now, or anywhere — we
+  //      normalise position via key bursts), then walk pure-west to fire
+  //      body_entered → gate_traversed on the UNLOCKED gate.
+  //   C. Still OPEN — neither fired before the helper. Take the existing
   //      phase 3-5 walk (the open-gate path).
+  //
+  // **Scan-start computation (ticket 86c9ugfzv N=2 sweep finding):** the
+  // first cut of this resolution used `[preRoomLineCount, preLineCount)`
+  // — i.e. only events emitted during `clearRoomMobs`. That MISSED gate
+  // events that fire BETWEEN the previous room's `gate_traversed` and the
+  // current room-loop iteration start (e.g. the 800ms settle window
+  // between iterations, during which Room N+1's `_assemble_room_fixtures`
+  // runs and the player can drift into the new gate's trigger from the
+  // teleport-to-spawn). For Room 03 specifically, every observed run in
+  // the first 8-run sweep showed `_on_mob_died` traces with the gate
+  // already in `state=locked` at the first mob death — proving
+  // `_on_body_entered → lock()` fired BEFORE `preRoomLineCount`. So we
+  // expand the scan slice: scan from `[previousRoomGateTraversedIndex+1,
+  // preLineCount)` — i.e. everything since the previous gate's traversal
+  // (or from 0 if there was no previous gate). That captures the load /
+  // settle window AND combat.
   //
   // **Why this resolution lives in the helper, not the spec:** the helper is
   // the single point of truth for "how to make Room N traverse." Every
-  // future spec that drives Rooms 02..08 inherits the fix transparently;
-  // the spec just passes its `preRoomLineCount` snapshot. Putting case
-  // resolution at the spec level would require every future AC spec to
-  // re-implement the same A/B/C ladder. See the module header for
-  // rationale.
+  // future spec that drives Rooms 02..08 inherits the fix transparently.
+  // Putting case resolution at the spec level would require every future
+  // AC spec to re-implement the same A/B/C ladder. See the module header
+  // for rationale.
   //
   // **Compatibility:** when `preRoomLineCount` is omitted (legacy callers),
   // the resolution scan is skipped and the helper falls through to the
   // existing phase 3-5 path — preserving pre-86c9ugfzv behavior for any
   // spec that hasn't been migrated.
   if (options.preRoomLineCount !== undefined) {
-    const combatPhaseSlice = capture
-      .getLines()
-      .slice(options.preRoomLineCount, preLineCount);
+    // Find the most recent `gate_traversed` event STRICTLY before the
+    // caller's `preRoomLineCount`. Any `gate_traversed` at-or-after that
+    // index would be for THIS room's gate (which is what we're trying to
+    // fire) — we don't want to count those.
+    const allLines = capture.getLines();
+    let lastPreviousTraversedIndex = -1;
+    for (let i = options.preRoomLineCount - 1; i >= 0; i--) {
+      if (/\[combat-trace\] RoomGate\.gate_traversed/.test(allLines[i].text)) {
+        lastPreviousTraversedIndex = i;
+        break;
+      }
+    }
+    // Scan from one past the previous traversal (or 0 if no previous gate)
+    // through the helper-entry point. This window covers both the
+    // room-load / settle period AND `clearRoomMobs`.
+    const scanStart = lastPreviousTraversedIndex + 1;
+    const combatPhaseSlice = allLines.slice(scanStart, preLineCount);
+    console.log(
+      `[gate-traversal] ${roomLabel}: scanning slice ` +
+        `[${scanStart}, ${preLineCount}) for combat-phase gate events ` +
+        `(previous gate_traversed at index ${lastPreviousTraversedIndex}, ` +
+        `caller preRoomLineCount=${options.preRoomLineCount}).`
+    );
     const combatPhaseUnlocked = combatPhaseSlice.some((l) =>
       /\[combat-trace\] RoomGate\._unlock \| gate_unlocked emitting/.test(
         l.text
@@ -500,22 +539,17 @@ export async function gateTraversalWalk(
       // would throw against this state. Instead, steer EAST-of-trigger
       // then walk pure-west across to fire body_entered → gate_traversed.
       //
-      // **Diagnostic dump** (added during 86c9ugfzv 8-run sweep): when
-      // case B fires, dump every RoomGate.* trace in the combat-phase
-      // slice so we can correlate the gate state-machine transitions
-      // empirically. The post-walk assertion `bodyEnteredDelta >= 2`
-      // surfaced an unexpected zero count in the first sweep — this
-      // dump lets future debugging triage the trace coverage gap.
-      const gateTraces = combatPhaseSlice
-        .filter((l) => /\[combat-trace\] RoomGate\./.test(l.text))
-        .map((l) => `    ${l.text}`)
-        .join("\n");
+      // Diagnostic: log the count of gate transitions in the scan slice
+      // so future failures can correlate state-machine activity against
+      // the chosen resolution case.
+      const gateTraceCount = combatPhaseSlice.filter((l) =>
+        /\[combat-trace\] RoomGate\./.test(l.text)
+      ).length;
       console.log(
         `[gate-traversal] ${roomLabel}: case B — gate_unlocked fired ` +
-          `during combat phase but gate_traversed did NOT. Steering ` +
-          `EAST-of-trigger then walking WEST in to finish traversal.\n` +
-          `  Combat-phase RoomGate.* traces in slice ` +
-          `[${options.preRoomLineCount}, ${preLineCount}):\n${gateTraces || "    (none)"}`
+          `before helper entry but gate_traversed did NOT. ` +
+          `${gateTraceCount} RoomGate.* trace(s) in scan slice. ` +
+          `Steering EAST-of-trigger then walking WEST in to finish traversal.`
       );
       const traversed = await finishTraversalFromUnlocked(
         page,
