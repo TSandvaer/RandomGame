@@ -206,6 +206,27 @@ const RETURN_TO_SPAWN_BUDGET_MS = 8_000;
 const RETURN_BURST_MS = 250;
 
 /**
+ * Staleness threshold (ms) at which the helper stops trusting the kiter's
+ * trace-reported `dist_to_player` field. The Shooter emits its `.pos` trace
+ * every `POS_TRACE_INTERVAL` (0.25 game-seconds, ~250–500ms wall-clock under
+ * Playwright's degraded HTML5 frame-rate). A trace older than 1000ms means
+ * the Shooter has skipped 2–4 throttle ticks — its `_physics_process` is
+ * pausing more than the throttle (wall-pinned kiter, async state transition,
+ * etc.) — so the line's `dist_to_player` field reflects an older geometry
+ * snapshot than the live player/mob positions. The fallback in
+ * `chaseAndClearKitingMobs` switches to computed-from-live-readings
+ * distance once this threshold is crossed (ticket 86c9u9neq — Room 06
+ * stuck-pursuit failure shape: `mob.dist=132` frozen for the full 90s
+ * budget while the player was already adjacent).
+ *
+ * 1000ms is conservative: a normal-frame-rate Shooter emits every ~250ms,
+ * so a 1000ms gap is 4× the cadence — well past any single delayed tick
+ * and short enough to escape the stuck-pursuit loop within ~2 helper cycles
+ * (each cycle is `PURSUIT_BURST_MS + SETTLE_MS` ≈ 430ms).
+ */
+const MOB_POS_STALE_MS = 1_000;
+
+/**
  * Window the helper waits AFTER the kill loop for the gate state machine to
  * finish reacting (ticket 86c9u1cy2). The kill loop exits the instant the
  * kiter's `_die` trace appears — but at that moment the gate is typically
@@ -360,7 +381,8 @@ interface PosReading {
 function latestPos(
   capture: ConsoleCapture,
   pattern: RegExp,
-  maxAgeMs?: number
+  maxAgeMs?: number,
+  minTimestamp?: number
 ): PosReading | null {
   const lines = capture.getLines();
   const now = Date.now();
@@ -371,6 +393,13 @@ function latestPos(
     if (maxAgeMs !== undefined && now - line.timestamp > maxAgeMs) {
       // The newest matching line is already older than the staleness
       // window — every earlier line is older still, so bail.
+      return null;
+    }
+    if (minTimestamp !== undefined && line.timestamp < minTimestamp) {
+      // The newest matching line is older than the caller's lower bound
+      // (typically the chase invocation's `t0`) — every earlier line is
+      // older still. Used to reject cross-room leaks where a prior room's
+      // mob trace lingers in the buffer after the room was destroyed.
       return null;
     }
     const posM = t.match(/pos=\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/);
@@ -528,6 +557,41 @@ async function returnToSpawn(
     RETURN_BURST_MS,
     "return-to-spawn"
   );
+}
+
+/**
+ * Public re-export of `returnToSpawn` for the AC4 spec — used between the
+ * kiting-Shooter chase pre-pass and the fixed-position chaser click-spam
+ * loop in mixed Shooter+Chaser rooms (Room 06 + 07 + 08). Extends PR #190's
+ * "chase always leaves the room in a deterministic state" pattern to the
+ * spec's own follow-on phase: the chase's case C `returnToSpawn` already
+ * fires when the chase did not drive the gate, but in mixed rooms with
+ * chargers still alive the gate STAYS LOCKED throughout the chase, so case
+ * C is the always-taken branch and calling it again at the spec level is
+ * idempotent. The redundant call is belt-and-suspenders against any future
+ * chase path that bypasses case C (case A / case B in a mob-mix where the
+ * gate unexpectedly resolves while chasers are alive — currently
+ * theoretical, since chargers register with the gate and keep it LOCKED
+ * until all die, but defensive coverage costs only a few ms when the
+ * player is already at spawn).
+ *
+ * Default-pattern signature mirrors `chaseAndClearKitingMobs` for caller
+ * convenience: caller passes only what differs from the spec's defaults
+ * (Player.pos regex), which is none for the AC4 spec.
+ *
+ * Returns the final measured distance to spawn (px), or `null` if no
+ * `Player.pos` reading was available (best-effort; no throw — the caller's
+ * own assertions are the hard gate).
+ */
+export async function returnPlayerToSpawn(
+  page: Page,
+  capture: ConsoleCapture,
+  roomLabel: string,
+  options: { playerPosPattern?: RegExp } = {}
+): Promise<number | null> {
+  const playerPosPattern =
+    options.playerPosPattern ?? /\[combat-trace\] Player\.pos /;
+  return returnToSpawn(page, capture, roomLabel, playerPosPattern);
 }
 
 /**
@@ -700,7 +764,27 @@ export async function chaseAndClearKitingMobs(
     cycle++;
 
     // ---- Read positions, steer toward the (live) kiter ----
-    const mob = latestPos(capture, posPattern);
+    //
+    // **Scoping `latestPos` to this chase invocation** (`minTimestamp = t0`):
+    // without it, `latestPos` returns the most recent matching line in the
+    // ENTIRE capture buffer — which leaks across rooms. A previous room's
+    // Shooter trace (e.g. Room 04's Shooter killed long ago) is still in
+    // the buffer, and if THIS room's Shooter hasn't emitted yet (the room
+    // just loaded, its `_player` reference isn't resolved, or the throttle
+    // accumulator hasn't reached `POS_TRACE_INTERVAL` from the new
+    // `_physics_process` start), the helper would steer toward the prior
+    // room's last known position. Observed empirically in Room 07 after a
+    // Room 06 clear — the helper saw `mob=(356,113) mobAge=94s` (the Room
+    // 04 Shooter's last trace from 94s ago) and treated it as a live
+    // pursuit target, never engaging Room 07's actual Shooters which
+    // emitted somewhere different. Scoping the lookup to `t0` rejects the
+    // leak and falls through to the "no fresh trace" click-spam nudge.
+    //
+    // **The player-pos lookup is NOT scoped** — Player.gd emits `Player.pos`
+    // continuously across rooms (it's the same Player node), so cross-room
+    // leaks are not possible there; the very next live emission supersedes
+    // any prior reading via `latestPos`'s `i--` scan.
+    const mob = latestPos(capture, posPattern, undefined, t0);
     const player = latestPos(capture, playerPosPattern);
 
     if (mob === null || player === null) {
@@ -713,20 +797,54 @@ export async function chaseAndClearKitingMobs(
 
     const dx = mob.x - player.x;
     const dy = mob.y - player.y;
-    // Prefer the kiter trace's own dist_to_player (authoritative); fall back
-    // to the computed distance between the two latest readings.
-    const dist =
-      mob.dist !== null && mob.dist >= 0
-        ? mob.dist
-        : Math.round(Math.hypot(dx, dy));
+    const computedDist = Math.round(Math.hypot(dx, dy));
+    const mobAgeMs = Date.now() - mob.timestamp;
+    // Prefer the kiter trace's own `dist_to_player` when fresh (it is
+    // authoritative — the Shooter computed it against the player's live
+    // position at emit time). But when the mob's `.pos` trace is STALE
+    // (>= `MOB_POS_STALE_MS`), `mob.dist` is no longer a live measurement
+    // — it reflects the gap at the trace's last emit, which can be a
+    // wildly wrong stand-in for the current geometry if the mob's
+    // `_physics_process` is taking ticks off (Godot HTML5 under Playwright
+    // runs the physics step well below 60Hz during heavy combat, and a
+    // wall-pinned kiter that hit some other early-return path can have its
+    // `.pos` cadence stretch past the throttle interval). Without this
+    // staleness fallback the helper preferred `mob.dist=132` over a
+    // computed-from-live-readings `~15` and stayed in pursuit mode while
+    // the player was already adjacent — 0/1 Shooter kills in Room 06's
+    // 90s budget (the "Room 06 stuck-pursuit" failure shape characterised
+    // for ticket 86c9u9neq).
+    //
+    // The fix: when the mob's trace is older than the staleness window,
+    // fall back to computed distance — the LATEST emitted mob position
+    // against the LATEST emitted player position. The mob's frozen
+    // position is still a meaningful pursuit target (a kiter that
+    // stopped emitting is still physically somewhere) — the player
+    // closing on that position can land swings as the gap shuts.
+    const distLive = computedDist;
+    const distAuth = mob.dist !== null && mob.dist >= 0 ? mob.dist : computedDist;
+    const dist = mobAgeMs >= MOB_POS_STALE_MS ? distLive : distAuth;
     lastDist = dist;
     const steerKeys = keysToward(dx, dy);
 
     if (cycle === 1 || cycle % 8 === 0) {
+      // Log includes mob.dist + computed + mobAge so any future
+      // "kiter unreachable" investigation can disambiguate stale-trace
+      // vs. genuine geometry mismatch in one trace scan (ticket
+      // 86c9u9neq — Room 06 stuck-pursuit failure shape: `mob.dist=132`
+      // frozen for the full 90s budget because the Shooter stopped
+      // emitting `.pos`, while the computed distance from live readings
+      // was ~15px the whole time).
+      const staleNote =
+        mobAgeMs >= MOB_POS_STALE_MS
+          ? ` [stale — using computed]`
+          : "";
       console.log(
         `[kiting-chase] ${roomLabel}: cycle ${cycle} t=${Date.now() - t0}ms ` +
           `player=(${player.x},${player.y}) mob=(${mob.x},${mob.y}) ` +
-          `dist=${dist} steer=[${steerKeys.join("+")}] kills=${killsSoFar()}`
+          `dist=${dist} (mob.dist=${mob.dist} computed=${computedDist}) ` +
+          `mobAge=${mobAgeMs}ms steer=[${steerKeys.join("+")}] ` +
+          `kills=${killsSoFar()}${staleNote}`
       );
     }
 
@@ -1132,7 +1250,11 @@ export async function chaseAndClearMultiChaserRoom(
     const player = latestPos(capture, playerPosPattern);
     const mobReadings: PosReading[] = [];
     for (const p of posPatterns) {
-      const r = latestPos(capture, p);
+      // Scope to `t0` so a prior room's chaser `.pos` trace doesn't leak
+      // in — same rationale as `chaseAndClearKitingMobs` (Room 07 stale-leak
+      // observed in PR #212 release-build characterisation, ticket
+      // 86c9u9neq follow-up).
+      const r = latestPos(capture, p, undefined, t0);
       if (r !== null) mobReadings.push(r);
     }
 
