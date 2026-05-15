@@ -141,6 +141,30 @@ Replace `<list of artifacts>`, `<NNN>`, and `<list of facts>` with task-specific
 
 The **Regression guard** line is non-negotiable. It forces every dispatch to produce a named, durable regression surface — not just "paired tests for this PR's logic." All four M2 RC Sponsor-soak findings (2026-05-15) were regressions in surfaces that had previously been tested by component-scoped tests; none had system-scoped regression guards. The named test is the artifact a future unrelated PR's CI run flips RED against, so the regression surfaces at PR-time rather than at Sponsor-soak-time.
 
+## Final-report shape — TIGHT (mandatory in every dispatch)
+
+```markdown
+**Final report to orchestrator — TIGHT (≤200 words):**
+
+Your task-completion message back to the orchestrator MUST be tight to preserve the orchestrator's main-window context. Required content:
+
+- **PR URL** (1 line)
+- **Verdict** (1 line — `APPROVE` / `blocked-on-X` / `partial — see follow-up #...`)
+- **Blockers or follow-ups** (1-3 lines max — only what the orchestrator needs to act on this turn)
+- **Doc updates** (1 line — `Doc updates: <file> — <one-line>` or `Doc updates: none`)
+
+Detailed content goes in artifacts the orchestrator can read on-demand, NOT in the orchestrator-bound message:
+
+- **Empirical evidence / trace excerpts** → PR body
+- **Per-AC verification + AC walkthrough** → Self-Test Report comment on the PR
+- **Non-obvious findings** → PR body "Non-obvious findings" section
+- **Cross-lane integration check** → Self-Test Report on the PR (template above)
+- **Sponsor-input items** → PR body section if applicable
+- **8-run sweep evidence** → PR body / Self-Test Report
+```
+
+**Backstory:** the M2 W3 mid-retro investigation (2026-05-15) found that verbose sub-agent final reports flooding the orchestrator's main conversation window was the dominant context-bloat surface — separate from static file loads (which are actually larger in MARIAN-TUTOR than Embergrave). Tight orchestrator-bound reports + detailed PR-body / ClickUp-comment artifacts is the discipline that closes that gap. See orchestrator memory `tightened-final-report-contract.md`. Pair with the persona-file references in `.claude/agents/{role}.md`.
+
 ## Doc-update reporting (mandatory in every dispatch)
 
 ```markdown

@@ -25,6 +25,10 @@ HTML5 / WebGL2 has several load-bearing divergences from desktop (HDR clamp, Pol
 - **ClickUp** — single source of truth for tickets; integrated via `mcp__clickup__*` tools
 - **`gh` CLI** — PR + run management; `--admin --squash --delete-branch` is the standard merge
 
+## Team roster
+
+Canonical roster + topology lives in [`.claude/agents/TEAM.md`](.claude/agents/TEAM.md). Per-role persona briefs at [`.claude/agents/{priya,uma,devon,drew,tess}.md`](.claude/agents/) — read by the orchestrator when dispatching and self-read by sub-agents at session start. The `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` flag is set in `.claude/settings.json` for forward-compat; currently inert in this Claude Code build (memory `agent-teams-flag-is-inert`).
+
 ## Hard rules (orchestrator + team)
 
 These are non-negotiable. Memory rules at `~/.claude/projects/c--Trunk-PRIVATE-RandomGame/memory/` enforce them across sessions:
@@ -36,6 +40,7 @@ These are non-negotiable. Memory rules at `~/.claude/projects/c--Trunk-PRIVATE-R
 - **ClickUp status as hard gate.** Every dispatch / PR-open / merge pairs with a ClickUp status move in the same tool round.
 - **Orchestrator never codes.** Don't read source, grep, trace bugs, or edit code. Dispatch agents from symptoms instead.
 - **Always parallel dispatch.** Every tick has 3-5 agents in flight; tickets aren't progress, dispatches are.
+- **Tightened final-report contract.** Sub-agent reports to orchestrator are TIGHT (≤200 words, PR URL + verdict + blockers + doc-updates line). Detailed content goes in PR body + Self-Test Report. Memory: `tightened-final-report-contract`.
 
 ## Detailed Documentation
 

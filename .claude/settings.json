@@ -1,7 +1,11 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "allow": [
-      "Bash(gh pr merge:*)"
+      "Bash(gh pr merge:*)",
+      "Edit(.claude/agents/*.md)"
     ]
   },
   "hooks": {
