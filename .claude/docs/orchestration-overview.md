@@ -86,6 +86,18 @@ For ClickUp updates and PR transitions, the standard cadence pairs each step wit
 - **Don't run cron during Sponsor wait** (memory `cron-noise-during-sponsor-wait.md`): when waiting on Sponsor's interactive soak / retest, lower cron cadence or kill it. Don't run no-op heartbeats for hours.
 - **Drain mode on session-end** (memory `drain-mode-on-session-end.md`): when Sponsor says "save session" / "drain", stop new dispatches, let in-flight finish, merge closure PRs, kill the cron.
 
+### Auto-status toggle (on / away / off)
+
+The `auto-status` skill drives a session-scoped orchestrator-check loop with three modes:
+
+- **on** — 5-minute read-only status pulse (board audit, CI check, surface blockers).
+- **away** — ~15-minute active orchestration tick; dispatches work, merges ready PRs, advances tickets. Never makes Sponsor-sign-off calls autonomously.
+- **off** — stops the loop.
+
+**Durability:** when the loop is running, its state is written to `.claude/auto-status.state`. The SessionStart hook (matcher: `startup|resume|clear` — explicitly excludes `compact`) reads that file and re-arms the loop automatically in the new session. Do not re-arm by hand — if auto-status is already running at session start, the hook did it.
+
+**Scope limits:** the loop is session-scoped and machine-local; laptop sleep freezes it. Full operational detail in auto-memory `auto-status-reporting.md`.
+
 ## Diagnostic build pattern
 
 When validation needs a tedious-to-trigger gameplay scenario, ship a temporary `diag/<short-purpose>` branch (e.g. `diag/2-swing-kill` lowering Grunt HP to 2). See memory `diagnostic-build-pattern.md`. Never merge to main; trigger release-build directly on the diag branch; cherry-pick onto fix branches when integrated verification is needed; delete from origin once the fix lands.

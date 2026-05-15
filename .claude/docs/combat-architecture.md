@@ -204,6 +204,27 @@ The combat / level pattern surfaced by PR #155: a signal named `<noun>_<state-ve
 
 Future state-change/action-event pairs (aggro/attack, pickup/equip, dialog/advance, save/load) should land their `[combat-trace]` lines AND their negative-assertion test simultaneously. When introducing any `<noun>_<state-verb>` signal, ask: "is there a separate `<noun>_<action-verb>` event that commits to the next thing?" If yes, add both traces and an assertion for both.
 
+### Negative-assertion buffer-scoping rule (PR #180 lesson)
+
+**Root cause.** `tests/playwright/specs/negative-assertion-sweep.spec.ts` Test 2 asserted zero `RoomGate.*` console traces for Room01 by scanning the **entire unbounded console buffer** collected since the spec started. PR #174's Stage 2b roster-swap introduced a `clearRoom01Dummy` 8-direction aim sweep that runs past `PracticeDummy._die`; that death triggers room-advance to Room02, whose `RoomGate.register_mob` calls land in the same buffer. The spec mis-attributed Room02 traces as Room01 violations and failed (RED on main).
+
+**Fix.** Scope the negative assertion to the sub-buffer captured **strictly before** the first `PracticeDummy._die` trace:
+
+```typescript
+const dieIndex = consoleLines.findIndex(l => /PracticeDummy\._die/.test(l));
+const room01Window = dieIndex === -1 ? consoleLines : consoleLines.slice(0, dieIndex);
+expect(room01Window.filter(l => /RoomGate/.test(l))).toHaveLength(0);
+```
+
+This is the canonical fix for any negative assertion whose truth window can be contaminated by a later phase of the same spec.
+
+**Generalised rule — negative-assertion buffer discipline:**
+1. **Anchor to a causal boundary.** Every negative assertion over a console buffer must define its truth window by finding a sentinel event (the first die-trace, the first room-transition trace, the first state-change line) and slicing to that boundary. An unbounded buffer scan is always wrong for multi-phase specs.
+2. **Parallel-phase contamination is the failure mode.** Any spec phase that advances beyond the state the negative assertion guards will push traces into the shared buffer. Stage-gating with `dieIndex`-style slices is the fix pattern.
+3. **New negative-assertion tests must declare their window.** Comment the sentinel expression explicitly — `// truth window: lines before first PracticeDummy._die` — so reviewers can verify the scope is correct without tracing the full spec flow.
+
+**Stale docstring pointer note.** The `[combat-trace]` reference in `Main.gd:381` (a `push_error` call) is NOT the documentation site for the no-`RoomGate`-in-Room01 rule. The real annotation lives in `scenes/Main.gd::_wire_room_signals` (~lines 406, 461). If you are hunting for why Room01 is expected to emit zero `RoomGate.*` traces, read `_wire_room_signals`, not line 381.
+
 ## Save autoload signal contract (added M2 W1)
 
 `Save.save_completed(slot: int, ok: bool)` (declared at `scripts/save/Save.gd`) is the project's first **global save-event signal** — emitted from every successful AND failed `save_game()` call on every entry point (autosave: `room_cleared`, `stratum_exit_unlocked`, quit; interactive: `StatAllocationPanel` allocation). Past-participle naming matches Inventory's `item_equipped` / `item_unequipped`.
