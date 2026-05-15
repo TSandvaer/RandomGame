@@ -271,6 +271,7 @@ func apply_mob_def(def: MobDef) -> void:
 ##   - mob_died emits exactly once on the death-transition.
 func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	if _is_dead:
+		_combat_trace("Charger.take_damage", "IGNORED already_dead amount=%d" % amount)
 		return
 	var clean_amount: int = max(0, amount)
 	var multiplier: float = RECOVERY_DAMAGE_MULTIPLIER if _state == STATE_RECOVERING else ARMORED_DAMAGE_MULTIPLIER

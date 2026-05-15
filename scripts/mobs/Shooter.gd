@@ -210,6 +210,7 @@ func apply_mob_def(def: MobDef) -> void:
 ## emit `damaged`, kill on 0.
 func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	if _is_dead:
+		_combat_trace("Shooter.take_damage", "IGNORED already_dead amount=%d" % amount)
 		return
 	var clean_amount: int = max(0, amount)
 	var hp_before: int = hp_current
