@@ -23,9 +23,20 @@ extends GutTest
 ## or a real save in dev environments.
 
 const TEST_SLOT: int = 998
+const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
+
+
+# ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
+##
+## See test_save.gd for the rationale. Save-roundtrip exercises the same
+## save-load surface and inherits the same gate.
+
+var _warn_guard: NoWarningGuard
 
 
 func before_each() -> void:
+	_warn_guard = NoWarningGuard.new()
+	_warn_guard.attach()
 	if _save().has_save(TEST_SLOT):
 		_save().delete_save(TEST_SLOT)
 	var tmp: String = _save().save_path(TEST_SLOT) + ".tmp"
@@ -36,6 +47,9 @@ func before_each() -> void:
 func after_each() -> void:
 	if _save().has_save(TEST_SLOT):
 		_save().delete_save(TEST_SLOT)
+	_warn_guard.assert_clean(self)
+	_warn_guard.detach()
+	_warn_guard = null
 
 
 func _save() -> Node:

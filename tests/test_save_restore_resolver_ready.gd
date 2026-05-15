@@ -43,6 +43,17 @@ extends GutTest
 ## assertion this ticket exists to unlock.
 
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
+const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
+
+
+# ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
+##
+## This whole file's purpose is pinning the no-warning posture for save-
+## restore. The guard makes the contract explicit: every test must
+## complete with zero ItemInstance.from_save_dict unknown-id warnings
+## (otherwise the AC5 console-silence assertion regresses).
+
+var _warn_guard: NoWarningGuard
 
 
 func _inv() -> Node:
@@ -52,11 +63,16 @@ func _inv() -> Node:
 
 
 func before_each() -> void:
+	_warn_guard = NoWarningGuard.new()
+	_warn_guard.attach()
 	_inv().reset()
 
 
 func after_each() -> void:
 	_inv().reset()
+	_warn_guard.assert_clean(self)
+	_warn_guard.detach()
+	_warn_guard = null
 
 
 # =======================================================================

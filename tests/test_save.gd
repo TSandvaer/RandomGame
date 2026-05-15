@@ -8,9 +8,22 @@ extends GutTest
 ## with a real save in dev environments.
 
 const TEST_SLOT: int = 999
+const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
+
+
+# ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
+##
+## Save is the load-bearing surface the M2 RC soak meta-finding singled
+## out — schema-newer-than-runtime + per-item migration warnings flow
+## through Save.gd. Every test here gets the guard attached; tests that
+## DELIBERATELY exercise a warning path must `expect_warning(pattern)`.
+
+var _warn_guard: NoWarningGuard
 
 
 func before_each() -> void:
+	_warn_guard = NoWarningGuard.new()
+	_warn_guard.attach()
 	# Clean slate per test.
 	if _save().has_save(TEST_SLOT):
 		_save().delete_save(TEST_SLOT)
@@ -23,6 +36,9 @@ func before_each() -> void:
 func after_each() -> void:
 	if _save().has_save(TEST_SLOT):
 		_save().delete_save(TEST_SLOT)
+	_warn_guard.assert_clean(self)
+	_warn_guard.detach()
+	_warn_guard = null
 
 
 func _save() -> Node:

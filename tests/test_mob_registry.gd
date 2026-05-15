@@ -23,6 +23,29 @@ extends GutTest
 ## to register them.
 
 const _MobDef: Script = preload("res://scripts/content/MobDef.gd")
+const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
+
+
+# ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
+##
+## Every test in this file gets a NoWarningGuard attached in before_each.
+## Tests that DELIBERATELY exercise a `push_warning` path (unknown id,
+## unknown stratum, null mob_def) must call `_warn_guard.expect_warning(
+## pattern)` BEFORE the path is exercised so the guard's `assert_clean`
+## in after_each doesn't flag it as a violation.
+
+var _warn_guard: NoWarningGuard
+
+
+func before_each() -> void:
+	_warn_guard = NoWarningGuard.new()
+	_warn_guard.attach()
+
+
+func after_each() -> void:
+	_warn_guard.assert_clean(self)
+	_warn_guard.detach()
+	_warn_guard = null
 
 
 # ---- Helpers ----------------------------------------------------------
@@ -101,6 +124,13 @@ func test_get_mob_def_returns_null_for_unknown_id_no_crash() -> void:
 	# crash, no exception. push_warnings are accepted at this surface
 	# (regression check: the warning lives in MobRegistry, not in the
 	# call site, so callers don't need to guard).
+	#
+	# Unknown-id paths in get_mob_def / get_mob_scene return null EARLY
+	# without push_warning (registration table miss path). It's the
+	# spawn() path that warns. has_mob has no warning either. So no
+	# expect_warning is needed here — pinning that contract is part of
+	# the test: if a future refactor moves the warning earlier, this
+	# test will flip RED via the universal-warning gate.
 	var def: MobDef = reg.get_mob_def(&"definitely_not_a_real_mob_id_zzzz")
 	assert_null(def, "unknown mob_id returns null from get_mob_def")
 	var scene: PackedScene = reg.get_mob_scene(&"definitely_not_a_real_mob_id_zzzz")
@@ -203,11 +233,15 @@ func test_multi_mob_room_spawn_via_registry_returns_correct_mob_type() -> void:
 
 
 func test_multi_mob_room_spawn_handles_unknown_id_gracefully() -> void:
+	# spawn() DELIBERATELY emits a WarningBus warning on unknown id. Opt
+	# the guard out for this specific pattern so after_each.assert_clean
+	# doesn't flag it.
+	_warn_guard.expect_warning("[MobRegistry] spawn: unknown mob_id")
 	var reg: Node = _registry()
 	var room: Node2D = Node2D.new()
 	add_child_autofree(room)
 	var node: Node = reg.spawn(&"definitely_not_a_real_mob_id_zzzz", Vector2.ZERO, room)
-	assert_null(node, "unknown mob_id returns null from spawn (push_warning'd)")
+	assert_null(node, "unknown mob_id returns null from spawn (WarningBus.warn'd)")
 	assert_eq(room.get_child_count(), 0, "no node parented under room for unknown id")
 
 
@@ -264,6 +298,9 @@ func test_has_mob_returns_true_for_registered_and_false_for_unknown() -> void:
 ## push_warning. Verifies the safety net for a typo'd stratum id.
 
 func test_apply_stratum_scaling_unknown_stratum_falls_back_to_baseline() -> void:
+	# Unknown-stratum DELIBERATELY emits a WarningBus warning. Opt the
+	# guard out for this specific pattern.
+	_warn_guard.expect_warning("unknown stratum_id")
 	var reg: Node = _registry()
 	var src: MobDef = ContentFactory.make_mob_def({"hp_base": 50, "damage_base": 4})
 	var scaled: MobDef = reg.apply_stratum_scaling(src, &"definitely_not_a_real_stratum_id_zzzz")
@@ -278,6 +315,9 @@ func test_apply_stratum_scaling_unknown_stratum_falls_back_to_baseline() -> void
 ## null and push_warnings.
 
 func test_apply_stratum_scaling_null_def_returns_null_no_crash() -> void:
+	# Null-MobDef DELIBERATELY emits a WarningBus warning. Opt the guard
+	# out for this specific pattern.
+	_warn_guard.expect_warning("apply_stratum_scaling called with null mob_def")
 	var reg: Node = _registry()
 	var scaled: MobDef = reg.apply_stratum_scaling(null, &"s2")
 	assert_null(scaled, "null mob_def in -> null out (graceful)")

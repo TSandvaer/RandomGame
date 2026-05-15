@@ -26,6 +26,19 @@ const FIXTURE_DIR: String = "res://tests/fixtures/"
 const FIXTURE_V0: String = "save_v0_pre_migration.json"
 const FIXTURE_V0_EMPTY: String = "save_v0_empty_inventory.json"
 const FIXTURE_V0_MALFORMED: String = "save_v0_malformed_item.json"
+const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
+
+
+# ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
+##
+## Save migration is the precise surface that catches schema-version drift
+## (the "save schema_version N is newer than runtime M" push_warning at
+## Save.gd:222) AND any per-entry warnings during v3→v4 migration when
+## that ships. Tests that DELIBERATELY exercise a warning path (the
+## malformed-item fixture is a future candidate, partial-corruption
+## recovery once W3-T6 lands) opt out via `expect_warning(pattern)`.
+
+var _warn_guard: NoWarningGuard
 
 
 func _save() -> Node:
@@ -54,6 +67,8 @@ func _install_fixture_at_slot(name: String, slot: int) -> void:
 
 
 func before_each() -> void:
+	_warn_guard = NoWarningGuard.new()
+	_warn_guard.attach()
 	if _save().has_save(TEST_SLOT):
 		_save().delete_save(TEST_SLOT)
 	var tmp: String = _save().save_path(TEST_SLOT) + ".tmp"
@@ -64,6 +79,9 @@ func before_each() -> void:
 func after_each() -> void:
 	if _save().has_save(TEST_SLOT):
 		_save().delete_save(TEST_SLOT)
+	_warn_guard.assert_clean(self)
+	_warn_guard.detach()
+	_warn_guard = null
 
 
 # =====================================================================
