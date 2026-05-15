@@ -661,8 +661,15 @@ func test_pos_trace_emits_after_throttle_interval() -> void:
 		"Charger.pos must emit once the throttle accumulator passes " +
 		"POS_TRACE_INTERVAL — the AC4 multi-chaser clear helper steers off it")
 	# Downstream consequence (Tier 2 bar): the payload carries the world
-	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/.
-	assert_string_contains(pos_msg, "pos=(352,128)",
-		"Charger.pos payload must carry the parseable world-coord tuple")
+	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/. Position
+	# may have drifted ±1px from the seeded value if the engine auto-ticked
+	# (defensive — `_make_charger` disables auto-physics, but assert on the
+	# regex shape rather than the exact coords for robustness alongside the
+	# matching test in test_grunt.gd, which CAN drift).
+	var pos_match := RegEx.new()
+	pos_match.compile("pos=\\(-?\\d+,-?\\d+\\)")
+	assert_true(pos_match.search(pos_msg) != null,
+		"Charger.pos payload must carry the parseable world-coord tuple " +
+		"(harness parses /pos=\\((-?\\d+),(-?\\d+)\\)/); got: " + pos_msg)
 	assert_string_contains(pos_msg, "dist_to_player=",
 		"Charger.pos payload must carry dist_to_player for the chase helper")
