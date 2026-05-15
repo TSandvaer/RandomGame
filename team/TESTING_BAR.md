@@ -113,6 +113,7 @@ Every sub-agent's task-completion message back to the orchestrator MUST be tight
 - **Verdict** (1 line — `APPROVE` / `blocked-on-X` / `partial — see follow-up #...`)
 - **Blockers or follow-ups** (1-3 lines max — only what the orchestrator needs to act on this turn)
 - **Doc updates** (1 line — `Doc updates: <file> — <one-line>` or `Doc updates: none`)
+- **Decision draft** (omit if none — `Decision draft: <1-3 line bullet>` for any architectural or process decision worth logging; Priya batches these into `team/DECISIONS.md` weekly — agents NEVER edit that file directly)
 
 Detailed content goes in artifacts the orchestrator can read on-demand, NOT in the orchestrator-bound message:
 

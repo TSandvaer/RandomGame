@@ -188,8 +188,22 @@ Add to `.gitignore` before staging if in doubt.
 These are highly contended. Conventions:
 
 - `STATE.md` — only your own role's section. Use the Edit tool with the section header line as the unique anchor. The orchestrator may edit "Phase" and "Open decisions awaiting orchestrator" sections.
-- `DECISIONS.md` — append-only. Priya appends team-level decisions; the orchestrator may append cross-role calls and Sponsor directives.
+- `DECISIONS.md` — **centralized; see subsection below.** No direct edits by agents.
 - Always `git pull --rebase` immediately before editing these files. PR title `chore(state): <role> idle` or `docs(decisions): <topic>`. Merge fast (squash + delete-branch) so contention windows are short.
+
+## Decisions log — no direct edits
+
+**`team/DECISIONS.md` is centralized. Only Priya's weekly batch-PR may open a PR that targets this file.** All other roles are hard-prohibited from editing it directly.
+
+**Why:** N parallel agents appending under the same date heading produce N-1 rebase conflicts. This pattern fired 3× in M2 W3 (PR #213 ×2, PR #219 ×1). Centralizing via a weekly batch eliminates the contention surface entirely.
+
+**The protocol:**
+
+1. **Agents** — if your task produces an architectural or process decision worth logging, record it as a `Decision draft:` line in your final report to the orchestrator. Format: `Decision draft: <1-3 line bullet — what was decided, why, reversibility, who it affects>`. Do NOT edit `team/DECISIONS.md` directly. Do NOT open a PR against it.
+2. **Priya** — collects `Decision draft:` lines from merged PRs each Monday. Batches them into a single weekly PR (title: `pm(decisions): weekly batch — YYYY-MM-DD`). Template at `team/priya-pl/decisions-batch-pr-template.md`.
+3. **Orchestrator** — may append urgent cross-role calls or Sponsor directives directly (in-session only, when the decision is blocking and cannot wait for the next batch). Must still use PR-flow; no force-push to main.
+
+**Enforcement:** Tess bounces any PR whose diff includes changes to `team/DECISIONS.md` and whose author is not Priya (exception: orchestrator urgent escalations noted above). No exceptions for "I just needed to add one line."
 
 ## Branch naming
 
