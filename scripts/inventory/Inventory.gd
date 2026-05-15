@@ -365,12 +365,33 @@ func restore_from_save(data: Dictionary, item_resolver: Callable, affix_resolver
 ## `lmb_click` user-clicks). The negative-assertion sweep can tell the
 ## onboarding auto-equip apart from a user click. (`auto_starter` — the old
 ## PR #146 boot-equip tag — is retired; see `equip()` docstring.)
-func on_pickup_collected(item: ItemInstance, _pickup: Variant = null) -> void:
+##
+## **Pickup lifecycle ownership (ticket `86c9u33h1`).** This hook owns the
+## Pickup's destruction: `Pickup._on_body_entered` no longer queue_frees itself
+## unconditionally — instead it emits `picked_up` and waits for the consumer
+## (us) to call `consume_after_pickup()` if-and-only-if `add()` succeeded.
+## When `add()` rejects the item (grid full at 24/24), we return early WITHOUT
+## consuming the Pickup, leaving it on the ground so the player can free a
+## slot and re-collect it. Pre-fix this hook left destruction to the Pickup
+## itself, which `queue_free`'d unconditionally — and any add-rejected item
+## was silently destroyed (Tess bug-bash `86c9kxx7h`).
+func on_pickup_collected(item: ItemInstance, pickup: Variant = null) -> void:
 	if not add(item):
+		# add() rejected (null item or grid full at 24/24). The Pickup stays
+		# on the ground — do NOT call consume_after_pickup. The Pickup's own
+		# `_clear_collected_latch_if_alive` deferred call re-arms the latch so
+		# the player can re-attempt after freeing a slot (must walk off + back
+		# on per body_entered single-event semantics).
 		return
+	# add() succeeded — destroy the Pickup. The pickup arg is the second
+	# positional arg of `Pickup.picked_up(item, pickup)`; defend against tests
+	# / call sites that pass null or a non-Pickup.
+	if pickup is Pickup:
+		(pickup as Pickup).consume_after_pickup()
 	# Auto-equip-first-weapon-on-pickup: only when the picked-up item is a
 	# weapon AND no weapon is currently equipped. First-weapon-only — an
-	# already-equipped weapon is never auto-swapped.
+	# already-equipped weapon is never auto-swapped. This branch only runs
+	# when add() succeeded above, so a rejected-add never auto-equips either.
 	if item == null or item.def == null:
 		return
 	if item.def.slot != ItemDef.Slot.WEAPON:
