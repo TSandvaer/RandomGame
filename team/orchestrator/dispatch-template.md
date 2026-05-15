@@ -116,6 +116,9 @@ Comment template:
 ### Side-effect inventory
 - <other surface that might be affected>: <expected vs. observed>
 
+### Cross-lane integration check
+List every other role's feature that shares state with this PR (e.g. Inventory + Pickup + Room gate + Loot for any combat PR). Describe what you probed and what you observed. If you cannot probe cross-lane state (no browser, headless only), name it explicitly as a Sponsor-soak probe target so the orchestrator can route it to Tess's journey-probe (see `team/TESTING_BAR.md` § "Milestone-gate journey probe").
+
 ### Open concerns / known gaps
 <anything noticed but out of this PR's scope>
 
@@ -129,10 +132,14 @@ For `chore`/`docs`/`test`/data PRs that don't need a Self-Test Report, replace t
 ```markdown
 **Done = PR open with: <list of artifacts> + STATE.md <role> section bump + any required ClickUp queue updates (one PR). Brief report (<NNN words): <list of facts to surface>.**
 
+**Regression guard:** Name at least one test (GUT or Playwright spec) that would fail if this feature broke in a future unrelated PR. If none exists, add it in this PR.
+
 Report back when done.
 ```
 
 Replace `<list of artifacts>`, `<NNN>`, and `<list of facts>` with task-specific values.
+
+The **Regression guard** line is non-negotiable. It forces every dispatch to produce a named, durable regression surface — not just "paired tests for this PR's logic." All four M2 RC Sponsor-soak findings (2026-05-15) were regressions in surfaces that had previously been tested by component-scoped tests; none had system-scoped regression guards. The named test is the artifact a future unrelated PR's CI run flips RED against, so the regression surfaces at PR-time rather than at Sponsor-soak-time.
 
 ## Doc-update reporting (mandatory in every dispatch)
 
