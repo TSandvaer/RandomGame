@@ -499,10 +499,23 @@ export async function gateTraversalWalk(
       // (assumes OPEN gate, asserts gate_unlocked fires during walk-in)
       // would throw against this state. Instead, steer EAST-of-trigger
       // then walk pure-west across to fire body_entered → gate_traversed.
+      //
+      // **Diagnostic dump** (added during 86c9ugfzv 8-run sweep): when
+      // case B fires, dump every RoomGate.* trace in the combat-phase
+      // slice so we can correlate the gate state-machine transitions
+      // empirically. The post-walk assertion `bodyEnteredDelta >= 2`
+      // surfaced an unexpected zero count in the first sweep — this
+      // dump lets future debugging triage the trace coverage gap.
+      const gateTraces = combatPhaseSlice
+        .filter((l) => /\[combat-trace\] RoomGate\./.test(l.text))
+        .map((l) => `    ${l.text}`)
+        .join("\n");
       console.log(
         `[gate-traversal] ${roomLabel}: case B — gate_unlocked fired ` +
           `during combat phase but gate_traversed did NOT. Steering ` +
-          `EAST-of-trigger then walking WEST in to finish traversal.`
+          `EAST-of-trigger then walking WEST in to finish traversal.\n` +
+          `  Combat-phase RoomGate.* traces in slice ` +
+          `[${options.preRoomLineCount}, ${preLineCount}):\n${gateTraces || "    (none)"}`
       );
       const traversed = await finishTraversalFromUnlocked(
         page,
