@@ -8,7 +8,9 @@ extends GutTest
 ##   3. Player presses Enter -> allocation saved, panel closes.
 ##   4. Player presses Esc -> allocation banked (unsaved points carry to
 ##      next session via save).
-##   5. Time-slow active while panel open.
+##   5. Non-modal overlay: Engine.time_scale stays 1.0 and Player
+##      process_mode is UNCHANGED while panel is open (Sponsor redirect
+##      2026-05-15 — "i shouldnt be slowed when level up panel appears").
 ##   6. 12 tooltip strings load from `stat_strings.tres`.
 
 const StatAllocationPanelScript: Script = preload("res://scripts/ui/StatAllocationPanel.gd")
@@ -45,7 +47,8 @@ func _make_panel() -> StatAllocationPanel:
 func before_each() -> void:
 	_ps().reset()
 	_levels().reset()
-	# Reset Engine.time_scale in case a prior test left it slowed.
+	# Safety net: reset Engine.time_scale in case any other test in the
+	# suite changes it. The panel itself does NOT touch time_scale.
 	Engine.time_scale = 1.0
 	# Wipe save slot so first-level-up auto-open behavior is deterministic.
 	if _save().has_save(0):
@@ -192,26 +195,75 @@ func test_banked_points_carry_via_save() -> void:
 
 
 # =======================================================================
-# Spec test 5: time-slow active while panel open (LU-09)
+# Spec test 5: non-modal overlay — combat continues uninterrupted (LU-09)
+#
+# Sponsor redirect 2026-05-15: "i shouldnt be slowed when level up panel
+# appears, im in the middle of a fight."
+# Full non-modal: panel is purely cosmetic. Engine.time_scale stays 1.0.
+# Player.process_mode is NOT touched by the panel on open or close.
+# TIME_SLOW_FACTOR constant is retained (API compat) but never applied.
 # =======================================================================
 
-func test_time_slow_factor_is_uma_10_percent() -> void:
-	# Static contract — Uma `level-up-panel.md` Beat 2 specifies 10%.
-	# If this drifts the test bounces.
+func test_time_slow_factor_constant_is_retained() -> void:
+	# Constant retained for API compat — records the original spec value.
+	# The panel does NOT apply it to Engine.time_scale.
 	assert_almost_eq(StatAllocationPanel.TIME_SLOW_FACTOR, 0.10, 0.001,
-		"time slow factor is 10% per Uma spec")
+		"TIME_SLOW_FACTOR constant exists and is 0.10 (historical record)")
 
 
-func test_time_slow_applied_while_panel_open() -> void:
+func test_engine_time_scale_unchanged_while_panel_open() -> void:
+	# Non-modal fix: the panel must NOT touch Engine.time_scale.
+	# time_scale must be exactly 1.0 through the full open→allocate→close cycle.
 	var panel: StatAllocationPanel = _make_panel()
 	assert_almost_eq(Engine.time_scale, 1.0, 0.001,
 		"time scale starts at 1.0")
 	panel.open(false)
-	assert_almost_eq(Engine.time_scale, 0.10, 0.001,
-		"opening the panel sets time_scale to 0.10 (Uma 10%)")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001,
+		"LU-09: opening panel does NOT change Engine.time_scale")
 	panel.close()
 	assert_almost_eq(Engine.time_scale, 1.0, 0.001,
-		"closing the panel restores time_scale to 1.0")
+		"LU-09: closing panel leaves Engine.time_scale at 1.0")
+
+
+func test_player_process_mode_unchanged_while_panel_open() -> void:
+	# Non-modal: Player.process_mode must not be touched by the panel.
+	# Player stays in PROCESS_MODE_INHERIT throughout — keeps moving + attacking.
+	var player_scene: PackedScene = load("res://scenes/player/Player.tscn")
+	assert_not_null(player_scene, "Player.tscn loads")
+	var player: Player = player_scene.instantiate()
+	add_child_autofree(player)
+	# Baseline — default authored process_mode is INHERIT.
+	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT,
+		"player process_mode is INHERIT by default")
+	var panel: StatAllocationPanel = _make_panel()
+	panel.open(false)
+	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT,
+		"LU-09 non-modal: panel open does NOT change Player.process_mode")
+	panel.close()
+	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT,
+		"LU-09 non-modal: panel close does NOT change Player.process_mode")
+
+
+func test_player_can_move_while_panel_open() -> void:
+	# Integration guard: player velocity is not locked by the panel.
+	# We assert process_mode stays INHERIT (the engine guarantee that
+	# _physics_process will run) — headless GUT can't tick physics to
+	# directly observe move_and_slide(), but INHERIT is the necessary
+	# and sufficient condition.
+	var player_scene: PackedScene = load("res://scenes/player/Player.tscn")
+	assert_not_null(player_scene, "Player.tscn loads")
+	var player: Player = player_scene.instantiate()
+	add_child_autofree(player)
+	player.velocity = Vector2(120, 0)  # simulate mid-sprint
+	var panel: StatAllocationPanel = _make_panel()
+	panel.open(false)
+	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT,
+		"player process_mode is INHERIT mid-sprint with panel open — can still move")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001,
+		"time scale is 1.0 — no slowdown")
+	panel.close()
+	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT,
+		"process_mode unchanged after close")
 
 
 # =======================================================================

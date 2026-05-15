@@ -22,13 +22,14 @@ The instant the XP-bar fill crosses a level threshold (Devon's `Player.xp_change
 
 This 0.4 s beat plays **even if the player won't open the panel right now**. It's the irreducible "you leveled up" cue. If the player keeps fighting and ignores the pip, the unspent point sits patiently — exactly the inventory panel's existing behavior.
 
-### Beat 2 — World slows + panel slides up (T+0.4 → T+0.7 s)
+### Beat 2 — Panel slides up (T+0.4 → T+0.7 s) — NON-MODAL OVERLAY
 
 If the player **chose** to engage with the level-up (auto-trigger on first level only — see "Auto-open rule" below):
 
-- **World time slows to 10%** — same convention as `inventory-stats-panel.md` §"Time-slow behavior on open". Music ducks to 60%, combat audio cuts to 30%. HP bar stays 100% opacity behind the panel (mob-hit-while-reading is the same risk it was on Tab).
-- Camera **does not push in** (unlike the death sequence) — the playfield stays visible and the player keeps spatial awareness of the room.
-- Panel slides up from the bottom edge over 0.3 s, easing out. Panel is a **bottom-anchored band**, not a full-screen takeover — playfield is visible above.
+- **Panel is a purely cosmetic overlay — combat continues uninterrupted at full speed.** `Engine.time_scale` stays at 1.0. `Player.process_mode` is NOT changed — movement and attacks are fully live while the panel is visible. Pick a talent at leisure; die if you lose track of the fight. This replaces both the original "World time slows to 10%" spec AND the subsequent "modal pause via PROCESS_MODE_DISABLED" attempt — Sponsor's verbatim redirect (Room 5, 2026-05-15): "i shouldnt be slowed when level up panel appears, im in the middle of a fight." Decision locked in ticket `86c9ujerz`.
+- Music ducks to 60% to signal the panel's presence; combat audio stays at 100% (uninterrupted — the fight is still happening). HP bar stays 100% opacity behind the panel.
+- Camera **does not push in** — the playfield stays fully visible and interactive.
+- Panel slides up from the bottom edge over 0.3 s, easing out. Panel is a **bottom-anchored band**, not a full-screen takeover.
 - Faint vignette deepens to 40% so the panel reads cleanly without burying the world.
 
 ### Beat 3 — Allocation (player-paced)
@@ -40,7 +41,7 @@ Player picks one of three stats. Numbers and stat preview update inline (see "St
 - On confirm, a **second smaller ember-burst** spawns on the chosen stat tile (visual closure on the picked stat).
 - **Audio:** soft "settle" tone (`stat_allocate.ogg`, 0.2 s — same family as the level-up chime, lower note).
 - Panel slides back down over 0.3 s.
-- World time ramps back to 100% over 0.2 s, music restores.
+- Music restores to 100% as the panel closes. (No time_scale to ramp — non-modal, combat was live throughout.)
 - HUD `[+1 STAT]` pip disappears if no points remain. If the player banked points and hit a level that gave +2 (M2+ — see "Multi-level catch-up" below), the pip stays.
 
 ### Auto-open rule (M1)
@@ -57,7 +58,7 @@ Bottom-anchored band, ~280 px tall, full screen width, `#1B1A1F` at 92% opacity 
 +-----------------------------------------------------------------------------------------+
 |                                                                                         |
 |                                                                                         |
-|                          (   PLAYFIELD — visible, time at 10%   )                       |
+|                          (   PLAYFIELD — visible, combat live   )                        |
 |                                                                                         |
 |                                                                                         |
 |=========================================================================================|
@@ -191,11 +192,20 @@ These also appear in `inventory-stats-panel.md` §"Equipment / Stats" panel wher
 | `first_levelup_subtle_hint`    | `Press 1, 2, or 3 — or hover for details.`      | Tiny 12 px hint at the bottom of the level-up panel **only on Level 2** (first-level teaching beat). |
 | `cap_reached_hint` *(M2+ stub)* | `This stat is at cap. Try another.`            | Reserved string. M1 has no caps.                            |
 
-## Decision: level-up does NOT pause the game
+## Decision: level-up panel is a full non-modal overlay (Sponsor redirect 2026-05-15)
 
-Logged here so Devon's animation budget reflects it: the level-up moment is **time-slowed (10%), not paused**. Same as inventory open. Combat continues at slow speed; mob projectiles still travel; HP can still drop. This costs Devon zero animation budget (no pause-state to author) and keeps the design language consistent across all "modal" interrupts in the game.
+**Original decision (pre-M2-W3 soak):** world time-slowed to 10%, same as inventory open. Rationale: consistent design language.
 
-If playtest reveals this is too punishing during a boss fight, the fallback is **time-freeze on level-up only during boss rooms** — not a global change. Holds the line on time-slow until tested.
+**First revision (ticket `86c9ujerz`, post-M2-W3 soak):** modal pause via `Player.process_mode = PROCESS_MODE_DISABLED`. Rationale: Sponsor's soak found 10% "insanely slow" — a bug read, not a design beat.
+
+**Final decision (Sponsor redirect 2026-05-15, same ticket):** full non-modal overlay. Sponsor's verbatim: "i shouldnt be slowed when level up panel appears, im in the middle of a fight." Both time-slow AND modal-pause approaches are rejected. The panel is purely cosmetic:
+
+- `Engine.time_scale` stays at 1.0.
+- `Player.process_mode` is NOT changed.
+- Player keeps moving and attacking while picking a talent at leisure.
+- Panel responsibility: render tiles, accept 1/2/3/Enter/Esc input, close on selection. Zero game-state coupling.
+
+Devon impact: zero animation budget change — no pause-state, no process_mode authored. The inventory panel remains time-slow (10%) per its own spec; only the level-up panel is non-modal.
 
 ## Cross-references
 
@@ -233,7 +243,7 @@ Per `team/TESTING_BAR.md`.
 | LU-06 | Levels 3+ do NOT auto-open the panel; the pip is the only persistent cue                                    | yes                     |
 | LU-07 | Pressing **P** opens the panel manually when at least one unspent stat point exists                         | yes                     |
 | LU-08 | Pressing P with zero unspent points is a no-op (no panel, no audio)                                         | yes                     |
-| LU-09 | While panel is open, world time runs at ~10% (matches inventory time-slow); HP bar stays at 100% opacity     | yes                     |
+| LU-09 | While panel is open, player CAN still move + attack (non-modal); Engine.time_scale stays 1.0; Player.process_mode is INHERIT; HP bar stays 100% opacity | yes |
 | LU-10 | Panel slides up from bottom over 0.3 s; slides back down over 0.3 s on dismiss                              | yes                     |
 | LU-11 | Three tiles visible: VIGOR (1), FOCUS (2), EDGE (3) — left to right, equal width                            | yes                     |
 | LU-12 | Each tile shows: glyph, name, current → next preview (e.g. `8 → 9`), one derived-stat preview line          | yes                     |
