@@ -84,7 +84,8 @@ Coverage: every audio cue M1+M2 needs. Priority column maps to sourcing order �
 | `mus-boss-stratum1-ph1`| Music | (M2) Boss phase 1 stem (drum + cello)                  | tense                  | ~60 s loop, layer-A   | hand-composed (stem of mus-boss-stratum1)                | M2         |
 | `mus-boss-stratum1-ph2`| Music | (M2) Boss phase 2 stem (adds piano + horn)             | escalating             | ~60 s loop, layer-B   | hand-composed (stem of mus-boss-stratum1)                | M2         |
 | `mus-boss-stratum1-ph3`| Music | (M2) Boss phase 3 stem (full ensemble + bell)          | climactic              | ~60 s loop, layer-C   | hand-composed (stem of mus-boss-stratum1)                | M2         |
-| `mus-stratum2-bgm`     | Music | (M2) Player in stratum-2 (Cinder Vaults)               | pressure-depth, slow frame-drum heartbeat, sustained cello drone, occasional bronze-bell strike (heat-blasted iron strut), rust-warm | ~120 s loop          | hand-composed                                            | M2         |
+| `mus-stratum2-bgm`     | Music | (M2) Player in stratum-2 (Cinder Vaults)               | pressure-depth, slow frame-drum heartbeat, sustained cello drone, occasional bronze-bell strike (heat-blasted iron strut), rust-warm | ~120 s loop          | hand-composed — **M2 ships placeholder synthesis (`<deferred-M3>` promotion to DAW hand-composed)** | M2         |
+| `mus-boss-stratum2`    | Music | (M2) Stratum-2 boss-intro Beat 5 onward, until boss defeated | escalated Cinder Vaults — minor-third cello bed (D2+F2), driving 80 BPM frame drum, louder bronze-bell strikes, low-brass swells at phase-break beats | ~60 s loop | hand-composed — **M2 ships placeholder synthesis (`<deferred-M3>`)**. Decision: unique not cross-stratum-reuse — see DECISIONS.md 2026-05-15 entry | M2         |
 | `mus-victory-pad`      | Music | Boss-defeated Beat F4 → stratum-clear ambient resume   | quiet relief, simple cello chord | 4 s sustained, no loop | hand-composed                                  | M1 must    |
 
 ### Ambient
@@ -94,7 +95,7 @@ Coverage: every audio cue M1+M2 needs. Priority column maps to sourcing order �
 | `amb-stratum1-room`    | Ambient | Player in any stratum-1 room (always-on, layered under BGM) | stone-room tone, distant drip, faint wind | 60 s loop (min per visual-direction.md) | freesound (cave/dungeon ambient) + hand-mix | M1 must |
 | `amb-stratum1-torch`   | Ambient | Player within 4 tiles of a wall-torch (positional)   | soft flame crackle     | 30 s loop, positional, low gain | freesound (torch crackle) — looped seamlessly         | M1 must    |
 | `amb-boss-room-pre`    | Ambient | Player in boss room before boss-aggro fires          | quieter, deeper room tone | 30 s loop, replaces amb-stratum1-room | hand-mix (filtered version of amb-stratum1-room) | M1 must |
-| `amb-stratum2-room`    | Ambient | (M2) Player in stratum-2 rooms                       | water drip + parchment rustle | 60 s loop          | freesound + hand-mix                                     | M2         |
+| `amb-stratum2-room`    | Ambient | (M2) Player in stratum-2 rooms (Cinder Vaults)       | steam-hiss bed + faint vein-pulse hum (sub-bass ~55/82 Hz at 0.18 Hz pulse, audio cousin of palette-stratum-2.md §3 ash-glow vein anim) + sparse scree-rustle particle ticks | 60 s loop          | freesound + hand-mix — **M2 ships placeholder synthesis (`<deferred-M3>` promotion to freesound+DAW final)** | M2         |
 | `amb-wind-distant`     | Ambient | (M2) Special chunks with "outside" feel              | distant wind, faint    | 60 s loop, low gain   | freesound                                                | M2         |
 
 **Coverage check vs. task spec:**
@@ -108,7 +109,7 @@ Coverage: every audio cue M1+M2 needs. Priority column maps to sourcing order �
 - Ambient stratum-1 loop — `amb-stratum1-room` + `amb-stratum1-torch`.
 - Stratum-1 BGM — `mus-stratum1-bgm`.
 - Boss intro sting — `sfx-boss-aggro` (Beat 3) + reused `sfx-bell-struck` (Beat 4).
-- Boss music (3 phases) — `mus-boss-stratum1` (M1, single loop covers all phases) + `mus-boss-stratum1-ph1/2/3` stems (M2 layer-aware).
+- Boss music (3 phases) — `mus-boss-stratum1` (M1, single loop covers all phases) + `mus-boss-stratum1-ph1/2/3` stems (M2 layer-aware) + `mus-boss-stratum2` (M2 unique placeholder, M3 DAW promotion — see DECISIONS.md 2026-05-15).
 - UI clicks — `sfx-ui-click` (M1 must) + `sfx-ui-hover/tab-open/tab-close/stat-allocate` (M1 nice).
 - Save success — `sfx-save-success` (M1) + `sfx-save-fail` (M1 nice).
 
@@ -232,3 +233,21 @@ When this doc commits, the following cross-role calls move into `team/DECISIONS.
 - **Sourcing pass dispatch shape**: do we hand the `M1 must` cue list to a single dispatched run that hunts freesound + records hand-Foley + ships placeholders, or split it into 3 parallel dispatches by source type (freesound / hand-Foley / hand-composed)? Uma's lean: **single dispatch** — it's faster to keep one ear on the whole soundscape than to integrate three sourcing passes after the fact. Awaiting Priya's call.
 - **M3 scoring contract**: the M1 placeholder track for `mus-stratum1-bgm` ships as a hand-composed ~90 s loop. M3 promotes this to a real composer's pass. We should not commission the M3 pass before M1 RC has been played by the Sponsor — the music conversation is too dependent on how the game actually feels. Defer.
 - **Voice acting (M2+)**: not in scope for M1 or for this doc's M2 baseline beyond the bus reservation. If M2 adds NPC dialogue, the voice tonal direction is a follow-up doc.
+
+## 6. Placeholder synthesis disclosure (M2 ships — `<deferred-M3>` promotion required)
+
+W3-T9 (ClickUp `86c9ue23j`, this PR) is the first audio commit landing in the repo. **The three Cinder Vaults cues — `mus-stratum2-bgm`, `mus-boss-stratum2`, `amb-stratum2-room` — are algorithmically-synthesized placeholders, not DAW hand-composed finals.** They were produced by `audio/_src/composer/compose_stratum2.py` using numpy + scipy + soundfile because the dispatched agent's environment has no DAW, no sample libraries, no recording capability, and no internet access for freesound curation. The placeholder fidelity is:
+
+- **Correct structurally**: every cue is the spec'd duration (120 s / 60 s / 60 s), correct loop length, correct OGG Vorbis container, correct 44.1 kHz stereo sample rate, peak normalized to -3 dBFS (music) / -5 dBFS (ambient).
+- **Correct directionally**: instrumentation palette honors `audio-direction.md §1` (cello drone + frame drum + bronze bell + low brass for boss + steam-hiss / vein-pulse hum / scree-rustle for ambient). No synths-as-pretense; the synthesis emulates additive-bowed-string + filtered-noise-burst-percussion + inharmonic-bell-partials.
+- **Tonally limited**: the synthesized cello is a sawtooth+harmonic-stack with a body-resonance low-pass — it reads as "low bowed string" but lacks the bow-noise / pressure-modulation / room-tone that a Spitfire LABS cello sample would carry. The synthesized frame drum lacks transient bite. The synthesized bell partial ratios are approximated, not measured against a real bronze bell.
+- **Aesthetically incomplete**: the cues will pass the "is this dark-folk-chamber and not orchestral / synth / chiptune" sniff test, but will not pass the "this feels like a real chamber ensemble recorded in a stone room" depth test.
+
+**M3 promotion plan** (file under M3 audio polish backlog):
+1. Promote `mus-stratum2-bgm` to DAW hand-composed (Spitfire LABS solo cello + frame drum + bell sample, ~3-4 h authoring per `audio-sourcing-pipeline.md §Route 5`).
+2. Promote `mus-boss-stratum2` to DAW hand-composed (same instrumentation + Spitfire LABS low-brass sample, ~3-4 h).
+3. Promote `amb-stratum2-room` to freesound+DAW (steam-hiss + scree-rustle particles via freesound CC0 + hand-mix in DAW, ~30 min per `Route 3`).
+
+The placeholder files retain the same file paths under `audio/music/stratum2/` and `audio/ambient/stratum2/`; M3 promotion is a one-file replace per `§4 versioning` rule. The placeholders are **explicit-acceptable for M2 RC ship per `m2-week-2-backlog.md §T9` "placeholder loops are explicit-acceptable" + `audio-sourcing-pipeline.md §Route 5 anti-pattern fallback rule** ("fall back to placeholder loop ... per `m2-week-1-backlog.md §R10`, placeholder is the explicit acceptable fallback — not a regression").
+
+The reproducible synthesis script lives at `audio/_src/composer/compose_stratum2.py`. Running `python audio/_src/composer/compose_stratum2.py` from repo root regenerates all three OGGs deterministically (numpy-RNG seeds are pinned in the script). The script is committed alongside the OGGs so future audits can reproduce the placeholders before the M3 promotion lands.
