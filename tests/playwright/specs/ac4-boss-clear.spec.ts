@@ -181,14 +181,19 @@ const ROOM_SHOOTER_COUNTS = [
 ];
 
 test.describe("AC4 — Stratum-1 boss reach + clear", () => {
-  // **STATUS: still test.fail(). The Room 02 gate bug (PR #183), the Room
-  // 04 pure-Shooter kiting wall (PR #186), and the Room 05 multi-chaser
-  // HARNESS-STEERING limitation (PR #198, this branch) are all FIXED. The
-  // current blocker is a GAME-side bug PR #198's release-build run
-  // uncovered: a death-path physics-flush freeze of the surviving sibling
-  // mobs in Room 05 — out of harness scope, needs a Drew game-side fix
-  // (follow-up to ticket 86c9u05d7). See the "CURRENT blocker" section
-  // below.**
+  // **STATUS: still test.fail(). Rooms 02-05 clear + traverse end-to-end on
+  // every release-build run after Drew's Room 05 panel-dismiss fix (PR
+  // #TBD, ticket 86c9u6uhg — see "What PR #207 fixed" below). The current
+  // blocker is the Room 06 fixed-position chaser-clear loop: the kiting
+  // Shooter chase pre-pass roams the player 100+px from spawn (typically
+  // ending in a corner), and the subsequent N+E click-spam loop for the
+  // 2 chargers cannot connect from that drifted position — observed
+  // 0/2 chasers killed across the 90s budget. Out of harness scope from
+  // this PR; the fix shape is either (a) add a return-to-spawn step
+  // between the kiting Shooter chase and the chaser fixed-position loop,
+  // or (b) generalise `chaseAndClearMultiChaserRoom` to 2-chaser rooms
+  // when a kiting Shooter pre-pass roamed the player. Tracked as the
+  // follow-up to ticket 86c9u6uhg.**
   //
   // ---- What PR #183 fixed (verified — no longer the blocker) ----
   //
@@ -248,43 +253,75 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
   // them to keep the player's facing locked on a live chaser. That harness
   // mechanism is correct and ready — but see the next section.
   //
-  // ---- The CURRENT blocker: a GAME-side death-path freeze in Room 05 ---
+  // ---- What PR #207 fixed (this branch, ticket 86c9u6uhg) ----
   //
-  // With the harness steering fixed, PR #198's release-build characterisation
-  // uncovered a DIFFERENT, GAME-side bug that the fixed-position harness had
-  // only ever seen as "0/3–2/3, non-deterministic": **in Room 05, the
-  // surviving sibling mobs' `_physics_process` STOPS ~1–2 frames after a
-  // concurrent sibling's `_die`.** Trace signature (every release-build run,
-  // fully deterministic): the chase kills 1–2 of the 3 chasers, then
-  // immediately after a `Grunt._die` / `Charger._die` line the remaining
-  // live mobs stop emitting `<Mob>.pos` ENTIRELY — for the rest of the 90s
-  // budget — while `Player.pos` keeps emitting. A live mob emits `.pos`
-  // every 0.25 game-seconds unconditionally at the top of `_physics_process`,
-  // so "no `.pos` for 80s from a mob that is not dead" means its
-  // `_physics_process` is no longer being called. This is the SAME
-  // physics-flush bug class as PR #183 / #191, but on the mob-DEATH path
-  // rather than the room-LOAD path: a deferred death-sequence operation
-  // (`_spawn_death_particles`' `room.call_deferred("add_child", burst)`, the
-  // `mob_died` emit chain, or the RoomGate decrement) lands inside a flush
-  // and knocks the surviving siblings out of the processing tree. PR #191
-  // fixed the room-load freeze; this death-path sibling-freeze is a separate
-  // regression. The `chaseAndClearMultiChaserRoom` throw message prints the
-  // explicit `>>> GAME-side freeze <<<` diagnosis (chaser `.pos` count in the
-  // last 10s = 0 while a live mob remains). **This is out of harness scope —
-  // it needs a game-side fix (Drew); tracked as the follow-up to 86c9u05d7.**
+  // Devon's PR #206 (AC4 balance pass — chaser damage trim + player iframes-
+  // on-hit) made the player SURVIVE Room 05 deterministically. Pre-PR-#206
+  // the player died inside Room 05 and the M1 death rule reloaded to Room 01
+  // — which masked a SECOND, pre-existing bug:
   //
-  // ---- Why this spec STAYS test.fail() ----
+  // **The `StatAllocationPanel` auto-opens on the FIRST EVER `Levels.level_up`
+  // signal (LU-05 in `team/uma-ux/level-up-panel.md`) and sets
+  // `Engine.time_scale = 0.10` for the duration the panel is visible.** It
+  // stays open until the player presses Enter / Esc / 1 / 2 / 3.
   //
-  // Rooms 01–04 clear + traverse end-to-end on every release-build run (the
-  // harness side is solid). The spec is a single monolithic sequential test
-  // (cold-boot → Room 01 → … → Room 08 → Boss); Room 05 is step 5 of 8 and
-  // everything after depends on traversing it, so it cannot be split into a
-  // passing `test()` half. It stays `test.fail()` until the GAME-side
-  // death-path sibling-freeze is fixed — at which point the PR #198 harness
-  // mechanism should carry Room 05 (and 06–08) through and the spec can be
-  // flipped to `test()`. No FIXED bug (#183's Room 02 gate, #186's Room 04
-  // Shooter wall, #198's Room 05 harness steering) is masked behind a stale
-  // annotation — the live blocker is precisely the death-path freeze.
+  // In a release-build AC4 run the player crosses the L1→L2 threshold
+  // (100 XP) precisely on the 3rd Room 05 chaser kill:
+  //   Room 02:  2 grunts × 10 XP        =  20  →  20
+  //   Room 03:  1 grunt + 1 charger     =  28  →  48
+  //   Room 04:  1 shooter × 14          =  14  →  62
+  //   Room 05:  +10 + +18 (mid-clear)  =  90
+  //   Room 05:  3rd kill (+10)          = 100  → **L1→L2, panel auto-opens**
+  //
+  // From that frame on, `Engine.time_scale = 0.10` — every engine-time
+  // clock, including `RoomGate._start_death_wait`'s 0.65 s timer and the
+  // player's WALK_SPEED-driven movement, runs at 10× wall-time. The 0.65 s
+  // gate-unlock takes 6.5 s wall to fire (well past the 2.5 s
+  // `GATE_SETTLE_WINDOW_MS`), and every subsequent `gateTraversalWalk`
+  // key-down at fixed wall-ms covers 10× less ground in game space, so
+  // the player never reaches the trigger.
+  //
+  // The Playwright harness has no concept of "allocate a stat point," so
+  // the panel stayed open for the rest of the test — exactly the
+  // `gateUnlocked=false, gateTraversed=false` signature Devon characterised
+  // 8/8 times in PR #206.
+  //
+  // **The fix (this PR):** the multi-chaser helper, the kiting Shooter
+  // chase helper, AND the AC4 spec's fixed-position chaser loop now press
+  // Escape 4× after the kill loop exits. KEY_ESCAPE is handled by
+  // `StatAllocationPanel._unhandled_input` and closes the panel (banking
+  // any unspent points). When no panel is open it's a no-op. This is
+  // applied in three places for defensive coverage of any room that
+  // might auto-open a panel:
+  //   - `chaseAndClearKitingMobs` (Room 04 Shooter clear + Room 06-08
+  //     Shooter pre-pass)
+  //   - `chaseAndClearMultiChaserRoom` (Room 05 — where the bug surfaces
+  //     today)
+  //   - the AC4 spec's `clearRoomMobs` fixed-position chaser loop
+  //     (Rooms 02-03, and the chaser portion of Rooms 06-08)
+  //
+  // Result: Rooms 02-05 now clear + traverse end-to-end deterministically
+  // across release-build Playwright runs. **Note the dispatch's original
+  // diagnosis ("RoomGate decrement chain bug, physics-flush family") was
+  // wrong** — the gate's state machine works correctly under the time-
+  // scaled clock; it's just slow. The harness-side panel-dismiss makes
+  // the engine clock match the harness's wall-clock expectations.
+  //
+  // **Game-side hardening (also this PR, defensive):** the `RoomGate`
+  // death-wait Timer was changed to `process_callback = TIMER_PROCESS_IDLE`
+  // already, and a regression-pin GUT test (`test_room_gate_3mob_concurrent
+  // _death_unlock`) pins that the gate unlocks correctly when 3 mobs die
+  // in the same frame — even though that scenario was never the actual
+  // failure mode. The pin guards against any future regression that
+  // dropped one of three deferred decrements.
+  //
+  // ---- Why this spec STILL stays test.fail() ----
+  //
+  // Room 06 is the next blocker — see the STATUS box above. The kiting
+  // Shooter chase pre-pass roams the player far from spawn, and the
+  // subsequent 2-charger fixed-position click-spam can't land hits from
+  // that drifted position. Out of scope for the 86c9u6uhg ticket; tracked
+  // as a follow-up.
   test.fail(
     "AC4 — Stratum-1 boss reach + clear in ≤10min from cold start",
     async ({ page, context }) => {
@@ -533,6 +570,18 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
               ).length;
             const roomKills = deathsNow - preDeathLines;
             if (roomKills >= chaserMobs) {
+              // Dismiss any auto-opened panel (level-up auto-open pins
+              // Engine.time_scale = 0.10 → gateTraversalWalk's key-down
+              // walks cover 10× less ground → never reach the trigger).
+              // Defensive: 4× Escape is cheap (~200 ms) and idempotent
+              // when no panel is open. See ticket 86c9u6uhg — root cause
+              // surfaced by PR #206's iframes-on-hit balance (player now
+              // survives long enough to cross the L1→L2 XP threshold
+              // mid-Room-05 instead of dying first).
+              for (let p = 0; p < 4; p++) {
+                await page.keyboard.press("Escape");
+                await page.waitForTimeout(50);
+              }
               console.log(
                 `[ac4-boss] ${roomLabel}: cleared ${roomKills}/${chaserMobs} ` +
                   `chaser mob(s) at t=${Date.now() - roomStart}ms ` +

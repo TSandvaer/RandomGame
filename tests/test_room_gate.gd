@@ -241,6 +241,61 @@ func test_late_registration_after_lock_still_tracked() -> void:
 	assert_true(g.is_unlocked(), "gate unlocks once both mobs dead, including the late one")
 
 
+func test_3mob_concurrent_death_with_death_wait_unlocks() -> void:
+	# Regression pin for ticket 86c9u6uhg (Room 05 unlocks correctly when 3
+	# chasers die concurrently — including the production death-wait Timer
+	# path, NOT the test-only `test_skip_death_wait = true` short-circuit
+	# that the other tests in this file use).
+	#
+	# Story: in the AC4 release-build run, all 3 Room 05 chasers die within
+	# ~1s of each other. The gate's `_on_mob_died` (CONNECT_DEFERRED) is
+	# fired three times in quick succession. The LAST decrement
+	# (mobs_alive 1 → 0) is the one that arms `_start_death_wait` for
+	# DEATH_TWEEN_WAIT_SECS (0.65s) before unlocking.
+	#
+	# The original AC4 failure ("gateUnlocked=false after settle") was NOT
+	# this race — investigation found the actual cause was
+	# `Engine.time_scale = 0.10` (StatAllocationPanel auto-open on the
+	# concurrent L1→L2 cross). But the dispatch asked for a regression pin
+	# on the 3-mob concurrent-death gate path itself, and this is it:
+	# without `test_skip_death_wait = true`, the gate must STILL fire
+	# `gate_unlocked` after the Timer's wait_time elapses.
+	#
+	# We don't wait the full 0.65 s real-time — `advance_death_wait_for_test`
+	# simulates the Timer firing immediately so the test stays fast.
+	var g: RoomGate = _make_gate()
+	# DO NOT use trigger_for_test (it sets test_skip_death_wait = true).
+	# Use lock() directly + register mobs to keep the production death-
+	# wait path active.
+	var m1: FakeMob = _make_fake_mob()
+	var m2: FakeMob = _make_fake_mob()
+	var m3: FakeMob = _make_fake_mob()
+	g.register_mob(m1)
+	g.register_mob(m2)
+	g.register_mob(m3)
+	# Manually flip state to LOCKED so _on_mob_died's
+	# `_mobs_alive == 0 and _state == STATE_LOCKED` branch arms the wait.
+	g.lock()
+	assert_true(g.is_locked(), "gate locked with 3 mobs alive")
+	watch_signals(g)
+	# Fire all three death signals concurrently (same frame).
+	m1.die()
+	m2.die()
+	m3.die()
+	# Drain ONE frame — CONNECT_DEFERRED queues all three decrements.
+	await _await_frame()
+	# After the deferred decrements, mobs_alive == 0 and the death-wait
+	# Timer has been armed. The gate has NOT unlocked yet (still LOCKED,
+	# waiting for the timer).
+	assert_eq(g.mobs_alive(), 0, "all three deaths decremented")
+	assert_true(g.is_locked(), "gate still LOCKED — waiting on death-wait timer")
+	# Simulate the timer firing (production path: SceneTreeTimer or Timer
+	# node fires after DEATH_TWEEN_WAIT_SECS).
+	g.advance_death_wait_for_test()
+	assert_true(g.is_unlocked(), "gate UNLOCKED after death-wait elapses")
+	assert_signal_emit_count(g, "gate_unlocked", 1, "gate_unlocked emitted exactly once")
+
+
 func test_layer_mask_targets_player_only() -> void:
 	# Defensive: the gate's collision_mask must include the player layer
 	# (bit 2) and NOT include the enemy layer (bit 4). This ensures mobs
