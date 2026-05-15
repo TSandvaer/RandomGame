@@ -219,7 +219,10 @@ func migrate(data: Dictionary, from_version: int) -> Dictionary:
 	if from_version > SCHEMA_VERSION:
 		# Save came from a newer build. Best-effort: pass through as-is and
 		# warn. Could also refuse-load and trigger a new-character flow.
-		push_warning("[Save] save schema_version %d is newer than runtime %d — loading as-is" % [from_version, SCHEMA_VERSION])
+		# Routed through WarningBus so the universal-warning gate (ticket
+		# 86c9uf0mm Half B) catches this in GUT tests.
+		_emit_warning("[Save] save schema_version %d is newer than runtime %d — loading as-is" % [from_version, SCHEMA_VERSION],
+			"schema_newer_than_runtime")
 		return data
 	var out: Dictionary = data.duplicate(true)
 	if from_version < 1:
@@ -355,7 +358,29 @@ func _write_readme() -> void:
 	var f: FileAccess = FileAccess.open(README_PATH, FileAccess.WRITE)
 	if f == null:
 		# Non-fatal: a missing README is a testability convenience, not a bug.
+		# Direct push_warning (not WarningBus) — this is a non-load-bearing
+		# diagnostic path; surfacing it through the bus would flag the
+		# universal-warning gate on every test that exercises save_game in
+		# a context where the user dir can't be written, but the underlying
+		# bug isn't a save-correctness issue. Reconsider on a future ticket.
 		push_warning("[Save] could not write README at %s (err %d)" % [README_PATH, FileAccess.get_open_error()])
 		return
 	f.store_string(contents)
 	f.close()
+
+
+# ---- WarningBus routing -----------------------------------------------
+##
+## Route load-bearing save-schema warnings through `WarningBus` so the
+## universal-warning gate (ticket 86c9uf0mm Half B) catches them in GUT
+## tests. Save is an autoload (loads before any user code touches it), but
+## the bus may not have booted yet during some autoload-order edge cases —
+## fall back to native `push_warning` defensively.
+func _emit_warning(text: String, category: String = "") -> void:
+	var main_loop := Engine.get_main_loop() as SceneTree
+	if main_loop != null:
+		var bus: Node = main_loop.root.get_node_or_null("WarningBus")
+		if bus != null and bus.has_method("warn"):
+			bus.warn(text, category)
+			return
+	push_warning(text)

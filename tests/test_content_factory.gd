@@ -6,6 +6,30 @@ extends GutTest
 ## Per `team/drew-dev/tres-schemas.md` § "Sign-off checklist" — exercises
 ## every `make_*` factory once.
 
+const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
+
+
+# ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
+##
+## ContentFactory exercises `ItemInstance.from_save_dict` and related
+## resolver paths in some downstream tests; pinning the no-warning posture
+## here catches any drift where a factory accidentally emits a
+## push_warning during construction.
+
+var _warn_guard: NoWarningGuard
+
+
+func before_each() -> void:
+	_warn_guard = NoWarningGuard.new()
+	_warn_guard.attach()
+
+
+func after_each() -> void:
+	_warn_guard.assert_clean(self)
+	_warn_guard.detach()
+	_warn_guard = null
+
+
 func test_make_affix_value_range_defaults() -> void:
 	var r: AffixValueRange = ContentFactory.make_affix_value_range()
 	assert_eq(r.min_value, 1.0)

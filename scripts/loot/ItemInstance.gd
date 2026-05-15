@@ -100,7 +100,13 @@ static func from_save_dict(data: Dictionary, item_resolver: Callable, affix_reso
 	var item_id: StringName = StringName(String(item_id_v))
 	var item_def: ItemDef = item_resolver.call(item_id) as ItemDef
 	if item_def == null:
-		push_warning("ItemInstance.from_save_dict: unknown item id '%s'" % item_id)
+		# Routed through WarningBus so the universal-warning gate (ticket
+		# 86c9uf0mm Half B) catches this in GUT tests. Direct `push_warning`
+		# is invisible to NoWarningGuard. The native `push_warning` is still
+		# fired inside WarningBus.warn — console / HTML5 console.warn /
+		# stderr surfaces are unchanged.
+		_emit_warning("ItemInstance.from_save_dict: unknown item id '%s'" % item_id,
+			"unknown_item_id")
 		return null
 	var tier_int: int = int(data.get("tier", int(item_def.tier)))
 	var inst: ItemInstance = ItemInstance.new(item_def, tier_int)
@@ -117,7 +123,8 @@ static func from_save_dict(data: Dictionary, item_resolver: Callable, affix_reso
 			var aff_id: StringName = StringName(String(aff_id_v))
 			var aff_def: AffixDef = affix_resolver.call(aff_id) as AffixDef
 			if aff_def == null:
-				push_warning("ItemInstance.from_save_dict: unknown affix id '%s' on item '%s'" % [aff_id, item_id])
+				_emit_warning("ItemInstance.from_save_dict: unknown affix id '%s' on item '%s'" % [aff_id, item_id],
+					"unknown_affix_id")
 				continue
 			var v: float = float(entry.get("value", 0.0))
 			rolls.append(AffixRoll.new(aff_def, v))
@@ -173,3 +180,21 @@ static func _fmt_number(v: float) -> String:
 	if absf(v - roundf(v)) < 0.005:
 		return "%d" % int(roundf(v))
 	return "%.2f" % v
+
+
+# Route a warning through WarningBus when the autoload is available, so the
+# universal-warning gate (ticket 86c9uf0mm Half B) catches it in GUT tests.
+# Falls back to direct `push_warning` if the autoload is missing (defensive
+# — only matters in test contexts where the autoload didn't boot).
+#
+# Static because `from_save_dict` is static. Autoload globals are accessible
+# from static methods (they live on the SceneTree root, not the class).
+static func _emit_warning(text: String, category: String = "") -> void:
+	var main_loop := Engine.get_main_loop() as SceneTree
+	if main_loop != null:
+		var bus: Node = main_loop.root.get_node_or_null("WarningBus")
+		if bus != null and bus.has_method("warn"):
+			bus.warn(text, category)
+			return
+	# Fallback: native push_warning preserves the console / stderr surface.
+	push_warning(text)

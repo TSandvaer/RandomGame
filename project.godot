@@ -22,6 +22,7 @@ boot_splash/show_image=false
 Save="*res://scripts/save/Save.gd"
 BuildInfo="*res://scripts/debug/BuildInfo.gd"
 DebugFlags="*res://scripts/debug/DebugFlags.gd"
+WarningBus="*res://scripts/debug/WarningBus.gd"
 Levels="*res://scripts/progression/Levels.gd"
 PlayerStats="*res://scripts/progression/PlayerStats.gd"
 StratumProgression="*res://scripts/progression/StratumProgression.gd"

@@ -117,7 +117,8 @@ func get_mob_def(mob_id: StringName) -> MobDef:
 		var path: String = _REGISTRATIONS[mob_id]["def"]
 		var def: MobDef = load(path) as MobDef
 		if def == null:
-			push_warning("[MobRegistry] failed to load MobDef at %s for id '%s'" % [path, String(mob_id)])
+			_emit_warning("[MobRegistry] failed to load MobDef at %s for id '%s'" % [path, String(mob_id)],
+				"load_failure")
 			return null
 		_def_cache[mob_id] = def
 	return _def_cache[mob_id]
@@ -131,7 +132,8 @@ func get_mob_scene(mob_id: StringName) -> PackedScene:
 		var path: String = _REGISTRATIONS[mob_id]["scene"]
 		var scene: PackedScene = load(path) as PackedScene
 		if scene == null:
-			push_warning("[MobRegistry] failed to load PackedScene at %s for id '%s'" % [path, String(mob_id)])
+			_emit_warning("[MobRegistry] failed to load PackedScene at %s for id '%s'" % [path, String(mob_id)],
+				"load_failure")
 			return null
 		_scene_cache[mob_id] = scene
 	return _scene_cache[mob_id]
@@ -151,11 +153,13 @@ func has_mob(mob_id: StringName) -> bool:
 ## so a typo'd id surfaces in console.
 func apply_stratum_scaling(mob_def: MobDef, stratum_id: StringName) -> MobDef:
 	if mob_def == null:
-		push_warning("[MobRegistry] apply_stratum_scaling called with null mob_def")
+		_emit_warning("[MobRegistry] apply_stratum_scaling called with null mob_def",
+			"null_mob_def")
 		return null
 	var multipliers: Dictionary = _STRATUM_SCALING.get(stratum_id, {"hp": 1.0, "damage": 1.0})
 	if not _STRATUM_SCALING.has(stratum_id):
-		push_warning("[MobRegistry] unknown stratum_id '%s' — using baseline 1.0/1.0" % String(stratum_id))
+		_emit_warning("[MobRegistry] unknown stratum_id '%s' — using baseline 1.0/1.0" % String(stratum_id),
+			"unknown_stratum_id")
 	# Allocate a fresh MobDef and copy every field from the source. We do NOT
 	# mutate `mob_def` itself — calling this twice on the same source returns
 	# a new def with the SAME scaled values, NOT compounded values. Tess's
@@ -185,7 +189,8 @@ func apply_stratum_scaling(mob_def: MobDef, stratum_id: StringName) -> MobDef:
 func spawn(mob_id: StringName, world_position: Vector2, room_node: Node) -> Node:
 	var scene: PackedScene = get_mob_scene(mob_id)
 	if scene == null:
-		push_warning("[MobRegistry] spawn: unknown mob_id '%s'" % String(mob_id))
+		_emit_warning("[MobRegistry] spawn: unknown mob_id '%s'" % String(mob_id),
+			"unknown_mob_id")
 		return null
 	var def: MobDef = get_mob_def(mob_id)
 	var node: Node = scene.instantiate()
@@ -206,3 +211,25 @@ func spawn(mob_id: StringName, world_position: Vector2, room_node: Node) -> Node
 ## Godot 4 is insertion-stable but callers should not depend on it).
 func registered_ids() -> Array:
 	return _REGISTRATIONS.keys()
+
+
+# ---- WarningBus routing -----------------------------------------------
+##
+## Route warnings through `WarningBus` so the universal-warning gate (ticket
+## 86c9uf0mm Half B) can catch them in GUT tests. Falls back to native
+## `push_warning` if the autoload is not reachable (e.g. EP-OOO test which
+## constructs a MobRegistry instance OUTSIDE the tree — `Engine.get_main_loop`
+## returns the root SceneTree but a fresh-off-tree instance can be called
+## before any autoload has booted; the fallback keeps that path warning-
+## producing for the console without crashing).
+func _emit_warning(text: String, category: String = "") -> void:
+	var main_loop := Engine.get_main_loop() as SceneTree
+	if main_loop != null:
+		var bus: Node = main_loop.root.get_node_or_null("WarningBus")
+		if bus != null and bus.has_method("warn"):
+			bus.warn(text, category)
+			return
+	# Fallback — preserves the console / stderr surface when WarningBus is
+	# unavailable. NoWarningGuard will not catch these (intentional — the
+	# off-tree EP-OOO path is not a production code path).
+	push_warning(text)
