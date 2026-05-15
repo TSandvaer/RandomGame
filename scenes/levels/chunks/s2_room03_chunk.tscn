@@ -1,0 +1,119 @@
+[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_s2room03_chunk"]
+
+; Cinder Vaults — Vent Chamber (s2_room03 chunk geometry).
+; Hex-block placeholder geometry per §2 authoritative palette in
+; team/uma-ux/palette-stratum-2.md. Soft-retint sprite variants from W3-T3
+; replace these ColorRect placeholders later.
+;
+; Decoration beats (palette-stratum-2.md §3 beat 4 + §8 q3 deferral):
+;   - Beat 4: Steam-vent props in `#D8B89A` (steam-vent emission color).
+;     Decorative ONLY — the §8 open-question 3 hazard mechanic is deferred;
+;     these vents are visually inert (no Area2D, no damage trigger).
+;   - Beat 1 (carry-over): ash-glow vein band on the EAST wall to lead the
+;     eye toward the boss-door exit port.
+;
+; Walls match s1_room01_chunk pattern (4 StaticBody2D walls). Carries the
+; `boss_door` port tag downstream W3-T4 picks up for boss-room handoff.
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_h"]
+size = Vector2(480, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_v"]
+size = Vector2(32, 256)
+
+[node name="S2Room03Chunk" type="Node2D"]
+
+; Floor — burnt earth `#3F1E1A`.
+[node name="Floor" type="ColorRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 256.0
+color = Color(0.247, 0.118, 0.102, 1)
+
+; Walls — collapsed mining stone `#2A1410`.
+[node name="WallNorth" type="StaticBody2D" parent="."]
+position = Vector2(240, 16)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallNorth"]
+shape = SubResource("RectangleShape2D_wall_h")
+
+[node name="Sprite" type="ColorRect" parent="WallNorth"]
+offset_left = -240.0
+offset_top = -16.0
+offset_right = 240.0
+offset_bottom = 16.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+[node name="WallSouth" type="StaticBody2D" parent="."]
+position = Vector2(240, 240)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallSouth"]
+shape = SubResource("RectangleShape2D_wall_h")
+
+[node name="Sprite" type="ColorRect" parent="WallSouth"]
+offset_left = -240.0
+offset_top = -16.0
+offset_right = 240.0
+offset_bottom = 16.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+[node name="WallWest" type="StaticBody2D" parent="."]
+position = Vector2(16, 128)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallWest"]
+shape = SubResource("RectangleShape2D_wall_v")
+
+[node name="Sprite" type="ColorRect" parent="WallWest"]
+offset_left = -16.0
+offset_top = -128.0
+offset_right = 16.0
+offset_bottom = 128.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+[node name="WallEast" type="StaticBody2D" parent="."]
+position = Vector2(464, 128)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallEast"]
+shape = SubResource("RectangleShape2D_wall_v")
+
+[node name="Sprite" type="ColorRect" parent="WallEast"]
+offset_left = -16.0
+offset_top = -128.0
+offset_right = 16.0
+offset_bottom = 128.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+; Decoration — Beat 1 carry-over: ash-glow vein band on EAST wall.
+; Leads the eye toward the boss-door exit port.
+[node name="AshGlowVeinEast" type="ColorRect" parent="."]
+offset_left = 444.0
+offset_top = 64.0
+offset_right = 448.0
+offset_bottom = 192.0
+color = Color(0.761, 0.353, 0.122, 1)
+
+; Decoration — Beat 4: steam-vent prop #1 (north-mid). DECORATIVE ONLY
+; per §8 open-question 3 deferral. Steam emission `#D8B89A`.
+[node name="SteamVent1" type="ColorRect" parent="."]
+offset_left = 152.0
+offset_top = 56.0
+offset_right = 168.0
+offset_bottom = 72.0
+color = Color(0.847, 0.722, 0.604, 1)
+
+; Decoration — Beat 4: steam-vent prop #2 (south-mid). DECORATIVE ONLY.
+[node name="SteamVent2" type="ColorRect" parent="."]
+offset_left = 280.0
+offset_top = 200.0
+offset_right = 296.0
+offset_bottom = 216.0
+color = Color(0.847, 0.722, 0.604, 1)
+
+; Decoration — Beat 4: steam-vent prop #3 (mid-east). DECORATIVE ONLY.
+[node name="SteamVent3" type="ColorRect" parent="."]
+offset_left = 384.0
+offset_top = 128.0
+offset_right = 400.0
+offset_bottom = 144.0
+color = Color(0.847, 0.722, 0.604, 1)

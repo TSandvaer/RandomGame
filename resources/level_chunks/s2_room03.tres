@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="LevelChunkDef" load_steps=10 format=3]
+
+; Cinder Vaults — Vent Chamber.
+; Mob mix per W3 dispatch: 1 Stoker + 1 Charger + 1 Shooter (heat-blasted).
+; Carries the `&"boss_door"` port tag on the EAST exit so the downstream
+; W3-T4 boss-room handoff picks it up (mirrors s1_room08 -> Stratum1BossRoom
+; pattern).
+
+[ext_resource type="Script" path="res://scripts/levels/LevelChunkDef.gd" id="1_chunk"]
+[ext_resource type="Script" path="res://scripts/levels/MobSpawnPoint.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://scripts/levels/ChunkPort.gd" id="3_port"]
+
+[sub_resource type="Resource" id="Resource_s2r3_entry"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(0, 4)
+direction = 3
+tag = &"entry"
+
+[sub_resource type="Resource" id="Resource_s2r3_boss_door"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(14, 4)
+direction = 1
+tag = &"boss_door"
+
+[sub_resource type="Resource" id="Resource_s2r3_stoker"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(6, 3)
+mob_id = &"grunt"
+
+[sub_resource type="Resource" id="Resource_s2r3_charger"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(9, 5)
+mob_id = &"charger"
+
+[sub_resource type="Resource" id="Resource_s2r3_shooter"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(11, 3)
+mob_id = &"shooter"
+
+[resource]
+script = ExtResource("1_chunk")
+id = &"s2_room03"
+display_name = "Cinder Vaults — Vent Chamber"
+size_tiles = Vector2i(15, 8)
+tile_size_px = 32
+scene_path = "res://scenes/levels/chunks/s2_room03_chunk.tscn"
+ports = [SubResource("Resource_s2r3_entry"), SubResource("Resource_s2r3_boss_door")]
+mob_spawns = [SubResource("Resource_s2r3_stoker"), SubResource("Resource_s2r3_charger"), SubResource("Resource_s2r3_shooter")]
