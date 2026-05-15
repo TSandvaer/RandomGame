@@ -28,6 +28,11 @@ StratumProgression="*res://scripts/progression/StratumProgression.gd"
 Inventory="*res://scripts/inventory/Inventory.gd"
 TutorialEventBus="*res://scripts/ui/TutorialEventBus.gd"
 MobRegistry="*res://scripts/content/MobRegistry.gd"
+AudioDirector="*res://scripts/audio/AudioDirector.gd"
+
+[audio]
+
+buses/default_bus_layout="res://default_bus_layout.tres"
 
 [debug]
 

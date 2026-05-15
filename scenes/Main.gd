@@ -992,6 +992,21 @@ func _on_descend_restart_run() -> void:
 		sp.reset()
 	if _player != null:
 		_player.revive_full_hp()
+	# W3-T9 (`86c9uf6hh`) — S1→S2 audio transition. The DescendScreen is
+	# the canonical "you descended" gate; semantically this IS the stratum
+	# step even though the M1 placeholder reloads Room 01 rather than a
+	# real Stratum 2 scene (per `scripts/screens/DescendScreen.gd` Beat F).
+	# Firing S2 BGM + Ambient here means the audio identity for Cinder
+	# Vaults is audible from the moment the player chooses to descend —
+	# proves the audio plumbing works end-to-end for Sponsor's next soak.
+	# When the actual S2 scene transition lands (post-M2 W3), this trigger
+	# moves to the scene-load callback alongside `_load_room_at_index(0)`.
+	# The user-gesture click on the "Return to Stratum 1" button unlocks
+	# the HTML5 AudioContext (see AudioDirector.gd § HTML5 audio-playback
+	# gate), so this is the safe first-cue spot regardless of browser.
+	var audio_director: Node = _audio_director()
+	if audio_director != null and audio_director.has_method("play_stratum2_entry"):
+		audio_director.play_stratum2_entry()
 	_load_room_at_index(0)
 	_persist_to_save()
 
@@ -999,6 +1014,14 @@ func _on_descend_restart_run() -> void:
 func _on_player_died(_death_position: Vector2) -> void:
 	# Defer the death rule to the next frame so any signals on this tick
 	# (final hit's mob_died, etc.) finish first.
+	# W3-T9 (`86c9uf6hh`) — per `audio-direction.md §3 ducking rule 3` the
+	# death sequence Beat A hard-mutes BGM over 200 ms. We fire it
+	# synchronously here (not deferred) so the music begins fading
+	# immediately when the death frame freezes — the audio cue lands
+	# alongside Uma's Beat A visual freeze rather than one frame later.
+	var audio_director: Node = _audio_director()
+	if audio_director != null and audio_director.has_method("stop_all_music"):
+		audio_director.stop_all_music(200)
 	call_deferred("apply_death_rule")
 
 
@@ -1158,3 +1181,7 @@ func _inventory() -> Node:
 
 func _stratum_progression() -> Node:
 	return get_tree().root.get_node_or_null("StratumProgression")
+
+
+func _audio_director() -> Node:
+	return get_tree().root.get_node_or_null("AudioDirector")
