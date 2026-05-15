@@ -36,6 +36,28 @@ This is the **load-bearing fix** for the M1 RC P0 wave 2 (PR #143). Five spawn s
 
 `Stratum1BossRoom._build_door_trigger` **was** a latent instance of this bug class — fixed in ticket `86c9tv8uf` (the follow-up flagged in PR #183). The earlier claim here that it had "zero panic risk because it spawns from `_ready`, not a physics-tick path" was **wrong**: the boss room is loaded by `Main._load_room_at_index(8)` from Room 08's `RoomGate.gate_traversed` body callback, so `Stratum1BossRoom._ready()` runs *inside a physics flush* — exactly like Rooms 02–08. `_build_door_trigger` (synchronous Area2D `add_child`) and `_spawn_stratum_exit` (adds a `StratumExit` whose own `_ready` builds an Area2D interaction area) are now deferred via `Stratum1BossRoom._ready → call_deferred("_assemble_room_fixtures")`, landing them after the flush closes. `_spawn_boss` stays synchronous in `_ready` — the boss is a CharacterBody2D (no monitoring mutation on tree-entry) and `Main._wire_room_signals` reads `get_boss()` on the same tick. Tracking tickets: `86c9p1fgf` (the original monitorable harmonization), `86c9tv8uf` (the physics-flush defer). See `team/log/process-incidents.md` for the full history.
 
+## Mob spawn registry (MobRegistry autoload)
+
+[`scripts/content/MobRegistry.gd`](scripts/content/MobRegistry.gd) — autoload registered in `project.godot` as `MobRegistry="*res://scripts/content/MobRegistry.gd"` (ticket `#86c9ue1up`, W3-T5). Maps `mob_id: StringName → MobDef + PackedScene` and exposes stratum-scaling.
+
+**Surface:**
+
+- `get_mob_def(mob_id) -> MobDef` / `get_mob_scene(mob_id) -> PackedScene` — return `null` on unknown id (graceful, push_warning'd).
+- `has_mob(mob_id) -> bool` — allocation-free check; mirrors get_mob_def's null result.
+- `apply_stratum_scaling(mob_def, stratum_id) -> MobDef` — returns a **NEW** MobDef with hp_base × multiplier + damage_base × multiplier. Source is NEVER mutated — calling twice with `&"s2"` returns a new def with the SAME 1.2x value, NOT compounded 1.44x. Integer scaling uses `roundi`. Unknown stratum falls back to baseline 1.0/1.0 with push_warning.
+- `spawn(mob_id, world_position, room_node) -> Node` — unified entry-point. Instantiates the scene, applies MobDef to `node.mob_def`, sets position, parents under `room_node`. Returns null on unknown id.
+- `registered_ids() -> Array` — diagnostic enumeration of mob_ids.
+
+**Scaling table** (mvp-scope.md §M2): `&"s1"` → {hp: 1.0, damage: 1.0}; `&"s2"` → {hp: 1.2, damage: 1.15}. Add future strata by appending to `_STRATUM_SCALING`.
+
+**Adding a new mob class** (e.g. Stoker, W3-T3/T4 surface): one-line append to `_REGISTRATIONS` with `{def: "res://resources/mobs/<id>.tres", scene: "res://scenes/mobs/<Id>.tscn"}`. Every existing spawn site picks it up via `MobRegistry.spawn` or `get_mob_def`/`get_mob_scene` with no further code changes — this is the load-bearing benefit of the W3-T5 refactor.
+
+**Autoload-order independence.** `_REGISTRATIONS` and `_STRATUM_SCALING` are module-scope `const` dictionaries; `_def_cache` / `_scene_cache` are member init-time `Dictionary = {}`. Callers can invoke `get_mob_def` / `get_mob_scene` BEFORE the autoload's `_ready` runs (e.g. from another autoload's `_ready` if Godot resolves autoloads in a different order than the project.godot declarations). Pinned by `tests/test_mob_registry.gd::test_get_mob_def_before_ready_returns_correct_def`.
+
+**MultiMobRoom integration.** `scripts/levels/MultiMobRoom.gd::_spawn_mob` was a per-mob match-block pre-W3-T5; it now delegates to `_instantiate_from_registry(mob_id)` which calls `MobRegistry.get_mob_scene` + `get_mob_def`. The legacy `@export_file` paths on MultiMobRoom (`grunt_scene_path` / `charger_mob_def_path` / etc.) remain **only** to preserve existing `.tscn` author-time values; the registry is the source of truth for dispatch. Behaviour is bit-identical pre-/post-refactor (same PackedScene instance via resource cache, same MobDef applied) — regression pinned by `tests/test_stratum1_rooms.gd` + `tests/test_stratum2_rooms.gd` staying green. **`Stratum1Room01._spawn_mob` is NOT yet refactored** (tutorial room, grunt + practice-dummy dispatch on a different surface); a follow-up can pull it into the registry if M2+ surfaces benefit from unified dispatch.
+
+**Stratum-scaling NOT yet applied to live spawns.** `apply_stratum_scaling` is exposed on the API but the W3-T5 PR does NOT inject it into `MobRegistry.spawn`'s mob_def-apply path — that would silently change M1 / M2 mob HP-damage values mid-W3 and break the refactor's "no behavior change" promise. The wiring decision (which spawn sites become stratum-aware) deferred to W3-T1 AC4 balance pass or a dedicated follow-up ticket.
+
 ## Mob `_die` death pipeline
 
 When a mob's HP reaches 0, the synchronous chain is:

@@ -21,9 +21,16 @@ extends Node2D
 ##
 ## Renamed 2026-05-02 from `Stratum1MultiMobRoom` (W3-B2 multi-stratum
 ## scaffold). Body has zero S1-specific assumptions — the mob_id list
-## (`grunt` / `charger` / `shooter`) is M1 *content* served via export
-## paths, not a class-name contract. M2 implementers extend the
-## `_spawn_mob` match block with new mob_ids as needed.
+## (`grunt` / `charger` / `shooter`) is M1 *content* served via the
+## `MobRegistry` autoload, not a class-name contract. M2+ implementers
+## register new mob_ids in `MobRegistry._REGISTRATIONS` (W3-T5 refactor,
+## ticket #86c9ue1up) — `MultiMobRoom._spawn_mob` requires no edits when a
+## new mob class lands. Pre-W3-T5 this dispatch was a per-mob match-block
+## of `@export_file` paths + lazy-load helpers; that surface collapsed into
+## a single `MobRegistry.spawn(...)` call with bit-identical runtime
+## behaviour (refactor pinned by `tests/test_stratum1_rooms.gd` +
+## `tests/test_stratum2_rooms.gd` regression sweep, and
+## `tests/test_mob_registry.gd::test_multi_mob_room_spawn_via_registry_returns_correct_mob_type`).
 ##
 ## Acceptance criteria touched:
 ##   - AC2 (player encounters varying mobs across the stratum).
@@ -49,16 +56,24 @@ signal room_cleared()
 ## The chunk this room loads. Set in the .tscn at author time.
 @export var chunk_def: LevelChunkDef
 
-## res:// paths to the mob scenes. Indirected via export so tests can swap
-## in fakes without coupling the assembler to production scenes.
+## res:// paths to the mob scenes.
+##
+## **W3-T5 / #86c9ue1up — legacy export, no longer load-bearing.** Pre-W3-T5
+## these path exports drove `_spawn_mob`'s match-block dispatch. The
+## refactor moved dispatch to `MobRegistry.spawn(mob_id, ...)`, which
+## resolves mob_id → PackedScene + MobDef via the autoload's
+## `_REGISTRATIONS` table. These exports remain ONLY so existing
+## `scenes/levels/Stratum1Room0N.tscn` (which set them at author-time) can
+## continue to load without breaking. They are NOT read by `_spawn_mob` —
+## the registry is the source of truth. To swap a scene for a test, register
+## a fake in MobRegistry (or extend the registry with an injectable
+## override) instead of overriding these exports.
 @export_file("*.tscn") var grunt_scene_path: String = "res://scenes/mobs/Grunt.tscn"
 @export_file("*.tscn") var charger_scene_path: String = "res://scenes/mobs/Charger.tscn"
 @export_file("*.tscn") var shooter_scene_path: String = "res://scenes/mobs/Shooter.tscn"
 
-## res:// paths to the mob MobDef TRES files. Applied to each spawned mob
-## so its `mob_def` reference is set (HP/damage/xp_reward/loot_table flow
-## from here). Without this, `mob_def` stays null and the Levels/loot
-## pipelines silently no-op on kill — same fix as Stratum1Room01.
+## res:// paths to the mob MobDef TRES files. Legacy — see comment on
+## scene-path exports above. The MobRegistry is the source of truth.
 @export_file("*.tres") var grunt_mob_def_path: String = "res://resources/mobs/grunt.tres"
 @export_file("*.tres") var charger_mob_def_path: String = "res://resources/mobs/charger.tres"
 @export_file("*.tres") var shooter_mob_def_path: String = "res://resources/mobs/shooter.tres"
@@ -79,13 +94,9 @@ signal room_cleared()
 
 # ---- Runtime ---------------------------------------------------------
 
-# Cached scene + def loads to avoid re-parsing per spawn.
-var _grunt_scene_cache: PackedScene = null
-var _charger_scene_cache: PackedScene = null
-var _shooter_scene_cache: PackedScene = null
-var _grunt_def_cache: MobDef = null
-var _charger_def_cache: MobDef = null
-var _shooter_def_cache: MobDef = null
+# Pre-W3-T5 this carried per-mob PackedScene + MobDef caches. The
+# MobRegistry autoload now owns the cache (id -> resource) — see
+# `scripts/content/MobRegistry.gd::get_mob_scene` / `get_mob_def`.
 
 var _assembly: LevelAssembler.AssemblyResult = null
 var _room_gate: RoomGate = null
@@ -267,26 +278,48 @@ func _register_mobs_with_gate() -> void:
 
 # ---- Spawner -------------------------------------------------------
 
+## Mob spawn dispatch. **W3-T5 / #86c9ue1up — refactored from match-block to
+## MobRegistry.** Pre-refactor: this function carried a per-mob match-block
+## that pulled scenes + defs from `@export_file` paths and `_get_*` cache
+## helpers. Post-refactor: every `mob_id` resolves through
+## `MobRegistry.get_mob_scene` / `get_mob_def`, with the autoload owning the
+## cache. Adding a new mob class (e.g. Stoker — W3-T3/T4 surface) is now a
+## one-line append to `MobRegistry._REGISTRATIONS` with zero edits here.
+##
+## Behaviour is bit-identical pre-/post-refactor:
+##   - same PackedScene instance returned (resource cache),
+##   - same MobDef applied to `node.mob_def`,
+##   - same push_warning shape on unknown id.
+##
+## **Position handling note.** The world-position argument is intentionally
+## ignored here — `LevelAssembler` is responsible for positioning every
+## spawned mob via the chunk's `MobSpawnPoint.position_tiles` × tile_size.
+## `MobRegistry.spawn(mob_id, position, room)` IS position-aware but only
+## the unified callers (not the assembler-callable contract) use that
+## variant; the assembler is a black box that calls
+## `factory.call(mob_id, world_pos)` and then sets the mob's position from
+## its own bookkeeping. To preserve that contract we route through
+## `_instantiate_from_registry` (which mirrors the registry's `spawn` but
+## skips the position-set + parent-add) rather than `MobRegistry.spawn`.
 func _spawn_mob(mob_id: StringName, _world_pos: Vector2) -> Node:
-	var scene: PackedScene = null
-	var def: MobDef = null
-	match mob_id:
-		&"grunt":
-			scene = _get_grunt_scene()
-			def = _get_grunt_def()
-		&"charger":
-			scene = _get_charger_scene()
-			def = _get_charger_def()
-		&"shooter":
-			scene = _get_shooter_scene()
-			def = _get_shooter_def()
-		_:
-			push_warning("MultiMobRoom: unknown mob_id '%s'" % mob_id)
-			return null
+	return _instantiate_from_registry(mob_id)
+
+
+## Instantiate a mob via MobRegistry WITHOUT setting position / parenting.
+## Mirrors `MobRegistry.spawn`'s scene-instantiate + mob_def-apply path so
+## the assembler-callable contract (returns a free-floating Node the
+## assembler then positions + parents) is preserved.
+func _instantiate_from_registry(mob_id: StringName) -> Node:
+	var registry: Node = _get_mob_registry()
+	if registry == null:
+		push_warning("MultiMobRoom: MobRegistry autoload not found at /root/MobRegistry")
+		return null
+	var scene: PackedScene = registry.get_mob_scene(mob_id)
 	if scene == null:
-		push_warning("MultiMobRoom: scene cache miss for mob_id '%s'" % mob_id)
+		push_warning("MultiMobRoom: unknown mob_id '%s' (not in MobRegistry)" % mob_id)
 		return null
 	var node: Node = scene.instantiate()
+	var def: MobDef = registry.get_mob_def(mob_id)
 	# Apply the MobDef so kill -> mob_died -> XP/loot pipelines see a non-null
 	# mob_def payload (otherwise both pipelines silently no-op).
 	if def != null and "mob_def" in node:
@@ -294,40 +327,15 @@ func _spawn_mob(mob_id: StringName, _world_pos: Vector2) -> Node:
 	return node
 
 
-func _get_grunt_scene() -> PackedScene:
-	if _grunt_scene_cache == null and grunt_scene_path != "":
-		_grunt_scene_cache = load(grunt_scene_path) as PackedScene
-	return _grunt_scene_cache
-
-
-func _get_charger_scene() -> PackedScene:
-	if _charger_scene_cache == null and charger_scene_path != "":
-		_charger_scene_cache = load(charger_scene_path) as PackedScene
-	return _charger_scene_cache
-
-
-func _get_shooter_scene() -> PackedScene:
-	if _shooter_scene_cache == null and shooter_scene_path != "":
-		_shooter_scene_cache = load(shooter_scene_path) as PackedScene
-	return _shooter_scene_cache
-
-
-func _get_grunt_def() -> MobDef:
-	if _grunt_def_cache == null and grunt_mob_def_path != "":
-		_grunt_def_cache = load(grunt_mob_def_path) as MobDef
-	return _grunt_def_cache
-
-
-func _get_charger_def() -> MobDef:
-	if _charger_def_cache == null and charger_mob_def_path != "":
-		_charger_def_cache = load(charger_mob_def_path) as MobDef
-	return _charger_def_cache
-
-
-func _get_shooter_def() -> MobDef:
-	if _shooter_def_cache == null and shooter_mob_def_path != "":
-		_shooter_def_cache = load(shooter_mob_def_path) as MobDef
-	return _shooter_def_cache
+func _get_mob_registry() -> Node:
+	if not is_inside_tree():
+		# Tree-detached construction (rare — most tests autofree the room
+		# into a tree). Fall back to the main loop root if available.
+		var loop: SceneTree = Engine.get_main_loop() as SceneTree
+		if loop == null:
+			return null
+		return loop.root.get_node_or_null("MobRegistry")
+	return get_tree().root.get_node_or_null("MobRegistry")
 
 
 # ---- Internal -------------------------------------------------------
