@@ -28,11 +28,22 @@ on:
     branches:
       - main
 
-  # Manual trigger: run against a specific artifact or any branch
+  # Manual trigger: run against a specific artifact or any branch.
+  #
+  # SHA-pin contract (W3-T11, ticket 86c9ue1xu):
+  #   - Pass EITHER `artifact_run_id` (exact run) OR `artifact_sha` (matching
+  #     release-github.yml run by head_sha).
+  #   - Passing neither is now a HARD FAIL — the legacy "latest successful
+  #     release on main" silent-fallback bit Tess's W2 soak (pulled the W2 RC
+  #     artifact for a PR-branch Playwright run) and is gone.
   workflow_dispatch:
     inputs:
       artifact_run_id:
-        description: "GitHub Actions run ID of the release-github.yml run to test against. Leave blank to use the latest."
+        description: "Exact run ID of the release-github.yml run to test against. Takes precedence over artifact_sha."
+        required: false
+        default: ""
+      artifact_sha:
+        description: "Commit SHA (full or short) to resolve against the most recent matching release-github.yml run. Fails fast if no match."
         required: false
         default: ""
       artifact_name_prefix:
@@ -56,20 +67,121 @@ jobs:
 
       # ---- Resolve the release-build artifact ----
 
-      - name: Resolve artifact run ID
+      # Resolution paths (W3-T11 SHA-pin contract, ticket 86c9ue1xu):
+      #
+      #   1. workflow_run (chain trigger from release-github.yml on main):
+      #      Honor github.event.workflow_run.{id, head_sha} verbatim. The
+      #      upstream run's head_sha IS the SHA we're testing — no resolve
+      #      ambiguity. Emit run_id + expected_sha.
+      #
+      #   2. workflow_dispatch with explicit artifact_run_id:
+      #      Honor verbatim. Read head_sha from the named run for downstream
+      #      display + the artifact-name SHA check. Fail fast if the run
+      #      doesn't exist or didn't conclude success.
+      #
+      #   3. workflow_dispatch with artifact_sha (no artifact_run_id):
+      #      Search release-github.yml runs for the FIRST successful run whose
+      #      head_sha matches the requested SHA (full or short prefix). Fail
+      #      fast with a clear error if no match — never silently grab a
+      #      different SHA's artifact.
+      #
+      #   4. workflow_dispatch with NEITHER input:
+      #      HARD FAIL. The legacy "latest successful release on main" fallback
+      #      bit Tess's W2 soak (pulled W2 RC artifact for a PR-branch Playwright
+      #      run) and is intentionally removed. Pass artifact_run_id or
+      #      artifact_sha explicitly.
+      - name: Resolve artifact run ID + expected SHA
         id: resolve_run
         run: |
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            echo "run_id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ github.event.inputs.artifact_run_id }}" ]; then
-            echo "run_id=${{ github.event.inputs.artifact_run_id }}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          event="${{ github.event_name }}"
+          repo="${{ github.repository }}"
+
+          fail() {
+            echo "::error::$1"
+            echo ""
+            echo "Resolution contract (W3-T11 SHA-pin, ticket 86c9ue1xu):"
+            echo "  - workflow_run trigger: automatic"
+            echo "  - workflow_dispatch:    pass artifact_run_id OR artifact_sha"
+            echo "  - 'latest on main' silent-fallback is intentionally removed"
+            exit 1
+          }
+
+          resolve_via_sha() {
+            local needle="$1"
+            # Workflow name from release-github.yml `name:` field.
+            local wf_name="Release to GitHub (M1 RC build)"
+            local wf_id
+            wf_id=$(gh api "repos/${repo}/actions/workflows" \
+              --jq ".workflows[] | select(.name == \"${wf_name}\") | .id" | head -1)
+            if [ -z "${wf_id}" ]; then
+              fail "Could not locate workflow '${wf_name}' in repo ${repo}"
+            fi
+            # Page through recent successful runs and match head_sha by prefix.
+            # Short SHA (7 chars) is the standard handoff format; full SHA also works.
+            local match_run match_sha
+            # Pull last 50 successful runs (covers > a week of release activity); jq filters by SHA prefix.
+            match_run=$(gh api "repos/${repo}/actions/workflows/${wf_id}/runs?status=success&per_page=50" \
+              --jq ".workflow_runs[] | select(.head_sha | startswith(\"${needle}\")) | .id" | head -1)
+            match_sha=$(gh api "repos/${repo}/actions/workflows/${wf_id}/runs?status=success&per_page=50" \
+              --jq ".workflow_runs[] | select(.head_sha | startswith(\"${needle}\")) | .head_sha" | head -1)
+            if [ -z "${match_run}" ]; then
+              fail "No matching successful release-github.yml run found for SHA '${needle}'. Run release-github.yml against this SHA first, then re-trigger."
+            fi
+            echo "run_id=${match_run}" >> "$GITHUB_OUTPUT"
+            echo "expected_sha=${match_sha}" >> "$GITHUB_OUTPUT"
+            echo "Resolved SHA '${needle}' -> run ${match_run} (head_sha=${match_sha})"
+          }
+
+          resolve_via_run_id() {
+            local run_id="$1"
+            local run_json
+            run_json=$(gh api "repos/${repo}/actions/runs/${run_id}" 2>/dev/null || true)
+            if [ -z "${run_json}" ]; then
+              fail "Run ID '${run_id}' not found in ${repo}/actions/runs/. Check the run ID is correct."
+            fi
+            # Detect API error response (404 returns a JSON message but no .head_sha).
+            local has_id
+            has_id=$(echo "${run_json}" | jq -r '.id // empty')
+            if [ -z "${has_id}" ]; then
+              fail "Run ID '${run_id}' lookup returned no run object — likely 404. Check the run ID is correct."
+            fi
+            local conclusion head_sha wf_name
+            conclusion=$(echo "${run_json}" | jq -r '.conclusion // ""')
+            head_sha=$(echo "${run_json}" | jq -r '.head_sha // ""')
+            wf_name=$(echo "${run_json}" | jq -r '.name // ""')
+            if [ "${conclusion}" != "success" ]; then
+              fail "Run ${run_id} concluded '${conclusion}', not 'success'. Pin to a green release build."
+            fi
+            if [ -z "${head_sha}" ]; then
+              fail "Run ${run_id} has no head_sha — cannot verify artifact pin."
+            fi
+            echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+            echo "expected_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+            echo "Resolved explicit run_id=${run_id} (workflow='${wf_name}', head_sha=${head_sha})"
+          }
+
+          if [ "${event}" = "workflow_run" ]; then
+            run_id="${{ github.event.workflow_run.id }}"
+            head_sha="${{ github.event.workflow_run.head_sha }}"
+            if [ -z "${run_id}" ] || [ -z "${head_sha}" ]; then
+              fail "workflow_run event missing id or head_sha — should be impossible; investigate event payload."
+            fi
+            echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+            echo "expected_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+            echo "Resolved via workflow_run chain: run ${run_id} (head_sha=${head_sha})"
+          elif [ "${event}" = "workflow_dispatch" ]; then
+            input_run_id="${{ github.event.inputs.artifact_run_id }}"
+            input_sha="${{ github.event.inputs.artifact_sha }}"
+            if [ -n "${input_run_id}" ]; then
+              resolve_via_run_id "${input_run_id}"
+            elif [ -n "${input_sha}" ]; then
+              resolve_via_sha "${input_sha}"
+            else
+              fail "workflow_dispatch requires either artifact_run_id or artifact_sha. Pass one explicitly."
+            fi
           else
-            # Find the latest successful release-github.yml run on main
-            latest_run=$(gh api repos/${{ github.repository }}/actions/workflows \
-              --jq '.workflows[] | select(.name == "Release to GitHub (M1 RC build)") | .id' | head -1)
-            latest_success=$(gh api "repos/${{ github.repository }}/actions/workflows/${latest_run}/runs?branch=main&status=success&per_page=1" \
-              --jq '.workflow_runs[0].id')
-            echo "run_id=${latest_success}" >> "$GITHUB_OUTPUT"
+            fail "Unsupported event '${event}' — this workflow only handles workflow_run + workflow_dispatch."
           fi
         env:
           GH_TOKEN: ${{ github.token }}
@@ -86,22 +198,41 @@ jobs:
           run-id: ${{ steps.resolve_run.outputs.run_id }}
         continue-on-error: true  # If exact name match fails, try wildcard below
 
-      - name: Download HTML5 artifact (fallback — any embergrave-html5 artifact)
+      # Fallback: if the wildcard download missed, list the run's artifacts
+      # directly and pick the one whose name embeds the expected_sha. This
+      # double-binds the SHA pin — even if the wildcard expansion misbehaves,
+      # we explicitly assert the artifact name carries the resolved SHA.
+      - name: Download HTML5 artifact (fallback — SHA-bound lookup by run-id)
         if: ${{ hashFiles('./artifact-download/**') == '' }}
         uses: actions/github-script@v7
         with:
           script: |
             const runId = '${{ steps.resolve_run.outputs.run_id }}';
+            const expectedSha = '${{ steps.resolve_run.outputs.expected_sha }}';
+            const shortSha = expectedSha.slice(0, 7);
             const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
               repo: context.repo.repo,
               run_id: runId,
             });
+            const names = artifacts.data.artifacts.map(a => a.name);
+            core.info(`Run ${runId} artifacts: ${JSON.stringify(names)}`);
+            // SHA-pin: prefer name containing short SHA; refuse to fall back to
+            // a "first embergrave-html5-*" match if that match does NOT carry
+            // the expected SHA. This is the W3-T11 fail-fast contract.
             const html5Artifact = artifacts.data.artifacts.find(
-              a => a.name.startsWith('embergrave-html5')
+              a => a.name.startsWith('embergrave-html5') && a.name.includes(shortSha)
             );
             if (!html5Artifact) {
-              core.setFailed(`No embergrave-html5 artifact found in run ${runId}`);
+              const candidates = artifacts.data.artifacts
+                .filter(a => a.name.startsWith('embergrave-html5'))
+                .map(a => a.name);
+              core.setFailed(
+                `No embergrave-html5 artifact matching SHA ${shortSha} (full: ${expectedSha}) ` +
+                `found in run ${runId}. ` +
+                `Candidates in run: ${JSON.stringify(candidates)}. ` +
+                `This is the W3-T11 SHA-pin fail-fast — do NOT fall back to a non-matching artifact.`
+              );
               return;
             }
             core.exportVariable('ARTIFACT_NAME', html5Artifact.name);
@@ -121,6 +252,38 @@ jobs:
           echo "=== Artifact download directory ==="
           ls -la ./artifact-download/ || echo "(empty)"
           find ./artifact-download -type f | head -20
+
+      # SHA-pin verification: the wildcard-downloaded path didn't go through the
+      # explicit SHA filter above. If the wildcard grabbed an artifact whose
+      # name doesn't include the expected SHA, fail HERE rather than running
+      # Playwright against the wrong artifact. The W3-T11 contract: never run
+      # tests against an artifact whose SHA doesn't match what was resolved.
+      - name: Verify downloaded artifact carries expected SHA
+        run: |
+          set -euo pipefail
+          expected_sha="${{ steps.resolve_run.outputs.expected_sha }}"
+          short_sha="${expected_sha:0:7}"
+          run_id="${{ steps.resolve_run.outputs.run_id }}"
+          # Strategy: re-query the run's artifacts list and verify at least one
+          # of the artifact names downloaded here contains the short SHA. The
+          # artifact-download directory itself doesn't preserve the original
+          # artifact name (extract is flat), so we cross-reference via the API.
+          artifact_names_json=$(gh api "repos/${{ github.repository }}/actions/runs/${run_id}/artifacts" \
+            --jq '[.artifacts[] | select(.name | startswith("embergrave-html5")) | .name]')
+          echo "Release artifacts in run ${run_id}: ${artifact_names_json}"
+          # Did any embergrave-html5 artifact in this run carry the expected SHA?
+          match_count=$(echo "${artifact_names_json}" | jq "[.[] | select(contains(\"${short_sha}\"))] | length")
+          if [ "${match_count}" -lt 1 ]; then
+            echo "::error::SHA-pin verification failed."
+            echo "Expected an artifact name containing SHA '${short_sha}' (full: ${expected_sha}) in run ${run_id}."
+            echo "Found artifacts: ${artifact_names_json}"
+            echo "This means the release-build artifact's SHA does NOT match what the resolve step pinned to."
+            echo "Likely cause: the release-github.yml run was re-triggered on a different commit between resolve + download."
+            exit 1
+          fi
+          echo "OK: artifact-name SHA-pin verified — at least one artifact in run ${run_id} contains '${short_sha}'."
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Extract HTML5 artifact (idempotent — handles zip or pre-unzipped)
         id: unzip
@@ -237,6 +400,8 @@ jobs:
           echo "## Playwright E2E Results" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**Artifact:** \`embergrave-html5\` from run \`${{ steps.resolve_run.outputs.run_id }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Resolved SHA:** \`${{ steps.resolve_run.outputs.expected_sha }}\` (W3-T11 SHA-pin verified)" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Trigger:** \`${{ github.event_name }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**Specs run:**" >> "$GITHUB_STEP_SUMMARY"
           echo "- \`ac1-boot-and-sha\` — build boots + SHA correct + no errors + no 404s" >> "$GITHUB_STEP_SUMMARY"
