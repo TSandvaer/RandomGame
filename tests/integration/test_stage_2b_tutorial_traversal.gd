@@ -164,49 +164,76 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 	# dummy takes three FIST_DAMAGE=1 hits to die (HP_MAX=3). Drive via direct
 	# take_damage. The dummy's `_die` spawns the iron_sword Pickup (deferred
 	# add_child) at the dummy's own death position — capture that position now,
-	# before the dummy frees, so the failure message can report where the
-	# Pickup was expected to spawn.
+	# before the dummy frees. `PracticeDummy._spawn_iron_sword_pickup` sets the
+	# Pickup's position to the dummy's `global_position`, so `dummy_pos` is
+	# where the Pickup will land in world space.
 	var dummy_pos: Vector2 = dummy.global_position
 	for _i in PracticeDummy.HP_MAX:
 		dummy.take_damage(1, Vector2.ZERO, null)
 	assert_true(dummy.is_dead(), "dummy dies after HP_MAX fist hits")
 	assert_true(room.get_tutorial_beat_emitted(&"rmb_heavy"),
 		"rmb_heavy beat fires on dummy poof")
-
-	# Step 4: drain one frame so the dummy's deferred `add_child` lands the
-	# Pickup in the room. The Pickup's `_ready` runs on this frame and defers
-	# `_activate_and_check_initial_overlap` (which will run NEXT frame).
-	await get_tree().process_frame
-	# The Room01 → Room02 advance is still GATED (player fistless) — Room01 is
-	# still alive, so the Pickup persists.
+	# The dummy's `add_child(pickup)` is deferred — it has NOT landed yet, the
+	# player is still fistless, so the Room01 → Room02 advance is still GATED.
 	assert_eq(main.get_current_room_index(), 0,
 		"Room01 → Room02 advance is GATED on pickup-equip — still in Room01 " +
-		"because the player has not collected the iron_sword Pickup yet")
-	var pickup: Pickup = _find_pickup(room)
-	assert_not_null(pickup,
-		"the dummy dropped an iron_sword Pickup into the Room01 subtree")
-	assert_not_null(pickup.item, "the Pickup carries an ItemInstance")
-	assert_eq(pickup.item.def.id, &"iron_sword",
-		"the dropped Pickup is the iron_sword (deterministic dummy drop)")
+		"immediately after the kill, before the player collects the Pickup")
 
-	# Step 5: WALK THE PLAYER ONTO THE PICKUP. Move the player's body onto the
-	# Pickup's exact position NOW — after the Pickup is in the tree but BEFORE
-	# its deferred `_activate_and_check_initial_overlap` runs (queued during
-	# the Pickup's `_ready` above; runs next idle frame). When that deferred
-	# pass runs, `get_overlapping_bodies()` finds the player concentric with
-	# the Pickup and collects immediately — the exact production
-	# overlap-detection path (same pre-existing-overlap pattern
-	# `test_hitbox_overlapping_at_spawn.gd` exercises for Hitbox). Re-assert
-	# the position each physics frame so the player's `move_and_slide` cannot
-	# drift it back out of the Pickup's radius-8 collision shape before the
-	# overlap check lands.
-	for _i in 4:
-		p.global_position = pickup.global_position
+	# Step 4: PRE-POSITION THE PLAYER ON THE DROP TILE — the killing-blow case.
+	# The dummy's deferred `add_child` lands the Pickup a frame later; the
+	# Pickup's `_ready` then defers `_activate_and_check_initial_overlap`, which
+	# flushes shortly after. By the time test code regains control, that
+	# initial-overlap pass may have ALREADY run — so the player must be standing
+	# on the drop tile BEFORE we drain those frames, or the pass finds nobody.
+	# This is exactly the production "player standing on the dummy's tile from
+	# the killing blow" path the Pickup doc comment describes
+	# (`scripts/loot/Pickup.gd` § "Encapsulated-monitoring + initial-overlap").
+	# This mirrors the proven pattern in `test_hitbox_overlapping_at_spawn.gd`:
+	# the overlapping body must be in position when the Area2D's `_ready` runs,
+	# then several physics frames let the deferred sweep + the physics server's
+	# overlap computation settle. Interleave physics + process frames so the
+	# deferred `add_child` (idle-flush) and the deferred overlap pass both land
+	# while the player is pinned. Re-pin every iteration so the player's
+	# `move_and_slide` (zero velocity) cannot drift it off the radius-8 shape.
+	p.global_position = dummy_pos
+	p.velocity = Vector2.ZERO
+	for _i in 6:
+		p.global_position = dummy_pos
 		p.velocity = Vector2.ZERO
 		await get_tree().physics_frame
+		await get_tree().process_frame
+
+	# Find the Pickup. Two legitimate outcomes here:
+	#   (a) it is STILL in the tree — the player was pinned on `dummy_pos` but
+	#       the initial-overlap pass needed the player at the Pickup's exact
+	#       `global_position` (room offset) — Step 5 re-pins and finishes it.
+	#   (b) it is ALREADY GONE — the Step-4 pin landed it; `queue_free` ran.
+	#       That is the success path; skip straight to the Room02 assertions.
+	# Either way, before the Pickup is collected the iron_sword drop must have
+	# existed and been the right item — assert that on outcome (a).
+	var pickup: Pickup = _find_pickup(room)
+	if pickup != null:
+		assert_not_null(pickup.item, "the Pickup carries an ItemInstance")
+		assert_eq(pickup.item.def.id, &"iron_sword",
+			"the dropped Pickup is the iron_sword (deterministic dummy drop)")
+
+		# Step 5: belt-and-suspenders — re-pin to the Pickup's ACTUAL world
+		# position (defends against any room-offset between
+		# `dummy.global_position` and the Pickup's `global_position`) and drain
+		# a mix of physics + process frames so EITHER collection path catches
+		# the player: the `_activate_and_check_initial_overlap` pass OR a real
+		# `body_entered` transition. Re-pin each iteration against drift, and
+		# stop early once the Pickup is collected (its node is freed).
+		for _i in 8:
+			if not is_instance_valid(pickup):
+				break
+			p.global_position = pickup.global_position
+			p.velocity = Vector2.ZERO
+			await get_tree().physics_frame
+			await get_tree().process_frame
 
 	# Step 6: the pickup-equip + the gate release + the room advance all chain
-	# through deferred calls — drain a few frames for Room02 to load.
+	# through deferred calls — drain a few more frames for Room02 to load.
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await get_tree().process_frame
