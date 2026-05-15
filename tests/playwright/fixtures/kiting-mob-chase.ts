@@ -843,3 +843,277 @@ export async function chaseAndClearKitingMobs(
     durationMs: Date.now() - t0,
   };
 }
+
+// ===========================================================================
+// Multi-chaser clear — position-steered pursuit for 3-mob chaser rooms
+// (ticket 86c9u05d7 — Room 05+ deterministic clear)
+// ===========================================================================
+//
+// **Why this exists.** `ac4-boss-clear.spec.ts`'s `clearRoomMobs` originally
+// cleared chaser rooms (Grunt / Charger) by click-spamming from a FIXED
+// position near `DEFAULT_PLAYER_SPAWN` while alternating N/E facing. That
+// works for the 2-mob rooms (02, 03) — both chasers crowd the player and sit
+// inside the swing wedge. It does NOT work reliably for the 3-mob rooms
+// (05–08): with three concurrent chasers, one routinely drifts out of the
+// fixed wedge's coverage — knockback from the player's own swings shoves
+// mobs apart, the Charger's telegraph→charge cycle parks it outside melee,
+// and a Grunt circling to the player's flank is never faced. Tess
+// characterised Room 05's clear at 0/3–2/3 across runs via the fixed-position
+// path — never a deterministic 3/3.
+//
+// The fix is the SAME position-steered pursuit `chaseAndClearKitingMobs`
+// uses for kiting Shooters, generalised: instead of click-spamming from a
+// fixed point, the helper reads every chaser's throttled `.pos` trace
+// (`Grunt.pos` / `Charger.pos`, added alongside `Shooter.pos` for this
+// ticket) and steers the player AT whichever chaser is currently out of
+// swing range — so a drifting mob is pursued and cornered rather than left
+// to wander outside the wedge.
+//
+// **Distinguishing mobs of the same type.** The `.pos` trace carries no
+// unique per-instance id — Room 05 has two Grunts emitting the identical
+// `Grunt.pos` tag. The helper does NOT try to track individual instances.
+// Each cycle it samples the *latest* `Grunt.pos` and the *latest*
+// `Charger.pos` line; whichever the engine emitted most recently is, by the
+// 0.25s throttle, a live mob (a dead mob's `_physics_process` early-returns
+// on `_is_dead` and stops emitting). The helper steers toward the FARTHEST
+// live reading (the one drifting out of wedge range — the close ones get
+// caught in the wedge during the engage burst anyway) until something is
+// within `ENGAGE_RANGE`, then engage-bursts. Kills are counted off the
+// uniform `<Mob>._die` death traces, exactly like the spec's own loop. When
+// the last chaser dies its `.pos` emissions stop; the loop exits on the
+// death-count, not on position.
+//
+// **Gate handling.** Unlike a kiting Shooter, chasers do NOT retreat through
+// the RoomGate trigger — they close toward the player. Pursuit of a chaser
+// therefore rarely walks the player through the gate, so this helper does
+// NOT drive the gate sequence itself. After the kill loop it position-steers
+// the player back to `DEFAULT_PLAYER_SPAWN` (reusing `returnToSpawn`) so the
+// caller's `gateTraversalWalk` runs from its required geometry — the gate is
+// left OPEN with `mobs_alive == 0`, the kill-first precondition that helper
+// expects. The result's `gateTraversed` is therefore always `false` (the
+// caller always runs `gateTraversalWalk`); it is kept in the result shape
+// for symmetry with `KitingChaseResult` so `clearRoomMobs` can treat both
+// helpers uniformly. If a future chaser AI starts retreating through the
+// gate, the same case A/B/C resolution as `chaseAndClearKitingMobs` would
+// need porting here — for now chasers never do, so the simple
+// return-to-spawn is correct and deterministic.
+
+/** Default `.pos` / `._die` patterns for the two chaser mob types. */
+const GRUNT_POS_PATTERN = /\[combat-trace\] Grunt\.pos /;
+const GRUNT_DEATH_PATTERN = /\[combat-trace\] Grunt\._die/;
+const CHARGER_POS_PATTERN = /\[combat-trace\] Charger\.pos /;
+const CHARGER_DEATH_PATTERN = /\[combat-trace\] Charger\._die/;
+
+/**
+ * Options for `chaseAndClearMultiChaserRoom`.
+ */
+export interface MultiChaserOptions {
+  /**
+   * Position-trace regexes for every chaser mob type present in the room.
+   * Default: `[Grunt.pos, Charger.pos]` — covers Rooms 05–08's chaser
+   * composition. Each must capture `pos=(x,y)` and `dist_to_player=N`.
+   */
+  posPatterns?: RegExp[];
+  /**
+   * Death-trace regexes for every chaser mob type present in the room.
+   * Default: `[Grunt._die, Charger._die]`. Kills are counted off the union
+   * of these patterns.
+   */
+  deathPatterns?: RegExp[];
+  /** Player-position trace regex (must capture `pos=(x,y)`). */
+  playerPosPattern?: RegExp;
+  /** Per-room combat budget in ms. Default: 90_000 (matches the spec). */
+  budgetMs?: number;
+}
+
+/**
+ * Pursues and kills every chaser mob in a multi-chaser room (Rooms 05–08)
+ * by position-steered pursuit — the same technique `chaseAndClearKitingMobs`
+ * uses for kiting Shooters, generalised to chasers so a chaser that drifts
+ * out of the player's fixed swing wedge is pursued and cornered rather than
+ * left to wander (ticket 86c9u05d7).
+ *
+ * Preconditions:
+ *   - Canvas has keyboard focus (a prior `canvas.click()` was issued).
+ *   - No movement keys are currently held.
+ *   - The build emits `Player.pos` + the chasers' `.pos` traces (HTML5
+ *     release build — they are no-ops in headless GUT).
+ *
+ * Postconditions:
+ *   - `expectedMobs` matching chaser death traces observed (or the helper
+ *     throws with the last 30 trace lines on budget exhaustion).
+ *   - The player has been steered back to within
+ *     `RETURN_TO_SPAWN_TOLERANCE_PX` of `DEFAULT_PLAYER_SPAWN`, so the
+ *     caller's `gateTraversalWalk` runs from its required position.
+ *   - `KitingChaseResult.gateTraversed` is always `false` — chasers do not
+ *     retreat through the gate, so this helper never drives the gate
+ *     sequence; the caller always runs `gateTraversalWalk`. (`gateUnlocked`
+ *     is likewise `false`.)
+ *
+ * @param page          Playwright page.
+ * @param canvas        The game canvas locator.
+ * @param capture       ConsoleCapture instance (already attached).
+ * @param roomLabel     Log prefix, e.g. "Room 05".
+ * @param expectedMobs  Number of chaser mobs to clear in this room.
+ * @param clickX        Canvas-relative click X (swing origin).
+ * @param clickY        Canvas-relative click Y (swing origin).
+ * @param options       Pattern / budget tuning.
+ */
+export async function chaseAndClearMultiChaserRoom(
+  page: Page,
+  canvas: Locator,
+  capture: ConsoleCapture,
+  roomLabel: string,
+  expectedMobs: number,
+  clickX: number,
+  clickY: number,
+  options: MultiChaserOptions = {}
+): Promise<KitingChaseResult> {
+  const t0 = Date.now();
+  const posPatterns =
+    options.posPatterns ?? [GRUNT_POS_PATTERN, CHARGER_POS_PATTERN];
+  const deathPatterns =
+    options.deathPatterns ?? [GRUNT_DEATH_PATTERN, CHARGER_DEATH_PATTERN];
+  const playerPosPattern =
+    options.playerPosPattern ?? /\[combat-trace\] Player\.pos /;
+  const budgetMs = options.budgetMs ?? 90_000;
+
+  // Snapshot death counts so we only credit kills that happen during THIS
+  // room's chase. `killsSoFar` sums across every chaser death pattern.
+  const preDeathCounts = deathPatterns.map((p) => countLines(capture, p));
+  const killsSoFar = (): number =>
+    deathPatterns.reduce(
+      (sum, p, i) => sum + (countLines(capture, p) - preDeathCounts[i]),
+      0
+    );
+
+  console.log(
+    `[multi-chaser] ${roomLabel}: position-steered pursuit of ` +
+      `${expectedMobs} chaser mob(s).`
+  );
+
+  let cycle = 0;
+  let lastDist = -1;
+
+  while (Date.now() - t0 < budgetMs && killsSoFar() < expectedMobs) {
+    cycle++;
+
+    // ---- Read every chaser type's latest position, pick a pursuit target --
+    //
+    // A dead mob's `_physics_process` early-returns on `_is_dead` and stops
+    // emitting `.pos` — so the *latest* line per type is a live mob (within
+    // the 0.25s throttle window). We can't distinguish two live Grunts, but
+    // we don't need to: steering toward whichever live reading is FARTHEST
+    // from the player chases down the drifter, and the engage burst's held
+    // steer keys + click-spam catch any closer mob crowding the same wedge.
+    const player = latestPos(capture, playerPosPattern);
+    const mobReadings: PosReading[] = [];
+    for (const p of posPatterns) {
+      const r = latestPos(capture, p);
+      if (r !== null) mobReadings.push(r);
+    }
+
+    if (player === null || mobReadings.length === 0) {
+      // No fresh position trace yet — give the build a beat to emit one, and
+      // nudge with a short click-spam in case a mob is already adjacent.
+      await canvas.click({ position: { x: clickX, y: clickY } });
+      await page.waitForTimeout(ATTACK_INTERVAL_MS);
+      continue;
+    }
+
+    // Distance for each reading: prefer the trace's own dist_to_player
+    // (authoritative), fall back to the computed gap between the two latest
+    // readings.
+    const withDist = mobReadings.map((m) => {
+      const computed = Math.round(
+        Math.hypot(m.x - player.x, m.y - player.y)
+      );
+      const dist =
+        m.dist !== null && m.dist >= 0 ? m.dist : computed;
+      return { ...m, effDist: dist };
+    });
+
+    // Engage the CLOSEST mob if any is already in range; otherwise pursue
+    // the FARTHEST (the one drifting out of the wedge — closer mobs get
+    // caught in the engage burst's wedge anyway).
+    const closest = withDist.reduce((a, b) =>
+      b.effDist < a.effDist ? b : a
+    );
+    const farthest = withDist.reduce((a, b) =>
+      b.effDist > a.effDist ? b : a
+    );
+    const target = closest.effDist <= ENGAGE_RANGE ? closest : farthest;
+
+    const dx = target.x - player.x;
+    const dy = target.y - player.y;
+    const dist = target.effDist;
+    lastDist = dist;
+    const steerKeys = keysToward(dx, dy);
+
+    if (cycle === 1 || cycle % 8 === 0) {
+      console.log(
+        `[multi-chaser] ${roomLabel}: cycle ${cycle} t=${Date.now() - t0}ms ` +
+          `player=(${player.x},${player.y}) target=(${target.x},${target.y}) ` +
+          `dist=${dist} steer=[${steerKeys.join("+")}] ` +
+          `seen=${withDist.length} kills=${killsSoFar()}`
+      );
+    }
+
+    if (dist > ENGAGE_RANGE) {
+      // ---- Pursuit burst — close the gap toward the drifting chaser ----
+      await holdKeys(page, steerKeys, PURSUIT_BURST_MS);
+      await page.waitForTimeout(SETTLE_MS);
+    } else {
+      // ---- Engage burst — jam onto the chaser (held steer keys keep the
+      // player pressed against it AND keep `_facing` pointed at it) while
+      // click-spamming. Held input overrides knockback so the player stays
+      // in swing range for the whole burst — and a second chaser crowding
+      // the same wedge is caught by the same swings.
+      for (const k of steerKeys) await page.keyboard.down(k);
+      for (let s = 0; s < ENGAGE_SWINGS; s++) {
+        await canvas.click({ position: { x: clickX, y: clickY } });
+        await page.waitForTimeout(ATTACK_INTERVAL_MS);
+        if (killsSoFar() >= expectedMobs) break;
+        if (Date.now() - t0 >= budgetMs) break;
+      }
+      for (const k of [...steerKeys].reverse()) await page.keyboard.up(k);
+      await page.waitForTimeout(SETTLE_MS);
+    }
+  }
+
+  const kills = killsSoFar();
+  if (kills < expectedMobs) {
+    const recent = capture
+      .getLines()
+      .slice(-30)
+      .map((l) => `  ${l.text}`)
+      .join("\n");
+    throw new Error(
+      `[multi-chaser] ${roomLabel}: only killed ${kills}/${expectedMobs} ` +
+        `chaser mob(s) in ${budgetMs}ms (last measured dist=${lastDist}). ` +
+        `The position-steered pursuit did not converge — check that the ` +
+        `build emits the chaser '.pos' traces (Grunt.pos / Charger.pos) and ` +
+        `'${playerPosPattern}' (HTML5 release build required).\n` +
+        `Last 30 trace lines:\n${recent}`
+    );
+  }
+
+  console.log(
+    `[multi-chaser] ${roomLabel}: cleared ${kills}/${expectedMobs} chaser ` +
+      `mob(s) at t=${Date.now() - t0}ms after ${cycle} cycle(s). ` +
+      `Steering player back to spawn for the caller's gateTraversalWalk.`
+  );
+
+  // Chasers do not retreat through the gate, so the gate is still OPEN with
+  // `mobs_alive == 0`. Steer the player back to DEFAULT_PLAYER_SPAWN so the
+  // caller's gateTraversalWalk has deterministic W→N walk geometry.
+  await returnToSpawn(page, capture, roomLabel, playerPosPattern);
+
+  return {
+    cleared: true,
+    kills,
+    gateTraversed: false,
+    gateUnlocked: false,
+    durationMs: Date.now() - t0,
+  };
+}

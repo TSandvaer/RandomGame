@@ -112,7 +112,10 @@
 import { test, expect } from "@playwright/test";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import { gateTraversalWalk } from "../fixtures/gate-traversal";
-import { chaseAndClearKitingMobs } from "../fixtures/kiting-mob-chase";
+import {
+  chaseAndClearKitingMobs,
+  chaseAndClearMultiChaserRoom,
+} from "../fixtures/kiting-mob-chase";
 import { clearRoom01Dummy } from "../fixtures/room01-traversal";
 
 const BOOT_TIMEOUT_MS = 30_000;
@@ -388,6 +391,44 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         // `expectedMobs`, or a room with Shooters would never satisfy the
         // exit condition.
         const chaserMobs = expectedMobs - shooterCount;
+
+        // ---- Multi-chaser rooms: position-steered pursuit (ticket 86c9u05d7)
+        //
+        // The fixed-position N/E click-spam loop below clears the 2-mob
+        // rooms (02, 03) reliably — both chasers crowd the player and sit in
+        // the swing wedge. It does NOT reliably clear 3-mob rooms (05–08):
+        // with 2+ concurrent chasers, one routinely drifts out of the fixed
+        // wedge's coverage (swing knockback shoves mobs apart, the Charger's
+        // telegraph→charge cycle parks it outside melee, a Grunt circling to
+        // the flank is never faced). Tess characterised Room 05 at 0/3–2/3
+        // via the fixed-position path — never a deterministic 3/3.
+        //
+        // For 2+ remaining chasers, route them through the SAME
+        // position-steered pursuit the kiting-Shooter helper uses, now
+        // generalised to chasers: it reads each chaser's `.pos` trace
+        // (Grunt.pos / Charger.pos) and steers the player AT whichever
+        // chaser is out of swing range, so a drifter is cornered rather than
+        // left to wander. The helper steers the player back to spawn when
+        // done, so the gateTraversalWalk below runs from its required
+        // geometry. Chasers don't retreat through the gate, so this never
+        // drives the gate sequence — the normal two-part walk still runs.
+        if (chaserMobs >= 2) {
+          await chaseAndClearMultiChaserRoom(
+            page,
+            canvas,
+            capture,
+            roomLabel,
+            chaserMobs,
+            clickX,
+            clickY
+          );
+          console.log(
+            `[ac4-boss] ${roomLabel}: cleared ${chaserMobs} chaser mob(s) ` +
+              `via position-steered multi-chaser pursuit ` +
+              `(+${shooterCount} Shooter(s) cleared by chase pre-pass).`
+          );
+          return { chaseTraversedGate };
+        }
 
         const roomStart = Date.now();
         // Cycle facing through N → E (single-key presses produce clean
