@@ -769,6 +769,24 @@ export async function chaseAndClearKitingMobs(
     );
   }
 
+  // ---- Dismiss any auto-opened panel (level-up panel, etc.) ----
+  //
+  // Defensive: see the long-form rationale on the same idiom in
+  // `chaseAndClearMultiChaserRoom` below (ticket 86c9u6uhg). Room 04 doesn't
+  // currently trigger a level-up at the M2-W3 balance (62 XP cumulative
+  // after Room 04 — below the 100 XP L1→L2 threshold), but a future balance
+  // change could; pressing Escape post-clear is a cheap, idempotent guard
+  // against any auto-opened panel pinning `Engine.time_scale = 0.10` and
+  // wrecking the settle window's clock-base.
+  console.log(
+    `[kiting-chase] ${roomLabel}: hammering Escape post-clear to dismiss any ` +
+      `auto-opened panel (time_scale guard — ticket 86c9u6uhg).`
+  );
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(50);
+  }
+
   // ---- Gate-settle window — let the gate state machine finish reacting ----
   //
   // The kill loop above exits the INSTANT the kiter's `_die` trace appears.
@@ -1329,6 +1347,61 @@ export async function chaseAndClearMultiChaserRoom(
     `[multi-chaser] ${roomLabel}: cleared ${kills}/${expectedMobs} chaser ` +
       `mob(s) at t=${Date.now() - t0}ms after ${cycle} cycle(s).`
   );
+
+  // ---- Dismiss any auto-opened panel (level-up panel, etc.) ----
+  //
+  // **Root cause + fix (ticket 86c9u6uhg, Drew investigation 2026-05-15):**
+  // `StatAllocationPanel.open()` auto-opens on the FIRST EVER `Levels.level_up`
+  // signal (LU-05 in `team/uma-ux/level-up-panel.md`) and sets
+  // `Engine.time_scale = 0.10` for the duration the panel is visible. The
+  // panel stays open until the player presses Enter / Esc / 1 / 2 / 3 to
+  // allocate or dismiss.
+  //
+  // In a release-build AC4 run the player crosses the L1→L2 threshold
+  // (100 XP) precisely on the 3rd Room 05 chaser kill — Room 02 grants 20 XP
+  // (2 grunts × 10), Room 03 grants 28 XP (1 grunt + 1 charger), Room 04
+  // grants 14 XP (1 shooter), and Room 05's mob trio grants 38 XP (10 + 10 +
+  // 18), bringing the running total from 62 to 100. The level-up panel pops
+  // on the 3rd Room 05 kill, time_scale drops to 0.10, and from that frame
+  // on EVERY engine-time clock — including `RoomGate._start_death_wait`'s
+  // 0.65 s timer and the player's WALK_SPEED-driven movement — runs at 10×
+  // wall-time. The 0.65 s gate-unlock takes 6.5 s wall to fire — well past
+  // the 2.5 s `GATE_SETTLE_WINDOW_MS` below — and every subsequent
+  // `gateTraversalWalk` key-down at fixed wall-ms covers 10× less ground in
+  // game space, so the player never reaches the gate trigger.
+  //
+  // The Playwright harness does not allocate stats, so the panel stays open
+  // until the test ends; the bug surfaces as `gateUnlocked=false,
+  // gateTraversed=false` after settle, exactly matching the symptom Devon
+  // observed in PR #206's 8/8 release-build characterisation.
+  //
+  // **The fix**: press Escape after the kill loop exits but BEFORE the
+  // settle window starts. KEY_ESCAPE is handled by
+  // `StatAllocationPanel._unhandled_input` and closes the panel (banking
+  // any unspent points). When no panel is open it's a no-op. We press
+  // 4 times — once for the level-up panel (in case it auto-opened), once
+  // more after a brief wait (in case the panel opens slightly after the
+  // 3rd kill due to deferred XP signal chains), and twice more for
+  // defensive coverage of other panels that may auto-open in M3+. This is
+  // cheap (~200 ms total) and idempotent.
+  //
+  // **Why not F9 force-close**: `StatAllocationPanel` doesn't have a
+  // `force_close_for_test` hook yet (only `InventoryPanel` does, per ticket
+  // 86c9qb7f3). Escape on the panel goes through `_unhandled_input` which
+  // is reliably reached when the canvas (not a Button) holds focus — and
+  // the AC4 spec's combat phase doesn't focus any Button, so the focus-
+  // consumption problem that prompted `force_close_for_test` for the
+  // inventory panel does not apply here. Adding a parallel
+  // `force_close_for_test` to `StatAllocationPanel` is a future-proofing
+  // option but not required for AC4 — Escape works.
+  console.log(
+    `[multi-chaser] ${roomLabel}: hammering Escape post-clear to dismiss any ` +
+      `auto-opened level-up panel (Engine.time_scale guard — ticket 86c9u6uhg).`
+  );
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(50);
+  }
 
   // ---- Gate-settle window + post-chase gate resolution ----
   //
