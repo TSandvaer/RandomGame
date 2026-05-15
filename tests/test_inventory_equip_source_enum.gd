@@ -1,35 +1,42 @@
 extends GutTest
-## Paired tests for fix(combat-trace): Inventory.equip source enum
-## (lmb_click vs auto_starter), ticket 86c9qah0v.
+## Paired tests for the Inventory.equip source enum (lmb_click / auto_pickup /
+## deprecated auto_starter), tickets 86c9qah0v + 86c9qbb3k.
 ##
 ## **What this guards:**
 ##   (a) `Inventory.equip(item, slot)` accepts the default `source` parameter
 ##       (backwards-compat — every existing caller still type-checks).
-##   (b) `Inventory.equip(item, slot, &"auto_starter")` accepts an explicit
-##       override and still equips successfully.
+##   (b) `Inventory.equip(item, slot, &"auto_pickup")` accepts the
+##       auto-equip-first-weapon-on-pickup source tag and equips successfully.
 ##   (c) `Inventory.equip(item, slot, &"lmb_click")` accepts the default
 ##       value passed explicitly (matches the InventoryPanel call site shape
 ##       that doesn't pass a source, but keeps the equivalence test honest).
-##   (d) `equip_starter_weapon_if_needed` against a real Player ends with
-##       `_equipped["weapon"]` populated AND `Player._equipped_weapon` set —
-##       proves the dual-surface wiring still works through the new source
-##       overload.
+##   (d) `on_pickup_collected` with a weapon + empty slot routes through
+##       `equip(item, slot, &"auto_pickup")` and ends with `_equipped["weapon"]`
+##       populated AND `Player._equipped_weapon` set — the dual-surface wiring
+##       through the auto-equip-on-pickup path (real Player, not a stub).
 ##   (e) `_emit_equip_trace` is a no-op in headless GUT (DebugFlags.combat_trace
 ##       gate returns false off-HTML5) — proves we don't crash when invoked
 ##       through equip() with either source tag.
+##   (f) Deprecated-but-valid: `equip(item, slot, &"auto_starter")` still
+##       type-checks and equips. `auto_starter` was the retired PR #146
+##       boot-equip tag (ticket 86c9qbb3k retired its producer); `equip()` has
+##       no `match`/branch on `source`, so the value survives as a valid
+##       `StringName` input with no current producer. This test pins that
+##       the deprecated tag is still ACCEPTED (it would only break if someone
+##       added a `source` whitelist) — see `_emit_equip_trace` source-tag
+##       footnote in scripts/inventory/Inventory.gd.
 ##
 ## **What this does NOT guard:**
 ##   - The trace line *text* — `DebugFlags.combat_trace` is HTML5-only by
 ##     design, so the actual `[combat-trace] Inventory.equip | source=...` line
 ##     never appears in headless output. The Playwright `equip-flow.spec.ts`
-##     covers the trace-line text (positive: source=auto_starter at boot,
-##     source=lmb_click on user click; negative: neither post-F5-reload).
+##     covers the trace-line text (positive: source=auto_pickup on dummy-drop
+##     pickup, source=lmb_click on user click; negative: neither post-F5-reload).
 ##   - The trace shim's `damage_after` value — already covered by the
 ##     Playwright spec's assertion that `damage_after == iron_sword light damage`.
 ##
-## **Test isolation:** `before_each` / `after_each` reset the autoload so the
-## seed-on-init iron_sword from `_seed_starting_inventory` doesn't leak across
-## tests.
+## **Test isolation:** `before_each` / `after_each` reset the autoload so
+## equipped/grid state doesn't leak across tests.
 
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
@@ -79,17 +86,18 @@ func test_equip_default_source_lmb_click_succeeds() -> void:
 
 
 # ==========================================================================
-# AC (b) — explicit auto_starter source equips successfully
+# AC (b) — explicit auto_pickup source equips successfully
 # ==========================================================================
 
-func test_equip_explicit_auto_starter_source_succeeds() -> void:
+func test_equip_explicit_auto_pickup_source_succeeds() -> void:
 	var item: ItemInstance = _make_weapon_item()
 	_inv().add(item)
-	# This is the call shape `equip_starter_weapon_if_needed` uses internally.
-	assert_true(_inv().equip(item, &"weapon", &"auto_starter"),
-		"equip(item, slot, &\"auto_starter\") must succeed")
+	# This is the call shape `on_pickup_collected` uses internally for the
+	# auto-equip-first-weapon-on-pickup onboarding path.
+	assert_true(_inv().equip(item, &"weapon", &"auto_pickup"),
+		"equip(item, slot, &\"auto_pickup\") must succeed")
 	assert_eq(_inv().get_equipped(&"weapon"), item,
-		"item equipped via auto_starter is in the weapon slot")
+		"item equipped via auto_pickup is in the weapon slot")
 
 
 # ==========================================================================
@@ -106,7 +114,7 @@ func test_equip_explicit_lmb_click_source_succeeds() -> void:
 
 
 # ==========================================================================
-# AC (d) — equip_starter_weapon_if_needed wires the dual-surface state
+# AC (d) — on_pickup_collected routes through equip() with auto_pickup source
 # ==========================================================================
 #
 # This is the integration-class test. We instantiate a real Player so
@@ -116,30 +124,28 @@ func test_equip_explicit_lmb_click_source_succeeds() -> void:
 #   2. `Player._equipped_weapon` is non-null AND points at iron_sword.def.
 # Both halves of the dual-surface rule must hold simultaneously.
 
-func test_equip_starter_routes_through_equip_with_auto_starter_source() -> void:
-	# Reset autoload so the seed path runs cleanly.
+func test_pickup_collected_routes_through_equip_with_auto_pickup_source() -> void:
 	_inv().reset()
 	# Real Player so the equip_item path wires.
 	var player: Player = PlayerScript.new()
 	add_child_autofree(player)
-	# Force the seed-on-empty rule to fire by re-seeding.
-	_inv().call("_seed_starting_inventory")
-	assert_eq(_inv().get_items().size(), 1,
-		"precondition: seed put one iron_sword in the grid")
-	# Now drive the auto-equip path — it routes through equip(item, slot,
-	# &"auto_starter") internally. Since combat_trace is no-op in headless,
-	# the observable contract is the dual-surface state, not the trace text.
-	_inv().call("equip_starter_weapon_if_needed")
+	# Drive the production pickup hook with the real iron_sword the dummy
+	# drops. on_pickup_collected adds it to the grid and — because no weapon
+	# is equipped — auto-equips it via equip(item, slot, &"auto_pickup").
+	var iron: ItemDef = load("res://resources/items/weapons/iron_sword.tres") as ItemDef
+	assert_not_null(iron, "iron_sword.tres must load")
+	var sword: ItemInstance = ItemInstance.new(iron, iron.tier)
+	_inv().on_pickup_collected(sword)
 	# Inventory side: weapon slot populated.
 	var equipped: ItemInstance = _inv().get_equipped(&"weapon") as ItemInstance
 	assert_not_null(equipped,
-		"weapon slot must be populated after equip_starter_weapon_if_needed")
+		"weapon slot must be populated after on_pickup_collected auto-equip")
 	assert_eq(equipped.def.id, &"iron_sword",
-		"weapon slot occupant is the iron_sword starter")
+		"weapon slot occupant is the picked-up iron_sword")
 	# Player side: _equipped_weapon also set (the dual-surface invariant).
 	var weapon_on_player: ItemDef = player.get_equipped_weapon() as ItemDef
 	assert_not_null(weapon_on_player,
-		"Player.get_equipped_weapon() must be non-null after auto_starter equip — " +
+		"Player.get_equipped_weapon() must be non-null after auto_pickup equip — " +
 		"dual-surface invariant. If null, _apply_equip_to_player short-circuited.")
 	assert_eq(weapon_on_player.id, &"iron_sword",
 		"Player._equipped_weapon points at the iron_sword")
@@ -167,8 +173,8 @@ func test_emit_equip_trace_is_silent_noop_in_headless() -> void:
 	assert_true(_inv().equip(item_a, &"weapon", &"lmb_click"),
 		"first equip with lmb_click source: no crash")
 	# Equip a different item to drive the swap path (touches both branches).
-	assert_true(_inv().equip(item_b, &"weapon", &"auto_starter"),
-		"second equip (swap) with auto_starter source: no crash")
+	assert_true(_inv().equip(item_b, &"weapon", &"auto_pickup"),
+		"second equip (swap) with auto_pickup source: no crash")
 	# Final state: item_b equipped, item_a back in grid.
 	assert_eq(_inv().get_equipped(&"weapon"), item_b,
 		"swap completed: item_b is now equipped")
@@ -177,19 +183,33 @@ func test_emit_equip_trace_is_silent_noop_in_headless() -> void:
 
 
 # ==========================================================================
-# AC (f) — direct call to _emit_equip_trace with source override is safe
+# AC (f) — deprecated auto_starter source still type-checks + equips
 # ==========================================================================
 #
-# Lower-level direct probe. Confirms the shim's three-arg shape handles both
-# documented source tags without raising.
+# `auto_starter` was the PR #146 boot-equip bandaid's source tag. Ticket
+# 86c9qbb3k retired its producer (`equip_starter_weapon_if_needed` is gone),
+# but `equip()` has no `match`/branch on `source` — the value survives as a
+# valid `StringName` input with no current producer. This test pins that the
+# deprecated tag is still ACCEPTED: it would only break if someone added a
+# `source` whitelist, which would be a deliberate API change. The direct
+# `_emit_equip_trace` probe also confirms the shim handles every documented
+# tag (lmb_click / auto_pickup / deprecated auto_starter) without raising.
 
-func test_emit_equip_trace_handles_both_source_tags() -> void:
+func test_deprecated_auto_starter_source_still_type_checks_and_equips() -> void:
 	var item: ItemInstance = _make_weapon_item()
-	# Direct call into the private shim. It pulls Player from the "player"
-	# group; without a Player it returns FIST_DAMAGE for damage_after — that's
-	# fine for this safety probe.
-	_inv().call("_emit_equip_trace", item, &"weapon", &"lmb_click")
-	_inv().call("_emit_equip_trace", item, &"weapon", &"auto_starter")
-	# If we reached here, neither call raised. Cheap structural guarantee.
+	_inv().add(item)
+	# Deprecated tag — no current producer, but equip() still accepts it.
+	assert_true(_inv().equip(item, &"weapon", &"auto_starter"),
+		"equip(item, slot, &\"auto_starter\") must still type-check and equip — " +
+		"the tag is deprecated (ticket 86c9qbb3k) but equip() has no source " +
+		"whitelist, so it survives as a valid input with no producer")
+	assert_eq(_inv().get_equipped(&"weapon"), item,
+		"item equipped via the deprecated auto_starter tag is in the weapon slot")
+	# Direct shim probe — handles every documented source tag without raising.
+	var probe_item: ItemInstance = _make_weapon_item(&"shim_probe")
+	_inv().call("_emit_equip_trace", probe_item, &"weapon", &"lmb_click")
+	_inv().call("_emit_equip_trace", probe_item, &"weapon", &"auto_pickup")
+	_inv().call("_emit_equip_trace", probe_item, &"weapon", &"auto_starter")
 	assert_true(true,
-		"_emit_equip_trace handled both lmb_click and auto_starter without crash")
+		"_emit_equip_trace handled lmb_click, auto_pickup, and the deprecated " +
+		"auto_starter tag without crash")

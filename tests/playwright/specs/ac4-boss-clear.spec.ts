@@ -113,6 +113,7 @@ import { test, expect } from "@playwright/test";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import { gateTraversalWalk } from "../fixtures/gate-traversal";
 import { chaseAndClearKitingMobs } from "../fixtures/kiting-mob-chase";
+import { clearRoom01Dummy } from "../fixtures/room01-traversal";
 
 const BOOT_TIMEOUT_MS = 30_000;
 /** Per-room combat budget — enough to kill 4 mobs at production HP. */
@@ -260,10 +261,10 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       await page.goto(baseURL, { waitUntil: "domcontentloaded" });
 
       await capture.waitForLine(/\[Main\] M1 play-loop ready/, BOOT_TIMEOUT_MS);
-      await capture.waitForLine(
-        /\[Inventory\] starter iron_sword auto-equipped \(weapon slot\)/,
-        5_000
-      );
+      // No `[Inventory] starter iron_sword auto-equipped` line — the PR #146
+      // boot-equip bandaid is retired (ticket 86c9qbb3k). The player boots
+      // fistless and equips by picking up the Room 01 dummy drop; the Room 01
+      // phase below uses `clearRoom01Dummy` which handles the kill + pickup.
 
       const canvas = page.locator("canvas").first();
       await canvas.click();
@@ -463,189 +464,44 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         );
       };
 
-      // ---- Drive Room 01 (PR #169 tutorial dummy at far-NE of spawn) ----
+      // ---- Drive Room 01 (PR #169 tutorial dummy + iron_sword pickup) ----
       //
-      // Room 01 changed in PR #169 from 2 grunts to 1 practice_dummy. The
-      // dummy spawns at world (368, 144), which is 128px east + 56px north
-      // of player spawn (240, 200) — well outside attack range. Unlike the
-      // grunt scenario, the dummy doesn't chase, so the player MUST walk
-      // up to the dummy and stop alongside it before attacking.
-      //
-      // Pattern (validated via screenshot diagnosis of prior failure runs):
-      //   Phase A: walk-burst NE for ~1.7s (no clicks) — covers the ~140px
-      //     NE distance from spawn at full WALK_SPEED=120px/s × NE-component
-      //     0.707 = 85px/s/axis × 1.7s ≈ 144px on each axis. Lands player
-      //     near the dummy.
-      //   Phase B: attack-spam in 4 directions (NE, E, N, NW). Player's
-      //     swing reach is 28px + radius 18 = 46px effective hit range.
-      //     The dummy could be on any side relative to where the walk
-      //     ended (overshoot/undershoot), so cycling through 4 directions
-      //     guarantees the swing wedge overlaps the dummy. Each direction
-      //     click-spammed for 4 attacks (HP=3, damage=6 → 1 hit kills).
-      //   Phase C: if not dead, walk a small correction burst SW briefly
-      //     (in case we overshot too far NE), then re-attack. Safety net.
-      //
-      // Why we can't combine walk + attack: holding w+d + clicking at the
-      // same time empirically does not produce net player displacement
-      // (Playwright canvas.click stabilization may interfere with held
-      // keys). Splitting into pure-walk and pure-attack phases produces
-      // observable progress.
-      //
-      // Detection: PR #169 emits `[combat-trace] PracticeDummy._die |
-      // starting death sequence` on death. Main._install_room01_clear_listener
-      // hooks the `mob_died` signal and auto-loads Room 02 on death — no
-      // RoomGate involvement, no body_entered required.
-      const ROOM01_BUDGET_MS = 90_000;
+      // Room 01 ships 1 PracticeDummy at world (~368, 144). Ticket 86c9qbb3k:
+      // the player boots FISTLESS. The clearRoom01Dummy helper walks the
+      // player NE, attack-sweeps the dummy (3 FIST_DAMAGE=1 swings poof it),
+      // THEN walks the player onto the dummy-dropped iron_sword Pickup.
+      // Inventory.on_pickup_collected auto-equips it; the Room 01 -> Room 02
+      // advance is GATED on that pickup-equip (Main._on_room01_mob_died holds
+      // the advance while the player is fistless), so pickupEquipped must be
+      // true before Room 02 loads -- and the player carries the iron_sword
+      // into the rest of the boss-clear run.
       console.log(
-        "[ac4-boss] Room 01 — walk-NE then 4-direction attack-sweep to " +
-          "kill practice_dummy at world (368, 144)."
+        "[ac4-boss] Room 01 -- clearRoom01Dummy: kill the practice_dummy + " +
+          "collect the dropped iron_sword Pickup (fistless onboarding)."
       );
-
-      const room01Start = Date.now();
-      const preRoom01DummyDeaths = capture
-        .getLines()
-        .filter((l) => /\[combat-trace\] PracticeDummy\._die/.test(l.text))
-        .length;
-      let dummyKilled = false;
-
-      const checkDummyDead = () =>
-        capture
-          .getLines()
-          .filter((l) => /\[combat-trace\] PracticeDummy\._die/.test(l.text))
-          .length > preRoom01DummyDeaths;
-
-      // Attack-sweep helper for Room 01 only — cycles through 4 directions
-      // and click-spams each. Local to Room 01 because Rooms 02-08 use the
-      // tight NE-only clearRoomMobs (chasing mobs handle the geometry).
-      const attackSweep = async (
-        directions: { keys: string[]; label: string }[],
-        attacksPerDir: number
-      ): Promise<boolean> => {
-        for (const dir of directions) {
-          // Set facing via direction-key chord (release in reverse order
-          // so the final input_dir tick is the chord, not a single key).
-          for (const k of dir.keys) await page.keyboard.down(k);
-          await page.waitForTimeout(80);
-          for (const k of [...dir.keys].reverse()) await page.keyboard.up(k);
-          await page.waitForTimeout(80);
-
-          for (let a = 0; a < attacksPerDir; a++) {
-            await canvas.click({ position: { x: clickX, y: clickY } });
-            await page.waitForTimeout(ATTACK_INTERVAL_MS);
-            if (checkDummyDead()) return true;
-          }
-        }
-        return false;
-      };
-
-      // Geometry plan: From spawn (240, 200) → dummy (368, 144).
-      // Distance = 128 east + 56 north = 140px on the diagonal. At
-      // WALK_SPEED=120px/s pure-axis, separate-axis walks land precisely:
-      //   - Pure N for 56/120 = 0.47s → Y reaches 144.
-      //   - Pure E for 128/120 = 1.07s → X reaches 368.
-      // Walking N first then E lands player at (368, 144) — same tile as
-      // dummy. Body radius = 10, hitbox radius = 18, dummy body radius
-      // ≈ 10 → swing wedge always overlaps dummy regardless of facing.
-      //
-      // We use slightly-longer durations (700ms N, 1300ms E) for safety
-      // against any ticks that don't register movement. The room walls
-      // clamp overshoots, so even if we walk past target, we end up
-      // adjacent to the wall near the dummy's tile column / row.
-      //
-      // Why separate axes (not diagonal): empirical evidence from prior
-      // runs (screenshot inspection) showed diagonal walks land the
-      // player wildly past the dummy due to walk-speed × diagonal
-      // overshoot. Pure-axis walks are easier to predict.
-      const SWEEP_DIRECTIONS: { keys: string[]; label: string }[] = [
-        { keys: ["w"], label: "N" },
-        { keys: ["w", "d"], label: "NE" },
-        { keys: ["d"], label: "E" },
-        { keys: ["s", "d"], label: "SE" },
-        { keys: ["s"], label: "S" },
-        { keys: ["s", "a"], label: "SW" },
-        { keys: ["a"], label: "W" },
-        { keys: ["w", "a"], label: "NW" },
-      ];
-
-      // ---- Phase A: walk pure N for 700ms ----
-      console.log("[ac4-boss] Room 01: phase A — walk pure N (700ms).");
-      await page.keyboard.down("w");
-      await page.waitForTimeout(700);
-      await page.keyboard.up("w");
-      await page.waitForTimeout(150);
-
-      if (checkDummyDead()) dummyKilled = true;
-
-      // ---- Phase B: walk pure E for 1300ms ----
-      if (!dummyKilled) {
-        console.log("[ac4-boss] Room 01: phase B — walk pure E (1300ms).");
-        await page.keyboard.down("d");
-        await page.waitForTimeout(1300);
-        await page.keyboard.up("d");
-        await page.waitForTimeout(150);
-        if (checkDummyDead()) dummyKilled = true;
-      }
-
-      // ---- Phase C: 8-direction sweep, 3 attacks each ----
-      if (!dummyKilled) {
-        console.log("[ac4-boss] Room 01: phase C — 8-dir sweep × 3 attacks.");
-        dummyKilled = await attackSweep(SWEEP_DIRECTIONS, 3);
-      }
-
-      // ---- Phase D: small position correction + retry sweep (in case
-      // walls clamped player far from dummy) ----
-      if (!dummyKilled && Date.now() - room01Start < ROOM01_BUDGET_MS - 8_000) {
-        console.log(
-          "[ac4-boss] Room 01: phase D — small SW correction + sweep retry."
-        );
-        // 200ms SW = ~17px on each axis. Nudges player slightly off any wall
-        // they may be pinned against.
-        await page.keyboard.down("s");
-        await page.keyboard.down("a");
-        await page.waitForTimeout(200);
-        await page.keyboard.up("a");
-        await page.keyboard.up("s");
-        await page.waitForTimeout(150);
-
-        dummyKilled = await attackSweep(SWEEP_DIRECTIONS, 3);
-      }
-
-      // ---- Phase E: walk back N+E in case phase B didn't register ----
-      if (!dummyKilled && Date.now() - room01Start < ROOM01_BUDGET_MS - 8_000) {
-        console.log(
-          "[ac4-boss] Room 01: phase E — extra E+N walk + sweep retry."
-        );
-        await page.keyboard.down("w");
-        await page.waitForTimeout(500);
-        await page.keyboard.up("w");
-        await page.waitForTimeout(100);
-        await page.keyboard.down("d");
-        await page.waitForTimeout(800);
-        await page.keyboard.up("d");
-        await page.waitForTimeout(150);
-
-        dummyKilled = await attackSweep(SWEEP_DIRECTIONS, 3);
-      }
-
-      if (dummyKilled) {
-        console.log(
-          `[ac4-boss] Room 01: practice_dummy killed at t=${Date.now() - room01Start}ms.`
-        );
-      }
-
-      if (!dummyKilled) {
-        throw new Error(
-          `[ac4-boss] Room 01: practice_dummy did not die within ` +
-            `${ROOM01_BUDGET_MS}ms across phases A-E. Player likely never ` +
-            `reached the dummy at world (368, 144). Check screenshot for ` +
-            `player position. Last 30 trace lines:\n` +
-            capture
-              .getLines()
-              .slice(-30)
-              .map((l) => `  ${l.text}`)
-              .join("\n")
-        );
-      }
+      const room01Result = await clearRoom01Dummy(
+        page,
+        canvas,
+        capture,
+        clickX,
+        clickY,
+        { budgetMs: 90_000 }
+      );
+      expect(
+        room01Result.dummyKilled,
+        "[ac4-boss] Room 01: practice_dummy must die (3 fistless swings)."
+      ).toBe(true);
+      expect(
+        room01Result.pickupEquipped,
+        "[ac4-boss] Room 01: the dummy-dropped iron_sword Pickup must be " +
+          "collected + auto-equipped. The Room 01 -> Room 02 advance is GATED " +
+          "on this equip (ticket 86c9qbb3k) -- and every subsequent room of " +
+          "the boss-clear run depends on the player being equipped."
+      ).toBe(true);
+      console.log(
+        `[ac4-boss] Room 01: dummy killed + iron_sword equipped in ` +
+          `${room01Result.durationMs}ms (${room01Result.attacksFired} attacks).`
+      );
 
       // Settle frame for room load + player respawn at DEFAULT_PLAYER_SPAWN.
       // 1500ms covers Main._on_room_cleared deferred call + room scene load

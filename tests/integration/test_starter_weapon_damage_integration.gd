@@ -1,35 +1,35 @@
 extends GutTest
-## Integration test for iron_sword starter-equip → Player.try_attack damage surface.
+## Integration test for the auto-equip-first-weapon-on-pickup onboarding path
+## → Player.try_attack damage surface (ticket 86c9qbb3k).
 ##
-## **Why this test exists:**
-## PR #145 added Inventory._seed_starting_inventory + equip_starter_weapon_if_needed.
-## Its paired tests (test_starting_inventory.gd) verified Inventory state-only:
-## _equipped[weapon] != null, get_equipped("weapon") returns iron_sword.
-## They did NOT verify that Player.try_attack actually produces weapon-scaled
-## damage through the real combat path.
+## **Why this test exists / what changed:**
+## PR #145 added `Inventory._seed_starting_inventory` + a boot-time
+## `equip_starter_weapon_if_needed` auto-equip. PR #146 moved that call after
+## save-restore. Both are now RETIRED (ticket 86c9qbb3k) — the design-correct
+## onboarding path is **auto-equip the first weapon on pickup**: the Stage-2b
+## Room01 PracticeDummy drops an iron_sword, the player walks onto it, and
+## `Inventory.on_pickup_collected` adds it to the grid AND auto-equips it
+## (first-weapon-only).
 ##
-## Sponsor soak on embergrave-html5-3937831 found every swing still dealt
-## damage=1 (FIST_DAMAGE). Root cause: equip_starter_weapon_if_needed() fired in
-## Player._ready(), but Main._ready() called _load_save_or_defaults() immediately
-## after _spawn_player(). A pre-existing save with equipped:{} triggered
-## Inventory.restore_from_save which called _apply_unequip_to_player("weapon"),
-## setting Player._equipped_weapon = null. The equip was clobbered.
-##
-## Fix: equip_starter_weapon_if_needed is now called from Main._ready() AFTER
-## _load_save_or_defaults(). These tests exercise the integrated path so this
-## class of bug (equip fires before save-restore finishes) cannot ship again
-## with green CI.
+## This file drives the integration surface that the bandaid used to cover —
+## the dual-surface equipped state + the actual `Player.try_attack` damage
+## delta on a real Grunt — but through the new pickup path instead of boot.
 ##
 ## **What these tests drive:**
-##   A. Boot Main.tscn → assert Player.get_equipped_weapon() != null immediately
-##      after main is ready (starter sword survives the save-restore sequence).
-##   B. Boot Main.tscn → drive Player.try_attack on a fresh Grunt → assert
-##      Grunt.hp dropped by weapon-scaled damage (NOT 1 / FIST_DAMAGE).
-##   C. Boot Main.tscn → open InventoryPanel → assert equipped-row shows the
-##      iron_sword (Tab UI surface renders the equipped slot).
-##   D. Regression: boot with a simulated "old save" that has equipped:{} (empty)
-##      → starter sword is still equipped after load (the save-restore does not
-##      clobber the starter).
+##   A. Boot Main.tscn → assert the player boots FISTLESS (no boot-time
+##      auto-equip). `Player.get_equipped_weapon()` is null right after boot.
+##   B. Boot Main.tscn → drive `Inventory.on_pickup_collected(iron_sword)` (the
+##      production pickup hook the dummy-dropped Pickup wires into) → assert
+##      `Player.get_equipped_weapon()` is the iron_sword AND `Player.try_attack`
+##      produces weapon-scaled damage on a real Grunt (NOT FIST_DAMAGE).
+##   C. After the pickup-equip, open InventoryPanel → assert the equipped-row
+##      weapon cell shows the iron_sword (Tab UI surface).
+##   D. Regression: a save with an equipped iron_sword restores it on boot —
+##      the save-restore path is unchanged by the bandaid retirement, and the
+##      player ends up equipped from the save (no pickup needed). This is the
+##      "returning player" path.
+##   E. LMB-click equip-swap drives the FULL dual-surface integration surface
+##      (P0 86c9q96m8 — unchanged by this PR, kept as a regression guard).
 
 const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
@@ -44,8 +44,8 @@ func _instantiate_main(preserve_save: bool = false) -> Node:
 	var main: Node = packed.instantiate()
 	_reset_autoloads()
 	# By default, ensure no save on disk so _load_save_or_defaults is a
-	# fresh-start path. AC-D passes preserve_save=true so its crafted
-	# pre-PR-145-shaped save survives to be loaded by Main._ready().
+	# fresh-start path. AC-D passes preserve_save=true so its crafted save
+	# survives to be loaded by Main._ready().
 	if not preserve_save:
 		var save_node: Node = _save()
 		if save_node != null and save_node.has_method("has_save") and save_node.has_save(0):
@@ -55,17 +55,12 @@ func _instantiate_main(preserve_save: bool = false) -> Node:
 
 
 func _reset_autoloads() -> void:
+	# Bandaid retired (ticket 86c9qbb3k): there is NO _seed_starting_inventory
+	# re-seed here any more. A reset Inventory has an empty grid + empty
+	# equipped map — exactly the fresh-boot state production sees.
 	var inv: Node = _inventory()
 	if inv != null:
 		inv.reset()
-		# Re-seed the iron_sword so the test exercises the same fresh-game-start
-		# state production sees: Inventory autoload's _ready() seeded the sword
-		# at process start, but inv.reset() above wiped that. Without re-seeding,
-		# Main._ready()'s post-save-restore equip_starter_weapon_if_needed() finds
-		# an empty inventory and warns "no iron_sword to auto-equip" — which would
-		# defeat the integration these tests assert. The seed is idempotent
-		# (only-if-empty rule) so calling it on a freshly-reset inventory is safe.
-		inv.call("_seed_starting_inventory")
 	var levels: Node = _levels()
 	if levels != null:
 		levels.reset()
@@ -97,52 +92,69 @@ func _stratum() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("StratumProgression")
 
 
+func _make_iron_sword_instance() -> ItemInstance:
+	var def: ItemDef = load("res://resources/items/weapons/iron_sword.tres") as ItemDef
+	assert_not_null(def, "iron_sword.tres must load")
+	return ItemInstance.new(def, def.tier)
+
+
 # ==========================================================================
-# AC A — Starter sword survives save-restore on fresh boot
+# AC A — Player boots FISTLESS (no boot-time auto-equip)
 # ==========================================================================
 
-func test_player_equipped_weapon_is_non_null_after_boot() -> void:
-	## The title is the test: on a fresh boot (no save), Player._equipped_weapon
-	## must be the iron_sword, not null. Fails pre-fix because equip fires
-	## before save-restore, which clobbers it.
+func test_player_boots_fistless_no_boot_equip() -> void:
+	## With the PR #146 bandaid retired, Main._ready does NOT auto-equip a
+	## starter weapon. On a fresh boot (no save), the player is fistless until
+	## they pick up the iron_sword the Room01 dummy drops.
 	var main: Node = _instantiate_main()
 	await get_tree().process_frame
 	var player: Player = (main as Main).get_player() as Player
 	assert_not_null(player, "AC-A: Player spawned")
 	var weapon: ItemDef = player.get_equipped_weapon() as ItemDef
-	assert_not_null(weapon,
-		"AC-A: Player.get_equipped_weapon() must be non-null after boot — " +
-		"null means the starter equip was clobbered by save-restore")
-	assert_eq(weapon.id, &"iron_sword",
-		"AC-A: equipped weapon must be the iron_sword (id check)")
+	assert_null(weapon,
+		"AC-A: Player.get_equipped_weapon() must be NULL on a fresh boot — " +
+		"the boot-time auto-equip bandaid was retired (ticket 86c9qbb3k); " +
+		"the player equips by picking up the dummy's iron_sword drop")
+	var inv: Node = _inventory()
+	assert_null(inv.get_equipped(&"weapon"),
+		"AC-A: Inventory weapon slot must be empty on a fresh boot")
 
 
 # ==========================================================================
-# AC B — Player.try_attack produces weapon-scaled damage, NOT FIST_DAMAGE
+# AC B — pickup auto-equip → Player.try_attack produces weapon-scaled damage
 # ==========================================================================
 
-func test_first_swing_deals_weapon_scaled_damage_not_fist() -> void:
-	## This is the behavioral integration test that was missing from PR #145.
-	## Pre-fix: every swing dealt damage=1 because Player._equipped_weapon was
-	## null (save-restore clobber). Post-fix: damage must equal the iron_sword
-	## formula output (floor(6 * 1.0 * 1.0) = 6 for a light attack at edge=0).
+func test_pickup_equip_drives_weapon_scaled_damage_not_fist() -> void:
+	## The integration test that replaces PR #145's missing coverage, through
+	## the NEW path: the dummy-dropped iron_sword Pickup wires into
+	## `Inventory.on_pickup_collected`, which auto-equips it. Post-equip,
+	## Player.try_attack must produce the iron_sword formula output, not
+	## damage=1 (FIST_DAMAGE).
 	var main: Node = _instantiate_main()
 	await get_tree().process_frame
 
 	var player: Player = (main as Main).get_player() as Player
 	assert_not_null(player, "AC-B: Player spawned")
+	# Precondition: fistless at boot.
+	assert_null(player.get_equipped_weapon(),
+		"AC-B: precondition — player is fistless at boot (see AC-A)")
 
-	# Verify the weapon is actually equipped before we test swings.
+	# Drive the production pickup hook — this is exactly what the dummy-dropped
+	# Pickup's `picked_up` signal calls (PracticeDummy wires it to the Inventory
+	# autoload's on_pickup_collected).
+	var inv: Node = _inventory()
+	inv.on_pickup_collected(_make_iron_sword_instance())
+
+	# Post-pickup: the iron_sword must be equipped on BOTH surfaces.
 	var weapon: ItemDef = player.get_equipped_weapon() as ItemDef
-	assert_not_null(weapon, "AC-B: precondition — weapon equipped (if this fails, see AC-A)")
-	assert_eq(weapon.id, &"iron_sword", "AC-B: precondition — iron_sword equipped")
+	assert_not_null(weapon,
+		"AC-B: Player.get_equipped_weapon() must be non-null after pickup-equip — " +
+		"null means on_pickup_collected didn't auto-equip or didn't reach the Player")
+	assert_eq(weapon.id, &"iron_sword", "AC-B: equipped weapon is the iron_sword")
 
-	# Build a minimal Grunt to be the target. We use a bare-instantiated Grunt
-	# without a scene (same pattern as test_grunt.gd) so we can call
-	# _try_apply_hit directly without physics pipeline.
+	# Build a minimal Grunt target (bare-instanced, same pattern as test_grunt.gd).
 	var GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 	var grunt: Grunt = GruntScript.new()
-	# Give it a MobDef with known HP so we can compute the delta exactly.
 	var ContentFactoryScript: Script = preload("res://tests/factories/content_factory.gd")
 	var def_overrides: Dictionary = {"hp_base": 50, "damage_base": 5, "move_speed": 60.0}
 	grunt.mob_def = ContentFactoryScript.make_mob_def(def_overrides)
@@ -152,22 +164,18 @@ func test_first_swing_deals_weapon_scaled_damage_not_fist() -> void:
 	var hp_before: int = grunt.get_hp()
 	assert_eq(hp_before, 50, "AC-B: grunt starts at 50 HP")
 
-	# Fire a light attack through the real Player.try_attack path, then
-	# manually drive the Hitbox._try_apply_hit (same technique as test_m1_play_loop.gd
-	# _walk_in_and_kill helper — bypasses the Area2D physics overlap which
-	# requires a running physics server).
+	# Fire a light attack through the real Player.try_attack path.
 	var hb: Hitbox = player.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT) as Hitbox
 	assert_not_null(hb, "AC-B: try_attack must return a Hitbox")
 
-	# The damage encoded on the hitbox is the formula output. Assert it here
-	# so the test is specific about the exact value pre-apply.
 	var expected_light_dmg: int = DamageScript.compute_player_damage(weapon, 0, &"light")
 	assert_eq(hb.damage, expected_light_dmg,
 		"AC-B: hitbox.damage must equal Damage.compute_player_damage(iron_sword, 0, light) = %d" % expected_light_dmg)
 	assert_gt(hb.damage, DamageScript.FIST_DAMAGE,
-		"AC-B: hitbox.damage=%d must be > FIST_DAMAGE=%d — if this fails, Player._equipped_weapon was null when try_attack fired" % [hb.damage, DamageScript.FIST_DAMAGE])
+		"AC-B: hitbox.damage=%d must be > FIST_DAMAGE=%d — if this fails, the pickup-equip " % [hb.damage, DamageScript.FIST_DAMAGE] +
+		"didn't propagate to Player._equipped_weapon (dual-surface miss)")
 
-	# Apply the hit to the grunt and confirm HP drop matches formula output.
+	# Apply the hit and confirm HP drop matches formula output.
 	hb._try_apply_hit(grunt)
 	var hp_after: int = grunt.get_hp()
 	assert_eq(hp_after, hp_before - expected_light_dmg,
@@ -175,37 +183,29 @@ func test_first_swing_deals_weapon_scaled_damage_not_fist() -> void:
 
 
 # ==========================================================================
-# AC C — InventoryPanel Tab UI shows iron_sword in equipped row
+# AC C — InventoryPanel Tab UI shows iron_sword after the pickup-equip
 # ==========================================================================
 
-func test_inventory_panel_equipped_row_shows_iron_sword() -> void:
-	## Sponsor reported "I can't see any sword when I press Tab for inventory."
-	## This test asserts that after boot the InventoryPanel's weapon equipped
-	## cell displays the iron_sword name (non-empty text).
+func test_inventory_panel_equipped_row_shows_iron_sword_after_pickup() -> void:
+	## After the player picks up the iron_sword, the InventoryPanel's weapon
+	## equipped cell must display it (the Tab UI surface).
 	var main: Node = _instantiate_main()
 	await get_tree().process_frame
 
+	var inv: Node = _inventory()
+	inv.on_pickup_collected(_make_iron_sword_instance())
+
 	var panel: InventoryPanel = (main as Main).get_inventory_panel() as InventoryPanel
 	assert_not_null(panel, "AC-C: InventoryPanel mounted")
-
-	# Open the panel (same as Tab key in the live game).
 	panel.open()
 	assert_true(panel.is_open(), "AC-C: panel opens")
 
-	# The equipped slot button for "weapon" should have non-empty text.
-	# InventoryPanel._equipped_cells is a Dictionary (StringName slot -> Button).
-	# We access it via the test-only path: _refresh_equipped_row is called on
-	# open(), so by the time open() returns the cells are populated.
-	var inv: Node = _inventory()
-	assert_not_null(inv, "AC-C: Inventory autoload registered")
 	var equipped_item: ItemInstance = inv.get_equipped(&"weapon") as ItemInstance
 	assert_not_null(equipped_item,
-		"AC-C: Inventory.get_equipped('weapon') must be non-null after boot")
+		"AC-C: Inventory.get_equipped('weapon') must be non-null after pickup-equip")
 	assert_eq(equipped_item.def.id, &"iron_sword",
 		"AC-C: equipped weapon must be iron_sword")
 
-	# Verify the panel's weapon cell text is set (visual surface).
-	# InventoryPanel._equipped_cells is a var, accessible via Godot object property read.
 	var cells: Dictionary = panel.get("_equipped_cells") if "get" in panel else {}
 	if cells != null and not cells.is_empty():
 		var weapon_btn: Button = cells.get(&"weapon", null) as Button
@@ -217,25 +217,21 @@ func test_inventory_panel_equipped_row_shows_iron_sword() -> void:
 
 
 # ==========================================================================
-# AC D — Pre-PR-145 save (equipped:{}) does NOT clobber starter equip
+# AC D — a save with an equipped iron_sword restores it on boot
 # ==========================================================================
 
-func test_old_save_with_empty_equipped_does_not_clobber_starter_sword() -> void:
-	## Regression guard for the exact bug this PR fixes. A save created before
-	## PR #145 (or any save with equipped:{}) must not prevent the starter sword
-	## from being equipped. Pre-fix: restore_from_save called
-	## _apply_unequip_to_player("weapon") → Player._equipped_weapon = null.
-	## Post-fix: equip_starter_weapon_if_needed fires AFTER restore_from_save,
-	## so an empty equipped slot still gets the starter sword.
+func test_save_with_equipped_weapon_restores_on_boot() -> void:
+	## The "returning player" path: a save that already has an equipped
+	## iron_sword restores it on boot via Inventory.restore_from_save. The
+	## bandaid retirement does NOT touch the save-restore path — a returning
+	## player ends up equipped from their save, no pickup required.
 	_reset_autoloads()
 	var save_node: Node = _save()
 	if save_node == null:
 		gut.p("SKIP: Save autoload not available")
 		return
 
-	# Write a minimal save that has equipped:{} (like a pre-PR-145 save).
-	# We write directly via Save.save_game with a crafted payload rather than
-	# going through the full save pipeline.
+	# Build a save that has an equipped iron_sword (schema v3 shape).
 	var fake_data: Dictionary = {
 		"schema_version": 3,
 		"character": {
@@ -249,17 +245,20 @@ func test_old_save_with_empty_equipped_does_not_clobber_starter_sword() -> void:
 			"stats": {"vigor": 0, "focus": 0, "edge": 0},
 			"unspent_points": 0,
 		},
-		"equipped": {},   # <-- the "old save" condition: no equipped weapon
+		"equipped": {
+			"weapon": _make_iron_sword_instance().to_save_dict(),
+		},
 		"stash": [],
 		"meta": {"runs_completed": 0, "deepest_stratum": 1},
 		"stratum": {},
 	}
+	assert_false(fake_data["equipped"]["weapon"].is_empty(),
+		"AC-D: precondition — iron_sword serialized into the save dict")
 	if save_node.has_method("save_game"):
 		save_node.save_game(0, fake_data)
 
-	# Now boot Main — it should load the fake save, get equipped:{},
-	# and STILL call equip_starter_weapon_if_needed after restore.
-	# preserve_save=true so _instantiate_main does NOT delete our crafted save.
+	# Boot Main — it loads the save and restores the equipped iron_sword.
+	# preserve_save=true so _instantiate_main does NOT delete the crafted save.
 	var main: Node = _instantiate_main(true)
 	await get_tree().process_frame
 
@@ -267,12 +266,16 @@ func test_old_save_with_empty_equipped_does_not_clobber_starter_sword() -> void:
 	assert_not_null(player, "AC-D: Player spawned")
 	var weapon: ItemDef = player.get_equipped_weapon() as ItemDef
 	assert_not_null(weapon,
-		"AC-D: starter sword must be equipped even when save has equipped:{} — " +
-		"null means restore_from_save clobbered the equip (pre-fix regression)")
+		"AC-D: a save with an equipped iron_sword must restore it on boot — " +
+		"null means restore_from_save failed to re-apply the equipped weapon")
 	assert_eq(weapon.id, &"iron_sword",
-		"AC-D: equipped weapon must be iron_sword")
+		"AC-D: restored equipped weapon must be the iron_sword from the save")
+	var inv: Node = _inventory()
+	var inv_equipped: ItemInstance = inv.get_equipped(&"weapon") as ItemInstance
+	assert_not_null(inv_equipped, "AC-D: Inventory surface — weapon slot restored")
+	assert_eq(inv_equipped.def.id, &"iron_sword",
+		"AC-D: Inventory surface — restored weapon is the iron_sword")
 
-	# Clean up the test save so subsequent tests start fresh.
 	if save_node.has_method("delete_save"):
 		save_node.delete_save(0)
 
@@ -282,33 +285,34 @@ func test_old_save_with_empty_equipped_does_not_clobber_starter_sword() -> void:
 # ==========================================================================
 
 func test_lmb_click_equip_swap_real_main_drives_dual_surfaces() -> void:
-	## Sponsor M1 RC re-soak attempt 5 P0 86c9q96m8 — pick up a sword in
-	## Room 02, click to equip via LMB on inventory grid → "item disappears
-	## from grid but is NOT actually equipped (subsequent swings still
-	## register the previous weapon's damage)."
+	## Sponsor M1 RC re-soak attempt 5 P0 86c9q96m8 — pick up a sword, click to
+	## equip via LMB on inventory grid → "item disappears from grid but is NOT
+	## actually equipped (subsequent swings still register the previous
+	## weapon's damage)."
 	##
-	## This integration AC drives the full real-Main path (autoloads,
-	## Player, InventoryPanel, the Tab UI's `_handle_inventory_click`)
-	## through an equip-swap and confirms BOTH the Inventory surface AND
-	## the Player surface (dual-surface rule) end up pointing at the new
-	## sword. A swing on a fresh grunt confirms the damage value updated
-	## (Tier 3 of the combat-architecture.md §"Equipped-weapon dual-surface
-	## rule" test bar — actual damage delta on a real Grunt, NOT just the
-	## formula in isolation).
+	## This integration AC drives the full real-Main path through an equip-swap
+	## and confirms BOTH the Inventory surface AND the Player surface end up
+	## pointing at the new sword. Unchanged by the bandaid retirement — kept as
+	## a regression guard for the equip-swap dual-surface invariant.
 	var main: Node = _instantiate_main()
 	await get_tree().process_frame
 
 	var player: Player = (main as Main).get_player() as Player
 	assert_not_null(player, "AC-E: Player spawned")
 
-	# Confirm starter sword is the iron_sword (damage=6) so the post-swap
-	# delta is observable.
+	# Establish the starting equipped weapon via the production pickup path
+	# (the player is fistless at boot now — no bandaid). The picked-up
+	# iron_sword auto-equips.
+	var inv: Node = _inventory()
+	inv.on_pickup_collected(_make_iron_sword_instance())
 	var pre_weapon: ItemDef = player.get_equipped_weapon() as ItemDef
-	assert_not_null(pre_weapon, "AC-E: precondition — starter weapon equipped")
+	assert_not_null(pre_weapon, "AC-E: precondition — iron_sword equipped via pickup")
 	assert_eq(pre_weapon.id, &"iron_sword", "AC-E: starter is iron_sword")
 	var pre_damage: int = DamageScript.compute_player_damage(pre_weapon, 0, &"light")
 
-	# Build a higher-damage replacement weapon (a "Room 02 pickup").
+	# Build a higher-damage replacement weapon (a "Room 02 pickup"). This one
+	# does NOT auto-equip — a weapon is already equipped (first-weapon-only
+	# rule), so it lands in the grid for the user to LMB-click-equip.
 	var ContentFactoryScript: Script = preload("res://tests/factories/content_factory.gd")
 	var swap_def: ItemDef = ContentFactoryScript.make_item_def({
 		"id": &"swap_sword_e2e",
@@ -316,17 +320,17 @@ func test_lmb_click_equip_swap_real_main_drives_dual_surfaces() -> void:
 		"base_stats": ContentFactoryScript.make_item_base_stats({"damage": 12}),
 	})
 	var swap_sword: ItemInstance = ItemInstance.new(swap_def, ItemDef.Tier.T1)
-	var inv: Node = _inventory()
-	assert_true(inv.add(swap_sword),
-		"AC-E: Room 02 pickup lands in grid via Inventory.add")
+	inv.on_pickup_collected(swap_sword)
+	# First-weapon-only: the swap sword must NOT have auto-swapped.
+	assert_eq((inv.get_equipped(&"weapon") as ItemInstance).def.id, &"iron_sword",
+		"AC-E: second weapon pickup must NOT auto-swap — iron_sword stays equipped")
+	assert_true(inv.get_items().has(swap_sword),
+		"AC-E: the second weapon pickup lands in the grid (first-weapon-only rule)")
 
-	# Drive the LMB click via the InventoryPanel test helper (mirrors the
-	# production click path — `_handle_inventory_click(0, MOUSE_BUTTON_LEFT)`).
+	# Drive the LMB click via the InventoryPanel test helper.
 	var panel: InventoryPanel = (main as Main).get_inventory_panel() as InventoryPanel
 	assert_not_null(panel, "AC-E: InventoryPanel mounted")
 	panel.open()
-	# Find the index of the swap_sword in the grid (it was just added; index 0
-	# since auto-equip already moved iron_sword out of _items).
 	var items: Array = inv.get_items()
 	var swap_idx: int = items.find(swap_sword)
 	assert_gte(swap_idx, 0, "AC-E: swap_sword is in the grid pre-click")
@@ -343,11 +347,9 @@ func test_lmb_click_equip_swap_real_main_drives_dual_surfaces() -> void:
 	assert_eq(post_player_weapon.id, &"swap_sword_e2e",
 		"AC-E: Player._equipped_weapon points to the new sword — " +
 		"if this fails, the LMB-click path updated Inventory but didn't " +
-		"propagate to Player (dual-surface mismatch). Sponsor's exact symptom: " +
-		"grid shows new sword equipped but combat damage uses the OLD weapon.")
+		"propagate to Player (dual-surface mismatch).")
 
-	# Iron_sword (the previously-equipped weapon) must be BACK IN THE GRID,
-	# NOT silently lost to the equip-swap leak.
+	# The previously-equipped iron_sword must be BACK IN THE GRID.
 	var preserved_in_grid: bool = false
 	for it_v in inv.get_items():
 		var it_inst: ItemInstance = it_v as ItemInstance
@@ -358,8 +360,7 @@ func test_lmb_click_equip_swap_real_main_drives_dual_surfaces() -> void:
 		"AC-E: previously-equipped iron_sword must land back in the grid on swap " +
 		"(equip-swap data-loss guard — pre-fix this was lost to the floor)")
 
-	# Tier 3 — damage delta on a real Grunt confirms the swap took effect
-	# at the combat surface, not just the autoload state.
+	# Tier 3 — damage delta on a real Grunt confirms the swap took effect.
 	var GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 	var grunt: Grunt = GruntScript.new()
 	var def_overrides: Dictionary = {"hp_base": 100, "damage_base": 5, "move_speed": 60.0}
@@ -370,12 +371,10 @@ func test_lmb_click_equip_swap_real_main_drives_dual_surfaces() -> void:
 	var hp_before: int = grunt.get_hp()
 	var hb: Hitbox = player.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT) as Hitbox
 	assert_not_null(hb, "AC-E: try_attack returned a Hitbox post-swap")
-	# Hitbox damage MUST equal the new sword's formula output, NOT the old.
 	var expected_post: int = DamageScript.compute_player_damage(swap_def, 0, &"light")
 	assert_eq(hb.damage, expected_post,
-		"AC-E: hitbox.damage uses NEW weapon (%d), not old iron_sword (%d) — " %
-		[expected_post, pre_damage] +
-		"the load-bearing combat surface confirms the swap propagated.")
+		"AC-E: hitbox.damage uses NEW weapon (%d), not old iron_sword (%d)" %
+		[expected_post, pre_damage])
 	hb._try_apply_hit(grunt)
 	assert_eq(grunt.get_hp(), hp_before - expected_post,
 		"AC-E: grunt HP drops by NEW weapon damage, not by iron_sword's")
@@ -383,7 +382,6 @@ func test_lmb_click_equip_swap_real_main_drives_dual_surfaces() -> void:
 
 func before_each() -> void:
 	_reset_autoloads()
-	# Clean any leftover test save.
 	var save_node: Node = _save()
 	if save_node != null and save_node.has_method("has_save") and save_node.has_save(0):
 		save_node.delete_save(0)

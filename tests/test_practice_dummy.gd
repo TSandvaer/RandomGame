@@ -232,6 +232,46 @@ func test_dummy_drops_guaranteed_iron_sword() -> void:
 		"Pickup item is iron_sword (deterministic starter-equip drop)")
 
 
+# ---- 10b: dropped Pickup is wired to Inventory.on_pickup_collected -----
+
+func test_dummy_pickup_is_wired_to_inventory_on_pickup_collected() -> void:
+	# Ticket 86c9qbb3k: the dummy bypasses MobLootSpawner (mob_def == null), so
+	# Main._on_mob_died's auto_collect_pickups never sees this Pickup. The
+	# dummy must wire the Pickup's `picked_up` signal to the Inventory
+	# autoload's `on_pickup_collected` itself — otherwise the design-correct
+	# auto-equip-on-pickup onboarding flow could never fire.
+	var inv: Node = Engine.get_main_loop().root.get_node_or_null("Inventory")
+	assert_not_null(inv, "Inventory autoload registered")
+	inv.reset()
+	var bundle: Array = _make_dummy_in_room()
+	var d: PracticeDummy = bundle[0]
+	var room: Node2D = bundle[1]
+	_hit_dummy(d, PracticeDummy.HP_MAX)
+	await get_tree().process_frame
+	var found_pickup: Pickup = null
+	for child in room.get_children():
+		if child is Pickup:
+			found_pickup = child
+			break
+	assert_not_null(found_pickup, "precondition: iron_sword Pickup dropped")
+	# The load-bearing assertion: the Pickup's `picked_up` signal is connected
+	# to the Inventory autoload's `on_pickup_collected`.
+	assert_true(
+		found_pickup.picked_up.is_connected(inv.on_pickup_collected),
+		"the dummy-dropped Pickup must wire its `picked_up` signal to " +
+		"Inventory.on_pickup_collected — without this, walking onto the drop " +
+		"would not equip the iron_sword (ticket 86c9qbb3k onboarding path)")
+	# End-to-end: emitting `picked_up` (simulating the player walking onto it)
+	# auto-equips the iron_sword via on_pickup_collected.
+	found_pickup.picked_up.emit(found_pickup.item, found_pickup)
+	var equipped: ItemInstance = inv.get_equipped(&"weapon") as ItemInstance
+	assert_not_null(equipped,
+		"collecting the dummy-dropped Pickup auto-equips the iron_sword")
+	assert_eq(equipped.def.id, &"iron_sword",
+		"the auto-equipped weapon is the dummy's iron_sword drop")
+	inv.reset()
+
+
 # ---- 11: damage during dead is ignored (idempotent) -------------------
 
 func test_damage_during_dead_is_ignored() -> void:

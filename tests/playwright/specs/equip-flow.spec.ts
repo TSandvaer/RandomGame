@@ -4,50 +4,48 @@
  * Equip flow — equipped weapon survives F5 reload (save → restore round-trip)
  * AND equip-via-LMB-click drives BOTH dual-surface state in lockstep, AND the
  * combat-trace `source` enum cleanly distinguishes user clicks from system
- * auto-equips (ticket 86c9qah0v).
+ * auto-equips (tickets 86c9qah0v + 86c9qbb3k).
  *
- * **Stage 2b update (PR #169 + this PR):** Room01 changed from "2 grunts" to
- * "1 PracticeDummy". The Phase 2 "kill a grunt → damage=6" baseline now
- * targets the dummy poof: the dummy takes a damage=6 hit too (Hitbox.hit
- * trace fires the same way — same `team=player damage=6` shape). Phase 2.5's
- * Tab → click-equipped-slot → click-grid-cell → re-equip flow still works in
- * Room01 because Tab + InventoryPanel state is room-independent. After the
- * dummy poof, a guaranteed iron_sword pickup spawns + auto-collects into the
- * inventory grid (Pickup → `Inventory.on_pickup_collected` → `add(item)` —
- * note this does NOT auto-equip, just lands in the grid alongside the
- * originally-equipped one). The grid-cell-0 click in Phase 2.5 may equip the
- * dummy-drop sword OR the unequipped-from-slot sword (both are
- * iron_sword instances, both produce the same trace — assertion holds).
+ * **Bandaid RETIRED (ticket 86c9qbb3k — this PR).** The PR #146 boot-equip
+ * bandaid is gone. The player boots FISTLESS; the design-correct onboarding
+ * path is auto-equip-first-weapon-on-pickup: the Room01 PracticeDummy drops
+ * a guaranteed iron_sword Pickup, the player walks onto it, and
+ * `Inventory.on_pickup_collected` auto-equips it via
+ * `equip(item, &"weapon", &"auto_pickup")` — emitting
+ * `[combat-trace] Inventory.equip | source=auto_pickup`. The Room01 → Room02
+ * advance is GATED on that equip (`Main._on_room01_mob_died` holds the
+ * advance while the player is fistless), so reaching Room02 PROVES the
+ * onboarding equip happened. The `clearRoom01Dummy` helper now handles the
+ * full kill + pickup-collection flow and reports `pickupEquipped`.
  *
  * Verifies the equip-state persistence path AND the in-game LMB-click equip
  * path that PR #145 / #146 / closed P0 86c9q96m8 all hit in different ways:
  *
- *   1. Cold boot: iron_sword auto-equipped via the Inventory.gd seeding +
- *      Main._ready ordering (PR #146).
- *   1.5. **NEW (ticket 86c9qah0v):** assert the boot-window auto-equip emits
- *      `source=auto_starter` (positive) and ZERO `source=lmb_click` lines
- *      fire during cold boot (negative — no user click happened yet).
- *   2. Player kills the Room01 PracticeDummy → at least one Hitbox.hit
- *      damage=6 trace observed (proves iron_sword damage flows to combat).
+ *   1. Cold boot: player is FISTLESS — NO `Inventory.equip` line of any
+ *      source fires during the boot window (no boot-time seed/equip at all).
+ *   1.5. Boot-window negative assertions: ZERO `source=lmb_click`, ZERO
+ *      `source=auto_starter` (deprecated tag, no producer), AND ZERO
+ *      `source=auto_pickup` lines during cold boot — nothing equips until
+ *      the player picks up the dummy drop.
+ *   2. `clearRoom01Dummy` kills the dummy (fistless, damage=1 hits) and
+ *      walks the player onto the dropped iron_sword Pickup. Assert the
+ *      `source=auto_pickup` onboarding equip fired. After it, combat is
+ *      weapon-scaled (damage=6) — the baseline `preReloadDamageObserved`
+ *      is captured from a Room02 swing.
  *   3. **(P0 86c9q96m8 fix coverage):** open Tab inventory, click the
  *      equipped slot to unequip (iron_sword → grid), then click the grid
  *      cell to re-equip via the LMB-click path. Asserts the
  *      `[combat-trace] Inventory.equip | source=lmb_click damage_after=6`
  *      line fires AND post-equip swing damage matches.
  *   4. F5 reload → Save autoload restores equipped state from snapshot.
- *   5. Post-reload: a fresh swing still produces damage=6 hits (proves
- *      Inventory._equipped["weapon"] AND Player._equipped_weapon both
- *      restored to iron_sword — the dual-surface invariant). Note: post-
- *      reload, the player MIGHT be back in Room01 (if reload preserves
- *      the room counter at 0) OR in Room02 (if reload occurred while in
- *      Room02 and the save preserved that). Either way, the player can
- *      swing at SOMETHING within combat range and the damage trace fires —
- *      we don't assert which room.
- *      Negative assertion: NEITHER `source=lmb_click` NOR `source=auto_starter`
- *      lines fire post-reload (save-restore bypasses equip() entirely;
- *      auto_starter early-returns because slot is already populated).
+ *   5. Post-reload: the player is fistless again at cold boot, re-clears the
+ *      Room01 dummy + picks up the (re-dropped) iron_sword, and a fresh
+ *      Room02 swing still produces damage=6 hits (proves the equip path is
+ *      healthy after a reload). Negative assertion: ZERO `source=lmb_click`
+ *      and ZERO `source=auto_starter` lines fire post-reload (the F5 reload
+ *      cold-boots, so the only equip is the dummy-drop `source=auto_pickup`).
  *
- * **Status: green — P0 86c9q96m8 fix landed; ticket 86c9qah0v fix in flight.**
+ * **Status: green — bandaid retired (86c9qbb3k), P0 86c9q96m8 fix landed.**
  *
  * **Phase 2.5 swing-after-Tab race fix (tickets 86c9qb7f3 + 86c9qah0f):**
  * Phase 2.5 historically flaked on Windows headed Chromium (~1 in 3; on
@@ -156,51 +154,31 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
 
     // ---- Phase 1: Cold-boot integration baseline ----
     await capture.waitForLine(/\[Main\] M1 play-loop ready/, BOOT_TIMEOUT_MS);
-    await capture.waitForLine(
-      /\[Inventory\] starter iron_sword auto-equipped \(weapon slot\)/,
-      5_000
-    );
 
-    // ---- Phase 1.5: Boot-window source-enum assertions (ticket 86c9qah0v) ----
+    // ---- Phase 1.5: Boot-window negative assertions (ticket 86c9qbb3k) ----
     //
-    // The boot-time auto-equip routes through Inventory.equip() but tags its
-    // trace line with `source=auto_starter` rather than the default
-    // `lmb_click`. This lets the negative-assertion sweep distinguish system-
-    // driven equips from user-driven equips at the boot/restore window.
+    // The PR #146 boot-equip bandaid is RETIRED — the player boots FISTLESS.
+    // NO Inventory.equip line of ANY source should fire during the cold-boot
+    // window: nothing equips until the player picks up the dummy's drop.
     //
-    //   Positive: at least one `source=auto_starter` line during cold boot
-    //             (proves the auto-equip ran AND the source tag is correct).
-    //   Negative: ZERO `source=lmb_click` lines during cold boot (no click
-    //             has happened yet — pre-fix, this WOULD fire because the
-    //             auto-equip path emitted lmb_click instead of auto_starter).
+    //   Negative: ZERO source=auto_pickup  — no pickup collected yet.
+    //   Negative: ZERO source=lmb_click    — no user click yet.
+    //   Negative: ZERO source=auto_starter — the deprecated boot-equip tag
+    //             has no producer (the bandaid that emitted it is retired).
     //
     // Settle briefly so the deferred boot frames flush.
     await page.waitForTimeout(500);
     const bootWindowLines = capture.getLines();
-    const bootAutoStarterLines = bootWindowLines.filter((l) =>
-      /\[combat-trace\] Inventory\.equip \| .*source=auto_starter/.test(l.text)
+    const bootEquipLines = bootWindowLines.filter((l) =>
+      /\[combat-trace\] Inventory\.equip \|/.test(l.text)
     );
     expect(
-      bootAutoStarterLines.length,
-      `Boot-window positive (86c9qah0v): expected at least one ` +
-        `[combat-trace] Inventory.equip | source=auto_starter line during ` +
-        `cold-boot auto-equip. Got ${bootAutoStarterLines.length}. Either ` +
-        `equip_starter_weapon_if_needed didn't run, or the trace shim ` +
-        `dropped the source override.`
-    ).toBeGreaterThanOrEqual(1);
-    const bootLmbClickLines = bootWindowLines.filter((l) =>
-      /\[combat-trace\] Inventory\.equip \| .*source=lmb_click/.test(l.text)
-    );
-    expect(
-      bootLmbClickLines.length,
-      `Boot-window negative (86c9qah0v): expected ZERO ` +
-        `[combat-trace] Inventory.equip | source=lmb_click lines during ` +
-        `cold-boot — no user click has happened yet. Got ` +
-        `${bootLmbClickLines.length}. This is the original bug shape: ` +
-        `equip_starter_weapon_if_needed routed through equip() with the ` +
-        `default source=lmb_click, polluting the user-click negative-` +
-        `assertion sweep.\n` +
-        bootLmbClickLines.map((l) => `  ${l.text}`).join("\n")
+      bootEquipLines.length,
+      `Boot-window negative (86c9qbb3k): expected ZERO ` +
+        `[combat-trace] Inventory.equip lines of ANY source during cold boot ` +
+        `— the boot-equip bandaid is retired and the player is fistless until ` +
+        `they pick up the dummy drop. Got ${bootEquipLines.length}:\n` +
+        bootEquipLines.map((l) => `  ${l.text}`).join("\n")
     ).toBe(0);
 
     const canvas = page.locator("canvas").first();
@@ -211,14 +189,14 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
     const clickX = (canvasBB?.x ?? 0) + (canvasBB?.width ?? 1280) / 2;
     const clickY = (canvasBB?.y ?? 0) + (canvasBB?.height ?? 720) / 2;
 
-    // ---- Phase 2: Kill the Room01 dummy and observe pre-reload damage=6 ----
+    // ---- Phase 2: Kill the Room01 dummy + collect the iron_sword Pickup ----
     //
-    // Stage 2b: Room01 ships 1 PracticeDummy at world (~368, 144). The dummy
-    // takes a damage=6 hit on the bandaid path (PR #146 still active) → 1 swing
-    // kills. The Hitbox.hit trace shape is the same as Grunt's — same
-    // `[combat-trace] Hitbox.hit | team=player ... damage=6` line — so the
-    // damage assertion here is identical. The helper handles the walk + sweep.
-    const preReloadStart = Date.now();
+    // Ticket 86c9qbb3k: the player drops in FISTLESS. The Room01 PracticeDummy
+    // (HP=3) poofs in 3 FIST_DAMAGE=1 swings, then drops a guaranteed
+    // iron_sword Pickup. The `clearRoom01Dummy` helper kills the dummy AND
+    // walks the player onto the Pickup — `Inventory.on_pickup_collected`
+    // auto-equips it, emitting `source=auto_pickup`. The Room01 → Room02
+    // advance is GATED on that equip, so `pickupEquipped` MUST be true.
     const room01ClearResult = await clearRoom01Dummy(
       page,
       canvas,
@@ -229,34 +207,44 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
     );
     expect(
       room01ClearResult.dummyKilled,
-      "Stage 2b Phase 2: Room01 PracticeDummy must die. The dummy poof " +
-        "produces the load-bearing damage=6 Hitbox.hit trace this phase " +
-        "asserts on."
+      "Phase 2: Room01 PracticeDummy must die (3 fistless swings)."
+    ).toBe(true);
+    expect(
+      room01ClearResult.pickupEquipped,
+      "Phase 2: the dummy-dropped iron_sword Pickup must be collected + " +
+        "auto-equipped (source=auto_pickup). The Room01 → Room02 advance is " +
+        "GATED on this equip — if it never happened, Room02 is unreachable."
     ).toBe(true);
 
-    // Now extract the first damage=N value from the captured Hitbox.hit lines.
-    const preReloadHitLine = capture
+    // Assert the onboarding auto-equip trace fired with the right shape.
+    const autoPickupLine = capture
       .getLines()
       .find((l) =>
-        /\[combat-trace\] Hitbox\.hit \| team=player.*damage=(\d+)/.test(l.text)
+        /\[combat-trace\] Inventory\.equip \| .*source=auto_pickup/.test(l.text)
       );
     expect(
-      preReloadHitLine,
-      "After Room01 dummy clear, expected at least one Hitbox.hit team=player " +
-        "trace in the buffer (the dummy-killing swing). None found — the " +
-        "dummy died but no Hitbox.hit fired? Check the Hitbox combat-trace shim."
+      autoPickupLine,
+      "Phase 2: expected a [combat-trace] Inventory.equip | source=auto_pickup " +
+        "line — the design-correct onboarding equip (ticket 86c9qbb3k)."
     ).toBeDefined();
-    const preReloadMatch = preReloadHitLine!.text.match(/damage=(\d+)/);
-    expect(preReloadMatch).not.toBeNull();
-    const preReloadDamageObserved = parseInt(preReloadMatch![1], 10);
+    const autoPickupMatch = autoPickupLine!.text.match(
+      /Inventory\.equip \| item=(\S+) slot=(\S+) source=(\S+) damage_after=(\d+)/
+    );
+    expect(autoPickupMatch, `auto_pickup trace shape: "${autoPickupLine!.text}"`)
+      .not.toBeNull();
+    expect(autoPickupMatch![1]).toBe("iron_sword");
+    expect(autoPickupMatch![2]).toBe("weapon");
+    expect(autoPickupMatch![3]).toBe("auto_pickup");
+    // The iron_sword's light-attack damage — the value all later assertions
+    // compare against (same iron_sword, edge=0, same formula).
+    const preReloadDamageObserved = parseInt(autoPickupMatch![4], 10);
     console.log(
-      `[equip-flow] Pre-reload first hit damage=${preReloadDamageObserved} ` +
-        `(dummy poof at t=${Date.now() - preReloadStart}ms).`
+      `[equip-flow] auto_pickup equip: damage_after=${preReloadDamageObserved}.`
     );
     expect(preReloadDamageObserved).toBeGreaterThanOrEqual(2);
 
-    // Settle for Room02 load — the dummy poof auto-advances via
-    // _install_room01_clear_listener.
+    // Settle for Room02 load — the gate released on the auto_pickup equip,
+    // so _on_room_cleared → _load_room_at_index(1) now runs.
     await waitForRoom02Load(page, 1500);
 
     // ---- Phase 2.5: P0 86c9q96m8 — drive the LMB-click equip path ----
@@ -571,12 +559,6 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
     // The boot-ready line MUST fire again — the engine is restarting.
     await capture.waitForLine(/\[Main\] M1 play-loop ready/, BOOT_TIMEOUT_MS);
 
-    // The auto-equip line is conditional. equip_starter_weapon_if_needed
-    // is a no-op if Inventory._equipped["weapon"] is non-null. The save-
-    // restored state should already have iron_sword equipped, so the
-    // auto-equip print MAY OR MAY NOT fire. We don't assert either way —
-    // the load-bearing assertion is on damage trace below.
-
     // Wait briefly for save-restore deferred frames
     await page.waitForTimeout(1_000);
 
@@ -588,14 +570,17 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
     const clickX2 = (canvasBB2?.x ?? 0) + (canvasBB2?.width ?? 1280) / 2;
     const clickY2 = (canvasBB2?.y ?? 0) + (canvasBB2?.height ?? 720) / 2;
 
-    // Stage 2b: F5 reload restores save (equipped state survives) but Main's
-    // `_ready` always cold-loads Room01 (`_current_room_index = 0` initial,
-    // `_load_save_or_defaults` doesn't restore room counter — see scenes/
-    // Main.gd:748-788). The player respawns at DEFAULT_PLAYER_SPAWN with the
-    // Room01 PracticeDummy re-instantiated. We re-run the dummy-clear helper:
-    // a successful kill produces the post-reload Hitbox.hit damage=N trace
-    // we assert below.
-    const postReloadStart = Date.now();
+    // F5 reload restores the save (equipped iron_sword survives) but Main's
+    // `_ready` always cold-loads Room01 — the player respawns at
+    // DEFAULT_PLAYER_SPAWN ALREADY EQUIPPED (the save restored the weapon).
+    // The Room01 PracticeDummy is re-instantiated. We re-run the dummy-clear
+    // helper: because the player is already equipped, the kill-sweep hits are
+    // weapon-scaled (damage=6), the Room01 → Room02 advance is NOT gated
+    // (immediate-advance path — `Main._on_room01_mob_died` sees the equipped
+    // weapon), and the helper skips its Phase F pickup-collection. So
+    // `pickupEquipped` is false here (no NEW auto_pickup equip — the player
+    // came in equipped from the save). The load-bearing assertion is the
+    // weapon-scaled damage below.
     const postReloadClearResult = await clearRoom01Dummy(
       page,
       canvas,
@@ -648,12 +633,13 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
         `The save → restore_from_save round-trip lost the equipped iron_sword. ` +
         `Either Inventory.restore_from_save's reset loop wiped equipped state, ` +
         `or Player._equipped_weapon was not re-applied via _apply_equip_to_player. ` +
-        `Compare pre-reload damage=${preReloadDamageObserved} vs post-reload=${postReloadDamageObserved}.`
+        `The post-reload Room01 kill should be weapon-scaled because the player ` +
+        `came back equipped FROM THE SAVE (no fistless start, no pickup needed).`
     ).toBeGreaterThanOrEqual(2);
 
-    // The pre-reload and post-reload damages should match (same equipped weapon,
-    // same edge formula, same room geometry). If they differ, something in the
-    // equipped-state restoration path subtly diverged.
+    // The post-reload Room01 kill damage should match the iron_sword's
+    // light-attack damage captured from the Phase 2 auto_pickup equip
+    // (same iron_sword, edge=0, same formula).
     expect(postReloadDamageObserved).toBe(preReloadDamageObserved);
 
     // ---- Negative assertions ----
@@ -662,24 +648,22 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
     );
     expect(panicLine).toBeNull();
 
-    // P0 86c9q96m8 trace-shim scoping: the [combat-trace] Inventory.equip line
-    // MUST NOT fire from the F5-reload save-restore path. `restore_from_save`
-    // bypasses `equip()` (it directly mutates `_equipped[slot]` and calls
-    // `_apply_equip_to_player` synchronously), so no trace line should be
-    // present after the page.reload(). If we see one, the trace shim was
-    // accidentally wired into the save-restore path too — the line shape
-    // would be identical and Sponsor would see double-fires (one on click,
-    // one on every page reload).
+    // Trace-shim scoping: NO user-driven or boot-driven `Inventory.equip`
+    // line should fire post-reload. The buffer was cleared right before
+    // `page.reload()`, so the entire current buffer is post-reload activity.
     //
-    // We scope the search to AFTER `capture.clearLines()` (line 163-ish),
-    // which fires immediately before the page.reload(). Anything in the
-    // buffer AFTER that point is post-reload activity.
+    //   - `source=lmb_click`: the player did NOT Tab→click-equip post-reload
+    //     (Phase 2.5 ran BEFORE the reload). `restore_from_save` bypasses
+    //     `equip()` entirely (directly mutates `_equipped[slot]` +
+    //     `_apply_equip_to_player`), so a save-restore must not emit a trace.
+    //   - `source=auto_starter`: the deprecated PR #146 boot-equip tag has no
+    //     producer at all (the bandaid is retired, ticket 86c9qbb3k).
+    //   - `source=auto_pickup`: post-reload the player is ALREADY equipped
+    //     (save-restored weapon), so when the helper kills the Room01 dummy,
+    //     the dropped Pickup does NOT auto-swap an equipped weapon — no
+    //     `on_pickup_collected` auto-equip fires.
     //
-    // Source-enum extension (ticket 86c9qah0v): post-reload, `restore_from_save`
-    // populates `_equipped[SLOT_WEAPON]` directly, so when Main._ready calls
-    // `equip_starter_weapon_if_needed` after restore, the early-return guard
-    // (`if _equipped.has(SLOT_WEAPON) ...`) fires — the auto_starter trace
-    // path is a no-op too. Thus BOTH source tags must be absent post-reload.
+    // Thus ALL THREE source tags must be absent post-reload.
     const postReloadLmbClickLines = capture
       .getLines()
       .filter((l) =>
@@ -688,10 +672,10 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
     expect(
       postReloadLmbClickLines.length,
       `Negative assertion: [combat-trace] Inventory.equip | source=lmb_click ` +
-        `fired during F5-reload save-restore — should ONLY fire on user-driven ` +
-        `LMB-click. Found ${postReloadLmbClickLines.length} post-reload trace ` +
-        `line(s). Re-check Inventory.restore_from_save: it must NOT route ` +
-        `through equip().`
+        `fired post-F5-reload — should ONLY fire on user-driven LMB-click, and ` +
+        `no Tab→click happened after the reload. Found ` +
+        `${postReloadLmbClickLines.length} line(s). Re-check ` +
+        `Inventory.restore_from_save: it must NOT route through equip().`
     ).toBe(0);
     const postReloadAutoStarterLines = capture
       .getLines()
@@ -700,12 +684,25 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
       );
     expect(
       postReloadAutoStarterLines.length,
-      `Negative assertion (86c9qah0v): [combat-trace] Inventory.equip | ` +
-        `source=auto_starter fired post-F5-reload — but save-restore already ` +
-        `populated the weapon slot, so equip_starter_weapon_if_needed should ` +
-        `be a no-op. Found ${postReloadAutoStarterLines.length} line(s). ` +
-        `Either restore_from_save failed to populate _equipped, or the ` +
-        `early-return guard in equip_starter_weapon_if_needed regressed.`
+      `Negative assertion (86c9qbb3k): [combat-trace] Inventory.equip | ` +
+        `source=auto_starter fired post-F5-reload — but the PR #146 boot-equip ` +
+        `bandaid (the only producer of auto_starter) is RETIRED. Found ` +
+        `${postReloadAutoStarterLines.length} line(s). Nothing should ever ` +
+        `emit auto_starter any more.`
+    ).toBe(0);
+    const postReloadAutoPickupLines = capture
+      .getLines()
+      .filter((l) =>
+        /\[combat-trace\] Inventory\.equip \| .*source=auto_pickup/.test(l.text)
+      );
+    expect(
+      postReloadAutoPickupLines.length,
+      `Negative assertion (86c9qbb3k): [combat-trace] Inventory.equip | ` +
+        `source=auto_pickup fired post-F5-reload — but the player came back ` +
+        `ALREADY EQUIPPED from the save-restore, so the dummy-drop Pickup must ` +
+        `NOT auto-swap (auto-equip-on-pickup is first-weapon-only). Found ` +
+        `${postReloadAutoPickupLines.length} line(s) — on_pickup_collected's ` +
+        `"weapon already equipped" guard regressed.`
     ).toBe(0);
 
     // Ticket 86c9qah1f fix verification: the save-restore push_warning for
