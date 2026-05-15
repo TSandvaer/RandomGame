@@ -152,6 +152,7 @@ Your task-completion message back to the orchestrator MUST be tight to preserve 
 - **Verdict** (1 line — `APPROVE` / `blocked-on-X` / `partial — see follow-up #...`)
 - **Blockers or follow-ups** (1-3 lines max — only what the orchestrator needs to act on this turn)
 - **Doc updates** (1 line — `Doc updates: <file> — <one-line>` or `Doc updates: none`)
+- **Decision draft** (omit if none — `Decision draft: <1-3 line bullet describing the architectural or process decision>` — Priya batches into `team/DECISIONS.md` weekly; NEVER edit that file directly)
 
 Detailed content goes in artifacts the orchestrator can read on-demand, NOT in the orchestrator-bound message:
 

@@ -46,6 +46,7 @@ For pure visual-direction PRs (doc-only), Self-Test Report is replaced by a "Spo
 - **Honor existing decisions.** Boss music UNIQUE vs cross-stratum-reuse calls live in `DECISIONS.md`. Read before re-specifying.
 - **Tonal anchor first, mechanics second.** Decoration beats serve the tonal anchor; if a beat doesn't reinforce the anchor, cut it.
 - **`palette-stratum-2.md` §8 open questions:** make calls within your delegated authority; escalate only if proposal contradicts user-locked framing.
+- **Never edit `team/DECISIONS.md` directly.** Draft decisions as `Decision draft:` lines in your final report; Priya batches weekly.
 
 ## Tone
 

@@ -73,6 +73,7 @@ Per `html5-audio-playback-gate` (extension) — release-build audible verificati
 - **No Area2D `add_child` from physics-tick paths.** Defer via `call_deferred("_assemble_room_fixtures")` (the Stratum1Room0N + Stratum1BossRoom precedent).
 - **No new loot-table item without STARTER_ITEM_PATHS entry.** Per `combat-architecture.md` § "Every loot-table item must be in STARTER_ITEM_PATHS."
 - **No bypassing peer review.** Drew reviews your PRs; Tess QAs them. You don't self-approve.
+- **Never edit `team/DECISIONS.md` directly.** Draft decisions as `Decision draft:` lines in your final report; Priya batches weekly.
 
 ## Tone
 

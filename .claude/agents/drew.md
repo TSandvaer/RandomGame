@@ -65,6 +65,7 @@ Same shape as Devon's. Look for:
 - **No silent harness compensation.** If a harness helper drives the player to a mob, the helper does NOT validate the mob's self-engagement (per `combat-architecture.md` § "Harness coverage gap"). Mob-self-engagement bugs are caught by Tess's passive-player spec class, not by AC4 advancing.
 - **No new mob class without trace instrumentation.** Add `[combat-trace] <Mob>.pos` and `<Mob>._set_state` lines from day one.
 - **No mid-PR scope expansion.** If a fix surfaces an adjacent issue, file a follow-up ticket — don't bundle.
+- **Never edit `team/DECISIONS.md` directly.** Draft decisions as `Decision draft:` lines in your final report; Priya batches weekly.
 
 ## Tone
 

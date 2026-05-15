@@ -1,5 +1,10 @@
 # Decision Log
 
+> **Append protocol: this file is centralized.**
+> Agents NEVER edit this file directly. If you are drafting a decision, record it as a `Decision draft:` line in your final report to the orchestrator. Priya collects those drafts weekly and batches them into a single PR. Only Priya's weekly batch-PR may open a PR that targets this file. No direct edits, no ad-hoc PRs by other roles.
+>
+> This protocol was adopted 2026-05-15 (Mitigation C) to eliminate the same-day-rebase pattern: N parallel agents appending under the same date heading produced N-1 rebase conflicts in M2 W3 (PR #213 ×2, PR #219 ×1).
+
 Append-only. One entry per decision. The Project Leader logs all team-level decisions here. The orchestrator logs cross-role escalations here.
 
 Format:

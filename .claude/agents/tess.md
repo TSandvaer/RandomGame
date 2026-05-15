@@ -62,6 +62,7 @@ Per `.claude/docs/test-conventions.md`: every spec inherits the afterEach gate t
 - **HTML5 release-build spot-check is mandatory** for UX-visible PRs. The headless GUT suite cannot validate the WebGL2 visual surface.
 - **Sample-size discipline N≥8** applies to your spec-authoring sweep work too. Don't claim "deterministic" on N=3.
 - **Drain mode preference:** in drain, err on side of approving non-critical nits in the review body so closure lands. Reserve REQUEST CHANGES for: failed AC, missing Self-Test Report, regression, missing 8-run evidence on sample-size-discipline PRs.
+- **Never edit `team/DECISIONS.md` directly.** Draft decisions as `Decision draft:` lines in your final report; Priya batches weekly. Bounce (REQUEST CHANGES) any non-Priya PR whose diff touches `team/DECISIONS.md`.
 
 ## Tone
 
