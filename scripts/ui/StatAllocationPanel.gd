@@ -14,9 +14,16 @@ extends CanvasLayer
 ## player presses P to open. The first-level-up flag persists in save so
 ## auto-open never repeats for the same character.
 ##
-## **Time-slow (LU-09):** while open, sets `Engine.time_scale = 0.10` and
-## restores to 1.0 on close. Same convention as `inventory-stats-panel.md`
-## §"Time-slow behavior on open". Tests assert the exact value.
+## **Non-modal overlay (LU-09 revised — Sponsor redirect 2026-05-15):** the
+## panel is a purely cosmetic overlay. `Engine.time_scale` stays at 1.0.
+## Player process_mode is NOT changed — the player keeps moving and attacking
+## at full speed while picking a talent at leisure. No state changes to
+## Player, Engine, or scene on open or close. This replaces both the original
+## "World time slows to 10%" spec AND the subsequent "modal pause via
+## PROCESS_MODE_DISABLED" attempt — Sponsor's verbatim redirect (Room 5,
+## 2026-05-15): "i shouldnt be slowed when level up panel appears, im in
+## the middle of a fight." Panel responsibility: render, accept talent
+## input, close on selection. That is its full scope.
 ##
 ## **Multi-level catch-up (LU-23):** if the player banks 2+ points before
 ## opening, the header shows N and the panel stays open until N=0 (or the
@@ -36,6 +43,8 @@ extends CanvasLayer
 ##   real input events. `is_open()`, `get_time_slow_factor()`,
 ##   `force_press_for_test(StringName)` for deterministic key probes,
 ##   `force_p_keypress_for_test()` for the BB-4 P-key toggle path.
+##   Non-modal: tests assert player process_mode and Engine.time_scale are
+##   UNCHANGED by the panel (neither is touched on open or close).
 
 # ---- Signals ---------------------------------------------------------
 
@@ -45,8 +54,10 @@ signal point_allocated(stat: StringName, new_value: int)
 
 # ---- Tuning constants ------------------------------------------------
 
-## Per Uma `level-up-panel.md` §"Beat 2 — World slows + panel slides up":
-## "World time slows to 10%". 10% = 0.10.
+## Retained for backward-compat with test helpers that call
+## `get_time_slow_factor()`. The panel has never applied this value since
+## the Sponsor redirect (2026-05-15, ticket 86c9ujerz). Records the
+## original spec value; the constant itself has no runtime effect.
 const TIME_SLOW_FACTOR: float = 0.10
 
 ## Layer above HUD layers (mirrors DescendScreen).
@@ -89,7 +100,6 @@ var _header_label: Label = null
 var _hint_label: Label = null
 var _tiles: Dictionary = {}  # stat_id -> Dictionary { panel, name_label, value_label, ... }
 var _stat_strings: StatStrings = null
-var _previous_time_scale: float = 1.0
 
 
 func _ready() -> void:
@@ -115,14 +125,18 @@ func is_open() -> bool:
 	return _open
 
 
-## Returns the time-scale value applied while the panel is open. Used by
-## tests to assert Uma's 10% specification (LU-09).
+## Returns the time-scale constant (retained for test API compat). The panel
+## does NOT apply this to Engine.time_scale — Sponsor redirect 2026-05-15.
 func get_time_slow_factor() -> float:
 	return TIME_SLOW_FACTOR
 
 
-## Open the panel. Slows time, makes the panel visible, refreshes the
-## tile values from PlayerStats. Idempotent — already-open is a no-op.
+## Open the panel. Makes the panel visible, refreshes the tile values from
+## PlayerStats. Idempotent — already-open is a no-op.
+##
+## Non-modal design (Sponsor redirect 2026-05-15): NO Engine.time_scale
+## change, NO Player.process_mode change. Combat continues at full speed
+## while the panel is visible. Panel is a purely cosmetic overlay.
 ##
 ## `auto_opened`: true when triggered by the Level-2-first-time-only
 ## auto-open rule; false for manual P-key open. Currently informational
@@ -132,11 +146,6 @@ func open(_auto_opened: bool = false) -> void:
 	if _open:
 		return
 	_open = true
-	# Snapshot and slow the world. Engine.time_scale is global; we restore
-	# whatever was in place when we close (a future "boss-time-freeze"
-	# experiment that nests other slow-mo systems will play nicely).
-	_previous_time_scale = Engine.time_scale
-	Engine.time_scale = TIME_SLOW_FACTOR
 	visible = true
 	_refresh_tiles()
 	_refresh_header()
@@ -144,25 +153,21 @@ func open(_auto_opened: bool = false) -> void:
 
 
 ## Close the panel. If banked > 0, the unspent points stay in
-## PlayerStats. Restores time scale.
+## PlayerStats. Non-modal: no game-state restoration needed on close.
 func close(_emit: bool = true) -> void:
 	if not _open:
 		return
 	_open = false
-	Engine.time_scale = _previous_time_scale
 	visible = false
 	if _emit:
 		panel_closed.emit(_get_unspent())
 
 
 ## Safety guard: if the panel is freed while still open (scene reload,
-## HTML5 tab-blur path), restore Engine.time_scale so the world doesn't
-## stay at 0.10 forever. Idempotent w.r.t. close() — once `_open` is false
-## (normal close path already restored), this is a no-op. Per Tess's
-## `team/tess-qa/html5-rc-audit-591bcc8.md` §4 CR-2.
+## HTML5 tab-blur path), mark closed. Non-modal — no state to restore.
+## Per Tess's `team/tess-qa/html5-rc-audit-591bcc8.md` §4 CR-2.
 func _exit_tree() -> void:
 	if _open:
-		Engine.time_scale = _previous_time_scale
 		_open = false
 
 

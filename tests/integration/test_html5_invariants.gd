@@ -301,20 +301,30 @@ func test_inventory_panel_exit_tree_restores_time_scale() -> void:
 
 
 # =======================================================================
-# TI-7 — StatAllocationPanel _exit_tree restores Engine.time_scale.
+# TI-7 — StatAllocationPanel does not modify Engine.time_scale.
 # =======================================================================
 ##
-## Mirror invariant for `StatAllocationPanel` (audit CR-2 fix).
-func test_stat_allocation_panel_exit_tree_restores_time_scale() -> void:
+## Locks in the non-modal contract (Sponsor redirect 2026-05-15, ticket
+## 86c9ujerz): the panel is a purely cosmetic overlay. Engine.time_scale
+## MUST remain at 1.0 before, during, and after the panel's lifecycle.
+## The original CR-2 / time_scale=0.10 spec was superseded — the panel
+## never writes Engine.time_scale, so the _exit_tree guard only clears
+## the internal `_open` flag (no state to restore).
+func test_stat_allocation_panel_does_not_modify_time_scale() -> void:
+	assert_eq(Engine.time_scale, 1.0,
+		"baseline: time_scale is 1.0 before panel is created")
 	var packed: PackedScene = load("res://scenes/ui/StatAllocationPanel.tscn")
 	var panel: StatAllocationPanel = packed.instantiate()
 	add_child(panel)
+	assert_eq(Engine.time_scale, 1.0,
+		"time_scale is 1.0 after add_child (panel not yet open)")
 	panel.open()
-	assert_eq(Engine.time_scale, 0.10, "panel-open sets 0.10")
+	assert_eq(Engine.time_scale, 1.0,
+		"non-modal panel: time_scale stays 1.0 after open()")
 	panel.queue_free()
 	await get_tree().process_frame
 	assert_eq(Engine.time_scale, 1.0,
-		"freed-while-open panel restores time_scale via _exit_tree")
+		"time_scale is 1.0 after panel freed (_exit_tree does not restore because nothing was set)")
 
 
 # =======================================================================
