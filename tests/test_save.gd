@@ -215,6 +215,10 @@ func test_migrate_preserves_existing_fields() -> void:
 
 func test_migrate_handles_save_from_future_schema() -> void:
 	# Hand-author a save with schema_version=999. Should warn-and-pass-through.
+	# The "schema_version is newer than runtime" warning is DELIBERATE on this
+	# path (Save.migrate routes it through WarningBus per ticket 86c9uf0mm
+	# Half B); opt the universal-warning gate out for this specific pattern.
+	_warn_guard.expect_warning("is newer than runtime")
 	var future_envelope: Dictionary = {
 		"schema_version": 999,
 		"saved_at": "2099-01-01T00:00:00",
