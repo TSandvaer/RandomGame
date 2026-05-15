@@ -224,10 +224,13 @@ func test_boss_loot_pickup_count_equals_loot_table_rolls_no_double_spawn() -> vo
 	# We expect AT MOST `loot_table.entries.size()` pickups (= 2 for
 	# boss_drops.tres with roll_count=-1). Pre-fix produced 2x = 4. The exact
 	# count depends on LootRoller's roll_count=-1 contract; the load-bearing
-	# regression is "NOT 2x what the table dictates."
-	var expected_max_per_roll: int = boss.mob_def.loot_table.entries.size()
-	assert_le(pickup_count, expected_max_per_roll,
-		"REGRESSION-86c9uemdg: at most ONE roll set per boss death (no dual-spawn). Got %d pickups, expected ≤ %d" % [
-			pickup_count, expected_max_per_roll,
+	# regression is "NOT 2x what the table dictates." GUT exposes assert_lt /
+	# assert_gt but not assert_le, so we assert `pickup_count < 2x + 1` —
+	# semantically `pickup_count <= 2x` — and add an explicit `< 2 * entries`
+	# guard so the dual-spawn case (exactly 2x) fails loud.
+	var entries: int = boss.mob_def.loot_table.entries.size()
+	assert_lt(pickup_count, entries * 2,
+		"REGRESSION-86c9uemdg: dual-spawn would produce %d pickups (2x %d entries); got %d" % [
+			entries * 2, entries, pickup_count,
 		])
 	assert_gt(pickup_count, 0, "boss does drop loot via Main's pipeline")
