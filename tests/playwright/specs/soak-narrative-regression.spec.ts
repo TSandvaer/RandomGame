@@ -16,7 +16,7 @@
  *
  * | # | Sponsor finding            | Spec name (below)                    | Gate                       |
  * |---|----------------------------|--------------------------------------|----------------------------|
- * | 1 | Room 1 mob-aggro on hit    | room1-mob-aggro-on-hit               | test() — no fix needed     |
+ * | 1 | Room 1 mob-aggro on hit    | room1-mob-aggro-on-hit               | test() — timing fix #86c9ujt0k |
  * | 2 | Room 1 gate trigger source | room1-gate-unlocks-on-mobs-cleared   | test.fixme (Drew fix)       |
  * | 3 | Room 2 gate stickiness     | room2-gate-traversal-stickiness      | test.fixme (Drew fix)       |
  * | 4 | Room 5 level-up movement   | room5-level-up-movement-blocked      | test.fixme (Uma fix)        |
@@ -271,11 +271,14 @@ test.describe("soak-narrative finding #1 — Room 2 mob-aggro observable after p
       const baselineCount = capture.getLines().length;
 
       // ---- Fire one hit toward NE (where Room 02 grunts spawn) ----
-      // Walk NE briefly to get in range (grunts spawn at ~(272, 112) and
-      // (336, 176), ~100px NE of spawn (240, 200)). Then fire one attack.
+      // Walk NE to get in melee range. Grunts spawn at ~(272, 112) and
+      // (336, 176), ~100-140px NE of player spawn (240, 200). At 60px/s,
+      // 1000ms covers ~60px → player ends at ~(282, 158), within Grunt
+      // melee range (~80px proximity). 300ms was insufficient in CI
+      // (only ~18px coverage). Ticket: 86c9ujt0k.
       await page.keyboard.down("w");
       await page.keyboard.down("d");
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(1000);
       await page.keyboard.up("w");
       await page.keyboard.up("d");
       await page.waitForTimeout(100);
@@ -291,11 +294,11 @@ test.describe("soak-narrative finding #1 — Room 2 mob-aggro observable after p
         .find((l) => /\[combat-trace\] Hitbox\.hit \| team=player/.test(l.text));
 
       // If no hit landed yet — continue click-spam toward NE until a hit lands
-      // or budget runs out.
+      // or budget runs out. 15 iterations (was 8) for additional CI headroom.
       let hitLandedLineIdx = baselineCount;
       if (!firstPlayerHitLine) {
         // Extend to a brief attack loop to guarantee a hit before checking aggro.
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 15; i++) {
           await canvas.click({ position: { x: clickX, y: clickY } });
           await page.waitForTimeout(220);
           const hit = capture
