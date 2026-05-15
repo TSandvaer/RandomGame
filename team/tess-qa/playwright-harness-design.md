@@ -554,3 +554,64 @@ Specs that depend on PR #146's `equip_starter_weapon_if_needed` boot-time auto-e
 3. Adjust per-direction `attacksPerDir` if needed (dummy still dies in 3 swings at FIST_DAMAGE=1, which fits the helper's current budget without change).
 
 The header documentation makes this PR cheap to write — every affected spec already cites the retirement ticket and the change shape. Don't make the future spec-update PR re-discover the constraints.
+
+---
+
+## 14. Staleness-bounded latestPos lookup convention — 2026-05-15 (PR #212 lesson)
+
+**Status:** Convention codified in `tests/playwright/fixtures/kiting-mob-chase.ts` for kiting-chase + multi-chaser (PR #212, ticket `86c9u9neq`). Generalised here so all future `latestPos`-style consumers default to bounded lookups; reviewers should ding PRs that use raw `latestPos` without a staleness AND/OR cross-room bound.
+
+### The bug class — frozen `dist_to_player` under Playwright load
+
+Drew's PR #212 (Room 06 multi-mob return-to-spawn — extend PR #190 pattern to chase + chaser-clear chain) surfaced a latent bug class affecting every harness consumer that reads `Shooter.pos` / `<Mob>.pos` `[combat-trace]` lines via a "newest line wins" scan:
+
+**Bug shape.** Godot HTML5 under Playwright runs the physics step well below 60 Hz during heavy combat (frame-rate volatility on `gl_compatibility` + Chromium-throttled rAF + service-worker activity). A mob's `_physics_process` emits `.pos` every `POS_TRACE_INTERVAL` (0.25 *game*-seconds) — but in **wall-clock** time that cadence stretches unpredictably whenever `_physics_process` pauses. Symptoms observed:
+
+1. **Frozen `dist_to_player` field.** The `Shooter.pos` trace's `dist_to_player=N` value is computed at emit time against the player's then-live position. A wall-pinned kiter that hit some other early-return path can have its `.pos` cadence stretch past 1 s — `dist_to_player` is then a stale stand-in for current geometry. Empirically: Room 06 stuck-pursuit with `mob.dist=132` frozen for the full 90 s budget while the live computed-from-positions distance was ~15 px the entire time. Helper preferred the (stale) authoritative field, stayed in pursuit mode, never engaged, 0/1 Shooter kills.
+2. **Cross-room corpse leak.** A previous room's `<Mob>.pos` trace is still in the unbounded console buffer. If the current room's mob hasn't emitted yet (just loaded, `_player` reference unresolved, throttle accumulator from new `_physics_process` start hasn't reached `POS_TRACE_INTERVAL`), a raw `latestPos` scan returns the prior-room's last known position. Observed empirically in Room 07 after a Room 06 clear: helper saw `mob=(356,113) mobAge=94s` (Room 04's Shooter trace from 94 s ago), steered as if it were a live pursuit target, never engaged Room 07's actual Shooters.
+
+Both failure modes are silent — the harness logs a pursuit "in progress," and the test runs out the budget without a clear signal pointing back to "you were steering at a corpse / a different room."
+
+### The convention — bounded lookups by default
+
+The `latestPos(capture, pattern, maxAgeMs?, minTimestamp?)` signature in `tests/playwright/fixtures/kiting-mob-chase.ts` (PR #212) is the canonical reference. Callers MUST pass at least one bound:
+
+1. **Staleness bound (`maxAgeMs`).** Rejects readings older than the window. Hard rejection — caller falls through to a still-live channel or a click-spam nudge. Use when the harness needs proof of liveness (the mob is still emitting). Constant precedent: `MOB_POS_STALE_MS = 1_000` for the kiting single-target chase.
+
+2. **Cross-room scope (`minTimestamp`).** Rejects readings older than the caller-supplied lower bound (typically the chase invocation's `t0 = Date.now()` at the start of the room phase). Use to prevent prior-room's frozen trace leaking into the current room's combat. Mandatory whenever a spec advances rooms within a single `ConsoleCapture` buffer.
+
+3. **Distance-source policy** (paired with the staleness bound). When the trace's authoritative `dist_to_player` field is stale, fall back to **computed distance from live mob position + live player position**: the LATEST emitted mob position against the LATEST emitted player position. The mob's frozen position is still a meaningful pursuit target (a kiter that stopped emitting is still physically somewhere) — the player closing on that position can land swings as the gap shuts. Reference: `kiting-mob-chase.ts` line 833–835 (`const dist = mobAgeMs >= MOB_POS_STALE_MS ? distLive : distAuth`).
+
+4. **Player-pos lookups are NOT scoped.** `Player.gd` emits `Player.pos` continuously across rooms (same Player node), so cross-room leaks are impossible there; the very next live emission supersedes any prior reading via the `i--` reverse scan. Only scope mob-pos lookups.
+
+5. **Soft staleness signal for "is the build emitting at all?" diagnostics.** When the multi-chaser pursuit picks the **freshest** reading across channels (a corpse never emits again, so it falls further behind), it's frame-rate-independent — the freshness signal is the live-mob identifier. The soft constant `CHASER_POS_STALENESS_MS = 4_000` is logged when every channel's latest reading looks old but is NOT used to reject readings (a fixed rejection window false-rejects live mobs under wall-clock volatility and stalls combat). Use for log lines, not for control flow. Reference: `kiting-mob-chase.ts` lines 1071–1084.
+
+### When the convention applies
+
+ANY new fixture or spec that reads `<Mob>.pos` / `<Mob>.dist_to_player` / similar throttled position-trace fields via a "newest line wins" scan MUST:
+
+1. Pass `minTimestamp = t0` (or equivalent caller-scoped lower bound) at a minimum, even when staleness is not in scope. Cross-room leaks are nearly free to introduce and very expensive to diagnose.
+2. Pass `maxAgeMs` whenever the consumer relies on the trace's authoritative computed-at-emit-time fields (`dist_to_player`, computed angles, computed velocities). The authoritative fields are only meaningful when the trace is fresh.
+3. Document the freshness assumption in the helper's header comment. Spec authors who pass a bound are declaring their assumption; future failure modes can blame the contract rather than guess.
+
+The convention generalises beyond Shooter / Charger / kiting + multi-chaser. Any `latestPos`-style consumer of throttled position traces is in scope — including future Boss-phase trackers, future ranged-mob classes, future loot-spawner position readings, future tutorial-beat anchor checks.
+
+### Reviewer checklist
+
+When reviewing a Playwright fixture or spec that reads `[combat-trace] <X>.pos` lines:
+
+- [ ] Does the consumer call `latestPos` (or equivalent) on a mob-pos pattern? If yes:
+  - [ ] Is `minTimestamp` passed? (Required for cross-room scope.)
+  - [ ] If the consumer reads the trace's `dist_to_player` or similar authoritative field: is `maxAgeMs` passed? (Required for staleness rejection.)
+  - [ ] Is the staleness-fallback policy documented (compute from live positions when trace is stale)?
+- [ ] Is the assumption documented in the helper / spec header?
+- [ ] If the consumer is a per-room helper, is `t0` captured at the start of the room phase and threaded through the bounded lookup?
+
+A raw `latestPos(capture, pattern)` call with no bounds is a smell on any mob-pos consumer. Bounce the PR back to add the bounds — the cost of the bound is one parameter; the cost of an undetected corpse-steer / cross-room leak is a budget-exhausted spec with no clear signal.
+
+### Cross-references
+
+- **Empirical surface.** `tests/playwright/fixtures/kiting-mob-chase.ts` — `latestPos` definition (lines 390–425), single-mob kiting chase consumer with `minTimestamp = t0` and staleness fallback (lines 770–860), multi-chaser pursuit with freshness-based target selection (lines 1240–1330). Specs consuming the helpers: `tests/playwright/specs/mob-self-engagement.spec.ts`, `tests/playwright/specs/ac4-boss-clear.spec.ts`.
+- **Architecture context.** `.claude/docs/combat-architecture.md` § "Shooter state machine — engagement bands + cornered fallback (ticket 86c9uehaq)" — covers the Harness contract preserved paragraph (the `Shooter.pos` trace shape `pos=(x,y) state=... dist_to_player=...` is unchanged across the band rebalance). The harness coverage of `Shooter.pos` is what THIS convention protects from staleness-induced misreads.
+- **Engine-clock context.** `.claude/docs/combat-architecture.md` § "Engine.time_scale interactions — harness assumption-vs-game-clock rule" — a sibling rule for the wall-clock-vs-game-clock divergence class. The `time_scale = 0.10` panel-open path is the most extreme case of throttled `.pos` cadence (10× stretch) and is mitigated by the Escape-press idiom in the helpers; the staleness-bounded convention here is the complementary defence when game-clock drift is less extreme but still bites.
+- **Process incident.** `team/log/process-incidents.md` § "2026-05-15 — Sample-size discipline for re-introducing flaky tests" — the sibling lesson from the same PR-#208/#212/#221 cycle. The convention here is the *technical* fix; the sample-size discipline is the *procedural* fix.
