@@ -181,61 +181,66 @@ test.describe("AC3 — death preserves level + V/F/E + equipped weapon", () => {
     await page.waitForTimeout(2_500); // Walk well into grunts' attack range
     await page.keyboard.up("w");
 
-    // Wait for player_died signal evidence. The Player emits player_died and
-    // Main._on_player_died defers apply_death_rule. apply_death_rule reloads
-    // Room 01 — the room load is observable via the re-spawned dummy.
+    // Wait for player death. Drew's PR #200 added `[combat-trace] Player._die`
+    // (ticket 86c9u397c) — the most precise death signal available. Wait for
+    // that trace, then a couple of seconds for `apply_death_rule` to defer +
+    // reload Room 01 + re-instantiate the PracticeDummy.
     //
-    // Console signals we can watch for:
-    //   - The HUD HP-bar updates flow through Main._on_player_hp_changed but
-    //     don't print to console.
-    //   - Player.player_died is a Godot signal, NOT a print line.
-    //   - apply_death_rule does NOT print either.
-    //   - HOWEVER — `Grunt._die` only fires on mob death.
-    //   - The cleanest tell: the room reloads + a fresh PracticeDummy is
-    //     re-instantiated. We confirm respawn by attempting Room01 dummy
-    //     clear AGAIN below — if the dummy is gone post-respawn (still dead),
-    //     either the room didn't reload or the player is somewhere else.
-    //
-    // Instead, we poll for a state where:
-    //   1. Some pre-death enemy hits were observed
-    //   2. After ~17-30s, the player has died (no observable trace) and
-    //      respawn has fired (player at (240,200), Room 01 reloaded, dummy
-    //      respawned at full HP=3)
-    //
-    // The most robust signal: after the death window elapses, the player can
-    // SWING again and the next damage=6 hit lands. If the equipped weapon was
-    // wiped by a buggy apply_death_rule, damage=N would be 1.
+    // Pre-PR-#200 history: the spec polled hit-count as a death heuristic
+    // (`preDeathEnemyHits >= 35` → "enough damage absorbed to be dead").
+    // That heuristic was tuned against grunt damage_base=3 and assumed every
+    // hit landed. Both assumptions changed in the AC4 balance pass (PR #206,
+    // ticket 86c9u4mdc): damage_base 3 → 2 AND `take_damage` now grants
+    // 0.25s of post-hit iframes that absorb ~26% of cluster hits. Net DPS
+    // dropped from ~6.4 dmg/s to ~3.1 dmg/s, so 35 landed hits = 70 dmg
+    // (player still alive at 30 HP). Switching to the explicit `Player._die`
+    // trace makes the spec robust against any future damage-tuning ripple
+    // and matches the cleaner death-detection signal Drew shipped.
 
     const deathWindowStart = Date.now();
     let preDeathEnemyHits = 0;
+    let died = false;
 
     // Stand still. Don't swing.
     while (Date.now() - deathWindowStart < DEATH_TIMEOUT_MS) {
-      const enemyHits = capture
-        .getLines()
-        .filter((l) =>
-          /\[combat-trace\] Hitbox\.hit \| team=enemy/.test(l.text)
-        ).length;
+      const lines = capture.getLines();
+      const enemyHits = lines.filter((l) =>
+        /\[combat-trace\] Hitbox\.hit \| team=enemy/.test(l.text)
+      ).length;
       if (enemyHits > preDeathEnemyHits) {
         preDeathEnemyHits = enemyHits;
       }
 
-      // Heuristic for death detection: the Player's hp_current hits 0 ->
-      // emit player_died -> Main calls apply_death_rule -> _load_room_at_index(0)
-      // -> player.position = DEFAULT_PLAYER_SPAWN.
-
-      // We've taken enough hits to die — break early to save test budget
-      if (preDeathEnemyHits >= 35) {
+      // Death detection — explicit trace (PR #200, ticket 86c9u397c).
+      const dieLine = lines.find((l) =>
+        /\[combat-trace\] Player\._die/.test(l.text)
+      );
+      if (dieLine) {
+        died = true;
         console.log(
-          `[ac3-death] ${preDeathEnemyHits} enemy hits absorbed in ` +
-            `${Date.now() - deathWindowStart}ms — breaking early.`
+          `[ac3-death] Player._die observed after ${preDeathEnemyHits} enemy ` +
+            `hits in ${Date.now() - deathWindowStart}ms — waiting for ` +
+            `apply_death_rule respawn deferred frames.`
         );
-        // Continue waiting a few more seconds for the death + respawn deferred frames
+        // Wait for apply_death_rule to defer + reload + re-instantiate the
+        // Room01 dummy. 2s is generous (typically completes within 1 frame).
         await page.waitForTimeout(2_000);
         break;
       }
 
       await page.waitForTimeout(500);
+    }
+
+    if (!died) {
+      throw new Error(
+        `AC3 setup failed: Player did NOT die within ${DEATH_TIMEOUT_MS}ms. ` +
+          `Saw ${preDeathEnemyHits} enemy hits absorbed. Expected the ` +
+          `\`[combat-trace] Player._die\` line. With grunt damage_base=2 + ` +
+          `0.25s post-hit iframes (PR #206), effective DPS is ~3.1/s; the ` +
+          `100 HP pool should drain in ~33s. If the spec consistently misses ` +
+          `the death window, either DEATH_TIMEOUT_MS needs to grow, the ` +
+          `iframe window changed, or the grunts aren't reaching the player.`
+      );
     }
 
     if (preDeathEnemyHits === 0) {
