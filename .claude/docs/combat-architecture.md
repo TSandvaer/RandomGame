@@ -467,6 +467,47 @@ Both are swallowed by the focus system while a Control is focused. A spec that c
 
 **Generalised rule:** any Playwright spec that needs to close (or otherwise dismiss) a focus-holding panel after a click landed on a focusable child Control must NOT rely on `Tab`/`Escape`/any GUI-action key reaching `_unhandled_input`. Add a test-only direct-action method on the panel, wire it to a dedicated key handled in `_input()` (gated on `OS.has_feature("web")`), and have the spec assert a confirmation trace. Pattern check: does the spec press a key to dismiss UI immediately after clicking a focusable Control? If yes, it needs the `_input()`-handled hook, not a key-picking lottery.
 
+## Harness coverage gap — player-driven helpers + stale-trace consumption
+
+Two classes of harness blindness surfaced during M2 W3 by Sponsor manual soak + Drew's diagnostic-via-trace work on PR #212 / PR #221. Both invalidate the naive "AC4 green = gameplay works" reading and define the contract that future fixture authors must respect.
+
+### Class 1 — player-driven helpers don't validate mob self-engagement
+
+The AC4 Playwright spec (`tests/playwright/specs/ac4-boss-clear.spec.ts`) uses helper `chaseAndClearKitingMobs` (in `tests/playwright/fixtures/kiting-mob-chase.ts`) to navigate rooms with kiting Shooters. The helper **drives the player toward the Shooter** — issues player-side movement commands to chase, attacks at close range, then returns to spawn (the PR #190 / #212 pattern).
+
+When a mob is broken in a way that prevents IT from driving itself toward the player — always-flee logic, missing pursue state, no cornered-attack fallback, broken target acquisition — the AC4 spec **cannot detect it**. The harness covers the player's path to the mob; it does not cover the mob's path to the player.
+
+**Empirical case (Sponsor M2 RC soak 2026-05-15, build `5bef197`):** Room 04 Shooter only flees, never engages; cornered = idle; out-of-range = no pursuit. AC4 spec had been green throughout this regression because the harness DROVE the player to the Shooter. Bug fixed in PR #221 (Shooter state-machine engagement bands + cornered fallback). The PASSIVE-PLAYER spec class `tests/playwright/specs/mob-self-engagement.spec.ts` (PR #215, Tess) is the canonical guard going forward — player stands still per room, harness asserts mob reaches and lands a hit within an expected window.
+
+**Implication:** "AC4 green" means "the player can clear the rooms via the prescribed harness sequence." It does NOT mean "mobs engage the player as designed." This coverage gap applies to any mob behavior that requires mob initiative.
+
+### Class 2 — stale-trace consumption in `latestPos`-style harness lookups
+
+The harness reads mob position + state from `[combat-trace] <Mob>.pos | pos=... state=... dist_to_player=...` lines. Godot HTML5 frame-rate is volatile under Playwright load — `_physics_process` can pause for multi-frames, **freezing the trace's authoritative-distance field** at a snapshot from 1+ seconds ago. Harness consumers that prefer `latestPos.dist_to_player` over computed-from-live-readings get stuck in pursuit loops against ghost positions.
+
+Two distinct failure shapes (Drew's PR #212 surfaced both):
+
+1. **Frozen `dist_to_player` for a still-emitting mob:** Shooter pauses physics-tick mid-trace, dist_to_player reads stale, harness sees "mob is far" when mob is actually adjacent.
+2. **Cross-room corpse leak:** without a `minTimestamp` lower bound on `latestPos` lookups, the prior room's last `Shooter.pos` line (emitted seconds ago, mob now destroyed) is treated as a live target.
+
+**Convention (canonical):** future fixture authors using `latestPos`-style lookups MUST default to **staleness-bounded + cross-room-scoped** reads. See `team/tess-qa/playwright-harness-design.md` § 14 "Staleness-bounded latestPos lookup convention" for the full rule set:
+
+- `minTimestamp` always set on mob-pos lookups (cross-room scope)
+- `maxAgeMs` always set when reading authoritative trace fields (`dist_to_player`, etc.) — fall back to computed-from-live-readings if stale
+- Player-pos is NOT scoped (single source, no destruction lifecycle)
+- Soft `CHASER_POS_STALENESS_MS` is log-only — multi-chaser pursuit picks freshest reading across channels; do NOT extend into a rejection window
+
+Reviewers should ding PRs that use raw `latestPos` without bounds.
+
+### Mitigations
+
+- **Manual soak remains essential** for mob-self-engagement validation and any other surface where mob initiative or visual-fidelity is load-bearing. Sponsor-soak is the first detection surface; it cannot be retired by harness coverage alone.
+- **The "passive player" spec class** (`tests/playwright/specs/mob-self-engagement.spec.ts`, PR #215) closes Class 1 mechanically.
+- **The staleness-bounded latestPos convention** (PR #212, codified in `playwright-harness-design.md` § 14) closes Class 2 mechanically — for future helper authors. Apply at code-review time.
+- **Universal console-warning zero-gate** (PR #217, `tests/playwright/fixtures/test-base.ts`) catches the related class of latent `USER WARNING:` / `USER ERROR:` lines that previously slipped past as console-noise.
+
+A future reader looking at "AC4 green ✓" should NOT conclude that mob behavior, mob-state-machine completeness, or visual fidelity is end-to-end validated. The harness validates the player's prescribed sequence; the rest is soak.
+
 ## Cross-references
 
 - HTML5-renderer-specific quirks (HDR clamp, Polygon2D, service worker cache): `.claude/docs/html5-export.md`
