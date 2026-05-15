@@ -8,14 +8,16 @@
  * release-build artifact, and lets the auto-asserted gate fire on any
  * `USER WARNING:` / `USER ERROR:` line.
  *
- * **Current disposition: `test.fail()` until Devon's `86c9uen3z`
- * (leather_vest) fix merges.** Once that fix lands:
+ * **Current disposition: `test()` — flipped 2026-05-15 since PR #214
+ * (Devon's `leather_vest` fix, ticket `86c9uen3z`) already merged to
+ * `main` before this PR's commit landed.** The gate now asserts clean
+ * boot as an ongoing regression guard. Next step:
  *
- *   1. Flip this spec from `test.fail()` to `test()`.
- *   2. Migrate the other specs (`ac1-boot-and-sha`, `ac2-first-kill`,
+ *   1. Migrate the other specs (`ac1-boot-and-sha`, `ac2-first-kill`,
  *      etc.) to import from `../fixtures/test-base` instead of
  *      `@playwright/test`. One-line change per spec; the gate then
- *      applies universally as the ticket spec requires.
+ *      applies universally as the ticket spec requires (tracked under
+ *      this same ticket `86c9uf0mm` as Phase 2).
  *
  * **Why ship this as a separate demonstration spec rather than as the
  * sole new spec:** the universal application requires migrating every
@@ -69,20 +71,18 @@ test.describe("universal console-warning gate — Sponsor 86c9uf0mm", () => {
   // Demo test 1 — gate verifies clean boot.
   // ===================================================================
   //
-  // **Disposition: `test.fail()` until Devon's `86c9uen3z` fix merges.**
+  // **Disposition: `test()` — flipped 2026-05-15 since PR #214 (Devon's
+  // `leather_vest` fix, ticket `86c9uen3z`) already merged to `main`
+  // before this PR's commit landed.**
   //
-  // The `leather_vest` warning fires at boot in the current `main` build
-  // when the save contains the item. The auto-fixture's afterEach hook
-  // will catch it and fail the test. `test.fail()` makes Playwright treat
-  // the failure as expected.
-  //
-  // On flip (post-Devon-fix): change `test.fail` → `test` below; the
-  // gate then asserts clean boot as an ongoing regression guard. Any
-  // future regression that re-introduces an unknown-id (or any other
-  // USER WARNING / USER ERROR at boot) will flip this RED before
-  // Sponsor sees it.
-  test.fail(
-    "Demo — cold boot must emit no USER WARNING / USER ERROR (Sponsor 86c9uen3z flip trigger)",
+  // The auto-fixture's afterEach hook catches any USER WARNING / USER
+  // ERROR that fires during the test. Post-Devon-fix the gate now
+  // asserts clean boot as an ongoing regression guard. Any future
+  // regression that re-introduces an unknown-id (or any other USER
+  // WARNING / USER ERROR at boot) will flip this RED before Sponsor
+  // sees it.
+  test(
+    "Demo — cold boot must emit no USER WARNING / USER ERROR (Sponsor 86c9uen3z regression guard)",
     async ({ page, consoleCapture, context }) => {
       test.setTimeout(60_000);
       await context.route("**/*", (route) => route.continue());
@@ -123,19 +123,16 @@ test.describe("universal console-warning gate — Sponsor 86c9uf0mm", () => {
   // Demo test 2 — opt-out via `expectedUserWarnings` allow-list.
   // ===================================================================
   //
-  // **Disposition: `test.fail()` until Devon's `86c9uen3z` fix lands**
-  // (same blocker as Demo 1).
+  // **Disposition: `test()` — flipped 2026-05-15 since PR #214 already
+  // merged to `main` before this PR's commit landed (same flip trigger
+  // as Demo 1).**
   //
   // This test deliberately allows a specific warning shape via the
   // `expectedUserWarnings` allow-list. The regex matches a shape that
   // Godot does NOT actually emit — proving the mechanism works without
-  // depending on a real expected-warning path existing.
-  //
-  // The test is `test.fail()` because the BACKGROUND `leather_vest`
-  // warning still fires today (pre-Devon-fix) and would trip the gate —
-  // the allow-list narrowly opts out one specific regex but leaves the
-  // rest of the gate active. Post-Devon-fix, no warnings fire, and this
-  // flips to `test()`.
+  // depending on a real expected-warning path existing. Post-Devon-fix
+  // no `leather_vest` warning fires, so this test now passes naturally
+  // and the allow-list mechanism is exercised end-to-end.
   //
   // When a real "expected warning" test is authored (e.g. a future
   // "save with truly unknown id — graceful drop" spec), it follows
@@ -147,7 +144,7 @@ test.describe("universal console-warning gate — Sponsor 86c9uf0mm", () => {
       ],
     });
 
-    test.fail("allow-list lets specific warnings pass; everything else still blocks", async ({
+    test("allow-list lets specific warnings pass; everything else still blocks", async ({
       page,
       consoleCapture,
       context,
@@ -169,15 +166,12 @@ test.describe("universal console-warning gate — Sponsor 86c9uf0mm", () => {
 
       // The opt-out's empirical result is "no warning fires that the
       // allow-list matches, AND no warning fires that the allow-list
-      // does NOT match" — i.e. zero violations. Once Devon's
-      // `leather_vest` fix lands, this test passes naturally because
-      // no warnings fire. Pre-fix it would also fail (because
-      // `leather_vest` would fire and NOT match the allow-list regex
-      // above) — so it's `test()` not `test.fail()` only on the
-      // assumption that this PR lands AFTER 86c9uen3z. If we ship
-      // before 86c9uen3z, the test correctly catches the unfixed
-      // bug — the allow-list narrowly opts out a specific shape but
-      // leaves the rest of the gate intact.
+      // does NOT match" — i.e. zero violations. Post-Devon-fix
+      // (PR #214 merged 2026-05-15) no warnings fire at all, so this
+      // test passes naturally and exercises the allow-list mechanism
+      // end-to-end. If a future regression re-introduces a warning
+      // that does NOT match the allow-list regex above, the gate
+      // catches it — narrow opt-out, broad gate.
     });
   });
 });
