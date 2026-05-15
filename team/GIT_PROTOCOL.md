@@ -110,11 +110,16 @@ Any PR that touches a **player-visible surface** (scene tree, UI, visual feedbac
 ### Side-effect inventory
 - <other surface that might be affected>: <expected vs. observed>
 
+### Cross-lane integration check
+List every other role's feature that shares state with this PR (e.g. Inventory + Pickup + Room gate + Loot for any combat PR). Describe what you probed and what you observed. If you cannot probe cross-lane state (no browser, headless only), name it explicitly as a Sponsor-soak probe target so the orchestrator can route it to Tess's journey-probe (see `team/TESTING_BAR.md` § "Milestone-gate journey probe").
+
 ### Open concerns / known gaps
 <anything you noticed but is out of this PR's scope>
 ```
 
 **Headless-environment fallback:** if the agent has no browser binary (GUT-only environment), the Self-Test Report uses `godot --headless` to load the actual entry scene + drive the play loop programmatically (Devon PR #107 pattern). The verification section notes "verified via headless integration test, no browser repro available — Sponsor's interactive soak is the final gate."
+
+**Cross-lane discipline.** The Cross-lane integration check subsection is non-negotiable for every UX-visible PR. Author-side verification accurately describes what THAT PR's author probed — but the M2 RC Sponsor-soak findings (2026-05-15) showed that cross-PR / cross-lane failures slip through when no report cross-checks adjacent-lane state. A combat PR that doesn't touch Inventory code can still break loot pickup if the boss-room exit gate races a loot-drop callback. The check is "what adjacent surface shares state with this PR's mutation, and what did you observe when you exercised it?" Honest "I couldn't probe — please route to Tess's journey-probe" is acceptable and expected for headless authors; silent omission is not.
 
 **Tess's review path:** read the Self-Test Report first; spot-check ≥1 AC + ≥1 side-effect against the report; then sign off or bounce. **If the report is missing on a UX-visible PR, bounce it back immediately with "Self-Test Report missing" — don't burn review budget cold-reading the diff.**
 
