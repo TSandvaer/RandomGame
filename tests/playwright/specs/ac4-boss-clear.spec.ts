@@ -70,14 +70,19 @@
  *     Stratum1BossRoom._ready auto-fires the entry sequence; boss wakes
  *     after 1.8 s; spam attacks until boss_died emits.
  *
- * **CURRENT END-TO-END STATUS (origin/main `339a189`, PR #183 merged):**
- * Rooms 01, 02, 03 clear + traverse end-to-end (PR #183 fixed the Room 02
- * gate-registration blocker — verified). The spec then fails at **Room 04**
- * — the only PURE-Shooter room. `clearRoomMobs` assumes mobs chase into
- * melee; the Shooter KITES instead, so the near-spawn click-spam never
- * lands a hit. See the `test.fail()` block's STATUS comment for the full
- * analysis. The spec stays `test.fail()` until a Shooter-specific
- * chase-then-return sub-helper is added (AC4 residue, ticket 86c9qckrd).
+ * **CURRENT END-TO-END STATUS (PR #198, ticket 86c9u05d7):**
+ * Rooms 01–04 clear + traverse end-to-end on every release-build run
+ * (PR #183 fixed the Room 02 gate-registration blocker; PR #186 added the
+ * kiting-Shooter chase that clears Room 04). PR #198 generalised the
+ * position-steered pursuit to multi-chaser rooms — `clearRoomMobs` routes
+ * the 3-chaser Room 05 through `chaseAndClearMultiChaserRoom` — which fixed
+ * the HARNESS-STEERING half of the Room 05 blocker. But PR #198's
+ * release-build characterisation then uncovered a GAME-side bug: a
+ * death-path physics-flush freeze that stops the surviving sibling mobs'
+ * `_physics_process` ~1–2 frames after a concurrent sibling's `_die`. The
+ * spec stays `test.fail()` blocked at Room 05 on that game-side freeze
+ * (out of harness scope — needs a Drew fix). See the `test.fail()` block's
+ * STATUS comment for the full characterisation.
  *
  * Mob composition per room (from resources/level_chunks/s1_room0N.tres):
  *   Room 01: 2 grunts
@@ -176,11 +181,14 @@ const ROOM_SHOOTER_COUNTS = [
 ];
 
 test.describe("AC4 — Stratum-1 boss reach + clear", () => {
-  // **STATUS: still test.fail() — but the blocker has MOVED AGAIN. The
-  // Room 02 gate bug (PR #183) AND the Room 04 pure-Shooter kiting wall
-  // (PR #186, this branch) are both FIXED; the current blocker is now
-  // Room 05. Re-armed against origin/main `8885473` + this branch's
-  // chase-helper commits.**
+  // **STATUS: still test.fail(). The Room 02 gate bug (PR #183), the Room
+  // 04 pure-Shooter kiting wall (PR #186), and the Room 05 multi-chaser
+  // HARNESS-STEERING limitation (PR #198, this branch) are all FIXED. The
+  // current blocker is a GAME-side bug PR #198's release-build run
+  // uncovered: a death-path physics-flush freeze of the surviving sibling
+  // mobs in Room 05 — out of harness scope, needs a Drew game-side fix
+  // (follow-up to ticket 86c9u05d7). See the "CURRENT blocker" section
+  // below.**
   //
   // ---- What PR #183 fixed (verified — no longer the blocker) ----
   //
@@ -227,29 +235,56 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
   // gate sequence instead. Room 04 (the only PURE-Shooter room) now
   // clears end-to-end.
   //
-  // ---- The CURRENT blocker: Room 05 ----
+  // ---- What PR #198 fixed (this branch — the harness side of Room 05) --
   //
-  // With Rooms 01–04 clearing deterministically, the spec now fails at
-  // **Room 05** (2 grunts + 1 charger). This is a pre-existing failure
-  // unmasked by #186's progress — NOT introduced by the chase helper
-  // (Room 05 has `ROOM_SHOOTER_COUNTS[5] == 0`, so the chase pre-pass
-  // does not even run for it). It is tracked separately as AC4 residue
-  // under ticket **86c9u05d7** and is out of scope for PR #186, which
-  // only owns getting the spec PAST Room 04.
+  // Ticket 86c9u05d7 was filed as a HARNESS problem: even with the Room 05
+  // 3-concurrent-chaser room-LOAD freeze fixed (PR #191), the spec's
+  // `clearRoomMobs` could not reliably clear a 3-mob room — its
+  // fixed-position click-spam cleared Room 05 only 0/3–2/3 because one of
+  // three concurrent chasers always drifted out of the fixed swing wedge.
+  // PR #198 generalised the position-steered pursuit (built for kiting
+  // Shooters in #186/#190) to chasers: `Grunt.gd`/`Charger.gd` now emit a
+  // throttled `<Mob>.pos` trace, and `chaseAndClearMultiChaserRoom` reads
+  // them to keep the player's facing locked on a live chaser. That harness
+  // mechanism is correct and ready — but see the next section.
   //
-  // ---- Why this spec STAYS test.fail() (not split into test()) ----
+  // ---- The CURRENT blocker: a GAME-side death-path freeze in Room 05 ---
   //
-  // The spec is a single monolithic sequential test (cold-boot → Room 01
-  // → ... → Room 08 → Boss). It cannot be cleanly split into a passing
-  // `test()` half and a failing `test.fail()` half — Room 05 is step 5 of
-  // 8 and everything after it depends on traversing it. Extracting
-  // "Rooms 01-04 pass" into its own `test()` would require a second cold
-  // boot and a partial-run harness the spec doesn't have. So the spec
-  // stays `test.fail()`, but the comment now accurately names the CURRENT
-  // blocker (Room 05, ticket 86c9u05d7) so the next person to fix it
-  // flips the spec green knowingly — and no FIXED bug (#183's Room 02
-  // gate, #186's Room 04 Shooter wall) is masked behind a stale
-  // annotation.
+  // With the harness steering fixed, PR #198's release-build characterisation
+  // uncovered a DIFFERENT, GAME-side bug that the fixed-position harness had
+  // only ever seen as "0/3–2/3, non-deterministic": **in Room 05, the
+  // surviving sibling mobs' `_physics_process` STOPS ~1–2 frames after a
+  // concurrent sibling's `_die`.** Trace signature (every release-build run,
+  // fully deterministic): the chase kills 1–2 of the 3 chasers, then
+  // immediately after a `Grunt._die` / `Charger._die` line the remaining
+  // live mobs stop emitting `<Mob>.pos` ENTIRELY — for the rest of the 90s
+  // budget — while `Player.pos` keeps emitting. A live mob emits `.pos`
+  // every 0.25 game-seconds unconditionally at the top of `_physics_process`,
+  // so "no `.pos` for 80s from a mob that is not dead" means its
+  // `_physics_process` is no longer being called. This is the SAME
+  // physics-flush bug class as PR #183 / #191, but on the mob-DEATH path
+  // rather than the room-LOAD path: a deferred death-sequence operation
+  // (`_spawn_death_particles`' `room.call_deferred("add_child", burst)`, the
+  // `mob_died` emit chain, or the RoomGate decrement) lands inside a flush
+  // and knocks the surviving siblings out of the processing tree. PR #191
+  // fixed the room-load freeze; this death-path sibling-freeze is a separate
+  // regression. The `chaseAndClearMultiChaserRoom` throw message prints the
+  // explicit `>>> GAME-side freeze <<<` diagnosis (chaser `.pos` count in the
+  // last 10s = 0 while a live mob remains). **This is out of harness scope —
+  // it needs a game-side fix (Drew); tracked as the follow-up to 86c9u05d7.**
+  //
+  // ---- Why this spec STAYS test.fail() ----
+  //
+  // Rooms 01–04 clear + traverse end-to-end on every release-build run (the
+  // harness side is solid). The spec is a single monolithic sequential test
+  // (cold-boot → Room 01 → … → Room 08 → Boss); Room 05 is step 5 of 8 and
+  // everything after depends on traversing it, so it cannot be split into a
+  // passing `test()` half. It stays `test.fail()` until the GAME-side
+  // death-path sibling-freeze is fixed — at which point the PR #198 harness
+  // mechanism should carry Room 05 (and 06–08) through and the spec can be
+  // flipped to `test()`. No FIXED bug (#183's Room 02 gate, #186's Room 04
+  // Shooter wall, #198's Room 05 harness steering) is masked behind a stale
+  // annotation — the live blocker is precisely the death-path freeze.
   test.fail(
     "AC4 — Stratum-1 boss reach + clear in ≤10min from cold start",
     async ({ page, context }) => {
@@ -300,17 +335,21 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       //                                                        — W, N, NE, SE
       //
       // Grunt and Charger CHASE, so even south/west spawns close to melee
-      // range — the near-spawn N+E click-spam below kills them without the
-      // player wandering. **The Shooter does NOT chase — it KITES** (walks
-      // AWAY when the player closes below KITE_RANGE; see
-      // `scripts/mobs/Shooter.gd` § "Distance bands"). This helper therefore
-      // CANNOT clear a pure-Shooter room — most notably **Room 04**, whose
-      // only mob is one Shooter. Rooms 05-08 contain Shooters too, but their
-      // Grunts/Chargers keep the player engaged near spawn while the Shooter
-      // is incidentally caught in the wedge. Room 04 is the spec's current
-      // hard wall (see the `test.fail()` STATUS comment); fixing it needs a
-      // Shooter-specific chase-then-return sub-helper (AC4 residue,
-      // ticket 86c9qckrd).
+      // range. **The Shooter does NOT chase — it KITES** (walks AWAY when
+      // the player closes below KITE_RANGE; see `scripts/mobs/Shooter.gd`
+      // § "Distance bands") — so any room with Shooters routes its Shooter
+      // kills through `chaseAndClearKitingMobs` (PR #186, ticket 86c9tz7zg).
+      //
+      // The fixed-position N+E click-spam below reliably clears the 2-mob
+      // rooms (02, 03): both chasers crowd the player and sit in the swing
+      // wedge. It does NOT reliably clear 3-mob rooms (05–08) — with 2+
+      // concurrent chasers one routinely drifts out of the fixed wedge's
+      // coverage (Room 05 cleared only 0/3–2/3 via this path). So for 2+
+      // remaining chasers, `clearRoomMobs` routes them through
+      // `chaseAndClearMultiChaserRoom` instead — the same position-steered
+      // pursuit generalised to chasers (PR #198, ticket 86c9u05d7). The
+      // fixed-position loop below is now only the path for ≤1 remaining
+      // chaser.
       //
       // Cycling between N and NE facing covers mobs approaching from
       // either direction without inducing significant player drift (the
@@ -392,18 +431,20 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         // exit condition.
         const chaserMobs = expectedMobs - shooterCount;
 
-        // ---- Multi-chaser rooms: position-steered pursuit (ticket 86c9u05d7)
+        // ---- 3-chaser rooms: position-steered pursuit (ticket 86c9u05d7) --
         //
-        // The fixed-position N/E click-spam loop below clears the 2-mob
-        // rooms (02, 03) reliably — both chasers crowd the player and sit in
-        // the swing wedge. It does NOT reliably clear 3-mob rooms (05–08):
-        // with 2+ concurrent chasers, one routinely drifts out of the fixed
-        // wedge's coverage (swing knockback shoves mobs apart, the Charger's
-        // telegraph→charge cycle parks it outside melee, a Grunt circling to
-        // the flank is never faced). Tess characterised Room 05 at 0/3–2/3
-        // via the fixed-position path — never a deterministic 3/3.
+        // The fixed-position N/E click-spam loop below clears the 2-chaser
+        // rooms (02, 03, and the chaser portion of 06–08) reliably — two
+        // chasers crowd the player and sit in the swing wedge. It does NOT
+        // reliably clear a 3-CHASER room: with 3 concurrent chasers, one
+        // routinely drifts out of the fixed wedge's coverage (swing knockback
+        // shoves mobs apart, the Charger's telegraph→charge cycle parks it
+        // outside melee, a Grunt circling to the flank is never faced). Tess
+        // characterised Room 05 (2 grunts + 1 charger — the ONLY 3-chaser
+        // room) at 0/3–2/3 via the fixed-position path, never a deterministic
+        // 3/3.
         //
-        // For 2+ remaining chasers, route them through the SAME
+        // For 3+ remaining chasers, route them through the SAME
         // position-steered pursuit the kiting-Shooter helper uses, now
         // generalised to chasers: it reads each chaser's `.pos` trace
         // (Grunt.pos / Charger.pos) and steers the player AT whichever
@@ -412,8 +453,16 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         // done, so the gateTraversalWalk below runs from its required
         // geometry. Chasers don't retreat through the gate, so this never
         // drives the gate sequence — the normal two-part walk still runs.
-        if (chaserMobs >= 2) {
-          await chaseAndClearMultiChaserRoom(
+        //
+        // The threshold is `>= 3`, not `>= 2`, deliberately: the
+        // fixed-position path is PROVEN for the 2-chaser rooms (02, 03 have
+        // traversed end-to-end since PR #183), and the multi-chaser helper
+        // roams the player around the room — re-using it for a 2-chaser room
+        // would trade a proven path for an unproven one with no determinism
+        // gain (2 chasers reliably crowd the wedge). Only the genuine
+        // 3-chaser case (Room 05) needs pursuit.
+        if (chaserMobs >= 3) {
+          const multiResult = await chaseAndClearMultiChaserRoom(
             page,
             canvas,
             capture,
@@ -422,10 +471,19 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
             clickX,
             clickY
           );
+          // The multi-chaser pursuit roams the player enough that it can
+          // drive the gate to `gate_traversed` itself (the player drifts
+          // into the trigger during the engage, the gate auto-unlocks on
+          // the last kill, and the helper's case-B finishTraversalFromUnlocked
+          // completes the traversal). When that happens, propagate it so the
+          // per-room loop SKIPS its own gateTraversalWalk — exactly like the
+          // kiting-Shooter chase path.
+          chaseTraversedGate = multiResult.gateTraversed;
           console.log(
             `[ac4-boss] ${roomLabel}: cleared ${chaserMobs} chaser mob(s) ` +
               `via position-steered multi-chaser pursuit ` +
-              `(+${shooterCount} Shooter(s) cleared by chase pre-pass).`
+              `(+${shooterCount} Shooter(s) cleared by chase pre-pass; ` +
+              `chaseTraversedGate=${chaseTraversedGate}).`
           );
           return { chaseTraversedGate };
         }
