@@ -11,7 +11,45 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ## Phase
 
-`Phase 1 — MVP Build` (Week 1 of M1. Project is **Embergrave** — top-down 2D action-RPG dungeon crawler in Godot 4.3, browser-playable. Week-1 backlog of 20 tasks is live in ClickUp.)
+`Phase 2 — M2 Week 3 dispatching` (Project is **Embergrave** — top-down 2D action-RPG dungeon crawler in Godot 4.3, browser-playable. M1 RC signed off; M2 W1 + W2 closed clean; W3 backlog v1.0 live with 12 tickets at `team/priya-pl/m2-week-3-backlog.md`.)
+
+---
+
+## Current state — 2026-05-15 (W2 closed CLEAN, W3 dispatching)
+
+**This header is the canonical "what's going on right now" entry. Per-role sections below are append-only history; their most recent entries are dated 2026-05-05 and are now historical (M1 RC post-fix-wave era — superseded by M2 W1 + W2 closure). Read this header first on resume.**
+
+- **`origin/main` tip:** `5e471f0` (PR #202 — `pm(m2): week-2 close + week-3 backlog v1.0`). Verify: `git rev-parse origin/main`.
+- **M2 W2 closed CLEAN:** 22 PRs merged in the W2 arc (#176 through #202). Tess's end-of-week-2 exploratory bug-bash (`team/tess-qa/soak-2026-05-15.md`, ticket `86c9kxx7h`) against `embergrave-html5-d9cc159` returned **0 blockers, 0 majors, 2 minors** — both minors addressed (`86c9u33h1` Pickup silent-drop shipped in PR #199; `86c9u33hh` stale AC4 `test.fail()` annotation folded into W3-T1 implementation).
+- **M2 W3 dispatching:** 12 tickets — 8 P0 + 3 P1 + 1 P2 per `team/priya-pl/m2-week-3-backlog.md` (PR #202).
+  - **W3-T1 (AC4 Room 05 balance pass impl, P0)** — Drew (TRES: Grunt `damage_base 3→2`, Charger `damage_base 5→4`) + Devon (Player.gd: `HIT_IFRAMES_SECS = 0.25` auto-granted in `Player.take_damage`) per Uma's #201 design. Tess paired tests + Playwright deterministic clear without harness dodge.
+  - **W3-T2 (S2 rooms 2-3, P0)** + **W3-T3 (soft-retint sprites, P0)** + **W3-T4 (S2 boss room first impl — Vault-Forged Stoker, P0/L)** — Drew (heaviest M2 load to date).
+  - **W3-T5 (MobRegistry autoload, P0)** — Devon engine, Drew assists on registration/scaling.
+  - **W3-T6 (v4 save stress fixtures, P0)** — Tess fixtures + tests, Devon OPFS edge cases.
+  - **W3-T7 (stash UI v1.1 iteration, P1, Sponsor-conditional)** + **W3-T8 (ember-bag tuning v2, P1, Sponsor-conditional)** — Devon impl gated on Sponsor M2 soak feedback.
+  - **W3-T9 (audio sourcing close-out, P0 — promoted from P1)** — Uma sourcing + direction, Devon wiring.
+  - **W3-T10 (M2 acceptance plan W3 + bug-bash + fix-forward absorber, P0)** — Tess omnibus.
+  - **W3-T11 (Playwright SHA-pin fix, P1)** — Devon CI workflow.
+  - **W3-T12 (M3 design seeds, P2)** — Priya framing, Uma hub-town assist, Devon save-schema implications.
+- **AC4 progression status:** Rooms 01–04 deterministic post-#186/#190/#191/#198. Room 05 found to be balance issue, not freeze (PR #200 diagnostic-trace pair empirically refuted PR #198's framing). Uma's PR #201 locked the balance pass design; implementation lands in W3-T1.
+- **Sponsor M2 soak:** **Pending.** W2 RC `embergrave-html5-d9cc159` (release-build run `25895056935`) is the Sponsor target. Sponsor has not yet soaked M2 (last soak was M1 RC). W3-T10 Half B absorbs fix-forward findings.
+- **All 5 named roles idle post-W2-close:** nothing in-flight; safe to dispatch the W3 backlog at full parallel cadence. Recommended day-1 parallel: T2 + T3 + T5 + T6 + T9 + T1 (Uma's design merged at `dd4fed2` — no remaining gate). T4 (S2 boss room L) starts after T2 lands.
+- **Open PRs:** none at time of authoring. Verify: `gh pr list --state open`.
+- **Top-3 active risks at W3 entry** (per W2 retro):
+  1. **R6 — Sponsor-found-bugs flood** (high/high, re-promoted) — first M2 soak certain to surface findings; W3-T10 absorbs.
+  2. **R2 — Tess bottleneck** (med/med, strained) — PR #194 took 2 QA rounds; W3 has heavier sign-off load (AC4 balance + stratum-2 content + boss room).
+  3. **R1 — Save migration breakage** (med/high, re-armed) — was inactive in W2; W3-T6 stress fixtures + AC4 balance iframes re-open the surface.
+  Re-promoted to top-5 at W3: **R9 — Stratum-2 content triple-stack** (Drew's W3 load with T2+T3+T4 stacked).
+- **Auto-memory rules that landed in the M2 W2 arc:**
+  - Physics-flush rule generalized to `CollisionShape2D`-on-`PhysicsBody2D` adds inside `flush_queries()`; load-bearing pattern is `CONNECT_DEFERRED` on cross-frame signals bridging flush-rooted callbacks (PR #191 → `.claude/docs/combat-architecture.md` § "Cross-tree signal-connection discipline").
+  - GUT parse-failed test files now fail CI loudly — closed the testing-bar integrity hole where green CI masked silently-un-executed tests (PR #196).
+  - Iron-sword auto-equip-at-boot bandaid retired in favor of pickup-driven equip — cold-boot is now genuinely fistless, Room01 onboarding gates room-advance on first-weapon pickup (PR #194; 23-file coordinated change).
+  - Diagnostic-trace pair pattern: action-side + consequence-side traces paired in the same PR so cause-effect chains are observable in the trace stream (PR #200 → `Player._die` + `Main.apply_death_rule`; codification candidate for `.claude/docs/combat-architecture.md`).
+  - Negative-assertion buffer-scoping discipline: every negative assertion over a console buffer must declare its truth window via a sentinel event (PR #180 → `.claude/docs/combat-architecture.md` § "Negative-assertion buffer-scoping rule").
+  - Godot HTML5 `gl_compatibility` default font has no glyph for U+2713 / arrows / box-drawing chars — render cue glyphs as `ColorRect` geometry, not Unicode codepoints (PR #179 → `.claude/docs/html5-export.md` § "Default-font glyph coverage").
+  - Godot UI focus consumption is broader than Tab — `Escape`/`ui_cancel` also swallowed by focus-holding Controls. Use test-only direct-toggle hooks (e.g. `Inventory.close_for_test()`) for Playwright (PR #187; codification candidate for `team/tess-qa/playwright-harness-design.md`).
+  - Auto-status SessionStart re-arm hook for harness durability across session restarts (PR #181).
+- **Doc updates in this run (run 015):** Priya `team/RESUME.md` wholesale rewrite (Path B per dispatch brief — discard stale May-14 version, rewrite fresh against W2-closed / W3-dispatching reality). Priya `team/STATE.md` — this "Current state — 2026-05-15" header added at top; per-role sections below are append-only history (last entry 2026-05-05, M1 RC post-fix-wave era — explicitly superseded by this header).
 
 ---
 
