@@ -179,6 +179,25 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 		"Room01 → Room02 advance is GATED on pickup-equip — still in Room01 " +
 		"immediately after the kill, before the player collects the Pickup")
 
+	# Step 3b: LET THE DODGE STATE EXPIRE before the pin loop. Step 2 called
+	# `try_dodge(RIGHT)` — the player is in STATE_DODGE for DODGE_DURATION
+	# (0.30s). While dodging, `Player._process_dodge` OVERWRITES `velocity` to
+	# `_dodge_dir * DODGE_SPEED` (360 px/s RIGHT) every physics frame, so
+	# `move_and_slide()` flings the player off the drop tile no matter how
+	# often Step 4 re-pins `global_position` — the re-pin is undone by the very
+	# next `_physics_process`. Drain physics frames until the player is back in
+	# a non-DODGE state (idle/walk), where `_process_grounded` zeroes velocity
+	# on no input — only then will the Step 4 pin actually hold. DODGE_DURATION
+	# 0.30s / (1/60) = 18 physics frames; 30 is a safe ceiling with a guard.
+	var _dodge_drain_guard: int = 0
+	while p.get_state() == Player.STATE_DODGE and _dodge_drain_guard < 30:
+		_dodge_drain_guard += 1
+		await get_tree().physics_frame
+	assert_ne(p.get_state(), Player.STATE_DODGE,
+		"player exited STATE_DODGE before the pickup-pin loop — a still-active " +
+		"dodge would overwrite velocity each frame and drift the player off the " +
+		"drop tile, defeating the pin (root cause of the prior CI-red headline test)")
+
 	# Step 4: PRE-POSITION THE PLAYER ON THE DROP TILE — the killing-blow case.
 	# The dummy's deferred `add_child` lands the Pickup a frame later; the
 	# Pickup's `_ready` then defers `_activate_and_check_initial_overlap`, which
