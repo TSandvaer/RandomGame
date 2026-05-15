@@ -391,8 +391,38 @@ func _on_boss_died(boss: Stratum1Boss, death_position: Vector2, _mob_def: MobDef
 	# Activate the StratumExit so the player can walk to it and descend.
 	# The exit was spawned INACTIVE in `_spawn_stratum_exit` — this is the
 	# moment it lights up.
+	#
+	# **Physics-flush safety (ticket 86c9ujq8d — M2 W3 soak P0 finding 3):**
+	# `_on_boss_died` is connected to `Stratum1Boss.boss_died`, which fires
+	# from `Stratum1Boss._die()`. `_die` is called from `take_damage` which
+	# is reached via `Hitbox._on_body_entered` — a physics-query-flush callback.
+	# `StratumExit.activate()` calls `_apply_active_state(true)` which sets
+	# `_interaction_area.monitoring = true`. Mutating Area2D monitoring DURING
+	# a physics flush triggers Godot 4's ERR_FAIL_COND guard:
+	#
+	#     USER ERROR: Can't change this state while flushing queries. Use
+	#     call_deferred() or set_deferred() to change monitoring state instead.
+	#
+	# The C++ guard returns early; monitoring stays false; the player can never
+	# walk into the interaction area; `descend_triggered` never fires; player
+	# is trapped in the boss room forever.
+	#
+	# Fix: defer `activate()` to land AFTER the physics flush closes. The
+	# BOSS_DEATH_HOLD (400ms hold + 200ms tween) means the exit won't visually
+	# activate until ~600ms post-death regardless; deferring by one physics
+	# tick (~16ms) is imperceptible and preserves the signal ordering:
+	# `stratum_exit_unlocked.emit()` fires synchronously (Main._on_stratum_exit_unlocked
+	# subscribes here to wire the descend signal — that wiring must happen before
+	# the player can reach the portal, but the portal area monitoring itself
+	# need not be on the same frame as the signal emission).
+	#
+	# Same root-cause class as `Stratum1BossRoom._build_door_trigger` (ticket
+	# 86c9tv8uf) and `MobLootSpawner.on_mob_died` (PR #142) — all fixed by
+	# deferring the Area2D monitoring mutation out of the physics-flush window.
+	_combat_trace("Stratum1BossRoom._on_boss_died",
+		"boss_died received — deferring StratumExit.activate() to clear physics flush")
 	if _stratum_exit != null:
-		_stratum_exit.activate()
+		_stratum_exit.call_deferred("activate")
 	stratum_exit_unlocked.emit()
 	boss_defeated.emit(boss, death_position)
 

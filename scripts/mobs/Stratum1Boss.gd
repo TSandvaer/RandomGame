@@ -314,6 +314,13 @@ func apply_mob_def(def: MobDef) -> void:
 func wake() -> void:
 	if _state != STATE_DORMANT:
 		return
+	# [combat-trace] diagnostic (ticket 86c9ujq8d — finding 1): confirms the
+	# boss successfully exited DORMANT and can now engage the player. If this
+	# line never appears in the soak stream, the entry sequence timer did not
+	# fire — look for `trigger_entry_sequence` call (auto-fire in
+	# `_assemble_room_fixtures`) and the SceneTreeTimer creation path.
+	_combat_trace("Stratum1Boss.wake",
+		"exiting STATE_DORMANT — boss now IDLE, combat enabled")
 	_set_state(STATE_IDLE)
 	boss_woke.emit()
 
@@ -483,8 +490,32 @@ func _fire_melee_swing() -> void:
 	# the player's Vigor mitigation at swing-fire time. The melee-multiplier
 	# is a *boss-specific* attack-shape decision, applied on top of the
 	# formula output — same pattern as Grunt's heavy swing.
-	var formula_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
+	# Null-def fallback: when mob_def is null (bare-instantiated in tests),
+	# compute_mob_damage returns 0. Use damage_base directly instead —
+	# _apply_mob_def seeds it to 12 for null-def, so the hitbox carries
+	# non-zero damage even in the no-def test path.
+	var formula_dmg: int
+	if mob_def == null:
+		formula_dmg = damage_base
+	else:
+		formula_dmg = DamageScript.compute_mob_damage(mob_def, _player_vigor())
 	var dmg: int = int(round(float(formula_dmg) * MELEE_DAMAGE_MULTIPLIER))
+	# [combat-trace] diagnostic (ticket 86c9ujq8d — M2 W3 soak finding 1 — boss
+	# can't hit player). Emits BEFORE hitbox spawn so Sponsor's DevTools stream
+	# can distinguish "swing never fired" from "swing fired but hitbox didn't
+	# connect." Cross-reference with `Hitbox.hit` trace: if this line appears but
+	# no matching `Hitbox.hit team=enemy target=Player` line follows within ~8
+	# frames (MELEE_HITBOX_LIFETIME=0.14s ≈ 8 frames at 60fps), the hitbox
+	# spawned but body_entered never fired — look for wrong layer/mask or the
+	# player being on iframes (collision_layer cleared to 0 during dodge).
+	var player_dist: float = -1.0
+	if _player != null:
+		player_dist = global_position.distance_to(_player.global_position)
+	_combat_trace("Stratum1Boss._fire_melee_swing",
+		"dir=(%.2f,%.2f) dmg=%d reach=%.0f radius=%.0f lifetime=%.2f player_dist=%.1f phase=%d" % [
+			dir.x, dir.y, dmg, MELEE_HITBOX_REACH, MELEE_HITBOX_RADIUS,
+			MELEE_HITBOX_LIFETIME, player_dist, phase
+		])
 	var hb: Hitbox = _spawn_hitbox(
 		dir,
 		dmg,
@@ -537,7 +568,13 @@ func _fire_slam_hit() -> void:
 	# Damage routed through the formula utility, then scaled by the slam-
 	# specific multiplier (boss attack-shape, separate from Damage.gd's
 	# player-attack-type-mult).
-	var formula_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
+	# Null-def fallback: mirrors _fire_melee_swing — use damage_base when
+	# mob_def is null so headless tests get non-zero slam damage.
+	var formula_dmg: int
+	if mob_def == null:
+		formula_dmg = damage_base
+	else:
+		formula_dmg = DamageScript.compute_mob_damage(mob_def, _player_vigor())
 	var dmg: int = int(round(float(formula_dmg) * SLAM_DAMAGE_MULTIPLIER))
 	# Slam is omnidirectional — knockback from boss center outward.
 	var kb_dir: Vector2 = Vector2.RIGHT
@@ -545,6 +582,15 @@ func _fire_slam_hit() -> void:
 		var to_player: Vector2 = _player.global_position - global_position
 		if to_player.length_squared() > 0.0:
 			kb_dir = to_player.normalized()
+	# [combat-trace] diagnostic — same rationale as _fire_melee_swing trace.
+	var player_dist: float = -1.0
+	if _player != null:
+		player_dist = global_position.distance_to(_player.global_position)
+	_combat_trace("Stratum1Boss._fire_slam_hit",
+		"dmg=%d radius=%.0f lifetime=%.2f kb_dir=(%.2f,%.2f) player_dist=%.1f phase=%d" % [
+			dmg, SLAM_HITBOX_RADIUS, SLAM_HITBOX_LIFETIME,
+			kb_dir.x, kb_dir.y, player_dist, phase
+		])
 	var hb: Hitbox = _spawn_hitbox(
 		Vector2.ZERO,
 		dmg,
@@ -579,6 +625,20 @@ func _spawn_hitbox(
 	shape.shape = circle
 	hb.add_child(shape)
 	add_child(hb)
+	# [combat-trace] diagnostic (ticket 86c9ujq8d — M2 W3 soak finding 1).
+	# After add_child, Hitbox._ready has run and _apply_team_layers set the
+	# layer/mask. Monitoring is still FALSE here (will be deferred-enabled by
+	# Hitbox._activate_and_check_initial_overlaps next tick). This trace lets
+	# the Playwright spec or Sponsor's DevTools confirm the hitbox is in the
+	# tree with the correct TEAM_ENEMY layer config and that monitoring=false
+	# pre-defer is intentional.
+	# Expected: layer=16 (enemy_hitbox, bit 5), mask=2 (player, bit 2).
+	_combat_trace("Stratum1Boss._spawn_hitbox",
+		"id=%d pos=(%.0f,%.0f) layer=%d mask=%d monitoring=%s dmg=%d radius=%.0f lifetime=%.2f" % [
+			hb.get_instance_id(), hb.global_position.x, hb.global_position.y,
+			hb.collision_layer, hb.collision_mask, str(hb.monitoring),
+			dmg, radius, lifetime
+		])
 	return hb
 
 

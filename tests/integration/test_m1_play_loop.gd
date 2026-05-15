@@ -453,8 +453,11 @@ func test_boss_fight_phases_and_descend_signal_chain() -> void:
 		"AC8: boss_defeated signal fires")
 	assert_signal_emitted(boss_room, "stratum_exit_unlocked",
 		"AC8: stratum exit unlocks")
-	# StratumExit.activate() runs as part of _on_boss_died — verify
-	# is_active() flipped.
+	# REGRESSION-86c9ujq8d: StratumExit.activate() is now deferred via
+	# call_deferred() to clear the physics flush. Drain one process frame
+	# so the deferred activate() lands before asserting is_active().
+	await get_tree().process_frame
+	# StratumExit.activate() runs via call_deferred — verify is_active() flipped.
 	var exit: StratumExit = boss_room.get_stratum_exit()
 	assert_not_null(exit, "AC8: StratumExit was spawned")
 	assert_true(exit.is_active(), "AC8: StratumExit activated post-boss-death")

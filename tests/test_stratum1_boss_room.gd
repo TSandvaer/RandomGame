@@ -262,3 +262,72 @@ func test_boss_uses_authored_mobdef() -> void:
 	assert_eq(boss.get_max_hp(), 600, "authored stratum1_boss.tres applied — 600 HP")
 	assert_not_null(boss.mob_def)
 	assert_eq(boss.mob_def.id, &"stratum1_boss")
+
+
+## REGRESSION-86c9ujq8d — StratumExit.activate() must NOT run synchronously
+## inside the boss_died signal chain (physics-flush monitoring mutation fix).
+##
+## **Root cause (M2 W3 soak finding 3 — ticket 86c9ujq8d):** `_on_boss_died`
+## previously called `_stratum_exit.activate()` synchronously. `activate()`
+## calls `_apply_active_state(true)` which sets `_interaction_area.monitoring =
+## true`. The call chain `Hitbox.body_entered → boss.take_damage → boss._die →
+## boss_died.emit → _on_boss_died → activate() → monitoring = true` is entirely
+## within a Godot 4 physics-query flush. Setting Area2D monitoring DURING a
+## physics flush triggers `USER ERROR: Can't change this state while flushing
+## queries` — Godot's C++ ERR_FAIL_COND returns early; monitoring stays false;
+## the player can never walk into the StratumExit interaction area and trigger
+## `descend_triggered`; the player is trapped in the boss room.
+##
+## **Fix:** `call_deferred("activate")` in `_on_boss_died` so the monitoring
+## mutation lands AFTER the physics flush closes.
+##
+## **This test pins the post-fix contract:** after boss death (synchronous frame),
+## the StratumExit interaction area must NOT be active yet (monitoring stays
+## false until the deferred call lands). After awaiting one process frame, the
+## StratumExit IS active and its interaction area monitors.
+##
+## GUT's `add_child` is not itself inside a physics flush, so we can't reproduce
+## the C++ panic in headless GUT — we pin the OUTCOME: the deferred call lands
+## one frame later, not zero frames later (same pinning strategy as the
+## `test_door_trigger_enters_tree_and_monitors_after_deferred_pass` regression
+## gate for ticket 86c9tv8uf).
+func test_stratum_exit_activate_deferred_after_boss_death() -> void:
+	var room: Stratum1BossRoom = _make_room()
+	# Drain a frame for `_assemble_room_fixtures` (deferred from `_ready`).
+	await get_tree().process_frame
+	var boss: Stratum1Boss = room.get_boss()
+	var exit: StratumExit = room.get_stratum_exit()
+	assert_not_null(exit, "StratumExit spawned after deferred fixture pass")
+	# The StratumExit is INACTIVE before boss dies.
+	assert_false(exit.is_active(), "StratumExit starts INACTIVE")
+	var area: Area2D = exit.get_interaction_area()
+	assert_not_null(area, "StratumExit interaction area exists")
+	assert_false(area.monitoring,
+		"interaction area NOT monitoring before boss death")
+	# Kill the boss through the production damage path.
+	room.trigger_entry_sequence()
+	room.complete_entry_sequence_for_test()
+	boss.take_damage(204, Vector2.ZERO, null)
+	boss._physics_process(Stratum1Boss.PHASE_TRANSITION_DURATION + 0.01)
+	boss.take_damage(198, Vector2.ZERO, null)
+	boss._physics_process(Stratum1Boss.PHASE_TRANSITION_DURATION + 0.01)
+	boss.take_damage(198, Vector2.ZERO, null)
+	assert_true(boss.is_dead(), "boss died")
+	# **Same frame as boss death:** the `call_deferred("activate")` has NOT
+	# landed yet. In headless GUT (outside a physics flush) GDScript deferred
+	# calls still land next process frame — the idempotency of `call_deferred`
+	# is the same whether or not we are in a physics flush. So the exit must
+	# still be INACTIVE immediately after take_damage returns.
+	assert_false(exit.is_active(),
+		"REGRESSION-86c9ujq8d: StratumExit NOT active same-frame as boss death — " +
+		"activate() was deferred (physics-flush safety)")
+	assert_false(area.monitoring,
+		"REGRESSION-86c9ujq8d: interaction area NOT monitoring same frame as boss death " +
+		"— monitoring mutation is deferred to avoid physics-flush panic")
+	# **After one process frame:** the deferred `activate()` has landed.
+	await get_tree().process_frame
+	assert_true(exit.is_active(),
+		"REGRESSION-86c9ujq8d: StratumExit IS active after deferred activate() lands")
+	assert_true(area.monitoring,
+		"REGRESSION-86c9ujq8d: interaction area IS monitoring after deferred activate() — " +
+		"player can walk in and trigger descend_triggered")
