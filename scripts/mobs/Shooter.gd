@@ -669,6 +669,16 @@ func _set_state(new_state: StringName) -> void:
 		return
 	var old: StringName = _state
 	_state = new_state
+	# Diagnostic trace (ticket 86c9uehaq): every state transition emits a line
+	# so a release-build soak can characterise the Sponsor-reported AI failure
+	# modes (always-flee, cornered=idle, out-of-range no pursuit). Includes
+	# distance to player so the band (KITE_RANGE / sweet-spot / AIM_RANGE)
+	# is observable at each transition. HTML5-only via the combat_trace shim.
+	var dist: float = -1.0
+	if _player != null and is_inside_tree():
+		dist = (_player.global_position - global_position).length()
+	_combat_trace("Shooter._set_state",
+		"%s -> %s dist=%.0f pos=(%.0f,%.0f)" % [old, new_state, dist, global_position.x, global_position.y])
 	state_changed.emit(old, new_state)
 
 
