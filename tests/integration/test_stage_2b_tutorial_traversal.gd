@@ -235,15 +235,23 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 		await get_tree().physics_frame
 		await get_tree().process_frame
 
-	# Find the Pickup. Two legitimate outcomes here:
+	# Find the Pickup. Three legitimate outcomes here:
 	#   (a) it is STILL in the tree — the player was pinned on `dummy_pos` but
 	#       the initial-overlap pass needed the player at the Pickup's exact
 	#       `global_position` (room offset) — Step 5 re-pins and finishes it.
-	#   (b) it is ALREADY GONE — the Step-4 pin landed it; `queue_free` ran.
-	#       That is the success path; skip straight to the Room02 assertions.
-	# Either way, before the Pickup is collected the iron_sword drop must have
-	# existed and been the right item — assert that on outcome (a).
-	var pickup: Pickup = _find_pickup(room)
+	#   (b) it is ALREADY GONE but Room01 is still alive — the Step-4 pin landed
+	#       the collection; `queue_free` ran on the Pickup. `_find_pickup`
+	#       returns null. Success path; skip straight to the Room02 assertions.
+	#   (c) Room01 ITSELF is already freed — the Step-4 pin collected the Pickup,
+	#       the auto-equip released the Room01→Room02 gate, and the room advance
+	#       has already `queue_free`'d Room01 (with the Pickup inside it). This
+	#       is the *fastest* success path. `room` is a freed object now — guard
+	#       the `_find_pickup` call with `is_instance_valid` so we don't pass a
+	#       freed Node into a typed-arg function (SCRIPT ERROR). Treat it exactly
+	#       like outcome (b): skip to the Room02 assertions.
+	# In outcomes (b)/(c) the Pickup is gone; outcome (a) is the only one where
+	# we can still assert the drop existed + was the right item.
+	var pickup: Pickup = _find_pickup(room) if is_instance_valid(room) else null
 	if pickup != null:
 		assert_not_null(pickup.item, "the Pickup carries an ItemInstance")
 		assert_eq(pickup.item.def.id, &"iron_sword",
