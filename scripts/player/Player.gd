@@ -96,6 +96,16 @@ const DODGE_SPEED: float = 360.0
 const DODGE_DURATION: float = 0.30
 const DODGE_COOLDOWN: float = 0.45  # measured from dodge START
 
+# Post-hit invulnerability window (Uma's AC4 Room 05 balance pin,
+# `team/uma-ux/ac4-room05-balance-design.md` §3.B). Granted after every
+# non-fatal `take_damage` to break simultaneous-hit clusters in multi-chaser
+# rooms without trivialising skilled dodge play. Strictly SHORTER than
+# `DODGE_DURATION = 0.30` so the dodge mechanic remains the dominant skilled
+# strategy (eat-hit-and-recover stays a safety floor, not a free crutch).
+# Re-uses `_enter_iframes` / `_exit_iframes` infrastructure (collision-layer
+# swap honored by `Hitbox.gd::_try_apply_hit`).
+const HIT_IFRAMES_SECS: float = 0.25
+
 # Light: short reach, fast recovery. Damage comes from Damage.gd formula
 # (weapon_base + Edge + light/heavy multiplier).
 const LIGHT_KNOCKBACK: float = 80.0
@@ -560,6 +570,21 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 		velocity = knockback
 	if hp_current == 0:
 		_die()
+		return  # death path consumes the frame; no iframes-on-hit on a corpse
+	# Grant brief post-hit iframes to break simultaneous-hit clusters
+	# (Uma's AC4 Room 05 balance pin §3.B). Skipped if the player is already
+	# in STATE_DODGE — the dodge's i-frame window (DODGE_DURATION = 0.30s) is
+	# strictly larger AND owned by the dodge end-condition; layering a 0.25s
+	# hit-iframe timer over a still-running dodge could fire `_exit_iframes`
+	# mid-dodge and clear `_is_invulnerable` while the dodge is still active.
+	# `_exit_iframes_if_not_dodging` defends against that for the
+	# dodge-began-AFTER-hit case; this guard handles the dodge-already-active
+	# case at the entry point. See team/uma-ux/ac4-room05-balance-design.md.
+	if _state == STATE_DODGE:
+		return
+	_enter_iframes()
+	get_tree().create_timer(HIT_IFRAMES_SECS).timeout.connect(
+		_exit_iframes_if_not_dodging, CONNECT_ONE_SHOT)
 
 
 ## Heal `amount` HP, clamped at hp_max. No-op while dead. Fires `hp_changed`.
@@ -906,6 +931,20 @@ func _exit_iframes() -> void:
 	_is_invulnerable = false
 	collision_layer = _saved_collision_layer
 	iframes_ended.emit()
+
+
+## Timer-callback companion to the post-hit iframe grant in `take_damage`
+## (Uma's AC4 Room 05 balance pin §3.B). If a dodge began DURING the
+## post-hit iframe window, the dodge's own `_exit_iframes` (called from
+## `_exit_dodge` when `_dodge_time_left` expires in `_process`) owns the
+## clear; we must not pre-empt it from the hit-iframe timer or we leave
+## the player vulnerable while still visually dodging. The dodge-already-
+## active-AT-hit case is handled at the entry point (`take_damage` skips
+## the timer arm entirely when `_state == STATE_DODGE`).
+func _exit_iframes_if_not_dodging() -> void:
+	if _state == STATE_DODGE:
+		return
+	_exit_iframes()
 
 
 # ---- Visual feedback ---------------------------------------------------

@@ -21,6 +21,27 @@ extends GutTest
 const PHYS_DELTA: float = 1.0 / 60.0
 
 
+# Post-AC4-balance-pass: take_damage now grants HIT_IFRAMES_SECS = 0.25s of
+# invulnerability after every non-fatal hit (Uma's pin, Devon W3 ticket
+# 86c9u4mdc). The hit-iframe SceneTreeTimer fires on real time, not
+# `_tick_timers` simulated time — so back-to-back `take_damage` calls in
+# the same frame land the FIRST hit and then short-circuit at the
+# `if _is_invulnerable: return` guard. Production gameplay never hits
+# this surface because grunt cycles (~0.95s) are far longer than the
+# iframe window, so real time always elapses between hits. To preserve
+# the original "rapid sequential damage application" semantics that
+# pre-date the iframe feature, these regen tests use `_apply_test_hit`
+# which calls `_exit_iframes()` after each `take_damage` to simulate the
+# real-time gap between successive grunt hits.
+func _apply_test_hit(p: Player, dmg: int, src: Node) -> void:
+	p.take_damage(dmg, Vector2.ZERO, src)
+	if p.is_invulnerable() and not p.is_dead():
+		# Clear the hit-iframe state so the NEXT call lands. In real
+		# gameplay the 0.25s timer would have fired well before the next
+		# grunt-cycle hit (~0.95s apart).
+		p._exit_iframes()
+
+
 func _reset_autoloads() -> void:
 	var levels: Node = Engine.get_main_loop().root.get_node_or_null("Levels")
 	if levels != null and levels.has_method("reset"):
@@ -66,10 +87,12 @@ func test_player_can_regen_between_room_encounters() -> void:
 	add_child_autofree(dummy_source)
 
 	# Simulate 3 grunt hits (5 dmg each = 15 total), plus one player attack
-	# (lands a hit → attack timer reset).
-	p.take_damage(5, Vector2.ZERO, dummy_source)
-	p.take_damage(5, Vector2.ZERO, dummy_source)
-	p.take_damage(5, Vector2.ZERO, dummy_source)
+	# (lands a hit → attack timer reset). `_apply_test_hit` clears the
+	# 0.25s post-hit iframe between calls (real grunt-cycle gap covers this
+	# in production; see helper docstring).
+	_apply_test_hit(p, 5, dummy_source)
+	_apply_test_hit(p, 5, dummy_source)
+	_apply_test_hit(p, 5, dummy_source)
 	var hp_after_combat: int = p.hp_current
 	assert_eq(hp_after_combat, initial_hp - 15,
 		"AC-6: Player took 15 damage in simulated combat")
@@ -106,7 +129,7 @@ func test_player_can_regen_between_room_encounters() -> void:
 
 	# --- Phase 4: combat interrupts regen.
 	assert_true(p.is_regenerating, "pre-condition for interrupt: regen active")
-	p.take_damage(5, Vector2.ZERO, dummy_source)
+	_apply_test_hit(p, 5, dummy_source)
 	assert_false(p.is_regenerating,
 		"AC-6: regen must stop when player takes damage in the next combat round")
 
@@ -188,7 +211,7 @@ func test_regen_stays_suppressed_under_sustained_damage_spam() -> void:
 		# Advance 1 s without damage first (just under threshold), then hit.
 		for _j in int(1.0 / PHYS_DELTA):
 			p._tick_timers(PHYS_DELTA)
-		p.take_damage(2, Vector2.ZERO, src)  # keep HP > 0
+		_apply_test_hit(p, 2, src)  # keep HP > 0 (clear iframes between hits)
 
 	# After 5 s of 1-hit-per-second spam, regen must still be inactive.
 	assert_false(p.is_regenerating,

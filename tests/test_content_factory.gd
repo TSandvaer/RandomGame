@@ -84,14 +84,35 @@ func test_make_mob_def_with_loot_table() -> void:
 
 func test_authored_grunt_tres_loads() -> void:
 	# Per sign-off checklist: load the authored grunt.tres, assert types
-	# resolve, fields match the spec. Damage rebalanced 5→3 in M1 RC soak-4.
+	# resolve, fields match the spec. Damage history: 5 → 3 in M1 RC soak-4;
+	# 3 → 2 in AC4 Room 05 balance pass (Uma's pin
+	# `team/uma-ux/ac4-room05-balance-design.md` §3.A; Devon W3 implementation
+	# ticket 86c9u4mdc).
 	var def: MobDef = load("res://resources/mobs/grunt.tres") as MobDef
 	assert_not_null(def, "grunt.tres loads as MobDef")
 	assert_eq(def.id, &"grunt")
 	assert_eq(def.hp_base, 50)
-	assert_eq(def.damage_base, 3)
+	assert_eq(def.damage_base, 2,
+		"REGRESSION GUARD: Grunt damage_base must remain 2 (Uma's AC4 pin §3.A). " +
+		"Reverting to 3 re-introduces the 3-chaser Room 05 cluster-DPS that the " +
+		"L1 no-dodge harness AI cannot survive.")
 	assert_eq(def.ai_behavior_tag, &"melee_chaser")
 	assert_not_null(def.loot_table, "grunt has a loot table")
+
+
+func test_authored_charger_tres_loads() -> void:
+	# Damage history: 5 → 4 in AC4 Room 05 balance pass (Uma's pin
+	# `team/uma-ux/ac4-room05-balance-design.md` §3.A; Devon W3 implementation
+	# ticket 86c9u4mdc).
+	var def: MobDef = load("res://resources/mobs/charger.tres") as MobDef
+	assert_not_null(def, "charger.tres loads as MobDef")
+	assert_eq(def.id, &"charger")
+	assert_eq(def.hp_base, 70)
+	assert_eq(def.damage_base, 4,
+		"REGRESSION GUARD: Charger damage_base must remain 4 (Uma's AC4 pin §3.A). " +
+		"Reverting to 5 re-introduces the Charger contact-spike that combines with " +
+		"the simultaneous-Grunt cluster to one-shot a low-HP player in Room 05.")
+	assert_eq(def.ai_behavior_tag, &"charger")
 
 
 func test_authored_affixes_each_have_three_tiers() -> void:
