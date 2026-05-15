@@ -428,11 +428,13 @@ func test_p0_shooter_closes_gap_during_post_fire_recovery() -> void:
 		"velocity must be non-zero during POST_FIRE_RECOVERY when out of sweet-spot")
 
 
-## P0 #2: POST_FIRE_RECOVERY holds position when player is in sweet-spot (KITE_RANGE..AIM_RANGE).
+## P0 #2: POST_FIRE_RECOVERY holds position when player is in sweet-spot
+## (KITE_RANGE..SHOOT_RANGE). Ticket 86c9uehaq tightened sweet spot from
+## ..AIM_RANGE (300) to ..SHOOT_RANGE (144) so projectiles actually reach.
 func test_p0_post_fire_recovery_holds_position_in_sweet_spot() -> void:
 	var shooter: Shooter = _make_shooter(Vector2.ZERO)
-	var player: FakePlayer = _make_player(Vector2(200.0, 0.0))
-	# 200 px: sweet-spot (KITE_RANGE=120 < 200 < AIM_RANGE=300).
+	# 130 px: sweet-spot (KITE_RANGE=120 < 130 < SHOOT_RANGE=144).
+	var player: FakePlayer = _make_player(Vector2(130.0, 0.0))
 	shooter.set_player(player)
 	shooter._post_fire_recovery_left = Shooter.POST_FIRE_RECOVERY
 	shooter._set_state(Shooter.STATE_POST_FIRE_RECOVERY)
