@@ -1,64 +1,76 @@
-# Resume Note — second-pause playbook (post-fix-wave)
+# Resume Note — M2 W3 dispatching (post-W2-close)
 
-**Status as of authoring (2026-05-05):** M1 still gated on Sponsor's interactive sign-off soak, but the BB-1/3/4/5 fix-forward wave from Tess's run-024 bug-bash has fully landed on `origin/main` (tip `a67474d`), Drew's BB-3 work also closed a load-bearing **LevelAssembler regression** (authored chunk geometry was being silently dropped by the assembler — green CI did not catch it), and Uma's `sponsor-soak-checklist-v2` is ready for the post-wave re-soak. The release-build workflow has NOT yet been triggered for the post-wave RC; the next build (TBD, on `a67474d` or later) will supersede the prior soak target. **NOT "M1 complete."** This doc is the orchestrator's playbook for resuming the project — read in order, then survey live state via the linked artifacts.
+**Status as of authoring (2026-05-15):** M2 Week 2 closed CLEAN, M2 Week 3 dispatching. The W2 RC is the next Sponsor-soak target (still pending Sponsor pickup — first M2 soak hasn't fired yet). AC4 Room 05 is in a **balance-implementation phase** (Uma's #201 design locked; Drew + Devon implement in W3-T1). There are **no live blockers**. `origin/main` tip is `5e471f0` (PR #202 — W2 retro + W3 backlog v1.0). This doc is the orchestrator's playbook for resuming the project; read in order, then survey live state via the linked artifacts.
 
-The previous version (2026-05-03 rewrite, `4104f96` PR #123) reflected the immediately-post-integration state — combat-fix shipped but root-cause-unconfirmed, BB items open, soak-checklist v1 in flight. State has moved on. This refresh captures the post-fix-wave snapshot for the next session.
+The previous version (2026-05-05 rewrite, PR #134-era) reflected the **M1 RC post-fix-wave** state — pre-Sponsor M1 sign-off, BB-1/3/4/5 bug-bash fixes just landed. State has moved on dramatically: M1 is signed off, M2 W1 + W2 both closed clean, AC4 boss-clear progression went from `test.fail()` blocker to balance-design-locked. This refresh captures the post-W2-close / W3-dispatching snapshot.
 
 ---
 
 ## 1 — Current phase + state
 
-- **Phase:** M1 RC sign-off + post-bug-bash fix-forward — Sponsor re-soak ⟷ release-build cut ⟷ M2 design+spec readiness loop. M2 backlogs (week 1 + week 2) drafted but Sponsor-gated.
-- **Bug-bash wave landed:** Tess's run-024 `m1-bugbash-4484196.md` surfaced 8 bugs against the M1 RC. Four are now fixed-forward on `main`: **BB-1** (PR #125 — `build_info.txt` actually shipped inside the HTML5 export bundle + CI regression-gate), **BB-3** (PR #129 — room boundary collision walls + LevelAssembler regression-fix; Drew also caught Tess's CI-red test-bug and fixed-forward in the same PR), **BB-4** (PR #130 — P-key reopens `StatAllocationPanel` after close), **BB-5** (PR #128 — boot banner now lists all 7 input bindings including LMB/RMB). BB-2 (save-fix) landed earlier in PR #118 (`92f7a19`). Remaining BB items (BB-6, BB-7, BB-8) await triage post-Sponsor re-soak.
-- **LevelAssembler regression (load-bearing, R11 evidence):** Drew's BB-3 root-cause investigation found that `LevelChunkDef.scene_path` was authored on every `s1_roomNN.tres` but `LevelAssembler.assemble_single` never loaded it — so the chunk's authored floor + walls existed in the .tscn but never reached the running scene tree. This is a pure **product-vs-component completeness** miss: the test suite was green, the chunk-load code path didn't exist, and the runtime quietly dropped authored content. Boss arena was potentially shipping empty. PR #129 closes both the surface symptom (room walls) and the underlying loader gap; new paired tests cover the chunk-load path at runtime.
-- **Combat visibility shipped:** PR #115 (mob-side hit-flash + death tween + boss particles, `ad38e04`) and PR #122 (player-side swing wedge + ember-flash, `7b80429`) merged earlier in the session. Sponsor will now perceive hits clearly. **Combat-fix root cause is STILL UNCONFIRMED** — PR #109 (`5a3c945`) was a defensive-only fix; the empirical investigation showed Godot 4.3 headless DOES fire `body_entered` correctly. If unlanded-hits regression returns under HTML5, the next investigation is browser-harness reproduction.
-- **Soak-checklist v2 ready:** Uma PR #132 (`a67474d`) — `team/uma-ux/sponsor-soak-checklist-v2.md` is the post-wave re-soak playbook, co-existing with v1 (not replacing). v2 §0 captures wave-LOCAL deltas (BB-1 footer-SHA positive screen, BB-3 walls + LevelAssembler regression-watch, BB-5 7-line banner positive confirmation, BB-4 P-key handler) while v1's wave-DURABLE shape (§1..§9) inherits.
-- **Process incidents normalized:** Priya PR #131 added 5 new entries to `team/log/process-incidents.md` covering the W3-A7 4-occurrence shared-HEAD pattern, N7 affix-count drift, `clickup-pending.md` parallel-edit conflict, PR-body test-count drift, and harness-identity self-approval cross-run pattern.
-- **Doc-drift bundle landed:** Priya PR #127 (`fdff8c0`) tightened `GIT_PROTOCOL.md` exemption wording, added the ClickUp lifecycle hard-gate section, added the Self-Test Report (UX-visible PRs) section to `GIT_PROTOCOL.md` + `dispatch-template.md` + `TESTING_BAR.md`, and added the "product completeness ≠ component completeness" section to `TESTING_BAR.md`.
-- **Charger flake postmortem:** Tess PR #133 (`c0c604e`) — `team/log/charger-flake-postmortem.md` captures the wall-stop-epsilon race root-cause + remediation as a reusable lesson (test-passes-with-overridden-speed-but-fails-on-default class).
-- **Current `main` tip when this was authored:** `0e77a92` (PR #134 — Tess run-031 STATE; `a67474d` + state-bump only). Verify live: `git fetch origin && git log origin/main --oneline -10`.
+- **Phase:** **M2 Week 3 dispatching.** M2 W2 closed CLEAN per Priya's `team/priya-pl/m2-week-2-retro.md` (PR #202). M2 W3 backlog v1.0 is live at `team/priya-pl/m2-week-3-backlog.md` (12 tickets — 8 P0 + 3 P1 + 1 P2). The W3 backlog explicitly absorbs the W2 carry-over queue (stratum-2 content authoring, MobRegistry, v4 stress fixtures, audio sourcing close-out, M3 design seeds) PLUS the AC4 Room 05 balance pass per Uma's #201 design.
+- **M2 W2 closed clean:** **22 PRs merged** in the W2 arc (Sept dispatch start post-PR #175 → close-out tip `3d614a6` at PR #200; the close-out itself was PR #202 at `5e471f0`). **Tess's end-of-week bug-bash** (`team/tess-qa/soak-2026-05-15.md`, ticket `86c9kxx7h`) against `embergrave-html5-d9cc159` returned **0 blockers / 0 majors / 2 minors**. Both minors addressed: `86c9u33h1` (Pickup silent-drop on full grid) shipped in PR #199; `86c9u33hh` (stale AC4 `test.fail()` annotation) is folded into W3-T1 (Room 05 balance pass implementation). The team shipped the largest M2 batch to date with no soak-stopper findings.
+- **AC4 progression (`86c9qckrd`):** Rooms 01–04 are deterministic post-PR #186 (Room 04 chase helper) / #190 (chase return-to-spawn) / #191 (Room 05 mob-freeze fix via `CONNECT_DEFERRED` on `gate_traversed → next-room load`) / #198 (harness position-steered multi-chaser clear). **Room 05 was found to be a balance issue, not a freeze bug** — PR #200's diagnostic-trace pair (`Player._die` action-side + `Main.apply_death_rule` consequence-side) empirically refuted PR #198's "chasers must be unwinnable" framing. The Player was being killed by the chaser-triangle and respawned in Room 01; the harness reported a freeze because mob deaths raced room transitions. **PR #201 (Uma) locked the balance pass design:** Grunt `damage_base 3→2`, Charger `damage_base 5→4`, new player iframes-on-hit constant `HIT_IFRAMES_SECS = 0.25` (auto-granted inside `Player.take_damage`). The implementation lands in W3-T1 (Drew on TRES, Devon on `Player.gd` iframes, Tess on paired tests + Playwright deterministic clear without the position-steered harness dodge).
+- **Inventory bandaid retirement landed:** PR #194 (`chore(inventory): retire PR #146 iron_sword bandaid → auto-equip first weapon on pickup`) — a 23-file coordinated change. Cold-boot is now genuinely fistless; equip happens via gameplay; Room01 onboarding gates room-advance on first-weapon pickup. The retirement surfaced two latent bugs (unreachable dummy-drop pickup; full-grid silent-drop) both fixed in-arc (PR #199). PR #194 is the load-bearing UX change of the M2 arc to date — it ships the "play your way into the loop" experience.
+- **Combat-trace coverage closed:** 4 PRs in the W2 arc — #177 (`TutorialEventBus.request_beat`), #182 (Charger/Shooter `_die`), #192 (Charger/Shooter `take_damage`), #195 (Charger/Shooter `take_damage IGNORED already_dead`). Future negative-assertion specs have the diagnostic surface they need; the per-mob death-event trace family is now complete.
+- **Physics-flush harmonization:** PR #184 closed the `Stratum1BossRoom._build_door_trigger` harmonization gap called out in `.claude/docs/combat-architecture.md` (ticket `86c9p1fgf`); PR #193 audited `Stratum1Room01` death-reload flush path as safe; PR #197 added per-swing Hitbox monitoring assertion to the sustained-swing-spam regression. PR #191's W2-leveraging fix generalized the physics-flush rule **beyond Area2D** — `CollisionShape2D`-on-`PhysicsBody2D` adds inside `flush_queries()` also panic; the load-bearing pattern is `CONNECT_DEFERRED` on cross-frame signals that bridge flush-rooted callbacks (codified in `.claude/docs/combat-architecture.md` § "Cross-tree signal-connection discipline").
+- **Polish / UX:** PR #176 (Uma design — color-blind secondary cue for equipped distinction) + PR #179 (Devon impl — `✓ EQUIPPED` glyph). Devon caught the `gl_compatibility` U+2713 tofu-rendering bug during Self-Test Report and shipped the fix in the same PR (final draws the glyph as `ColorRect` geometry, not a Unicode codepoint). Codified into `.claude/docs/html5-export.md` § "Default-font glyph coverage" — Self-Test Report gate is the load-bearing surface for HTML5-default-font divergences.
+- **Auto-memory rules that landed this arc:**
+  - **Physics-flush rule generalized** to `CollisionShape2D`-on-`PhysicsBody2D` (PR #191 — combat-architecture.md update).
+  - **GUT parse-failed test files now fail CI loudly** (PR #196 — closes a testing-bar integrity hole where GUT's green exit code masked parse errors).
+  - **Iron-sword auto-equip-at-boot bandaid retired** (PR #194 — replaced by pickup-driven equip).
+  - **Diagnostic-trace pair pattern codified** (PR #200 — action-side + consequence-side traces paired in the same PR; combat-architecture.md update candidate per Priya's retro §"Lessons learned" §3).
+  - **Negative-assertion buffer-scoping discipline codified** (PR #180 — `.claude/docs/combat-architecture.md` § "Negative-assertion buffer-scoping rule").
+  - **Auto-status SessionStart re-arm hook** (PR #181 — harness durability across session restarts).
+- **No live blockers.** All five named roles are idle post-W2-close; safe to dispatch the W3 backlog at full parallel cadence (W3-T2/T3/T5 + Tess T9 acceptance plan are dispatch-ready without further blockers; W3-T1 waits on Uma's #201 design merge, which already landed at `dd4fed2`).
+- **Current `main` tip when this was authored:** `5e471f0` (PR #202 — W2 retro + W3 backlog v1.0). Verify live: `git fetch origin && git log origin/main --oneline -10`.
 
 ---
 
-## 2 — Latest M1 RC artifact
+## 2 — Latest M2 RC artifact
 
-- **Prior soak target (now superseded):** `embergrave-html5-7b80429` from release-build run `25288018826`. This was the artifact cut after the player-visible-feedback PR #122 landed; it was the soak target before the BB-1/3/4/5 fix-forward wave landed.
-- **Pre-integration verified-coverage build (older):** `embergrave-html5-591bcc8` — pre-integration RC referenced in `team/tess-qa/html5-rc-audit-591bcc8.md`. Use the audit doc as a probe-target reference, not as a current Sponsor-soak target.
-- **Next post-wave RC (in flight):** Triggered against `0e77a92` (post-wave tip — Tess's PR #134 STATE bump landed before the trigger fired). Release-build run `25393528075` (https://github.com/TSandvaer/RandomGame/actions/runs/25393528075), in-flight at this rewrite (~2-3 min typical build time). Expected artifact `embergrave-html5-0e77a92` (or near-tip if `main` moves before workflow completes). New Sponsor-soak ticket `86c9nbu2u` (status `to do`, awaiting Sponsor pickup). This supersedes the prior `7b80429` build (run `25288018826`) as the Sponsor target.
-- **How to find the latest build:** `gh run list --workflow=release-github.yml --limit 1 --json databaseId,headSha,conclusion,url`. The release workflow drops `embergrave-html5-<sha>.zip` as an artifact.
+- **W2 RC (Sponsor-soak target):** `embergrave-html5-d9cc159` from release-build run `25895056935` (https://github.com/TSandvaer/RandomGame/actions/runs/25895056935). This was the artifact cut after PR #194 (the bandaid-retirement coordinated change) landed; it's the current Sponsor-soak target for M2 W3 entry. Sponsor has NOT yet soaked M2 — last Sponsor soak was M1 RC. **The first M2 soak findings are expected to surface in W3** and will feed the W3-T10 fix-forward absorber.
+- **Post-W2-close builds:** several release-build runs fired after `d9cc159` (latest at the time of authoring is run `25900025812` on `212ecd3`). These are not the canonical Sponsor-soak target — `d9cc159` is what Tess soaked and signed off. Use them as smoke-check references only.
+- **How to find the latest build:** `gh run list --workflow=release-github.yml --limit 5 --json databaseId,headSha,conclusion,url,createdAt`. The release workflow drops `embergrave-html5-<short-sha>.zip` as an artifact.
+- **Artifact download URL pattern** (use this in Sponsor handoff per memory `sponsor-soak-artifact-links.md`):
+  ```
+  https://github.com/TSandvaer/RandomGame/actions/runs/<run_id>/artifacts/<artifact_id>
+  ```
+  Get the artifact ID via `gh api repos/TSandvaer/RandomGame/actions/runs/<run_id>/artifacts --jq '.artifacts[]|"\(.id) \(.name)"'`.
 
 ---
 
 ## 3 — Roles in flight (typical)
 
-Each role has a persistent worktree (W3-A7 option A — see `team/orchestrator/dispatch-template.md`). Worktrees are **role-persistent**, not per-dispatch. Dispatched agents check out a fresh branch off `origin/main` inside their worktree, push by refspec, do not delete branches locally (worktree-conflict pattern).
+Each role has a persistent worktree at the same level as the project root. Worktrees are role-persistent, not per-dispatch. Dispatched agents check out a fresh branch off `origin/main` inside their worktree, push by refspec, do not delete branches locally (worktree-conflict pattern).
 
-| Role | Worktree | Typical work | Last run (verify in STATE.md) |
+| Role | Worktree | Typical work | Last run focus |
 |---|---|---|---|
-| Priya | `RandomGame-priya-wt` | Backlogs (M2 w1, M2 w2, perf budget), risk register, retros, ROLES/process-incident polish, RESUME refreshes | run-013 going to run-014 (this rewrite) |
-| Uma | `RandomGame-uma-wt` | Visual + UX + audio direction, palette docs, copy/microcopy, Sponsor-soak checklists. Most recent: BB-5 boot banner (PR #128), soak-checklist v2 (PR #132) | run-012 |
-| Devon | `RandomGame-devon-wt` | Engine + UI + save + integration. Most recent: BB-1 build_info export (PR #125), BB-4 stat-panel reopen (PR #130) | run-018 |
-| Drew | `RandomGame-drew-wt` | Mobs, levels, content (TRES), stratum-2 scaffolding. Most recent: BB-3 walls + LevelAssembler regression-fix (PR #129) | run-010 |
-| Tess | `RandomGame-tess-wt` | Sign-offs, integration tests (Tess writes them), audits, bug-bashes, RC HTML5 audits, postmortems. Most recent: run-028 bug-board audit (PR #126), charger flake postmortem (PR #133), run-031 post-wave state landing (PR #134) | run-031 |
+| Priya | `RandomGame-priya-wt` | Backlogs, risk register, retros, ROLES/process-incident polish, RESUME refreshes. **W2 deliverables: retro + W3 backlog (PR #202).** | This refresh — RESUME + STATE for 2026-05-15 |
+| Uma | `RandomGame-uma-wt` | UX/design specs, palette docs, copy/microcopy, Sponsor-soak checklists. **W2 deliverables: AC4 Room 05 balance design (PR #201), color-blind equipped-distinction design (PR #176).** | W3-T9 audio sourcing close-out + W3-T1 design hand-off |
+| Devon | `RandomGame-devon-wt` | Engine + UI + save + integration. **W2 deliverables: equipped-glyph impl (PR #179), Pickup silent-drop fix (PR #199), inventory bandaid retirement (PR #194), focus-consumption equip-flow fix (PR #187).** | W3-T1 (Player iframes-on-hit), W3-T5 (MobRegistry), W3-T9 (audio wiring) |
+| Drew | `RandomGame-drew-wt` | Mobs, levels, content (TRES), stratum-2 scaffolding. **W2 deliverables: MultiMobRoom gate-registration fix (PR #183), Room 05 3-concurrent-chaser fix (PR #191), Stratum1BossRoom door-trigger defer (PR #184), diagnostic-trace pair (PR #200).** | W3-T1 (TRES edits), W3-T2/T3 (S2 rooms 2-3 + soft-retint sprites), W3-T4 (S2 boss room first impl — heaviest of M2) |
+| Tess | `RandomGame-tess-wt` | Sign-offs, integration tests, audits, bug-bashes, postmortems. **W2 deliverables: end-of-W2 bug-bash (`soak-2026-05-15.md`), harness fixes (PRs #186/#190/#198), per-swing Hitbox regression (PR #197), Playwright artifact-extract fix (PR #178), negative-assertion buffer-scoping (PR #180), CI parse-fail gate (PR #196).** | W3-T6 (v4 save stress fixtures), W3-T9 (acceptance plan + bug-bash), W3-T10 absorber |
 | Orchestrator | `RandomGame-orch-wt` | Dispatch + heartbeat + merges + ClickUp sync | continuous |
 
-**All 5 named roles are idle post-wave** — nothing in-flight; safe to re-dispatch on next session entry.
+**All 5 named roles are idle post-W2-close** — nothing in-flight; safe to dispatch the W3 backlog at full parallel cadence (≥3 agents in flight per heartbeat tick).
 
-**STATE.md** at `team/STATE.md` is the live source of truth for per-role status. Read it on resume — sections drift relative to merge state because mergers don't currently update the originating role's section (`team/log/doc-drift-audit-2026-05-03.md` S-03..S-06 systemic finding; defer-fix per audit verdict).
+**STATE.md** at `team/STATE.md` is the live source of truth for per-role status. Read it on resume — note the per-role sections are append-only history; the "Current state — 2026-05-15" header at the top is the canonical "what's going on right now" entry.
 
 ---
 
 ## 4 — Memory rules governing orchestrator behavior
 
-The orchestrator's behavior is governed by 11 memory entries at `C:/Users/538252/.claude/projects/c--Trunk-PRIVATE-RandomGame/memory/MEMORY.md`. **Read the index** (one-liners with links into per-rule docs). Five are load-bearing for orchestrator decision-making:
+The orchestrator's behavior is governed by ~25 memory entries at `C:/Users/538252/.claude/projects/c--Trunk-PRIVATE-RandomGame/memory/MEMORY.md`. **Read the index** (one-liners with links into per-rule docs). Six are load-bearing for current orchestrator decision-making:
 
-1. **`orchestrator-never-codes.md`** — orchestrator does not Read/Grep/trace source or edit code. Dispatches agents from symptoms, even when "I could just fix this" is faster. The Stratum1BossRoom one-line fix the orchestrator made personally is the cautionary precedent.
-2. **`always-parallel-dispatch.md`** — every tick has 3-5 agents in flight. Tickets are NOT progress; dispatches are. "Half-A done, envelope exhausted" is rarely a real blocker — Half-B-design + anticipatory backlog + cross-role planning are always dispatchable.
-3. **`clickup-status-as-hard-gate.md`** — every dispatch / PR-open / merge / bounce pairs with a ClickUp status flip in the **same tool round** as the workflow action. Heartbeat ticks audit the board against reality.
-4. **`self-test-report-gate.md`** — UX-visible PRs (`feat(integration|ui|combat|level|audio|progression|gear)`, `fix(ui|combat|level|audio|integration)`, certain `design(spec)`) require an author-posted Self-Test Report comment **before** Tess reviews. Tess bounces immediately if missing — don't burn review budget cold-reading a UX diff.
-5. **`product-vs-component-completeness.md`** — "tests pass" ≠ "product ships." A feature is not complete until instantiated in `Main.tscn` and reachable via the player's path. **Just realized again** in BB-3: LevelAssembler never loaded `chunk_def.scene_path`, so authored room geometry never reached runtime despite green CI. Verify integration surface, not just tests.
+1. **`orchestrator-never-codes.md`** — orchestrator does not Read/Grep/trace source or edit code. Dispatches agents from symptoms, even when "I could just fix this" is faster.
+2. **`always-parallel-dispatch.md`** — every tick has 3-5 agents in flight. Tickets are NOT progress; dispatches are.
+3. **`clickup-status-as-hard-gate.md`** — every dispatch / PR-open / merge / bounce pairs with a ClickUp status flip in the **same tool round** as the workflow action.
+4. **`self-test-report-gate.md`** — UX-visible PRs require an author-posted Self-Test Report comment **before** Tess reviews. Tess bounces immediately if missing.
+5. **`html5-visual-verification-gate.md`** — Tween / modulate / Polygon2D / CPUParticles2D / Area2D-state / glyph-rendering PRs need explicit HTML5 verification before merge. PR #179 is the latest precedent — the `gl_compatibility` U+2713 tofu would have shipped without the gate.
+6. **`product-vs-component-completeness.md`** — "tests pass" ≠ "product ships." Verify integration surface (Main.tscn) at every "feature-complete" claim, not just CI green. PR #196's GUT parse-fail gate is the latest precedent — green CI can lie when test files are silently un-executed.
 
-Plus: `agent-verify-evidence.md` (check actual evidence before refusing or asserting impossibility — Stratum1BossRoom incident), `dispatch-cadence-after-override.md` ("get to work" is session-durable), `testing-bar.md` (Sponsor will not debug — paired tests + green CI + edge probes + Tess sign-off), `sponsor-decision-delegation.md` (orchestrator + PL together hold all team-call authority), `team-roster.md` (Priya/Uma/Devon/Drew/Tess + scope), `git-and-workflow.md` (main is harness-protected, PR-flow + `gh pr merge --admin`), `external-resources.md` (ClickUp IDs, GitHub URLs, paths).
+Plus: `godot-physics-flush-area2d-rule.md` (generalized post-#191 to non-Area2D `CollisionShape2D`-on-`PhysicsBody2D` adds; CONNECT_DEFERRED on cross-frame signals is the load-bearing pattern), `agent-verify-evidence.md`, `dispatch-cadence-after-override.md`, `testing-bar.md`, `sponsor-decision-delegation.md`, `team-roster.md`, `git-and-workflow.md`, `external-resources.md`, `cron-noise-during-sponsor-wait.md`, `sponsor-soak-artifact-links.md`, `diagnostic-build-pattern.md`, `multi-dispatch-worktree-conflict.md`, `manual-soak-failure-invest-in-automation.md`, `sub-agent-doc-update-reporting.md`, `sub-agent-context-load-discipline.md`, `auto-status-reporting.md`, `orphaned-agent-recovery-on-restart.md`, `html5-service-worker-cache-trap.md`, `drain-mode-on-session-end.md`.
 
 **Don't restate the rules; reference the memory file.** Rules update; this doc shouldn't drift again.
 
@@ -68,33 +80,31 @@ Plus: `agent-verify-evidence.md` (check actual evidence before refusing or asser
 
 | Bucket | Status | Notes |
 |---|---|---|
-| Half-A (M1 close-out polish) | Done | CI hardening, integration GUT, HTML5 audit, worktree-isolation v3 |
-| Half-B-design (M2-onset design) | Done | stash UI v1, stratum-2 palette (Cinder Vaults), save-schema-v4 plan, audio direction v1.1, combat visual feedback design, audio sourcing pipeline, S3-S8 indicative palette, performance budget |
-| Half-B-code (W3-B2 stratum-2 chunk scaffold) | Done | `Stratum` namespace + `MultiMobRoom` baseline on `main` |
-| M1 integration finish-line (PR #107) | Done | `4484196` — Main.tscn wired |
-| M1 fix-forward wave (BB-1/3/4/5 + combat visibility) | **Done** | PRs #115, #122, #125, #128, #129, #130. Soak-checklist v2 (#132) ready for re-soak |
-| M2 week-1 backlog | Drafted (PR #97) | `team/priya-pl/m2-week-1-backlog.md` — 12 tickets, 11 P0 + 1 P1, Sponsor-gated |
-| M2 week-2 backlog | Drafted (PR #114) | `team/priya-pl/m2-week-2-backlog.md` — 12 tickets, 8 P0 + 3 P1 + 1 P2, doubly-anticipatory |
-| Performance budget spec | Done (PR #119) | `team/priya-pl/performance-budget.md` |
-| Bug-bash (`86c9kxx7h`) | **Reserved** | Post-Sponsor-sign-off; will absorb deferred M1 polish + remaining BB-6/7/8 |
-| M2 implementation (T1-T11) | Sponsor-gated | Held until Sponsor signs off M1 |
-| Post-wave release-build cut | **In flight** | Run `25393528075` against `0e77a92`; awaiting green conclusion |
+| M1 RC + sign-off | Done (historic) | Sponsor signed off M1; team transitioned to M2 W1 |
+| M2 Week-1 | Done | Closed clean; 12 tickets shipped |
+| M2 Week-2 | **Done (closed CLEAN)** | 22 PRs merged in arc; Tess bug-bash 0 blockers / 0 majors / 2 minors (both addressed). See `m2-week-2-retro.md` (PR #202) |
+| M2 Week-3 | **Dispatching** | 12 tickets — 8 P0 + 3 P1 + 1 P2. See `m2-week-3-backlog.md` (PR #202). Drew heaviest (4 tickets — T1 TRES + T2 S2 rooms 2-3 + T3 soft-retint sprites + T4 S2 boss room first impl). Devon on T1 iframes + T5 MobRegistry + T9 audio wiring. Tess on T6 v4 stress + T9 acceptance plan + T10 bug-bash absorber. Uma on T9 audio sourcing + T1 design support. Priya on T12 M3 design seeds + retro. |
+| AC4 boss-clear progression | Design-locked → implementation in W3-T1 | Uma's PR #201 locked Grunt 3→2 dmg, Charger 5→4 dmg, Player iframes-on-hit 0.25s. Drew + Devon impl. Tess paired tests + Playwright deterministic clear. |
+| Sponsor M2 RC soak | **Pending** | W2 RC `embergrave-html5-d9cc159` is the Sponsor target; first M2 soak hasn't fired yet. W3-T10 absorbs fix-forward findings. |
+| M3 design seeds (W3-T12) | Dispatch-ready (P2) | Pure design / scoping work; defer-acceptable. Priya assist. |
 
-**What's safe to dispatch now without Sponsor:** anticipatory planning (M3 design seeds), retros, doc-drift fixes, audio sourcing operations doc follow-ups, M2 week-1 retro skeleton, RESUME refreshes (this PR is one). Avoid touching M1 player-facing code surfaces while Sponsor's mid-soak.
+**What's safe to dispatch now without Sponsor:** the full W3 P0 + P1 backlog (T1 through T11). T7 (stash UI iteration) + T8 (ember-bag tuning) are Sponsor-conditional and close paper-trivial if no soak feedback fires. T12 (M3 design seeds) is P2-deferrable.
+
+**Dispatch order recommendation:** T2 (Drew, S2 rooms 2-3) + T3 (Drew, soft-retint sprites) + T5 (Devon, MobRegistry) + T6 (Tess, v4 save stress) + T9 (Tess, acceptance plan) all parallel from day 1 — none depend on Uma's design which is already merged (PR #201). T1 (Drew TRES + Devon Player.gd) dispatches as soon as the brief is written. T4 (S2 boss room first impl, L) starts after T2 lands.
 
 ---
 
-## 6 — Top 5 active risks
+## 6 — Top 3 active risks
 
-From the refreshed risk register (`team/priya-pl/risk-register.md`, last refreshed PR #112). Read the register on resume — these may have shifted; the BB-3 LevelAssembler regression is **strong R11 evidence to re-cite at the next refresh**.
+From the W2 retro risk-register update (`m2-week-2-retro.md` §"Risk-register update"). Full register at `team/priya-pl/risk-register.md`.
 
-1. **R11 — Integration-stub / silently-dropped-authored-content shipped as feature-complete** (high / high) — **just realized again** in BB-3. Authored `chunk_def.scene_path` was orphaned because `LevelAssembler.assemble_single` never loaded it; full test suite was green; runtime silently dropped the authored geometry. Boss arena was potentially shipping empty. Same risk class as the M1 Main.tscn-stub miss. Mitigation (`product-vs-component-completeness.md`) needs another evidence row + the BB-3 PR's runtime-load test as a discipline pattern.
-2. **R6 — Sponsor-found-bugs flood** (high / high) — actively firing across the bug-bash wave; combat-not-landing was a soak-stopper. Fix-forward wave landed; whether re-soak surfaces a new flood is the next data point.
-3. **R12 — Orchestrator-bottleneck-on-dispatch** (high / med) — has fired multiple times under user override ("continue / get to work / always parallel"). Mitigation: `always-parallel-dispatch.md` + tightened cron prompt + `dispatch-cadence-after-override.md`.
-4. **R1 — Save migration breakage** (med / high) — held; sixth schema bump (v3→v4) lands in M2 week 1. Pattern is robust over five prior bumps but v4 is the first Dictionary-of-Dictionary shape.
-5. **R8 — Stash UI complexity (M2)** (high / med-high) — pre-positioned for M2 week 1 (T3); stub-PR-then-interactive-PR split planned per R8 mitigation.
+1. **R6 — Sponsor-found-bugs flood** (high / high — re-promoted) — W2 RC is Sponsor's first M2 soak target. 22 PRs of new surface (AC4 progression, inventory bandaid retirement, combat-trace coverage, polish/UX, harness hardening). Sponsor's first M2 soak findings are certain. Mitigation: W3-T10 Half B absorber + buffer reserved at ~2-3 dev ticks; promotes M→L if Sponsor surfaces ≥3 P0s.
+2. **R2 — Tess bottleneck** (med / med — strained but not breaking) — PR #194's 23-file coordinated change required two QA rounds. W3 has heavier sign-off load than W2 (AC4 balance + stratum-2 content + S2 boss room). Mitigation: flag high-blast-radius PRs in dispatch brief; parallel scaffold from day 1; QA capacity reservation up front for #194-class retirements.
+3. **R1 — Save migration breakage** (med / high — re-armed) — was inactive in W2 (no save-schema-touching PRs shipped). RE-OPENS in W3 because the v4 stress fixtures (W3-T6) lands AND the AC4 balance pass adds player iframe state (technically not a schema change but migration-adjacent). Mitigation: 8 new stress fixtures land paired tests covering INV-1..INV-8; any TRES additions get a migration note in PR body even if no schema bump.
 
-R2 + R4 stay off top-5 (probability lowered). R3 / R5 / R7 closed. R3-M2 will re-open at M2 dispatch entry (six new HTML5 surfaces).
+**Re-promoted to top-5 at W3 entry:** R9 (Stratum-2 content triple-stack — Drew's W3 load is heaviest of M2 with 3 content tickets including L-sized boss room).
+
+**Demoted from top-3:** R11 (Integration-stub-shipped-as-feature-complete) — held; M1 close discipline survived M2 W1 + W2; Main.tscn integration surface is verified per ticket. R8 (Stash UI complexity) — held; no stash UI work shipped in W2 (deferred pending Sponsor signal); re-promotes when W3-T7 carry dispatches.
 
 ---
 
@@ -108,9 +118,9 @@ git log origin/main --oneline -10
 gh pr list --state open --json number,title,headRefName
 
 # Latest release artifact
-gh run list --workflow=release-github.yml --limit 1 --json databaseId,headSha,conclusion,url
+gh run list --workflow=release-github.yml --limit 5 --json databaseId,headSha,conclusion,url,createdAt
 
-# Trigger a fresh release build for re-soak (pending action post-wave)
+# Trigger a fresh release build
 gh workflow run release-github.yml --ref main
 
 # CI status of a specific PR / branch
@@ -128,46 +138,52 @@ gh pr merge <num> --squash --delete-branch --admin
 
 # ClickUp audit sweep
 # Use mcp__clickup__clickup_filter_tasks (list 901523123922) to compare board state vs reality
-# Use mcp__clickup__clickup_update_task to flip status (status field accepts: "to do" / "in progress" / "ready for qa test" / "complete")
-# Live MCP preferred; team/log/clickup-pending.md is the queue when MCP is down
+# Use mcp__clickup__clickup_update_task to flip status
 
 # Tess sign-off pattern (harness denies self-approval)
 # Tess agents post approval via: gh pr comment <num> --body "Approved per <evidence>."
-# Then orchestrator merges per category (Tess merges feat/fix; orchestrator merges chore/docs/design)
+# Then orchestrator merges per category
 ```
 
-See `team/GIT_PROTOCOL.md` (refreshed in PR #127) and `team/orchestrator/dispatch-template.md` (Self-Test + ClickUp-lifecycle blocks landed in PR #127) for full protocol.
+See `team/GIT_PROTOCOL.md` and `team/orchestrator/dispatch-template.md` for full protocol.
 
 ---
 
-## 8 — What gates M1 sign-off
+## 8 — What gates M2 sign-off
 
-**Single gate:** Sponsor's interactive 30-min soak on the next post-wave RC.
+**Single gate:** Sponsor's interactive M2 RC soak. The W2 RC (`embergrave-html5-d9cc159`) is the current Sponsor target. Sponsor has not yet soaked M2 — last soak was M1 RC.
 
-**Pre-conditions for cutting that next RC:**
+**Pre-conditions for cutting the M2 RC (status at this resume point):**
 
-1. **BB-1 / BB-3 / BB-4 / BB-5 fixes ✓** — PRs #125, #129, #130, #128 all merged. BB-2 ✓ (PR #118 earlier).
-2. **Combat visibility ✓** — PRs #115 (mob-side) + #122 (player-side) merged. Sponsor will perceive hits clearly even if the unlanded-hits regression returns; combat-fix root cause STILL UNCONFIRMED but the visibility layer makes any return diagnosable rather than soak-stopping.
-3. **Soak-checklist v2 ✓** — PR #132 merged (`team/uma-ux/sponsor-soak-checklist-v2.md`).
-4. **Fresh release-build cut ⏳ in flight** — `release-github.yml` run `25393528075` triggered by Tess against `0e77a92` (post-wave tip + state-bump); awaiting green conclusion + artifact download + build sanity-check (Main.tscn instantiates, footer SHA matches stamped CI SHA per BB-1 regression gate, player can move + attack + take damage + save + reload).
-5. **Sponsor's interactive 30-min soak ⏳ pending** — soak ticket `86c9nbu2u` (status `to do`); execute soak-checklist-v2 §1 setup + §5 per-AC probes against the new RC; structured output per §7 template.
+1. ✅ **M2 W1 closed clean** — historic.
+2. ✅ **M2 W2 closed clean** — verified by `m2-week-2-retro.md` (PR #202) + Tess soak `soak-2026-05-15.md` (0 blockers / 0 majors / 2 minors both addressed).
+3. ⏳ **M2 W3 close clean** — in flight; W3-T9 acceptance plan + W3-T10 bug-bash absorb fix-forward.
+4. ⏳ **AC4 balance pass shipped + Playwright deterministic clear** — W3-T1 implementation (Uma's #201 design merged at `dd4fed2`).
+5. ⏳ **Stratum-2 content authored** — W3-T2 (rooms 2-3) + W3-T3 (sprites) + W3-T4 (boss room first impl).
+6. ⏳ **MobRegistry refactor** — W3-T5; verify whether M2 W1's Stoker PR folded it; if so, retire ticket.
+7. ⏳ **v4 save stress fixtures** — W3-T6.
+8. ⏳ **M2 audio sourcing close-out** — W3-T9.
+9. ⏳ **Sponsor's interactive M2 RC soak** — pending; W3-T10 absorbs fix-forward findings.
 
-**Sponsor probe targets** carry forward from `team/tess-qa/html5-rc-audit-591bcc8.md` + `team/tess-qa/m1-bugbash-4484196.md` + `team/uma-ux/sponsor-soak-checklist-v2.md` §0 wave-deltas. Updated probe-targets for the new RC tip should be the next Tess dispatch when the post-wave RC is cut.
+**Sponsor probe targets** carry forward from `team/uma-ux/sponsor-soak-checklist-v2.md`. Updated probe-targets for the M2 RC should be the next Tess dispatch when the M2 RC is cut.
 
 ---
 
-## 9 — Anti-patterns to avoid (the stuff that bit us this week)
+## 9 — Anti-patterns to avoid (the stuff that bit us recently)
 
-These are codified in `team/log/process-incidents.md`, the risk register's R11/R12, and the orchestrator memory. Listing them inline because they're load-bearing on resume.
+These are codified in `team/log/process-incidents.md`, the risk register's R6/R2, and the orchestrator memory. Listing them inline because they're load-bearing on resume.
 
-1. **Treating "tests pass" as "product ships"** — 587 passing tests + 30+ "feature-complete" claims hid the Main.tscn-stub miss for ~30 PRs. **Just realized again** in BB-3: LevelAssembler dropped authored chunk geometry while the test suite was green. Always verify the entry-point scene file + integration surface at "feature-complete" claims, not just CI green. (R11 / `product-vs-component-completeness.md`.)
-2. **Treating ticket creation as progress** — orchestrator created `86c9m37n9` (Tess bug-bash) and `86c9m37q9` (Uma visual feedback) without same-tick dispatch; user had to override with "continue / get to work / always parallel." Tickets ≠ progress; dispatches = progress. (R12 / `always-parallel-dispatch.md`.)
-3. **Soft-blocker "envelope exhausted" log entries when there's always Half-B design / planning work** — heartbeat tick 2026-05-02 22:03 / 22:33 logged "envelope exhausted" while Priya backlog-expansion / Tess acceptance plan / Uma S3-S8 palette were always dispatchable. (R12 / `always-parallel-dispatch.md`.)
-4. **Orchestrator coding** (read source, grep, trace) instead of dispatching from symptoms — the Stratum1BossRoom one-line fix the orchestrator made directly bypassed the agent-from-symptom dispatch pattern. Even when "I could just fix this" is faster, the orchestrator is the dispatcher, not the implementer. (`orchestrator-never-codes.md`.)
-5. **Skipping ClickUp status moves** — every dispatch/PR-open/merge MUST pair with a same-tool-round status flip. Heartbeat tick audits the board; drift means a future agent reads stale state. (`clickup-status-as-hard-gate.md`.)
-6. **Skipping Self-Test Reports on UX-visible PRs** — Tess shouldn't be cold-reading a UI diff. Author posts a Self-Test Report comment before Tess reviews; Tess bounces if missing. (`self-test-report-gate.md`.)
-7. **Refusing or asserting impossibility from priors** — fresh Drew agent confidently refused a real bug claiming the premise was fabricated; CI logs proved otherwise. Always check actual evidence (CI logs, file contents, repro output) before refusing. (`agent-verify-evidence.md`.)
-8. **`chore(...)` self-merge by author** — `chore(ci|build|repo)` is exempt from Tess sign-off but **not** from orchestrator/Priya merge identity. Devs do not self-merge their own PRs in any category. (Process-incidents 2026-05-02; GIT_PROTOCOL G-01 fix landed in PR #127.)
+1. **Forensic framing without empirical refutation** (PR #198 vs #200) — PR #198 framed Room 05's chaser-mob-freeze as a harness shortcoming and shipped a position-steered sweep. The symptom partially persisted; the actual root cause was a physics-flush race fixed in PR #191. **Generalization:** when a fix lands and the symptom partially persists, the framing is suspect. Use the diagnostic-trace pair pattern (action-side + consequence-side traces paired in the same PR) to make cause-effect chains observable.
+2. **Bandaid retirement without high-blast-radius framing** — PR #194's 23-file coordinated change exposed two latent bugs the bandaid had been masking (unreachable dummy-drop; full-grid silent-drop). Bandaid-retirement PRs should be flagged "high-blast-radius" in the dispatch brief so QA capacity is reserved up front.
+3. **Trusting CI green without trusting the gate's *reasons*** — GUT exits 0 on parse-failed test files. PR #194 first ran "green" with a test silently un-executed. Fixed by PR #196's CI parse-fail gate. Generalization: trust the gate's *reasons*, not just its *result*.
+4. **Treating "tests pass" as "product ships"** — the M1 LevelAssembler regression precedent + the PR #194 parse-fail miss are siblings. Always verify the entry-point scene file + integration surface at "feature-complete" claims, not just CI green.
+5. **Treating ticket creation as progress** — Tickets ≠ progress; dispatches = progress. (R12 / `always-parallel-dispatch.md`.)
+6. **Orchestrator coding** instead of dispatching from symptoms. Even when "I could just fix this" is faster, the orchestrator is the dispatcher, not the implementer. (`orchestrator-never-codes.md`.)
+7. **Skipping ClickUp status moves** — every dispatch/PR-open/merge MUST pair with a same-tool-round status flip. (`clickup-status-as-hard-gate.md`.)
+8. **Skipping Self-Test Reports on UX-visible PRs** — Tess shouldn't be cold-reading a UI diff. Author posts a Self-Test Report comment before Tess reviews; Tess bounces if missing. PR #179's `✓ EQUIPPED` glyph caught the U+2713 HTML5 tofu bug DURING Self-Test, before Tess. (`self-test-report-gate.md`.)
+9. **Skipping the HTML5 visual-verification gate** for Tween / modulate / Polygon2D / CPUParticles2D / Area2D-state / glyph PRs — primitives-safety analysis is insufficient. Screenshot/video evidence is the load-bearing surface. (`html5-visual-verification-gate.md`.)
+10. **Refusing or asserting impossibility from priors** — check actual evidence (CI logs, file contents, repro output) before refusing. (`agent-verify-evidence.md`.)
+11. **Driving focus-consuming UI through keyboard simulation alone** — Godot UI focus consumption is broader than `Tab`; `Escape`/`ui_cancel` is also swallowed. Use test-only direct-toggle hooks (e.g. `Inventory.close_for_test()` per PR #187).
 
 ---
 
@@ -176,66 +192,81 @@ These are codified in `team/log/process-incidents.md`, the risk register's R11/R
 When picking up the project after a pause, do these in order:
 
 1. **Read live state-of-truth, in order:**
-   - `team/STATE.md` (per-role status — note the systemic merger-bump drift; `git log` is more authoritative than role sections for "what merged when")
+   - `team/STATE.md` (the "Current state — 2026-05-15" header at top; per-role sections below are append-only history)
+   - `team/priya-pl/m2-week-2-retro.md` (W2 close-out; pattern catalog + lessons)
+   - `team/priya-pl/m2-week-3-backlog.md` (live W3 dispatch corpus — 12 tickets)
+   - `team/uma-ux/ac4-room05-balance-design.md` (Uma's #201 design — the balance levers Drew + Devon implement in W3-T1)
+   - `team/tess-qa/soak-2026-05-15.md` (Tess's end-of-W2 bug-bash report)
    - `team/log/heartbeats.md` (recent 5-10 ticks for trajectory)
    - `team/DECISIONS.md` (recent 5-10 entries for what's locked)
    - `team/priya-pl/risk-register.md` (top-5 + watch-list)
-   - `team/log/process-incidents.md` (5 new entries from PR #131)
+   - `team/log/process-incidents.md`
    - `C:/Users/538252/.claude/projects/c--Trunk-PRIVATE-RandomGame/memory/MEMORY.md` (the rules)
 2. **Survey GitHub:**
-   - `git fetch origin && git log origin/main --oneline -10`
+   - `git fetch origin && git log origin/main --oneline -10` (verify tip; expect `5e471f0` or newer)
    - `gh pr list --state open --json number,title,headRefName`
-   - `gh run list --workflow=release-github.yml --limit 1` (current RC artifact — likely still the prior `7b80429` build until post-wave trigger fires)
+   - `gh run list --workflow=release-github.yml --limit 5` (latest release-build; W2 RC `d9cc159` is the canonical Sponsor target)
 3. **Check ClickUp board reality vs STATE.md:** `mcp__clickup__clickup_filter_tasks` on list `901523123922`. If MCP is down, drain `team/log/clickup-pending.md` on reconnect.
-4. **Decide path** based on Sponsor signal:
-   - **Sponsor signed off M1** → dispatch M2 week-1 per `m2-week-1-backlog.md`; bug-bash drains first.
-   - **Sponsor bounced with bugs** → Tess triages → file as `bug(...)` ClickUp tasks → Devon/Drew fix-forward → re-soak.
-   - **Sponsor still mid-soak / no signal** → 3-5 parallel dispatches in the safe-to-dispatch envelope (anticipatory planning, doc-drift fixes, design specs, M2 prep). Don't load M1 player-facing code while soak is mid-flight.
-   - **Post-wave RC in flight (run `25393528075`)** → wait for green conclusion; capture artifact link for soak-checklist-v2 §1 setup. If red, dispatch Devon/Tess to triage the regression.
+4. **Decide path** based on signal:
+   - **Sponsor has soaked M2** → triage findings → file as `bug(...)` ClickUp tasks → W3-T10 fix-forward absorber. If ≥3 P0s, W3-T10 promotes from M to L per R6 trigger threshold.
+   - **Sponsor still pre-soak / no signal** → dispatch the W3 backlog at full parallel cadence. T2 + T3 + T5 + T6 + T9 are all dispatch-ready day 1. T1 dispatches as soon as the brief is written (Uma's design is merged). T4 (S2 boss room L) starts after T2 lands.
    - **Sponsor asked a question** → just answer; don't auto-dispatch.
-5. **Confirm dispatch envelope on the heartbeat tick** — at least 3 agents in flight, or an explicit narrow-blocker logged (Sponsor-input-required / auto-mode-permission-denied / agent-reports-contract-conflict / user-says-stop). "Nothing to dispatch" is rarely true; default to dispatching Priya for backlog expansion if genuinely empty.
+5. **Confirm dispatch envelope on the heartbeat tick** — at least 3 agents in flight, or an explicit narrow-blocker logged. "Nothing to dispatch" is rarely true at W3 entry — 12 tickets are live.
 
 ---
 
 ## Appendix — useful artifact links
 
-- **Repo:** https://github.com/TSandvaer/RandomGame on `main`. Tip when authored: `0e77a92` (`a67474d` + PR #134 Tess run-031 STATE refresh). Verify current via `git fetch origin && git rev-parse origin/main`.
-- **ClickUp list (M1 backlog):** `901523123922`. Recognized tags: `bug`, `chore`, `week-3`, `design`, `qa`. New tag categories require Sponsor / Priya space-level addition (per `team/log/clickup-pending.md` 22:30 flush).
-- **Recent load-bearing PRs (post-fix-wave):**
-  - PR #125 — `fix(build): ship build_info.txt inside HTML5 export bundle (BB-1)` at `879f099`
-  - PR #126 — `chore(state): tess run 028 — post-drain restoration + bug-board audit (zero drift)` at `638bd27`
-  - PR #127 — `docs(team): doc-drift bundle — GIT_PROTOCOL + dispatch-template + TESTING_BAR (Tess run-025 audit P0s)` at `1136e1d`
-  - PR #128 — `fix(ui): add LMB/RMB to boot banner — full control reminder (BB-5)` at `4943137`
-  - PR #129 — `fix(levels): room boundary collision walls (BB-3)` at `a02bb38` — also closes the LevelAssembler regression
-  - PR #130 — `fix(ui): P-key reopens StatAllocationPanel after close (BB-4)` at `9b2c7a9`
-  - PR #131 — `docs(team): process-incidents normalization (T-EXP-5)` at `9f68762`
-  - PR #132 — `design(ux): sponsor-soak-checklist v2 — post-fix-wave re-soak` at `a67474d`
-  - PR #133 — `qa(postmortem): charger test flake — root cause + remediation` at `c0c604e`
-  - PR #134 — `chore(state): tess run 031 — post-wave landing + RC1-soak retired + post-fix-wave soak cut` at `0e77a92`
-- **Earlier load-bearing PRs (pre-wave):**
-  - PR #107 — `feat(integration): wire M1 play loop into Main.tscn` at `4484196` (M1 finish line)
-  - PR #109 — `fix(combat): Hitbox sweeps already-overlapping bodies at spawn` at `5a3c945` (combat-fix defensive; root cause UNCONFIRMED)
-  - PR #115 — `feat(combat): mob-side visual feedback — hit-flash + death tween + boss particles` at `ad38e04`
-  - PR #118 — `fix(save): real ItemDef + AffixDef resolvers on load (BB-2)` at `92f7a19`
-  - PR #122 — `feat(combat): player-side visual feedback — swing wedge + ember-flash on attack` at `7b80429`
-  - PR #119 — `design(spec): performance budget` at `dd63909`
-  - PR #123 — `docs(team): RESUME.md rewrite — post-M1-integration state + MARIAN-TUTOR rules adoption` at `4104f96` (this doc's prior version)
+- **Repo:** https://github.com/TSandvaer/RandomGame on `main`. Tip when authored: `5e471f0` (PR #202 — W2 retro + W3 backlog v1.0). Verify current via `git fetch origin && git rev-parse origin/main`.
+- **ClickUp list:** `901523123922`. Recognized tags: `bug`, `chore`, `week-3`, `design`, `qa`, plus per-milestone tags.
+- **W2 close-out PRs (the load-bearing arc):**
+  - PR #176 — `design(ux): color-blind secondary cue for equipped distinction` (Uma)
+  - PR #177 — `infra(combat-trace): TutorialEventBus.request_beat trace line`
+  - PR #178 — `bug(ci): playwright-e2e.yml artifact extract — handle both zip + pre-unzipped formats`
+  - PR #179 — `feat(ui): color-blind secondary cue — ✓ EQUIPPED glyph` (Devon — caught U+2713 HTML5 tofu in Self-Test)
+  - PR #180 — `bug(e2e): negative-assertion-sweep Test 2 — scope RoomGate check to Room01 window`
+  - PR #181 — `chore(harness): durable auto-status — SessionStart re-arm hook`
+  - PR #182 — `infra(combat-trace): Charger._die + Shooter._die trace lines`
+  - PR #183 — `fix(level): MultiMobRoom gate-registration` (Drew — load-bearing first-room blocker)
+  - PR #184 — `fix(level): Stratum1BossRoom door-trigger — defer Area2D insert out of physics-flush window`
+  - PR #185 — `qa(e2e): AC4 spec re-arm — re-point test.fail() blocker comment post-#183`
+  - PR #186 — `fix(harness): clearRoomMobs Shooter-aware chase-then-return sub-helper`
+  - PR #187 — `fix(harness): equip-flow Phase 2.5 swing-after-Tab race`
+  - PR #188 — `chore(repo): gitignore hygiene — diag-build/ + untrack committed-then-ignored test artifacts`
+  - PR #190 — `fix(harness): chaseAndClearKitingMobs return-to-spawn — Room 04 determinism`
+  - PR #191 — `fix(level): Room 05 3-concurrent-chaser mob-freeze — CONNECT_DEFERRED on gate_traversed defers next-room load out of physics-flush window` (highest-leverage physics-flush fix of W2)
+  - PR #192 — `infra(combat-trace): Charger.take_damage + Shooter.take_damage trace lines`
+  - PR #193 — `docs(level): Stratum1Room01 death-reload flush path — audited safe`
+  - PR #194 — `chore(inventory): retire PR #146 iron_sword bandaid — auto-equip first weapon on pickup` (23-file coordinated change; the largest behavioural change in W2)
+  - PR #195 — `infra(combat-trace): Charger/Shooter take_damage IGNORED already_dead trace`
+  - PR #196 — `fix(ci): fail GUT job on parse-failed test files` (testing-bar integrity hole closure)
+  - PR #197 — `qa(test): per-swing Hitbox monitoring assertion in sustained-swing-spam test`
+  - PR #198 — `fix(harness): clearRoomMobs position-steered multi-chaser clear — Room 05+ deterministic`
+  - PR #199 — `fix(inventory): Pickup no silent-drop when grid is full — wait for add() success before queue_free`
+  - PR #200 — `fix(diag): Player._die + Main.apply_death_rule combat-trace lines` (diagnostic-trace pair pattern that empirically refuted #198's framing)
+  - PR #201 — `design(combat): AC4 Room 05 balance proposal — chaser lethality + iron-sword feel` (Uma — the balance design W3-T1 implements)
+  - PR #202 — `pm(m2): week-2 close + week-3 backlog v1.0` (Priya — the retro + W3 dispatch corpus)
 - **Key team docs:**
-  - `team/STATE.md` (per-role status)
+  - `team/STATE.md` (per-role status with "Current state — 2026-05-15" header at top)
   - `team/DECISIONS.md` (decision audit trail)
-  - `team/GIT_PROTOCOL.md` (workflow rules — refreshed in PR #127)
+  - `team/GIT_PROTOCOL.md` (workflow rules)
   - `team/ROLES.md` (role + responsibility matrix)
-  - `team/TESTING_BAR.md` (Tess sign-off DoD — Self-Test Report + product-completeness sections landed in PR #127)
-  - `team/orchestrator/dispatch-template.md` (canonical dispatch shape — refreshed in PR #127)
+  - `team/TESTING_BAR.md` (Tess sign-off DoD)
+  - `team/orchestrator/dispatch-template.md` (canonical dispatch shape)
   - `team/log/heartbeats.md` (20-min watchdog ticks)
-  - `team/log/process-incidents.md` (recurring drift patterns — 5 new entries in PR #131)
-  - `team/log/charger-flake-postmortem.md` (Tess PR #133 — reusable test-flake lesson)
-  - `team/log/doc-drift-audit-2026-05-03.md` (Tess run-025; the prior RESUME rewrite resolved RE-01..RE-07 from this audit)
-  - `team/priya-pl/m2-week-1-backlog.md` + `m2-week-2-backlog.md` + `risk-register.md` + `performance-budget.md` (planning corpus)
-  - `team/tess-qa/m1-bugbash-4484196.md` + `html5-rc-audit-591bcc8.md` (M1 soak probe-targets + bug catalog)
-  - `team/uma-ux/sponsor-soak-checklist.md` (v1) + `sponsor-soak-checklist-v2.md` (post-wave re-soak playbook)
+  - `team/log/process-incidents.md` (recurring drift patterns)
+  - `team/priya-pl/m2-week-2-retro.md` (W2 close-out — pattern catalog + lessons + risk-register update)
+  - `team/priya-pl/m2-week-3-backlog.md` (W3 dispatch corpus — 12 tickets)
+  - `team/priya-pl/risk-register.md` (top-5 + watch-list)
+  - `team/uma-ux/ac4-room05-balance-design.md` (Uma's #201 design — W3-T1 implementation source-of-truth)
+  - `team/tess-qa/soak-2026-05-15.md` (Tess's end-of-W2 bug-bash report)
+  - `team/uma-ux/sponsor-soak-checklist-v2.md` (soak playbook — feeds Sponsor's first M2 soak)
+- **Architecture briefs (auto-loaded at SessionStart for the main session; sub-agents must Read manually):**
+  - `.claude/docs/combat-architecture.md` — Player swing flow, Hitbox/Projectile encapsulated-monitoring, mob `_die` death pipeline, physics-flush rule (generalized post-#191 to non-Area2D), CharacterBody2D motion_mode rule, equipped-weapon dual-surface rule, save autoload signal contract, ContentRegistry.items_resolved, body_entered single-event continuous-walk, negative-assertion buffer-scoping
+  - `.claude/docs/html5-export.md` — `gl_compatibility` renderer divergences, HDR clamp, Polygon2D quirks, default-font glyph coverage, service-worker cache trap, BuildInfo SHA verification, visual-verification gate, release-build + artifact handoff, diagnostic-build pattern, Sponsor soak ritual
+  - `.claude/docs/orchestration-overview.md` — topology, named-agent roster, worktree layout, dispatch conventions, hard gates, cron rules, sub-agent doc-reading pointer
 - **Orchestrator memory:** `C:/Users/538252/.claude/projects/c--Trunk-PRIVATE-RandomGame/memory/MEMORY.md`. Read the index, then per-rule docs as needed.
 
 ---
 
-This doc is rewritten at every major phase boundary or whenever it drifts >1 P0 from current reality. Last rewrite: 2026-05-05 (Priya run-014, post-fix-wave). Previous version (2026-05-03 PR #123, "post-M1-integration state") is in git history if needed.
+This doc is rewritten at every major phase boundary or whenever it drifts >1 P0 from current reality. **Last rewrite: 2026-05-15** (Priya — RESUME + STATE refresh against post-W2-close / W3-dispatching reality, against `origin/main` tip `5e471f0` / PR #202). Previous version (2026-05-05, M1 RC post-fix-wave) is in git history if needed.
