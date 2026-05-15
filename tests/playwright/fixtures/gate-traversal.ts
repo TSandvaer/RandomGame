@@ -783,11 +783,8 @@ export async function gateTraversalWalk(
 
 // ---- Case B helper: finish traversal on already-UNLOCKED gate ----
 //
-// Mirrors `kiting-mob-chase.ts`'s `finishTraversalFromUnlocked` but inlined
-// here so this fixture is self-contained and the kiting-chase fixture stays
-// private. The behaviour is intentionally identical — the staging point,
-// walk geometry, and timeout match — so the two fixtures resolve the same
-// state in the same way, just from different invocation contexts.
+// Mirrors `kiting-mob-chase.ts`'s `finishTraversalFromUnlocked` (which is
+// not exported) but is inlined here so this fixture is self-contained.
 //
 // **Geometry recap** (matches the module header's gate trigger description):
 //   - Gate trigger: world `X ∈ [24, 72]`, `Y ∈ [104, 184]`.
@@ -795,52 +792,54 @@ export async function gateTraversalWalk(
 //     vertically centred in the Y-band. Far enough outside the trigger
 //     that the player is GUARANTEED to be in the non-overlap state before
 //     the walk begins (so `body_entered` fires fresh on the next entry).
-//   - Walk: pure WEST for 1100ms → covers ~132px → player crosses the
+//     Y=144 is the rect's vertical centre, so a subsequent pure-west walk
+//     keeps the player Y-locked inside the trigger Y-band.
+//   - Walk: pure WEST for ~1100ms → covers ~132px → player crosses the
 //     trigger east edge (X=72) at ~t=400ms, firing body_entered →
 //     gate_traversed on the UNLOCKED gate.
 //
-// **Why we don't use position-steering from kiting-mob-chase.ts:** that
-// helper needs `Player.pos` traces (HTML5-only, throttled at 0.25s). For
-// this case-B path we can rely on a simpler east-walk burst because the
-// player's starting position is unknown but bounded — they're somewhere
-// in/near the trigger after combat-phase drift. A pure-east burst with
-// generous duration drives them past the staging X regardless of starting
-// position, and any wall collision pins them against the room east wall
-// (X ≈ 304) — well outside the trigger, ready for the pure-west walk-in.
+// **Position-steered approach (ticket 86c9ugfzv N=4 sweep finding):** the
+// earlier blind east-burst + west-walk approach failed in Room 03 because
+// after chase-combat the player's Y position is unpredictable (knockback
+// pushes them N out of the trigger Y-band). Walking pure-west from a Y
+// outside the band never crosses the trigger rect. The position-steered
+// version reads throttled `Player.pos` traces and steers the player to a
+// known staging point first — guaranteeing the player Y is inside the
+// trigger Y-band when the pure-west walk begins.
+//
+// This mirrors the kiting-mob-chase fixture's existing approach
+// (`steerToPoint(..., FINISH_TRAVERSAL_STAGE, ...)`) — but inlined here
+// rather than imported so the fixture stays self-contained.
+
+/** Player.pos trace pattern. Throttled at ~0.25s in the GDScript Player. */
+const PLAYER_POS_PATTERN = /\[combat-trace\] Player\.pos \| pos=\((\-?\d+),(\-?\d+)\)/;
+
+/** Staging point: just east of trigger east edge, vertically centred. */
+const FINISH_STAGE_POINT = { x: 120, y: 144 };
+
+/** Tolerance (px) for "reached the finish-traversal staging point". */
+const FINISH_STAGE_TOLERANCE_PX = 28;
 
 /**
- * East-walk duration to clear the player out of the trigger rect before the
- * traversal walk-in. Generous overshoot: 1500ms at 120px/s = 180px, more
- * than the full ~48-72px westward distance the player could be from the
- * room's east wall after combat. Walls clamp the position so overshoot is
- * harmless (the player ends pinned against X≈304 either way). Mirrors the
- * `WALK_EAST_OUT_OF_GATE_MS` constant in spirit (also east-walk to clear
- * the trigger) but longer because the starting X is less predictable.
+ * Budget for steering the player to `FINISH_STAGE_POINT`. The room is ~320px
+ * across, player walks ~120px/s, so 6s is generous headroom.
  */
-const FINISH_STAGE_EAST_WALK_MS = 1_500;
+const FINISH_STAGE_STEER_BUDGET_MS = 6_000;
+
+/** Burst duration per steering tick. */
+const FINISH_STAGE_BURST_MS = 250;
 
 /**
  * Pure-west walk duration for the finish-traversal re-entry. From the
- * staging area (X≈120-304), walking west at 120px/s for 1500ms covers
- * ~180px — the player crosses the trigger's east edge (X=72) en route to
- * X≈0 (clamped against west wall). `body_entered` fires mid-walk →
+ * staging point (X≈120, Y≈144), walking west at 120px/s for 1100ms covers
+ * ~132px — the player crosses the trigger's east edge (X=72) at ~t=400ms
+ * and ends pinned against the west wall. `body_entered` fires mid-walk →
  * `gate_traversed` emits on the UNLOCKED gate.
- *
- * We deliberately use a generous duration here vs. the
- * `WALK_WEST_BACK_INTO_GATE_MS = 1100ms` from phase 5: phase 5 starts from
- * the helper-controlled (X≈132, Y≈104) position; case B starts from
- * wherever the spec's combat phase left the player, so we need more
- * margin to guarantee crossing the trigger east edge regardless of
- * starting X.
  */
-const FINISH_STAGE_WEST_WALK_MS = 1_500;
+const FINISH_STAGE_WEST_WALK_MS = 1_100;
 
-/**
- * Brief settle between the east-burst and the west-walk. Lets the player's
- * STATE_ATTACK recovery (if any) clear and the body_exited signal land
- * before the next body_entered transition.
- */
-const FINISH_STAGE_SETTLE_MS = 300;
+/** Brief settle between staging and the west-walk. */
+const FINISH_STAGE_SETTLE_MS = 250;
 
 /**
  * Wait for a NEW line matching `pattern` to appear in the capture buffer
@@ -872,6 +871,88 @@ async function waitForNewLine(
   return null;
 }
 
+/**
+ * Read the most recent `Player.pos` trace from the buffer, parse out x/y.
+ * Returns null if no matching trace is in the buffer yet.
+ */
+function latestPlayerPos(
+  capture: ConsoleCapture
+): { x: number; y: number } | null {
+  const lines = capture.getLines();
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].text.match(PLAYER_POS_PATTERN);
+    if (m) {
+      return { x: parseInt(m[1], 10), y: parseInt(m[2], 10) };
+    }
+  }
+  return null;
+}
+
+/** Convert an (dx, dy) vector into a set of arrow keys to press. */
+function keysForDelta(dx: number, dy: number): string[] {
+  const keys: string[] = [];
+  if (dx < -4) keys.push("a");
+  else if (dx > 4) keys.push("d");
+  if (dy < -4) keys.push("w");
+  else if (dy > 4) keys.push("s");
+  return keys;
+}
+
+/**
+ * Steer the player toward `target` using throttled `Player.pos` traces.
+ * Stops once within `tolerancePx` or `budgetMs` elapses. Best-effort: if
+ * no Player.pos trace ever appears (headless build / shim broken), returns
+ * after the budget.
+ */
+async function steerPlayerToPoint(
+  page: Page,
+  capture: ConsoleCapture,
+  roomLabel: string,
+  target: { x: number; y: number },
+  tolerancePx: number,
+  budgetMs: number,
+  burstMs: number
+): Promise<{ x: number; y: number } | null> {
+  const start = Date.now();
+  let lastPos: { x: number; y: number } | null = null;
+  while (Date.now() - start < budgetMs) {
+    const pos = latestPlayerPos(capture);
+    if (pos === null) {
+      await page.waitForTimeout(150);
+      continue;
+    }
+    lastPos = pos;
+    const dx = target.x - pos.x;
+    const dy = target.y - pos.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= tolerancePx) {
+      console.log(
+        `[gate-traversal] ${roomLabel}: steered to staging — pos=(${pos.x},${pos.y}) ` +
+          `target=(${target.x},${target.y}) dist=${dist.toFixed(0)}px ` +
+          `tolerance=${tolerancePx}px.`
+      );
+      return pos;
+    }
+    const keys = keysForDelta(dx, dy);
+    if (keys.length === 0) {
+      // Player is at the target on one axis but far on the other —
+      // wait for the throttled trace to update.
+      await page.waitForTimeout(150);
+      continue;
+    }
+    for (const k of keys) await page.keyboard.down(k);
+    await page.waitForTimeout(burstMs);
+    for (const k of [...keys].reverse()) await page.keyboard.up(k);
+    await page.waitForTimeout(50);
+  }
+  console.warn(
+    `[gate-traversal] ${roomLabel}: steering budget (${budgetMs}ms) exhausted. ` +
+      `Last pos=${lastPos ? `(${lastPos.x},${lastPos.y})` : "unknown"}. ` +
+      `Proceeding with west-walk from current position.`
+  );
+  return lastPos;
+}
+
 async function finishTraversalFromUnlocked(
   page: Page,
   capture: ConsoleCapture,
@@ -885,21 +966,30 @@ async function finishTraversalFromUnlocked(
   // match a stale line immediately.
   const preWalkIndex = capture.getLines().length;
 
-  // Step 1: clear the player OUT of the trigger to the east. Generous
-  // overshoot is fine — the room east wall pins the player at X≈304.
+  // Step 1: position-steered staging — move player to (120, 144), just east
+  // of the trigger and vertically centred in the trigger Y-band. This
+  // guarantees the player is OUTSIDE the trigger (so the next walk-in
+  // fires a fresh body_entered) AND Y is in the band (so the west-walk
+  // crosses the trigger rect rather than passing above/below it).
   console.log(
-    `[gate-traversal] ${roomLabel}: case B step 1 — walk EAST ` +
-      `(${FINISH_STAGE_EAST_WALK_MS}ms) to clear player out of trigger ` +
-      `before re-entry. Wall-pinning at X≈304 is expected.`
+    `[gate-traversal] ${roomLabel}: case B step 1 — steer to staging point ` +
+      `(${FINISH_STAGE_POINT.x}, ${FINISH_STAGE_POINT.y}) ` +
+      `(tolerance ${FINISH_STAGE_TOLERANCE_PX}px, budget ${FINISH_STAGE_STEER_BUDGET_MS}ms).`
   );
-  await page.keyboard.down("d");
-  await page.waitForTimeout(FINISH_STAGE_EAST_WALK_MS);
-  await page.keyboard.up("d");
+  await steerPlayerToPoint(
+    page,
+    capture,
+    roomLabel,
+    FINISH_STAGE_POINT,
+    FINISH_STAGE_TOLERANCE_PX,
+    FINISH_STAGE_STEER_BUDGET_MS,
+    FINISH_STAGE_BURST_MS
+  );
   await page.waitForTimeout(FINISH_STAGE_SETTLE_MS);
 
   // Step 2: pure-WEST walk into trigger. body_entered fires when the player
   // crosses the trigger east edge (X=72). The UNLOCKED gate emits
-  // gate_traversed on this single transition (no need for a second walk).
+  // gate_traversed on this single transition.
   console.log(
     `[gate-traversal] ${roomLabel}: case B step 2 — walk WEST ` +
       `(${FINISH_STAGE_WEST_WALK_MS}ms) across trigger east edge to fire ` +
@@ -934,10 +1024,10 @@ async function finishTraversalFromUnlocked(
   console.warn(
     `[gate-traversal] ${roomLabel}: case B finish-traversal did NOT produce ` +
       `a NEW gate_traversed trace within 5s (baseline index ${preWalkIndex}). ` +
-      `The east-walk-then-west pattern should reliably cross the trigger. ` +
-      `Possible causes: wall geometry regressed, gate state machine regressed, ` +
-      `or the player was already past the trigger west edge before the ` +
-      `west-walk began.\n\nLast 30 trace lines:\n${recent}`
+      `Possible causes: (a) staging did not converge — Player.pos shim broken ` +
+      `or wall blockage prevented reaching (120, 144); (b) walking west ` +
+      `from staging didn't cross the trigger east edge; (c) gate state ` +
+      `machine regressed.\n\nLast 30 trace lines:\n${recent}`
   );
   return false;
 }
