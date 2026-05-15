@@ -305,3 +305,69 @@ func test_layer_mask_targets_player_only() -> void:
 	add_child_autofree(g)
 	assert_true((g.collision_mask & RoomGate.LAYER_PLAYER) != 0, "masks player")
 	assert_eq(g.collision_layer, 0, "gate emits no collisions itself")
+
+
+# ---- Knockback-overlap fix (ticket 86c9ujf5v / 86c9ujf14) ---------------
+#
+# When combat knockback pushes the player INTO the gate trigger while mobs are
+# alive, `body_entered` fires the lock transition. If the player stays inside
+# the trigger until the last mob dies and `_unlock()` runs, Godot will NOT
+# re-emit `body_entered` — the player is STUCK.
+#
+# Fix: `_unlock` calls `_fire_traversal_if_unlocked` deferred. The test asserts
+# the deferred helper emits `gate_traversed` exactly once, even without a real
+# physics overlap, by calling it directly after `_unlock`.
+
+func test_fire_traversal_if_unlocked_emits_gate_traversed() -> void:
+	# `_fire_traversal_if_unlocked` fires `gate_traversed` when the gate is
+	# UNLOCKED and `_traversed_emitted` is false. Simulates the knockback-overlap
+	# path: player was inside the trigger when `_unlock` ran, then the deferred
+	# `_fire_traversal_if_unlocked` fires.
+	var g: RoomGate = _make_gate()
+	var m: FakeMob = _make_fake_mob()
+	g.register_mob(m)
+	g.trigger_for_test(null)   # sets test_skip_death_wait + locks
+	m.die()
+	await _await_frame()       # CONNECT_DEFERRED decrement runs
+	# Gate is now UNLOCKED (test_skip_death_wait=true → _unlock fires synchronously).
+	assert_true(g.is_unlocked(), "gate must be UNLOCKED before testing the overlap path")
+	watch_signals(g)
+	# Simulate the deferred call from _unlock: player was overlapping at unlock time.
+	g._fire_traversal_if_unlocked()
+	assert_signal_emitted(g, "gate_traversed",
+		"gate_traversed emits when _fire_traversal_if_unlocked is called on UNLOCKED gate")
+	assert_signal_emit_count(g, "gate_traversed", 1,
+		"gate_traversed emits exactly once (idempotency guard)")
+
+
+func test_fire_traversal_if_unlocked_is_idempotent() -> void:
+	# Calling `_fire_traversal_if_unlocked` twice must emit `gate_traversed`
+	# exactly once — the `_traversed_emitted` guard prevents double-emission
+	# even if the deferred call races with a real `body_entered`.
+	var g: RoomGate = _make_gate()
+	var m: FakeMob = _make_fake_mob()
+	g.register_mob(m)
+	g.trigger_for_test(null)
+	m.die()
+	await _await_frame()
+	assert_true(g.is_unlocked(), "gate UNLOCKED precondition")
+	watch_signals(g)
+	g._fire_traversal_if_unlocked()
+	g._fire_traversal_if_unlocked()  # second call — must no-op
+	assert_signal_emit_count(g, "gate_traversed", 1,
+		"second _fire_traversal_if_unlocked is a no-op (_traversed_emitted guard)")
+
+
+func test_fire_traversal_if_unlocked_noop_when_not_unlocked() -> void:
+	# `_fire_traversal_if_unlocked` must be a no-op when the gate is LOCKED
+	# (not yet UNLOCKED). Guards against a race where the deferred call fires
+	# before the unlock completes.
+	var g: RoomGate = _make_gate()
+	var m: FakeMob = _make_fake_mob()
+	g.register_mob(m)
+	g.trigger_for_test(null)  # LOCKED, mob alive
+	assert_true(g.is_locked(), "gate is LOCKED precondition")
+	watch_signals(g)
+	g._fire_traversal_if_unlocked()  # must be a no-op (gate not UNLOCKED yet)
+	assert_signal_not_emitted(g, "gate_traversed",
+		"_fire_traversal_if_unlocked is a no-op when gate is LOCKED (not UNLOCKED)")

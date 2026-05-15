@@ -335,3 +335,104 @@ func test_full_traversal_emits_four_beats_via_bus_in_order() -> void:
 		assert_eq(params[0], expected_order[i],
 			"bus emit #%d carries beat_id = %s" % [i, str(expected_order[i])])
 		assert_eq(params[1], 2, "bus emit #%d anchor = BOTTOM (Uma Beat 4)" % i)
+
+
+# ---- 4: post-death-respawn path (P0 fix — ticket 86c9ujf0q) -------------
+#
+# Bug: when the player dies and respawns to Room01 with iron_sword already
+# equipped (M1 death rule: equipped items survive), `_on_room01_mob_died`
+# previously called `call_deferred("_on_room_cleared")` immediately on dummy
+# death — before the player could collect the dropped Pickup. Room01 would
+# free (taking the Pickup with it) and the player entered Room02 with no sword
+# in their inventory, only in the equipped slot from the prior run.
+#
+# Fix: arm `_room01_already_equipped_awaiting_add` instead, wait for
+# `Inventory.item_added` (the pickup lands in the grid without auto-equip
+# since the weapon slot is already full), THEN advance. This test asserts the
+# respawn path no longer advances Room01 before the player collects the Pickup.
+
+func test_respawn_path_gates_on_pickup_add_before_advancing() -> void:
+	# Simulate the post-death-respawn state: Main is freshly loaded (Room01)
+	# but the player has the iron_sword already equipped (prior-run carry).
+	var inv: Node = _inventory()
+	var main: Main = _instantiate_main()
+	await _await_tutorial_wire()
+	var room: Node = main.get_current_room()
+	var dummy: PracticeDummy = _first_dummy(room)
+	assert_not_null(dummy, "Room01 dummy present on respawn boot")
+
+	# Pre-equip iron_sword into the Inventory (simulates the M1 death-rule
+	# carry: equipped item survives the run death, inventory is cleared).
+	# We must add it first (equip() requires the item in inventory).
+	var cr: ContentRegistry = main.get_content_registry()
+	assert_not_null(cr, "ContentRegistry available via Main.get_content_registry()")
+	var item_resolver: Callable = main.get_item_resolver()
+	var iron_sword_def: ItemDef = item_resolver.call(&"iron_sword") as ItemDef
+	assert_not_null(iron_sword_def, "iron_sword ItemDef resolves")
+	var iron_sword_inst: ItemInstance = ItemInstance.new()
+	iron_sword_inst.def = iron_sword_def
+	var added: bool = inv.add(iron_sword_inst)
+	assert_true(added, "iron_sword added to inventory for pre-equip simulation")
+	var equipped_ok: bool = inv.equip(iron_sword_inst, &"weapon", &"test_respawn")
+	assert_true(equipped_ok, "iron_sword pre-equipped (simulating death-rule carry)")
+	assert_not_null(inv.get_equipped(&"weapon"), "weapon slot occupied pre-test")
+
+	# Kill the dummy. With the weapon pre-equipped, `_on_room01_mob_died`
+	# should arm `_room01_already_equipped_awaiting_add` and NOT advance yet.
+	var p: Player = main.get_player()
+	var dummy_pos: Vector2 = dummy.global_position
+	for _i in PracticeDummy.HP_MAX:
+		dummy.take_damage(1, Vector2.ZERO, null)
+	assert_true(dummy.is_dead(), "dummy dies after HP_MAX hits")
+
+	# Allow the deferred `add_child(pickup)` + initial-overlap pass to land.
+	# The room must NOT have advanced yet — the gate is held.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_eq(main.get_current_room_index(), 0,
+		"Room01 → Room02 advance is GATED on pickup-add — still in Room01 " +
+		"after dummy death even though player is already equipped (P0 fix)")
+
+	# Walk the player onto the dropped Pickup so it lands in the grid.
+	# The weapon slot is full — auto-equip is skipped — but item_added fires,
+	# which `_on_weapon_added_to_grid` catches to release the gate.
+	# Pin the player on the dummy's drop position across several physics+process
+	# frames, mirroring the first-run pickup approach above.
+	p.global_position = dummy_pos
+	p.velocity = Vector2.ZERO
+	for _i in 6:
+		p.global_position = dummy_pos
+		p.velocity = Vector2.ZERO
+		await get_tree().physics_frame
+		await get_tree().process_frame
+
+	# Belt-and-suspenders: if Pickup is still alive, re-pin to its actual position.
+	var pickup: Pickup = _find_pickup(room) if is_instance_valid(room) else null
+	if pickup != null:
+		for _i in 8:
+			if not is_instance_valid(pickup):
+				break
+			p.global_position = pickup.global_position
+			p.velocity = Vector2.ZERO
+			await get_tree().physics_frame
+			await get_tree().process_frame
+
+	# Drain a few frames for the item_added handler + deferred room advance.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# The room must have advanced: item_added fired → gate released → Room02 loaded.
+	assert_eq(main.get_current_room_index(), 1,
+		"Main advanced to Room02 after player collected the dummy-dropped Pickup " +
+		"into the grid (respawn path — weapon slot was full, item_added released gate). " +
+		"Pickup spawned at world ~%s." % dummy_pos)
+
+	# The previously-equipped sword is still equipped (unchanged — equip did not fire).
+	assert_not_null(inv.get_equipped(&"weapon"),
+		"Inventory weapon slot still occupied after Room02 advance (carried from respawn)")
+	# And a second iron_sword landed in the grid (the dummy's fresh drop).
+	var grid_count: int = inv.get_items().size()
+	assert_true(grid_count >= 1,
+		"At least one iron_sword in the inventory grid (the dummy-dropped sword " +
+		"collected via item_added path); got %d items" % grid_count)

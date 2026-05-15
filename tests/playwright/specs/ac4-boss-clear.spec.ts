@@ -182,19 +182,31 @@ const ROOM_SHOOTER_COUNTS = [
 ];
 
 test.describe("AC4 — Stratum-1 boss reach + clear", () => {
-  // **STATUS: still test.fail(). Rooms 02-05 clear + traverse end-to-end on
-  // every release-build run after Drew's Room 05 panel-dismiss fix (PR
-  // #TBD, ticket 86c9u6uhg — see "What PR #207 fixed" below). The current
-  // blocker is the Room 06 fixed-position chaser-clear loop: the kiting
-  // Shooter chase pre-pass roams the player 100+px from spawn (typically
-  // ending in a corner), and the subsequent N+E click-spam loop for the
-  // 2 chargers cannot connect from that drifted position — observed
-  // 0/2 chasers killed across the 90s budget. Out of harness scope from
-  // this PR; the fix shape is either (a) add a return-to-spawn step
-  // between the kiting Shooter chase and the chaser fixed-position loop,
-  // or (b) generalise `chaseAndClearMultiChaserRoom` to 2-chaser rooms
-  // when a kiting Shooter pre-pass roamed the player. Tracked as the
-  // follow-up to ticket 86c9u6uhg.**
+  // **STATUS: still test.fail(). Rooms 02-05 clear + traverse end-to-end
+  // deterministically after PR #207 + PR #208 + PR #212 + PR #224.
+  //
+  // **What PR #212 (ticket 86c9u9neq) fixed:** the Room 06 harness blocker
+  // (Shooter chase pre-pass roams player 100+px from spawn → 2-Charger
+  // fixed-position click-spam misses). Added `returnPlayerToSpawn` between
+  // the Shooter pre-pass and the chaser loop for all mixed Shooter+Chaser
+  // rooms (06/07/08). Room 06 chaser-clear is now deterministic.
+  //
+  // **What this PR (ticket 86c9ujf5v) fixes — GAME-SIDE gate-unlock overlap:**
+  // when combat knockback pushes the player INTO the gate trigger while mobs
+  // are alive, `body_entered` fires the lock. If the player is still inside
+  // the trigger when the last mob dies and `_unlock()` runs, Godot will NOT
+  // re-emit `body_entered` — the gate is UNLOCKED but `gate_traversed` never
+  // fires and the room counter never advances. `RoomGate._unlock` now calls
+  // `get_overlapping_bodies()` after emitting `gate_unlocked`; if the player
+  // is already inside, it defers `_fire_traversal_if_unlocked` to emit
+  // `gate_traversed`. This is the Sponsor M2 W3 manual-soak "gate stuck after
+  // mob clear" finding for Rooms 02, 06 — reproduced via the knockback-overlap
+  // code path. The Playwright harness already handled this via preLineCount
+  // case A/B/C (ticket 86c9ugfzv) — this fixes the game-side UX gap.
+  //
+  // **Remaining unknown:** whether Rooms 06-08 pass end-to-end on N≥8
+  // release-build Playwright runs with both fixes in place. test.fail()
+  // stays until N≥8 characterisation confirms it. See ticket 86c9ujf5v.**
   //
   // ---- What PR #183 fixed (verified — no longer the blocker) ----
   //
@@ -318,11 +330,14 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
   //
   // ---- Why this spec STILL stays test.fail() ----
   //
-  // Room 06 is the next blocker — see the STATUS box above. The kiting
-  // Shooter chase pre-pass roams the player far from spawn, and the
-  // subsequent 2-charger fixed-position click-spam can't land hits from
-  // that drifted position. Out of scope for the 86c9u6uhg ticket; tracked
-  // as a follow-up.
+  // Rooms 06-08 have not yet been verified N≥8 on a release build with both
+  // PR #212 (return-to-spawn harness fix) and this PR's RoomGate overlap fix
+  // in place. The game-side knockback-overlap bug fix (`RoomGate._unlock` →
+  // `get_overlapping_bodies` → deferred `_fire_traversal_if_unlocked`) is
+  // new in this PR — its effect on the Playwright trace sequence (case A/B/C
+  // resolution) is not yet characterized empirically. test.fail() stays until
+  // N≥8 release-build runs confirm Rooms 06-08 all traverse end-to-end.
+  // Tracked by ticket 86c9ujf5v.
   test.fail(
     "AC4 — Stratum-1 boss reach + clear in ≤10min from cold start",
     async ({ page, context }) => {

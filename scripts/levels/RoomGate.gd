@@ -408,6 +408,42 @@ func _unlock() -> void:
 	_state = STATE_UNLOCKED
 	_combat_trace("RoomGate._unlock", "gate_unlocked emitting — door visual opens; waiting for player door-walk to fire gate_traversed")
 	gate_unlocked.emit()
+	# **Knockback-overlap fix (ticket 86c9ujf5v / 86c9ujf14).**
+	# Godot 4 `body_entered` fires once per non-overlap → overlap TRANSITION.
+	# If combat knockback (Charger charge, Grunt-hit) pushed the player INTO the
+	# gate trigger while mobs were still alive (gate was LOCKED — `body_entered`
+	# fired the lock, not a traversal), the player is ALREADY overlapping when
+	# `_unlock` fires. Godot will NOT re-emit `body_entered` for a body that was
+	# already overlapping at the moment of unlock — so the traversal signal never
+	# fires and the player is stuck.
+	#
+	# Fix: after emitting `gate_unlocked`, check `get_overlapping_bodies()` for a
+	# CharacterBody2D. If the player is already inside the trigger, fire
+	# `gate_traversed` immediately (deferred — stay out of the physics-flush
+	# window the Timer.timeout runs in). The deferred call preserves the
+	# gate_unlocked → gate_traversed ordering contract.
+	if is_inside_tree() and not _traversed_emitted:
+		for body in get_overlapping_bodies():
+			if body is CharacterBody2D:
+				_combat_trace("RoomGate._unlock",
+					"player already overlapping on unlock — deferring gate_traversed (knockback-overlap fix)")
+				call_deferred("_fire_traversal_if_unlocked")
+				break
+
+
+## Deferred traversal helper: called via call_deferred from _unlock when the
+## player was already inside the trigger at unlock time. Idempotent — if the
+## player walked out and back in before this fires, the normal _on_body_entered
+## path fires gate_traversed first and _traversed_emitted guards the duplicate.
+func _fire_traversal_if_unlocked() -> void:
+	if _state != STATE_UNLOCKED:
+		return
+	if _traversed_emitted:
+		return
+	_traversed_emitted = true
+	_combat_trace("RoomGate.gate_traversed",
+		"player walked through open door — emitting gate_traversed (deferred from unlock overlap)")
+	gate_traversed.emit()
 
 
 ## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
