@@ -104,11 +104,21 @@ var _loot_spawner: MobLootSpawner = null
 ## before the player could ever collect it, and the "never fistless"
 ## onboarding guarantee would be impossible. This flag is set true when the
 ## dummy dies while the player is unequipped; `_on_weapon_equipped` clears it
-## and fires the deferred room advance. If the player is ALREADY equipped when
-## the dummy dies (e.g. a save-restored weapon, or a post-death respawn that
-## preserved the equipped weapon per the M1 death rule), the gate is skipped
-## and the room advances immediately as before.
+## and fires the deferred room advance.
+##
+## **Post-death respawn path (P0 fix, ticket 86c9ujf0q):** when the player IS
+## already equipped (death-respawn preserved the iron_sword in the equipped slot
+## per the M1 death rule), the dummy still drops a fresh iron_sword Pickup on
+## death. The prior "skip gate and advance immediately via call_deferred" path
+## freed Room01 — taking the Pickup with it — before the player could ever reach
+## it. `_room01_already_equipped_awaiting_pickup_add` is set true on that path;
+## `_on_weapon_added_to_grid` listens to Inventory.item_added and fires the room
+## advance once the Pickup lands in the grid (or if the player re-equips it).
 var _room01_awaiting_pickup_equip: bool = false
+## True when the dummy died while player was already-equipped (respawn path) and
+## we are waiting for the dummy-dropped iron_sword to be collected into the grid.
+## Mutually exclusive with `_room01_awaiting_pickup_equip`.
+var _room01_already_equipped_awaiting_add: bool = false
 
 # HUD widgets (built by _build_hud).
 var _hp_label: Label = null
@@ -525,7 +535,8 @@ func _on_room01_mob_died(_a: Variant = null, _b: Variant = null, _c: Variant = n
 			alive_count += 1
 	if alive_count != 0:
 		return
-	# Room01's dummy is dead. Decide: gate on pickup-equip, or advance now.
+	# Room01's dummy is dead. Decide: gate on pickup-equip (normal first-run
+	# path) or gate on pickup-add (post-death respawn with existing weapon).
 	if _current_room_index == 0 and not _player_has_weapon_equipped():
 		# Player is fistless — wait for the iron_sword Pickup to be collected
 		# and auto-equipped before advancing. Arm the gate.
@@ -535,11 +546,18 @@ func _on_room01_mob_died(_a: Variant = null, _b: Variant = null, _c: Variant = n
 			if not inventory.is_connected("item_equipped", _on_weapon_equipped):
 				inventory.connect("item_equipped", _on_weapon_equipped)
 		return
-	# Player already equipped (save-restored weapon, or a respawn that
-	# preserved equipped state) — no pickup needed, advance immediately.
-	# Deferred so any other `mob_died` listeners on this tick (XP gain,
-	# loot drop) finish their work first.
-	call_deferred("_on_room_cleared")
+	# Player already equipped (save-restored weapon, or a post-death respawn
+	# that preserved the iron_sword per the M1 death rule). The dummy still
+	# drops a fresh iron_sword Pickup — arm the item_added gate so Room01 does
+	# NOT free until the player collects it (or it is explicitly dismissed).
+	# This fixes the P0 respawn race: the prior `call_deferred("_on_room_cleared")`
+	# ran before the Pickup Add could fire, destroying the Pickup in the process
+	# (ticket 86c9ujf0q).
+	_room01_already_equipped_awaiting_add = true
+	var inventory: Node = _inventory()
+	if inventory != null and inventory.has_signal("item_added"):
+		if not inventory.is_connected("item_added", _on_weapon_added_to_grid):
+			inventory.connect("item_added", _on_weapon_added_to_grid)
 
 
 # Returns true if the player currently has a weapon equipped (Inventory's
@@ -569,15 +587,35 @@ func _on_weapon_equipped(_item: Variant = null, slot: Variant = null) -> void:
 	call_deferred("_on_room_cleared")
 
 
-# Disarm the Room01 onboarding pickup gate: clear the flag and drop the
-# `Inventory.item_equipped` connection. Idempotent — safe to call when the
-# gate was never armed.
+# Inventory.item_added handler — armed only on the post-death-respawn path
+# (player already equipped when dummy dies). When the player walks onto the
+# dummy-dropped iron_sword Pickup, `Inventory.on_pickup_collected` calls
+# `add()` which emits `item_added`. Since the weapon slot is already occupied,
+# auto-equip is skipped and `item_equipped` never fires — so we gate here
+# instead. Fires the room advance once any item is added (the only item that
+# can be added in Room01 after the dummy dies is the dropped iron_sword). One-
+# shot: disconnect immediately.
+func _on_weapon_added_to_grid(_item: Variant = null) -> void:
+	if not _room01_already_equipped_awaiting_add:
+		return
+	_clear_room01_pickup_gate()
+	call_deferred("_on_room_cleared")
+
+
+# Disarm the Room01 onboarding pickup gate: clear both flags and drop both
+# Inventory signal connections. Idempotent — safe to call when the gate was
+# never armed (either path).
 func _clear_room01_pickup_gate() -> void:
 	_room01_awaiting_pickup_equip = false
+	_room01_already_equipped_awaiting_add = false
 	var inventory: Node = _inventory()
-	if inventory != null and inventory.has_signal("item_equipped") \
-			and inventory.is_connected("item_equipped", _on_weapon_equipped):
-		inventory.disconnect("item_equipped", _on_weapon_equipped)
+	if inventory != null:
+		if inventory.has_signal("item_equipped") \
+				and inventory.is_connected("item_equipped", _on_weapon_equipped):
+			inventory.disconnect("item_equipped", _on_weapon_equipped)
+		if inventory.has_signal("item_added") \
+				and inventory.is_connected("item_added", _on_weapon_added_to_grid):
+			inventory.disconnect("item_added", _on_weapon_added_to_grid)
 
 
 func _mob_is_dead(m: Node) -> bool:
