@@ -163,6 +163,25 @@ func test_player_sustained_swing_spam_no_panic_50_attacks() -> void:
 	# Frame-by-frame swing loop. We assert per-swing that the spawned
 	# hitbox immediately entered the scene tree — pre-fix, the panic
 	# mid-add_child aborts the call chain so the hitbox never lands.
+	#
+	# We ALSO assert the encapsulated-monitoring transition ON EVERY
+	# SWING (ticket 86c9p1fk1 — sharpened from the prior aggregate-only
+	# shape). Per the Hitbox `_init` deferred-monitoring pattern
+	# (`scripts/combat/Hitbox.gd::_init`, `.claude/docs/combat-architecture.md`
+	# § "Hitbox + Projectile encapsulated-monitoring rule"):
+	#   - Immediately after `try_attack` (the hitbox has just been
+	#     `add_child`'d) monitoring/monitorable MUST still be false — the
+	#     node entered the tree monitoring-OFF. This off-at-add_child
+	#     state is the load-bearing invariant that avoids the
+	#     physics-flush panic; asserting it per-swing proves the `_init`
+	#     encapsulation held for THIS swing, not just that the aggregate
+	#     loop survived.
+	#   - After exactly one physics frame the deferred
+	#     `_activate_and_check_initial_overlaps` lands and flips both
+	#     back ON. Asserting it per-swing proves the deferred activation
+	#     fired for THIS swing (a swing whose activation silently no-op'd
+	#     would still be in-tree and still emit attack_spawned, so the
+	#     aggregate checks alone would not catch it).
 	for i in range(50):
 		# Tick past LIGHT_RECOVERY (0.18s) so the next swing can fire.
 		p._tick_timers(Player.LIGHT_RECOVERY + 0.001)
@@ -176,10 +195,31 @@ func test_player_sustained_swing_spam_no_panic_50_attacks() -> void:
 			"REGRESSION-86c9nx1dx: swing %d hitbox is in the tree synchronously after try_attack (pre-fix the panic aborts add_child)" % (i + 1))
 		assert_eq(hb.get_parent(), p,
 			"swing %d hitbox parented under the player" % (i + 1))
+		# Per-swing monitoring assertion (ticket 86c9p1fk1) — phase 1:
+		# the just-add_child'd hitbox MUST still be monitoring-OFF. This
+		# is the encapsulated `_init` invariant; if any swing entered the
+		# tree monitoring-ON it would be the exact physics-flush-panic
+		# shape this whole test exists to guard against.
+		assert_false(hb.monitoring,
+			"TICKET-86c9p1fk1: swing %d hitbox is monitoring=false right after add_child (encapsulated _init defers activation)" % (i + 1))
+		assert_false(hb.monitorable,
+			"TICKET-86c9p1fk1: swing %d hitbox is monitorable=false right after add_child" % (i + 1))
 		# Step one physics frame so the hitbox's deferred activation +
 		# initial-overlap sweep lands, body_entered fires (or the sweep
 		# applies the hit), and the hitbox's lifetime ticks down.
 		await get_tree().physics_frame
+		# Per-swing monitoring assertion (ticket 86c9p1fk1) — phase 2:
+		# after one physics frame the deferred
+		# `_activate_and_check_initial_overlaps` has run and flipped
+		# monitoring/monitorable back ON for THIS swing. The hitbox is
+		# still well within its 0.10s lifetime (one frame ~= 0.0167s),
+		# so it has not queue_free'd yet — it is in its active window.
+		assert_true(hb.is_inside_tree(),
+			"swing %d hitbox still in tree one frame post-spawn (within 0.10s lifetime)" % (i + 1))
+		assert_true(hb.monitoring,
+			"TICKET-86c9p1fk1: swing %d hitbox monitoring flipped ON after deferred activation landed" % (i + 1))
+		assert_true(hb.monitorable,
+			"TICKET-86c9p1fk1: swing %d hitbox monitorable flipped ON after deferred activation landed" % (i + 1))
 
 	# `attack_spawned` emit-count proves all 50 swings ran end-to-end.
 	# Pre-fix the panic could interrupt before the emit, dropping the count.
