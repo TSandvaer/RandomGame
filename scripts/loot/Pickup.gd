@@ -20,6 +20,19 @@ extends Area2D
 ## collected. The deferred initial-overlap pass walks `get_overlapping_bodies()`
 ## and collects against anything already inside — the same fix shape as
 ## `Hitbox._activate_and_check_initial_overlaps` (PR #143).
+##
+## **Listener-owned destruction (ticket 86c9u33h1, fixes Tess bug-bash 86c9kxx7h).**
+## `Pickup._on_body_entered` no longer calls `queue_free()` directly. The
+## consumer (`Inventory.on_pickup_collected`) decides whether the collection
+## actually succeeded — if `Inventory.add()` rejects the item (grid full at
+## 24/24), the consumer leaves the Pickup alive on the ground rather than
+## silently destroying it. The Pickup re-arms its `_collected` latch via a
+## deferred `_clear_collected_latch_if_alive` call so the player can re-attempt
+## the pickup after they free a slot (must walk off + back on, per Godot 4
+## body_entered single-event semantics — see `.claude/docs/combat-architecture.md`
+## § "body_entered semantics — single-event continuous-walk"). On success the
+## consumer calls `Pickup.consume_after_pickup()` which queue_frees us
+## immediately AND short-circuits the latch-clear (no race with deferred state).
 
 signal picked_up(item: ItemInstance, pickup: Pickup)
 
@@ -30,7 +43,11 @@ var item: ItemInstance = null
 
 ## Idempotency latch — set true the moment the Pickup is collected so a
 ## body_entered and an initial-overlap pass (or two body_entered events in
-## the same frame) cannot double-emit `picked_up`.
+## the same frame) cannot double-emit `picked_up`. The latch is cleared
+## one frame later by `_clear_collected_latch_if_alive` IFF we are still in
+## the tree (i.e. the consumer rejected the item — full grid). On a successful
+## collection the consumer calls `consume_after_pickup()` which queue_frees us
+## before the latch-clear runs, so re-emit cannot happen on a freed node.
 var _collected: bool = false
 
 
@@ -102,6 +119,37 @@ func _on_body_entered(body: Node) -> void:
 	# anyway, but belt-and-suspenders.
 	if not body.is_in_group("player"):
 		return
+	# Latch FIRST — defends against re-entry during the synchronous emit chain
+	# (a listener that triggers a second body_entered would otherwise double-emit).
 	_collected = true
+	# Emit the collection signal. The consumer (Inventory.on_pickup_collected)
+	# is responsible for calling `consume_after_pickup()` on success — which
+	# queue_frees this Pickup. If the consumer rejects the item (e.g. grid full
+	# at 24/24), it leaves us alive on the ground (ticket 86c9u33h1: previously
+	# this method called `queue_free()` unconditionally, silently destroying any
+	# item the consumer rejected).
 	picked_up.emit(item, self)
+	# If we are still in the tree after the synchronous emit chain, the consumer
+	# did not consume us — clear the latch one frame out so the player can
+	# re-attempt the pickup (after walk-off + walk-back, per body_entered
+	# single-event semantics). Deferred so the latch flip lands AFTER any
+	# in-flight queue_free from the consumer takes effect.
+	call_deferred("_clear_collected_latch_if_alive")
+
+
+## Called by the pickup consumer (Inventory.on_pickup_collected) when
+## `Inventory.add()` accepted the item — at that point the Pickup must
+## destroy itself. Idempotent (queue_free's guard handles double-call).
+func consume_after_pickup() -> void:
 	queue_free()
+
+
+## Deferred latch-clear. Runs end-of-frame; if we are still alive (consumer
+## did not consume us — typically because the grid was full), reset the
+## `_collected` latch so the player can re-attempt after walking off + back on.
+## Skips on a queued-for-deletion node so a successful consume races safely
+## against the deferred call.
+func _clear_collected_latch_if_alive() -> void:
+	if is_queued_for_deletion() or not is_inside_tree():
+		return
+	_collected = false
