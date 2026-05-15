@@ -381,7 +381,8 @@ interface PosReading {
 function latestPos(
   capture: ConsoleCapture,
   pattern: RegExp,
-  maxAgeMs?: number
+  maxAgeMs?: number,
+  minTimestamp?: number
 ): PosReading | null {
   const lines = capture.getLines();
   const now = Date.now();
@@ -392,6 +393,13 @@ function latestPos(
     if (maxAgeMs !== undefined && now - line.timestamp > maxAgeMs) {
       // The newest matching line is already older than the staleness
       // window — every earlier line is older still, so bail.
+      return null;
+    }
+    if (minTimestamp !== undefined && line.timestamp < minTimestamp) {
+      // The newest matching line is older than the caller's lower bound
+      // (typically the chase invocation's `t0`) — every earlier line is
+      // older still. Used to reject cross-room leaks where a prior room's
+      // mob trace lingers in the buffer after the room was destroyed.
       return null;
     }
     const posM = t.match(/pos=\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/);
@@ -756,7 +764,27 @@ export async function chaseAndClearKitingMobs(
     cycle++;
 
     // ---- Read positions, steer toward the (live) kiter ----
-    const mob = latestPos(capture, posPattern);
+    //
+    // **Scoping `latestPos` to this chase invocation** (`minTimestamp = t0`):
+    // without it, `latestPos` returns the most recent matching line in the
+    // ENTIRE capture buffer — which leaks across rooms. A previous room's
+    // Shooter trace (e.g. Room 04's Shooter killed long ago) is still in
+    // the buffer, and if THIS room's Shooter hasn't emitted yet (the room
+    // just loaded, its `_player` reference isn't resolved, or the throttle
+    // accumulator hasn't reached `POS_TRACE_INTERVAL` from the new
+    // `_physics_process` start), the helper would steer toward the prior
+    // room's last known position. Observed empirically in Room 07 after a
+    // Room 06 clear — the helper saw `mob=(356,113) mobAge=94s` (the Room
+    // 04 Shooter's last trace from 94s ago) and treated it as a live
+    // pursuit target, never engaging Room 07's actual Shooters which
+    // emitted somewhere different. Scoping the lookup to `t0` rejects the
+    // leak and falls through to the "no fresh trace" click-spam nudge.
+    //
+    // **The player-pos lookup is NOT scoped** — Player.gd emits `Player.pos`
+    // continuously across rooms (it's the same Player node), so cross-room
+    // leaks are not possible there; the very next live emission supersedes
+    // any prior reading via `latestPos`'s `i--` scan.
+    const mob = latestPos(capture, posPattern, undefined, t0);
     const player = latestPos(capture, playerPosPattern);
 
     if (mob === null || player === null) {
