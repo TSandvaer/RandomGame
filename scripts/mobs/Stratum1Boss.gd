@@ -490,7 +490,15 @@ func _fire_melee_swing() -> void:
 	# the player's Vigor mitigation at swing-fire time. The melee-multiplier
 	# is a *boss-specific* attack-shape decision, applied on top of the
 	# formula output — same pattern as Grunt's heavy swing.
-	var formula_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
+	# Null-def fallback: when mob_def is null (bare-instantiated in tests),
+	# compute_mob_damage returns 0. Use damage_base directly instead —
+	# _apply_mob_def seeds it to 12 for null-def, so the hitbox carries
+	# non-zero damage even in the no-def test path.
+	var formula_dmg: int
+	if mob_def == null:
+		formula_dmg = damage_base
+	else:
+		formula_dmg = DamageScript.compute_mob_damage(mob_def, _player_vigor())
 	var dmg: int = int(round(float(formula_dmg) * MELEE_DAMAGE_MULTIPLIER))
 	# [combat-trace] diagnostic (ticket 86c9ujq8d — M2 W3 soak finding 1 — boss
 	# can't hit player). Emits BEFORE hitbox spawn so Sponsor's DevTools stream
@@ -560,7 +568,13 @@ func _fire_slam_hit() -> void:
 	# Damage routed through the formula utility, then scaled by the slam-
 	# specific multiplier (boss attack-shape, separate from Damage.gd's
 	# player-attack-type-mult).
-	var formula_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
+	# Null-def fallback: mirrors _fire_melee_swing — use damage_base when
+	# mob_def is null so headless tests get non-zero slam damage.
+	var formula_dmg: int
+	if mob_def == null:
+		formula_dmg = damage_base
+	else:
+		formula_dmg = DamageScript.compute_mob_damage(mob_def, _player_vigor())
 	var dmg: int = int(round(float(formula_dmg) * SLAM_DAMAGE_MULTIPLIER))
 	# Slam is omnidirectional — knockback from boss center outward.
 	var kb_dir: Vector2 = Vector2.RIGHT
