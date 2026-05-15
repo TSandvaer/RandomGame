@@ -1,6 +1,12 @@
-# M2 Week-2 Backlog (DRAFT — anticipatory)
+# M2 Week-2 Backlog (CLOSED)
 
-**Owner:** Priya · **Tick:** 2026-05-03 (M1 RC `embergrave-html5-4484196` in active Sponsor soak; combat-fix dispatch in flight via `86c9m36zh` Devon + `86c9m37q9` Uma; M2 week-1 backlog drafted in `m2-week-1-backlog.md`, not yet dispatched) · **Status:** DRAFT — revisable post-Sponsor M1 sign-off AND post-week-1 close.
+**Owner:** Priya · **Original tick:** 2026-05-03 (M1 RC `embergrave-html5-4484196` in active Sponsor soak; combat-fix dispatch in flight) · **Closed:** 2026-05-15 — W2 RC `embergrave-html5-d9cc159` shipped clean (Tess bug-bash `team/tess-qa/soak-2026-05-15.md`: **0 blockers, 0 majors, 2 minors both addressed**).
+
+**Status:** **CLOSED 2026-05-15.** Retro at `team/priya-pl/m2-week-2-retro.md`. **Carry-overs absorbed by `team/priya-pl/m2-week-3-backlog.md`:** W2-T1, W2-T2, W2-T3, W2-T4, W2-T5, W2-T7 (conditional), W2-T8 (conditional), W2-T9, W2-T12. The W2 actual shape was playability close-out + harness completion (22 PRs merged across AC4 progression, inventory bandaid retirement, combat-trace coverage, polish/UX, harness hardening, level/physics-flush family) rather than the stratum-2 content authoring this backlog anticipated.
+
+---
+
+**Original status (preserved below):** DRAFT — revisable post-Sponsor M1 sign-off AND post-week-1 close.
 
 This document is **doubly anticipatory planning**. Goal: when (a) Sponsor signs off M1 and (b) M2 week-1 ships clean, the team can start week-2 immediately without a planning gap. The M2 week-1 backlog (`team/priya-pl/m2-week-1-backlog.md`) is itself anticipatory — week-2 is one step further out, so the gating is doubled.
 
