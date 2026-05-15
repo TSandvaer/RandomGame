@@ -1250,7 +1250,11 @@ export async function chaseAndClearMultiChaserRoom(
     const player = latestPos(capture, playerPosPattern);
     const mobReadings: PosReading[] = [];
     for (const p of posPatterns) {
-      const r = latestPos(capture, p);
+      // Scope to `t0` so a prior room's chaser `.pos` trace doesn't leak
+      // in — same rationale as `chaseAndClearKitingMobs` (Room 07 stale-leak
+      // observed in PR #212 release-build characterisation, ticket
+      // 86c9u9neq follow-up).
+      const r = latestPos(capture, p, undefined, t0);
       if (r !== null) mobReadings.push(r);
     }
 
