@@ -201,7 +201,22 @@ export const test = base.extend<
       // failures.
       const allLines = capture.getLines();
       const violations = allLines.filter((l) => {
-        if (l.type !== "warn" && l.type !== "error") return false;
+        // CRITICAL: Playwright's ConsoleMessage.type() returns "warning"
+        // (not "warn") for console.warn() calls — verified empirically
+        // 2026-05-16 against Playwright 1.49 + Chromium. The full enum
+        // is `"log" | "debug" | "info" | "error" | "warning" | "dir" |
+        // "dirxml" | "table" | "trace" | "clear" | "startGroup" |
+        // "startGroupCollapsed" | "endGroup" | "assert" | "profile" |
+        // "profileEnd" | "count" | "time" | "timeEnd"`. The original
+        // check (`l.type !== "warn"`) silently filtered out every
+        // `USER WARNING:` line — gate was a no-op for warnings since
+        // shipped (PR #217); the canary at universal-console-warning-
+        // gate.spec.ts:205 surfaced it via "Expected to fail, but
+        // passed" (ticket 86c9upfex). Accept BOTH "warning" (current
+        // Playwright API) AND "warn" (defensive against future API
+        // renames / CDP variations).
+        if (l.type !== "warning" && l.type !== "warn" && l.type !== "error")
+          return false;
         const isUserWarning = /^USER WARNING:/.test(l.text);
         const isUserError = /^USER ERROR:/.test(l.text);
         if (!isUserWarning && !isUserError) return false;

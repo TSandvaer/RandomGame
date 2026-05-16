@@ -699,3 +699,54 @@ When the game-side fix lands:
 - **Inaugural retirement.** PR #239 (`qa/harness-workaround-convention`) converts `gateTraversalWalk` case B to a hard throw per branch (b) of the convention.
 - **Second retirement.** PR `fix/qa-kiting-consumer2-case-b-retirement` (ticket 86c9unup7, audit `team/tess-qa/kiting-mob-chase-case-b-audit-2026-05-16.md`) converts `chaseAndClearMultiChaserRoom` (Consumer 2) case B in `tests/playwright/fixtures/kiting-mob-chase.ts` to a hard throw under the same convention — chaser AI does not retreat through the gate, so consumer 2's case B is dominantly the B-INSIDE sub-case that PR #230 deterministically consumes.
 - **Out-of-scope precedent — remaining case-B-style structure.** `chaseAndClearKitingMobs` (Consumer 1) in the same fixture KEEPS its case B branch — the single-Shooter kiter-retreat geometry makes the B-OUTSIDE sub-case (kill lands west of trigger, no overlapping body at unlock) legitimately reachable. Consumer 1's case B remains the lone case-B-style silent-resolution path in the harness and is out-of-scope per §15 (game-mechanic-driven multi-outcome, not a bug workaround). After PR #239 + PR `fix/qa-kiting-consumer2-case-b-retirement`, case B is fully retired in both `gateTraversalWalk` and kiting-mob-chase Consumer 2; Consumer 1 is the only remaining instance.
+
+## 16. Canary tests + `test.fail()` semantics — 2026-05-16 (ticket `86c9upfex`)
+
+### The bug class
+
+A "structural canary" test is a deliberately-failing test that proves a gate / fixture / assertion mechanism is still wired and functional. The canonical Embergrave example is the negative-control at `tests/playwright/specs/universal-console-warning-gate.spec.ts:205` — it deliberately emits a `USER WARNING:` line and uses Playwright's `test.fail()` to invert the expected outcome: gate fires → teardown throws → `test.fail()` inverts → reported as **passed**. If a future refactor breaks the gate, the canary flips RED (because teardown stops throwing → body passes → `test.fail()` says "expected to fail, but passed").
+
+The canary that shipped in PR #244 surfaced exactly this bug class against **its own gate** within hours of merging — Phase 2A migrated 11 specs to the `test-base` import, but the test-base afterEach filter had a type-string mismatch and silently let `USER WARNING:` lines pass. The canary was the only thing that caught it. **The harness gate had been a no-op for warnings since shipped in PR #217.** Every "green" Playwright run since 2026-05-15 had been hiding any real `USER WARNING:` line emitted at boot.
+
+### Root cause — Playwright `ConsoleMessage.type()` returns `"warning"`, not `"warn"`
+
+Playwright's `ConsoleMessage.type()` returns the string `"warning"` for `console.warn()` calls — verified empirically 2026-05-16 against Playwright 1.49 + Chromium with a minimal reproducer (`page.evaluate(() => console.warn(...))` + `page.on("console", msg => console.log(msg.type()))` → `"warning"`). The Playwright docs enumerate the full set: `"log" | "debug" | "info" | "error" | "warning" | "dir" | "dirxml" | "table" | "trace" | "clear" | "startGroup" | "startGroupCollapsed" | "endGroup" | "assert" | "profile" | "profileEnd" | "count" | "time" | "timeEnd"`.
+
+The original `test-base.ts` filter was `if (l.type !== "warn" && l.type !== "error") return false;` — `"warning"` matches neither, so every `USER WARNING:` line was filtered out before the regex match could fire. Errors (`"error"`) DID match correctly, so `USER ERROR:` lines were caught; only the warning path was broken.
+
+The fix accepts BOTH `"warning"` (current Playwright API) AND `"warn"` (defensive against future API renames / CDP variations). Same edit in `console-capture.ts::getLinesByType` docstring guidance: prefer `getLinesByType("warning")`, not `getLinesByType("warn")`.
+
+### `test.fail()` semantics — confirmed inverts fixture-teardown throws
+
+A separate hypothesis on the dispatch brief was that `test.fail()` might only invert assertion failures inside the test body, NOT fixture-teardown failures. **Verified empirically false** — a minimal reproducer (`test.fail("body passes, fixture throws", ...)` with a fixture that always throws in teardown) reports the test as `x` (expected failure) and the suite as `1 passed`. Playwright's `test.fail()` correctly inverts fixture-teardown failures too. The bug was purely the type-string mismatch.
+
+### Convention for future canary authors
+
+1. **Author the canary in a separate `describe` block** so allow-list / option overrides applied via `test.use({ ... })` in the canary block don't leak into the gate's other demonstration tests.
+
+2. **Use `test.fail()`, NOT `test.skip()` or `test.only()`** — only `test.fail()` provides the "expected-failure inverts" semantic that makes the canary self-asserting. A skipped canary is a non-canary.
+
+3. **Drive the deliberate failure from BROWSER-side**, not test-side. The current canary calls `page.evaluate(() => console.warn("USER WARNING: ..."))` — this routes through the real `page.on("console")` listener so it exercises the SAME capture path the gate uses in production. A test-side `throw new Error("USER WARNING:")` would NOT exercise that path and would give false confidence.
+
+4. **Include a drain interval** (e.g. `await page.waitForTimeout(500)`) AFTER the deliberate emission so the console event lands in the capture buffer before fixture teardown reads it.
+
+5. **No explicit assertion inside the test body.** The canary is structurally distinct from a regular test: the gate IS the assertion. If you `expect(...)` something in the body, you're asserting twice and the `test.fail()` semantics become ambiguous (which failure is the inverted one?).
+
+6. **Document the canary loudly** in the docstring, citing the ticket + the failure mode it catches. Future maintainers must understand that this is a `test.fail()` by design — if they "fix" the canary to pass under `test()`, they delete the regression guard.
+
+### Reviewer checklist (additive to §13–§15)
+
+- [ ] Does the PR introduce or modify a test using `test.fail()`?
+- [ ] If yes, is the failure driven through the SAME capture path the gate uses in production (not a synthetic test-side throw)?
+- [ ] Is there a docstring on the canary citing the ticket + describing the failure mode it catches?
+- [ ] Has the canary been verified end-to-end on CI at least once? (`test.fail()` failures only show as `x` in PR Playwright reports; trace through `gh run view` to confirm the inversion path works.)
+- [ ] Does the canary deliberately emit a console line that the gate fires on? (For warning gates: `console.warn("USER WARNING: ...")` from `page.evaluate`. For error gates: `console.error("USER ERROR: ...")`.)
+- [ ] Is the canary in its own `describe` block, isolated from other tests so `test.use({ ... })` allow-lists don't leak?
+
+### Cross-references
+
+- **Ticket.** `86c9upfex` — universal-warning-gate canary failure (this section's origin).
+- **PR.** `tess/canary-fix-86c9upfex` — type-string fix + this doc update.
+- **Sibling gate-broken pattern.** GUT-side `tests/test_no_warning_guard.gd` (`.claude/docs/test-conventions.md` § "Paired test for the guard itself") — same canary principle on the GUT surface; if the `WarningBus` signal wiring breaks, that file flips RED first.
+- **Test-base fixture.** `tests/playwright/fixtures/test-base.ts` line ~218 — the load-bearing filter with the fix + an inline comment pinning the failure mode.
+- **Console-capture helper.** `tests/playwright/fixtures/console-capture.ts::getLinesByType` — docstring now warns "use `\"warning\"`, not `\"warn\"`".

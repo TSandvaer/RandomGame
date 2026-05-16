@@ -78,7 +78,17 @@ export class ConsoleCapture {
   /**
    * Returns lines matching a specific console type.
    * Use type="error" to check for Godot push_error() calls.
-   * Use type="warn" for push_warning() calls.
+   * Use type="warning" for push_warning() calls.
+   *
+   * IMPORTANT: Playwright's `ConsoleMessage.type()` returns "warning"
+   * (NOT "warn") for `console.warn()` calls. The original "warn"
+   * convention assumed in earlier helper code is wrong against
+   * Playwright 1.49 — verified empirically 2026-05-16 (ticket
+   * 86c9upfex). The full enum returned by `msg.type()` is:
+   * `"log" | "debug" | "info" | "error" | "warning" | "dir" |
+   * "dirxml" | "table" | "trace" | "clear" | "startGroup" |
+   * "startGroupCollapsed" | "endGroup" | "assert" | "profile" |
+   * "profileEnd" | "count" | "time" | "timeEnd"`.
    */
   getLinesByType(type: string): CapturedLine[] {
     return this.lines.filter((l) => l.type === type);
