@@ -15,9 +15,31 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ---
 
-## Current state — 2026-05-15 (W2 closed CLEAN, W3 dispatching)
+## Current state — 2026-05-16 evening (M2 W3 RC Finding 2 saga closed; AC4 cluster still has 3 open P0s; week-ahead plan dispatched)
 
-**This header is the canonical "what's going on right now" entry. Per-role sections below are append-only history; their most recent entries are dated 2026-05-05 and are now historical (M1 RC post-fix-wave era — superseded by M2 W1 + W2 closure). Read this header first on resume.**
+**This header supersedes the 2026-05-15 W2-close entry below. Per-role sections further down are append-only history; their most recent entries are 2026-05-05 (M1 RC post-fix-wave era — historical). Read this header first on resume.**
+
+- **`origin/main` tip:** `84451f5` (PR #248 — universal-warning gate type-string fix; closes drift-class instance #1). Verify: `git rev-parse origin/main`.
+- **Open PRs at session-end:** Priya batch (this PR — week-ahead plan + M3 shape options + AC4 retro + risk-register refresh + STATE bump).
+- **Today's three structural surfaces (all merged at session-end):**
+  - **PR #247** (`c3ba4fb`) — closes Finding 2 boss-room Class B (Player.collision_layer regression via iframe re-entry guard). Diagnostic-instrumentation triad (Player.coll_diag / Pickup._activate_diag / StratumExit._arm_diag) preserved in main. `combat-architecture.md` § "Third Known Case" reframed with Class A vs Class B taxonomy. Diagnostic-trace-before-hypothesized-fix discipline validated TWICE this session.
+  - **PR #249** (`a885d56`) — `mob-self-engagement.spec.ts` `team=mob` regex was wrong from inception (~10 days silent-pass; engine emits `team=enemy`). Devon's `.claude/docs/test-conventions.md` § "Spec-string-vs-engine-emit drift" doc update names the class.
+  - **PR #248** (`84451f5`) — universal warning gate has been a no-op for warnings since PR #217 (~10 days); fixture checked `"warn"` but Playwright emits `"warning"`. **Every CI run pre-`84451f5` may have hidden warnings.**
+  - **Combined class: spec-string-vs-engine-emit drift** (R-DRIFT in risk register, §3.5 Gap 4 in AC4 retro). Inverts CI trust until drift-pin pattern universal across spec corpus.
+- **AC4 white whale (`86c9qckrd`):** 3 open P0 blockers — `86c9uf1x8` (Room 05 player-death recurrence, Drew in flight at session-handoff), `86c9uh2ue` (Rooms 06/07 mob-trace staleness, Drew queued), `86c9uh2kg` (Room 07 2-Shooter dispersal, Drew queued). Retro: `team/priya-pl/ac4-white-whale-retro.md` (this batch) — verdict STRUCTURAL_GAP-leaning-MIXED. Four structural gaps identified; Gap 4 (R-DRIFT) is the most concerning.
+- **Priya batch (this session):** `m2-week-3-rc-week-ahead-plan.md` + `m3-shape-options.md` + `ac4-white-whale-retro.md` + `risk-register.md` 2026-05-16 refresh (all under `team/priya-pl/`).
+- **New ClickUp tickets created (this batch):**
+  - `86c9ur5wf` — qa(harness): class-wide Playwright drift-pin audit (Urgent, Tess; dispatch AFTER #248 + #249 merge)
+  - `86c9ur5aq` — design(m3-seeds): M3 shape options exploration (P1, Priya; Sponsor decides at M2 sign-off)
+  - `86c9ur5j7` — chore(orch-meta): AWAY autonomy bar recalibration (P2, orchestrator-meta)
+- **Top-5 risks (2026-05-16, ordered by severity-this-week):** R-DRIFT (high/high, fired today), R-AC4 (high/med, actively firing), R6 (high/high, held), R-CANARY (med/high, in flight), R-AUTO (med/low). See `risk-register.md` 2026-05-16 refresh.
+- **Week-ahead critical chain:** PRs #248 + #249 merges → `86c9ur5wf` class-wide drift audit (Tess) → AC4 closure wave (Drew Rooms 05/06/07) → AC4 spec flip (Tess) → end-of-W3 journey-probe + bug-bash (PR #216 gate) → Sponsor M2 RC soak → M2 RC sign-off → M3 shape decision.
+
+---
+
+## Current state — 2026-05-15 (W2 closed CLEAN, W3 dispatching) — superseded by 2026-05-16 evening above
+
+**Historical header — kept for the 2026-05-15 → 2026-05-16 transition context. The 2026-05-16 evening header above is the live "what's going on right now" entry.**
 
 - **`origin/main` tip:** `5e471f0` (PR #202 — `pm(m2): week-2 close + week-3 backlog v1.0`). Verify: `git rev-parse origin/main`.
 - **M2 W2 closed CLEAN:** 22 PRs merged in the W2 arc (#176 through #202). Tess's end-of-week-2 exploratory bug-bash (`team/tess-qa/soak-2026-05-15.md`, ticket `86c9kxx7h`) against `embergrave-html5-d9cc159` returned **0 blockers, 0 majors, 2 minors** — both minors addressed (`86c9u33h1` Pickup silent-drop shipped in PR #199; `86c9u33hh` stale AC4 `test.fail()` annotation folded into W3-T1 implementation).
