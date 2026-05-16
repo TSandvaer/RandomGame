@@ -324,10 +324,19 @@ func test_stratum_exit_activate_deferred_after_boss_death() -> void:
 	assert_false(area.monitoring,
 		"REGRESSION-86c9ujq8d: interaction area NOT monitoring same frame as boss death " +
 		"— monitoring mutation is deferred to avoid physics-flush panic")
-	# **After one process frame:** the deferred `activate()` has landed.
+	# **After one process frame:** the deferred `activate()` has landed and
+	# flipped `_is_active` synchronously (the sync part of activate()).
 	await get_tree().process_frame
 	assert_true(exit.is_active(),
-		"REGRESSION-86c9ujq8d: StratumExit IS active after deferred activate() lands")
+		"REGRESSION-86c9ujq8d: StratumExit IS active after deferred activate() lands " +
+		"(sync portion: _is_active latch flips immediately in activate())")
+	# **REGRESSION-86c9unkr2 update:** after PR #240, the monitoring write is
+	# now ALSO awaited via `await get_tree().physics_frame` inside
+	# `_arm_interaction_area_after_flush` (double-defer for HTML5 silent
+	# ERR_FAIL_COND). So monitoring needs ONE MORE physics_frame to land.
+	await get_tree().physics_frame
+	await get_tree().process_frame
 	assert_true(area.monitoring,
-		"REGRESSION-86c9ujq8d: interaction area IS monitoring after deferred activate() — " +
+		"REGRESSION-86c9ujq8d + 86c9unkr2: interaction area IS monitoring after " +
+		"the double-defer settles (call_deferred activate + await physics_frame inside _arm_interaction_area_after_flush) — " +
 		"player can walk in and trigger descend_triggered")
