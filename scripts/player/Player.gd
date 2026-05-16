@@ -941,7 +941,42 @@ func _exit_dodge() -> void:
 	set_state(STATE_IDLE)
 
 
+## **Re-entry guard (load-bearing — ticket 86c9uq0ky, Sponsor 2026-05-16 soak).**
+##
+## When this function runs while the player is ALREADY invulnerable, do NOT
+## overwrite `_saved_collision_layer`. The current `collision_layer` at that
+## point is the cleared value `0` (set by the prior `_enter_iframes` call),
+## not the real player layer bit. Re-saving it would clobber the genuine
+## restore value, and the subsequent `_exit_iframes` would restore the
+## player to `collision_layer = 0` — permanently invisible to Pickup +
+## StratumExit Area2D queries (mask=2 vs player-now-layer=0).
+##
+## **Empirical failure chain (without the guard)**, Sponsor diag `83267fd`:
+##   1. Boss-combat hit → `take_damage` line 585 → `_enter_iframes` →
+##      saves layer=2, clears to layer=0, arms HIT_IFRAMES_SECS timer
+##      against `_exit_iframes_if_not_dodging`.
+##   2. Player dodges DURING the hit-iframe window → `try_dodge` line 741 →
+##      `_enter_iframes` AGAIN. Pre-fix this re-saved `_saved_collision_layer
+##      = collision_layer = 0`. Layer-2 restore value LOST.
+##   3. Hit-iframe timer fires → `_exit_iframes_if_not_dodging` → no-op
+##      (state == STATE_DODGE).
+##   4. Dodge ends → `_exit_dodge` → `_exit_iframes` → `collision_layer =
+##      _saved_collision_layer = 0`. Trapped forever.
+##
+## Sponsor trace `[combat-trace] Player.coll_diag | pos=... layer=0 mask=1
+## cs_disabled=false iframes=false` after boss death confirmed this exact
+## end-state. Pickup (mask=2) + StratumExit body_entered never fire because
+## the Player CharacterBody2D is on layer 0.
+##
+## Regression pin: `tests/test_player_collision_layer_restore.gd`.
 func _enter_iframes() -> void:
+	if _is_invulnerable:
+		# Already in iframes — `_saved_collision_layer` already holds the
+		# real (pre-iframe) layer; do NOT overwrite it with the cleared 0.
+		# Idempotent on collision_layer too: already 0 from the prior call.
+		_is_invulnerable = true  # explicit no-op for readability
+		iframes_started.emit()
+		return
 	_is_invulnerable = true
 	_saved_collision_layer = collision_layer
 	# Drop the player layer bit so enemy hitboxes (mask: layer 2) miss us.
