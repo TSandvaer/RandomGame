@@ -81,11 +81,18 @@ func test_activate_flips_to_active_state() -> void:
 
 
 func test_active_exit_enables_area_collision() -> void:
+	# REGRESSION-86c9unkr2: monitoring flip now lands via await get_tree().physics_frame
+	# inside _arm_interaction_area_after_flush, so tests must drain a physics frame
+	# AFTER activate() to observe the post-flip state. Previously the flip was
+	# synchronous in _apply_active_state; the await fix decouples the visual flip
+	# (sync) from the Area2D monitoring flip (async) to dodge HTML5 silent ERR_FAIL_COND.
 	var exit: StratumExit = _make_exit()
 	exit.activate()
+	await get_tree().physics_frame
+	await get_tree().process_frame
 	var area: Area2D = exit.get_interaction_area()
-	assert_true(area.monitoring, "Area2D monitoring ON while ACTIVE")
-	assert_true(area.monitorable, "Area2D monitorable ON while ACTIVE")
+	assert_true(area.monitoring, "Area2D monitoring ON while ACTIVE (post-await)")
+	assert_true(area.monitorable, "Area2D monitorable ON while ACTIVE (post-await)")
 
 
 func test_active_exit_shows_prompt_when_player_in_range() -> void:
@@ -357,3 +364,77 @@ func test_activate_idempotent_with_pre_existing_overlap() -> void:
 	exit.activate()  # second call must be a no-op
 	assert_signal_emit_count(exit, "exit_activated", 1,
 		"REGRESSION-86c9un4nh: exit_activated emits exactly once even with repeated activate() + overlap")
+
+
+# ---- REGRESSION-86c9unkr2: double-defer for HTML5 physics-flush silent ERR_FAIL_COND
+#
+# Sponsor's 2026-05-16 soak of `92b6206` (PR #236 build) showed boss-room
+# StratumExit + Pickups silently un-overlappable. The trace stream confirmed
+# `StratumExit.activate` ran but `body_entered` never fired afterward — the
+# C++ Area2D monitoring setter's `ERR_FAIL_COND_MSG` silently fired in HTML5
+# despite the single `call_deferred("activate")` from `Stratum1BossRoom._on_boss_died`.
+#
+# Fix: `activate()` flips `_is_active` + visual state synchronously, then
+# `await get_tree().physics_frame` inside `_arm_interaction_area_after_flush`
+# before touching `_interaction_area.monitoring`. This guarantees the
+# monitoring write lands strictly outside any in-flight `flush_queries()`
+# window.
+#
+# These tests pin:
+#   1. `_is_active` flips synchronously inside `activate()` (test bar: same-frame
+#      observation of `is_active()` continues to work).
+#   2. `_interaction_area.monitoring` flips AFTER one full physics_frame (not
+#      synchronous — the await is the load-bearing fix).
+#   3. `_arm_interaction_area_after_flush` is idempotent / safe-on-freed-node.
+
+func test_activate_is_active_flips_synchronously() -> void:
+	# REGRESSION-86c9unkr2: idempotency latch + UI state flip must remain
+	# synchronous so production callers (including Stratum1BossRoom that
+	# call_deferreds activate) observe `is_active()` true immediately.
+	var exit: StratumExit = _make_exit()
+	exit.activate()
+	# NO await — we expect is_active() true synchronously.
+	assert_true(exit.is_active(),
+		"REGRESSION-86c9unkr2: _is_active flips synchronously in activate() even with the async monitoring defer below")
+
+
+func test_activate_monitoring_flips_after_physics_frame_not_synchronously() -> void:
+	# REGRESSION-86c9unkr2: the load-bearing assertion — monitoring flips
+	# AFTER an await physics_frame, NOT on the same tick as activate(). This
+	# is the deferred-monitoring behavior that takes the mutation strictly
+	# outside any flush_queries() window in HTML5.
+	var exit: StratumExit = _make_exit()
+	var area: Area2D = exit.get_interaction_area()
+	assert_false(area.monitoring, "precondition: monitoring OFF on INACTIVE exit")
+	exit.activate()
+	# Synchronously after activate() returns: monitoring is STILL false
+	# (the await hasn't resolved yet). This is the load-bearing observable.
+	assert_false(area.monitoring,
+		"REGRESSION-86c9unkr2: monitoring stays false synchronously after activate() — " +
+		"the await get_tree().physics_frame defers the actual flip to dodge HTML5 silent ERR_FAIL_COND")
+	# Drain a physics_frame for the await to resolve + a process_frame for
+	# the resumed coroutine to write the field.
+	await get_tree().physics_frame
+	await get_tree().process_frame
+	assert_true(area.monitoring,
+		"REGRESSION-86c9unkr2: monitoring flips ON one physics_frame after activate() — " +
+		"_arm_interaction_area_after_flush resumed and wrote monitoring=true outside the flush")
+	assert_true(area.monitorable, "monitorable parity preserved post-await")
+
+
+func test_arm_interaction_area_after_flush_safe_on_freed_exit() -> void:
+	# REGRESSION-86c9unkr2: the deferred-resume body must guard `is_inside_tree`
+	# defensively — a Stratum1BossRoom torn down between activate() and the
+	# physics_frame resume (test teardown, room transition) must not crash on
+	# null `_interaction_area` or freed tree access.
+	var exit: StratumExit = _make_exit()
+	exit.activate()
+	# Free immediately — simulates the boss-room being queue_freed before
+	# the deferred resume lands.
+	exit.queue_free()
+	# Drain frames so the await + post-await code runs against the freed node.
+	# If the guard isn't in place, this would crash the test.
+	await get_tree().physics_frame
+	await get_tree().process_frame
+	# If we reach here without crashing, the guard worked.
+	assert_true(true, "REGRESSION-86c9unkr2: deferred resume guards is_inside_tree on freed exit")
