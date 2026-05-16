@@ -126,11 +126,45 @@ func get_prompt_label() -> Label:
 ## times after the first does nothing (the second `boss_died` is impossible
 ## but defensive: if the host scene wires the same signal twice we don't
 ## want a flicker or duplicate emit).
+##
+## **Knockback-overlap fix (ticket 86c9un4nh — Finding 3 M2 W3 re-soak).**
+## `activate()` is called via `call_deferred` from `Stratum1BossRoom._on_boss_died`
+## (PR #232 physics-flush fix). This defers the monitoring flip to the next
+## frame — but if the player is ALREADY standing inside the 40×40 interaction
+## area when monitoring turns on, Godot 4's `body_entered` does NOT re-fire
+## for pre-existing overlaps. `_player_in_range` stays false, the prompt never
+## shows, pressing E does nothing — player is trapped forever.
+##
+## This is the same bug class as `RoomGate._unlock()` (PR #230 knockback-
+## overlap fix): after `gate_unlocked` the player may be physically inside the
+## gate trigger but `body_entered` won't re-fire. Fix: explicit
+## `get_overlapping_bodies()` check after flipping monitoring on.
+##
+## Fix: after `_apply_active_state(true)`, walk `get_overlapping_bodies()`.
+## If the player is already inside, call `_on_body_entered(body)` directly
+## (deferred — stay out of any residual physics-flush context in the
+## call_deferred chain) so `_player_in_range` is set and the prompt appears.
+## Same shape as `RoomGate._fire_traversal_if_unlocked`.
 func activate() -> void:
 	if _is_active:
 		return
 	_is_active = true
 	_apply_active_state(true)
+	_combat_trace("StratumExit.activate",
+		"monitoring flipped ON — checking pre-existing body overlaps (knockback-overlap fix)")
+	# **Pre-existing overlap re-check (ticket 86c9un4nh):** if the player was
+	# already inside the interaction area before monitoring turned on, fire the
+	# in-range detection manually. Deferred (via call_deferred on _on_body_entered
+	# equivalent) to stay out of any physics-flush context this activate() might
+	# run in (it is called via call_deferred from _on_boss_died, but an
+	# additional defer is belt-and-suspenders for future call-site changes).
+	if is_inside_tree() and _interaction_area != null:
+		for body in _interaction_area.get_overlapping_bodies():
+			if body is CharacterBody2D:
+				_combat_trace("StratumExit.activate",
+					"player already inside interaction area — firing _on_body_entered deferred")
+				call_deferred("_on_body_entered", body)
+				break
 	exit_activated.emit()
 
 
@@ -255,8 +289,24 @@ func _on_body_entered(_body: Node) -> void:
 	# be the player. Don't couple to Player class — keeps tests light.
 	_player_in_range = true
 	_update_prompt_visibility()
+	_combat_trace("StratumExit._on_body_entered",
+		"player_in_range=true is_active=%s descend_triggered=%s" % [
+			str(_is_active), str(_descend_triggered)])
 
 
 func _on_body_exited(_body: Node) -> void:
 	_player_in_range = false
 	_update_prompt_visibility()
+
+
+## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
+## Same pattern as RoomGate._combat_trace and mob _combat_trace helpers; emits
+## in HTML5 builds so Sponsor's DevTools console can confirm the StratumExit
+## monitoring + player-overlap state — the observable surface for the ticket
+## 86c9un4nh knockback-overlap fix (Finding 3 M2 W3 re-soak).
+func _combat_trace(tag: String, msg: String = "") -> void:
+	var df: Node = null
+	if is_inside_tree():
+		df = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(tag, msg)

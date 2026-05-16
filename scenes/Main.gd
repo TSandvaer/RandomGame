@@ -950,12 +950,29 @@ func _save_on_quit() -> void:
 # ---- Signal handlers --------------------------------------------
 
 func _on_mob_died(mob: Node, death_position: Vector2, mob_def: Resource) -> void:
+	# Diagnostic trace (ticket 86c9un4nh — Finding 2 re-diagnosis). Emit at
+	# the entry point so the trace stream shows WHICH mob died and whether
+	# mob_def is null (the two early-exit conditions for the loot pipeline).
+	# Two on_mob_died lines for the same mob in the same frame = dual-spawner
+	# regression. Zero lines for a boss kill = signal not wired in _wire_mob.
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags") if is_inside_tree() else null
+	if df != null and df.has_method("combat_trace"):
+		var mob_id: String = "<null>"
+		if mob_def != null and mob_def.has_method("get") and mob_def.get("id") != null:
+			mob_id = String(mob_def.get("id"))
+		df.combat_trace("Main._on_mob_died",
+			"mob=%s mob_def=%s mob_id=%s pos=(%.0f,%.0f)" % [
+				str(mob), str(mob_def != null), mob_id,
+				death_position.x, death_position.y])
 	# Forward to the loot spawner so a pickup spawns at the death position.
 	if _loot_spawner != null and mob_def != null:
 		var pickups: Array[Node] = _loot_spawner.on_mob_died(mob, death_position, mob_def as MobDef)
 		var inventory: Node = _inventory()
 		if inventory != null and inventory.has_method("auto_collect_pickups"):
 			inventory.auto_collect_pickups(pickups)
+			if df != null and df.has_method("combat_trace"):
+				df.combat_trace("Main._on_mob_died",
+					"auto_collect_pickups wired for %d pickups — picked_up→on_pickup_collected connected" % pickups.size())
 	# Levels.subscribe_to_mob already grants XP via its own one-shot
 	# connection, so we don't double-call here.
 
