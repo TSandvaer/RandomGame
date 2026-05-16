@@ -89,6 +89,39 @@ func _ready() -> void:
 		item_id, global_position.x, global_position.y,
 		collision_layer, collision_mask,
 	])
+	# Diagnostic-only instrumentation (ticket `86c9uq0ky` — Finding 2 NEW bug
+	# class investigation, 2026-05-16 Sponsor soak of `8e76c74`). PR #241's
+	# double-defer + readback proved `mon_actual=true` post-flip — yet boss-room
+	# `body_entered` still never fires. Hypotheses to discriminate via these
+	# traces:
+	#   (a) CollisionShape2D missing or `disabled=true` in the boss-room scope
+	#       (would explain zero physics overlap despite monitoring=true)
+	#   (b) Pickup not actually `is_inside_tree()` when overlap probe runs
+	#   (c) Parent name unexpected (e.g. picked up wrong parent under add_child)
+	#   (d) local `position` set but a parent re-parenting moved global_position
+	# This trace pairs with `Pickup._activate_diag` (post-await overlap counts)
+	# + `StratumExit._arm_diag` (sibling) + `Player.coll_diag` (player-side state).
+	# Pickup is an Area2D, so its physics presence is gated on monitoring AND
+	# the child CollisionShape2D being non-disabled with a valid shape resource.
+	var cs: CollisionShape2D = get_node_or_null("CollisionShape2D") as CollisionShape2D
+	var cs_disabled: String = "<no_cs>"
+	var cs_shape_kind: String = "<no_cs>"
+	var cs_shape_set: String = "<no_cs>"
+	if cs != null:
+		cs_disabled = str(cs.disabled)
+		cs_shape_set = str(cs.shape != null)
+		cs_shape_kind = _describe_shape(cs.shape)
+	var parent_name: String = "<no_parent>"
+	var parent_node: Node = get_parent()
+	if parent_node != null:
+		parent_name = String(parent_node.name)
+	_combat_trace("Pickup._ready_diag",
+		"cs_disabled=%s cs_shape=%s shape_set=%s parent=%s is_inside_tree=%s local_pos=(%.0f,%.0f) global_pos=(%.0f,%.0f)" % [
+			cs_disabled, cs_shape_kind, cs_shape_set,
+			parent_name, str(is_inside_tree()),
+			position.x, position.y,
+			global_position.x, global_position.y,
+		])
 
 
 ## Re-enable monitoring (the encapsulated-monitoring pattern's `_ready`-side
@@ -147,6 +180,30 @@ func _activate_and_check_initial_overlap() -> void:
 	_combat_trace("Pickup._activate_and_check_initial_overlap",
 		"mon_actual=%s mon_req=true initial_overlap_player_count=%d" % [
 			str(monitoring), initial_overlaps])
+	# Diagnostic-only instrumentation (ticket `86c9uq0ky`): augments the
+	# existing `mon_actual` line with the full physics-server readback —
+	# overlapping bodies (count of ALL bodies, not just players), overlapping
+	# areas, child CollisionShape2D state, and a re-readback of `monitoring`.
+	# If `mon_actual=true` here but `overlapping_bodies=0` while the player is
+	# spatially adjacent (per `Player.pos` + `Pickup._ready` global_pos), the
+	# bug is NOT a monitoring flip failure — it is some downstream physics-server
+	# registration issue. cs_disabled=true would explain it directly (the shape
+	# isn't participating in queries). cs_shape_set=false would explain it too
+	# (shape resource lost on a re-instance / .tscn drift). monitorable matters
+	# less for body queries but is included for completeness.
+	var cs: CollisionShape2D = get_node_or_null("CollisionShape2D") as CollisionShape2D
+	var cs_disabled: String = "<no_cs>"
+	var cs_shape_set: String = "<no_cs>"
+	if cs != null:
+		cs_disabled = str(cs.disabled)
+		cs_shape_set = str(cs.shape != null)
+	_combat_trace("Pickup._activate_diag",
+		"overlapping_bodies=%d overlapping_areas=%d cs_disabled=%s cs_shape_set=%s monitoring=%s monitorable=%s" % [
+			get_overlapping_bodies().size(),
+			get_overlapping_areas().size(),
+			cs_disabled, cs_shape_set,
+			str(monitoring), str(monitorable),
+		])
 	if item == null:
 		return
 	for body in get_overlapping_bodies():
@@ -235,3 +292,21 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 		df = get_tree().root.get_node_or_null("DebugFlags")
 	if df != null and df.has_method("combat_trace"):
 		df.combat_trace(tag, msg)
+
+
+## Diagnostic-only helper (ticket `86c9uq0ky`): stringify a Shape2D resource
+## with type + relevant size dimension. `CircleShape2D.radius`, `RectangleShape2D.size`,
+## `CapsuleShape2D.radius/height`. Falls back to the class name only for other
+## shape types. Used by the `Pickup._ready_diag` instrumentation trace.
+func _describe_shape(s: Shape2D) -> String:
+	if s == null:
+		return "<null>"
+	if s is CircleShape2D:
+		return "Circle(r=%.1f)" % (s as CircleShape2D).radius
+	if s is RectangleShape2D:
+		var rs: Vector2 = (s as RectangleShape2D).size
+		return "Rect(%.0fx%.0f)" % [rs.x, rs.y]
+	if s is CapsuleShape2D:
+		var cap: CapsuleShape2D = s as CapsuleShape2D
+		return "Capsule(r=%.1f h=%.1f)" % [cap.radius, cap.height]
+	return s.get_class()

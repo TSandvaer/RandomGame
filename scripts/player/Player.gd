@@ -307,6 +307,29 @@ func _physics_process(delta: float) -> void:
 			"pos=(%.0f,%.0f) state=%s" % [
 				global_position.x, global_position.y, _state
 			])
+		# Diagnostic-only instrumentation (ticket `86c9uq0ky` — Finding 2 NEW
+		# bug class investigation, 2026-05-16 Sponsor soak of `8e76c74`).
+		# Throttled alongside `Player.pos` so Sponsor's HTML5 console always
+		# has a same-tick datapoint of player collision presence — if Pickup +
+		# StratumExit report `monitoring=true` AND `cs_disabled=false` AND
+		# `overlapping_bodies=0` while the player is spatially adjacent, the
+		# question becomes "is the PLAYER physics body actually present in the
+		# world?" During dodge i-frames `collision_layer` is intentionally
+		# cleared to 0 (see `_enter_iframes`) — this trace surfaces that state
+		# directly so we can rule out "player invisible to Area2D queries during
+		# the soak window where the player walked around the pickups." If
+		# `cs_disabled=true` here, the bug is on the player side regardless of
+		# any Pickup-side diagnostics.
+		var pcs: CollisionShape2D = get_node_or_null("CollisionShape2D") as CollisionShape2D
+		var pcs_disabled: String = "<no_cs>"
+		if pcs != null:
+			pcs_disabled = str(pcs.disabled)
+		_combat_trace("Player.coll_diag",
+			"pos=(%.0f,%.0f) layer=%d mask=%d cs_disabled=%s iframes=%s" % [
+				global_position.x, global_position.y,
+				collision_layer, collision_mask,
+				pcs_disabled, str(_is_invulnerable),
+			])
 
 
 # ---- Public API (used by tests, hitbox scripts, save) -------------------
