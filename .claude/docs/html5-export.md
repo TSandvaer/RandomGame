@@ -11,6 +11,42 @@ HTML5 export uses the **`gl_compatibility`** renderer (Godot 4.3 default for web
 - **Z-index sensitivity.** `z_index = -1` in `gl_compatibility` can sink a node below the room background's draw layer in ways that don't reproduce on desktop. The PR #137 wedge fix lifted z_index from `-1` to `+1` as part of the same swap. **Rule: don't rely on negative z_index for "draw above floor, below player body" layering** — use positive z_index above the floor's z_index or factor through CanvasLayer.
 - **Default-font glyph coverage.** The Godot 4.3 `gl_compatibility` HTML5 export's built-in default font covers only a subset of Unicode. Non-ASCII cue glyphs outside that subset — including U+2713 `✓` (checkmark), arrows, box-drawing characters — render as a notdef "tofu" box in HTML5, while passing undetected in headless GUT and desktop builds (those use a wider OS fallback font). PR #179's equipped-item inventory badge shipped `✓` in a Label and hit this in production. **Rule: draw cue glyphs (checkmarks, arrows, indicator icons) as geometry — e.g. two rotated `ColorRect` strokes — not as font characters. Plain ASCII text in `Label` nodes is unaffected.** If a Unicode glyph is essential, import a custom `.ttf`/`.otf` covering the codepoint and assign it as the control's custom font. This divergence is invisible to headless GUT and desktop — only an HTML5 smoke test catches it, so it is subject to the visual-verification gate.
 
+## Browser-native event leakage (RMB context menu, etc.)
+
+HTML5 builds run inside a browser tab, and the browser's native event handling fires alongside Godot's input handling unless explicitly suppressed. **Right-click is the most user-visible leak:** RMB heavy-attack triggers the browser's default `contextmenu` event (popup menu over the canvas), and the game loses input focus until the user dismisses it. Reported by Sponsor in the 2026-05-16 M2 W3 soak; fixed in PR #235.
+
+**Fix pattern — `export_presets.cfg` `html/head_include` script injection:**
+
+```ini
+[preset.0.options]
+html/head_include="<script>
+window.addEventListener('DOMContentLoaded', () => {
+  const block = e => e.preventDefault();
+  document.addEventListener('contextmenu', block);
+  document.querySelector('canvas')?.addEventListener('contextmenu', block);
+});
+</script>"
+```
+
+The `head_include` field embeds the script into the generated `index.html` `<head>` at export time. Suppress at both `document` and `canvas` to cover all hit paths. No GDScript change required.
+
+**Other likely browser-event leaks to watch for in future soak rounds** (none confirmed in the codebase yet, but Uma flagged the class in PR #235's decision draft):
+
+- `dragstart` / `drop` — browser drag-and-drop semantics
+- `wheel` — page-scroll while the game tries to consume the wheel
+- `selectstart` — text-selection on canvas-adjacent UI
+- `touchstart` double-tap zoom on mobile (suppress via `touch-action: manipulation` CSS or `viewport` meta tag)
+
+Each is a small `head_include` addition once it surfaces. The whole class is "browser default behaviour leaks through Godot input handling" — the suppression mechanism is the same.
+
+## Godot input handling order: `_input()` vs `_unhandled_input()` for UI shortcuts
+
+A second 2026-05-16 soak finding (PR #235): the inventory's "Tab close" hint did not work — pressing Tab while the inventory was open cycled focus between inventory Buttons instead of closing the panel. The toggle binding was in `_unhandled_input()`, which fires AFTER Godot's GUI system has already consumed Tab for focus-traversal between Control nodes.
+
+**Rule:** any UI shortcut that overlaps with Godot's built-in GUI input semantics (Tab for focus-cycle, Space for button-activate, arrow keys for focus-direction) MUST be handled in `_input()` (which fires BEFORE the GUI system), not `_unhandled_input()`. After handling, call `set_input_as_handled()` to stop propagation.
+
+Esc and most game-only keys do NOT have this conflict and remain fine in `_unhandled_input()`. The InventoryPanel pattern at HEAD is the canonical example: Tab toggle in `_input()`, Esc close in `_unhandled_input()`.
+
 ## Resource enumeration on packed `.pck` resources
 
 **`DirAccess.current_is_dir()` returns false on subdirectories of packed `.pck` resources in HTML5.** Recursive `DirAccess` scans that work on desktop (and headless GUT) silently skip subdirs in HTML5 — entries that ARE directories get `current_is_dir() == false` and the recursion never descends. This bit `ContentRegistry.load_all()` in PR #166 (ticket `86c9qah1f`): `iron_sword.tres` lives at `resources/items/weapons/iron_sword.tres`, the recursive scan missed it in HTML5 only, and `Inventory.restore_from_save` push_warning'd `unknown item id 'iron_sword'` on every F5 reload.
