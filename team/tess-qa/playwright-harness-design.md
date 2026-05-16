@@ -750,3 +750,85 @@ A separate hypothesis on the dispatch brief was that `test.fail()` might only in
 - **Sibling gate-broken pattern.** GUT-side `tests/test_no_warning_guard.gd` (`.claude/docs/test-conventions.md` § "Paired test for the guard itself") — same canary principle on the GUT surface; if the `WarningBus` signal wiring breaks, that file flips RED first.
 - **Test-base fixture.** `tests/playwright/fixtures/test-base.ts` line ~218 — the load-bearing filter with the fix + an inline comment pinning the failure mode.
 - **Console-capture helper.** `tests/playwright/fixtures/console-capture.ts::getLinesByType` — docstring now warns "use `\"warning\"`, not `\"warn\"`".
+
+## 17. Convention: drift-pin GUT tests for free-form engine-emit strings — 2026-05-16 (ticket `86c9ur5wf`)
+
+**Status:** Hard rule, established by the class-wide drift-pin audit (`team/tess-qa/playwright-drift-audit-2026-05-16.md`). Direct follow-up to PR #249's `Hitbox.TEAM_*` precedent (ticket `86c9upffv`).
+
+### The rule
+
+> **Any Playwright spec assertion whose regex captures a free-form string interpolated from an engine-side `StringName` / `String` constant MUST be paired with a GUT drift-pin asserting the constant's string value.**
+>
+> Free-form engine-emit strings include — but are not limited to:
+> - Mob state names rendered via `state=%s` (`Grunt.STATE_CHASING`, `Shooter.STATE_KITING`, etc. — formatted in `<Mob>.pos` / `<Mob>._set_state` traces).
+> - Tutorial beat ids rendered via `beat=%s` (`TutorialEventBus.BEAT_TEXTS` keys — formatted in `TutorialEventBus.request_beat` trace).
+> - Source-tag enums rendered via `source=%s` (`Inventory.equip` source argument — formatted in `Inventory._emit_equip_trace`).
+> - Team identifiers rendered via `team=%s` (`Hitbox.TEAM_PLAYER` / `Hitbox.TEAM_ENEMY` — formatted in `Hitbox._try_apply_hit`). **Precedent — already pinned in PR #249.**
+> - Any future `<noun>=<value>` slot pattern in a `[combat-trace]` line that the harness greps by literal value.
+
+### Why this rule exists
+
+PR #249 (`86c9upffv`) surfaced the cost: `mob-self-engagement.spec.ts` shipped with `team=mob target=Player` in the regex — a string that has never existed in the codebase (Hitbox.gd has only `&"player"` and `&"enemy"`). The spec failed for Room 02 + every `test.fail()` block on every CI run since merge, hidden among other CI bounces until PR #244 Phase 2A migration surfaced it as a named failure cluster. `soak-narrative-regression.spec.ts` had the same defect latent in an OR-branch (dead code).
+
+The drift-pin in `tests/test_hitbox.gd::test_team_constants_match_trace_string_contract` is the structural answer: a GUT test in headless CI flips RED on a future rename BEFORE the Playwright spec drifts silently green-on-no-match.
+
+The audit at `team/tess-qa/playwright-drift-audit-2026-05-16.md` swept every `tests/playwright/specs/*.spec.ts` and `tests/playwright/fixtures/*.ts` for free-form-engine-emit regex assertions, identified the gaps left by PR #249's first-pass fix, and shipped them as a class.
+
+### Workflow
+
+When you add or modify a Playwright spec assertion:
+
+1. **Identify free-form interpolated values in the regex.** Substrings like `state=chasing`, `beat=wasd`, `source=auto_pickup`, `team=enemy`, `<mob>._die`, `damage=<N>` — any value that the engine produces via `%s` / `%d` substitution from a non-literal-in-the-format-string source.
+
+2. **Trace the value to its engine const / production literal.**
+   - `state=chasing` → `Grunt.STATE_CHASING: StringName = &"chasing"` (in `scripts/mobs/Grunt.gd`)
+   - `beat=wasd` → `TutorialEventBus.BEAT_TEXTS` key `&"wasd"`
+   - `source=auto_pickup` → inline literal at `Inventory.on_pickup_collected` call site
+   - `team=enemy` → `Hitbox.TEAM_ENEMY: StringName = &"enemy"`
+
+3. **Confirm or add a value-asserting drift-pin** in the appropriate GUT test file:
+   - **For class-scoped consts:** `tests/test_<class>.gd` (or `tests/test_playwright_trace_string_contract.gd` for cross-class pins).
+   - **For inline production literals:** the test must exercise the production call shape (e.g. `Inventory.equip(item, &"weapon", &"auto_pickup")` succeeds) — the next-best pin when no central const exists.
+
+4. **Use `assert_eq(String(<const>), "<literal>", ...)`** — not `assert_eq(<const>, <const>)` (that is reference-equality and passes silently after a rename). The `String(...)` cast forces a value-rendering assertion.
+
+5. **Pair the spec PR with the pin PR.** A spec change that introduces a new free-form regex assertion without a paired pin is a REQUEST CHANGES finding in code review.
+
+When you review a Playwright PR:
+
+- Search the diff for new / changed regex assertions in `tests/playwright/specs/` or `tests/playwright/fixtures/`.
+- For each regex, identify free-form interpolated values.
+- For each value, confirm a value-asserting GUT pin exists (grep `assert_eq(String(...)` in the relevant test file).
+- If a pin is missing: **REQUEST CHANGES**. Cite this section + the audit doc.
+
+### Pre-existing drift-pin coverage
+
+The audit's first pass shipped pins for these surfaces. New free-form regex assertions in spec changes must extend the appropriate file:
+
+- **`Hitbox.TEAM_PLAYER` / `Hitbox.TEAM_ENEMY`** — `tests/test_hitbox.gd::test_team_constants_match_trace_string_contract` (PR #249).
+- **`Grunt.STATE_CHASING`** — `tests/test_playwright_trace_string_contract.gd::test_grunt_state_chasing_string_value_matches_trace_contract` (this audit).
+- **`Stratum1Boss.STATE_CHASING`** — same file, sibling test (preemptive — pinned in lockstep with `Grunt.STATE_CHASING`).
+- **`TutorialEventBus.BEAT_TEXTS` keys** — same file, `test_tutorial_event_bus_beat_keys_match_trace_contract` (asserts the full key-set as a sorted array).
+- **`Inventory.equip` source tags (`lmb_click` / `auto_pickup` / `auto_starter`)** — same file, `test_inventory_equip_accepts_all_playwright_asserted_source_tags` (exercises the production call shape — Inventory.equip has no central source-tag const).
+
+### Out of scope
+
+- **Wholly-literal format strings.** A trace like `_combat_trace("Grunt._die", "starting death sequence")` has no interpolated value — the regex `\[combat-trace\] Grunt\._die` is matching the literal class-method name (a class-name refactor is caught by every other test in the codebase that imports `Grunt.gd`).
+- **Numeric values.** Trace lines like `damage=%d`, `hp=%d/%d`, `pos=(%.0f,%.0f)` interpolate numbers — these are gameplay tunables (rebalances), not refactor-renames. Specs that assert on specific numbers (`damage=6 == iron_sword.base_damage`) should pair with a constant-value pin elsewhere (e.g. `iron_sword.tres`), but that is a balance-pin pattern, not a drift-pin.
+- **Trace prefixes that match class names.** `Grunt.pos`, `RoomGate.gate_traversed`, `Stratum1Boss._force_queue_free` — the literal class.method shape is protected by every other test importing the class. A rename of the class would fail the import resolution in dozens of files first.
+
+### Reviewer checklist (additive to §13–§16)
+
+- [ ] Does the PR introduce or modify a Playwright spec / fixture regex assertion?
+- [ ] If yes, does the regex capture any `<noun>=<value>` free-form interpolated value?
+- [ ] For each captured value, does an `assert_eq(String(<const>), "<literal>", ...)` drift-pin exist in the GUT suite?
+- [ ] If a pin is missing: REQUEST CHANGES citing §17 + `team/tess-qa/playwright-drift-audit-2026-05-16.md`.
+
+### Cross-references
+
+- **Audit doc.** `team/tess-qa/playwright-drift-audit-2026-05-16.md` — the class-wide sweep with per-spec assertion table + drift-pin status verdicts.
+- **Precedent.** PR #249 + `tests/test_hitbox.gd::test_team_constants_match_trace_string_contract` (ticket `86c9upffv`) — the first drift-pin.
+- **Pattern doc.** `.claude/docs/test-conventions.md` § "Spec-string-vs-engine-emit drift" — the load-bearing convention this rule operationalises.
+- **Drift-pin file.** `tests/test_playwright_trace_string_contract.gd` — the new audit-class pin file.
+- **Risk register.** `team/priya-pl/risk-register.md` § R-DRIFT — Priya's 2026-05-16 risk refresh framing the bug class.
+- **AC4 retro.** `team/priya-pl/ac4-white-whale-retro.md` § Gap 4 — attributes part of the AC4 surfacing-pattern cost to this drift class.
