@@ -263,8 +263,12 @@ var _regen_carry: float = 0.0
 func _ready() -> void:
 	# Seed the saved layer mask from whatever the scene authored. Tests may
 	# also instantiate this node bare (no scene), in which case the default
-	# CharacterBody2D.collision_layer == 1 and we explicitly set the player bit.
-	if collision_layer == 0:
+	# CharacterBody2D.collision_layer == 1 (bare-default) — explicitly set
+	# the player bit. Production .tscn authors layer=2 already; this branch
+	# is a no-op for the production path. Matches the BARE_DEFAULT_LAYER
+	# pattern used by Grunt/Charger/Shooter/Stratum1Boss/PracticeDummy._ready.
+	const BARE_DEFAULT_LAYER: int = 1
+	if collision_layer == 0 or collision_layer == BARE_DEFAULT_LAYER:
 		collision_layer = 1 << (PLAYER_LAYER_BIT - 1)
 	_saved_collision_layer = collision_layer
 	# Register in the "player" group so other systems (Pickup, Grunt's
