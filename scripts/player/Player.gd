@@ -263,8 +263,12 @@ var _regen_carry: float = 0.0
 func _ready() -> void:
 	# Seed the saved layer mask from whatever the scene authored. Tests may
 	# also instantiate this node bare (no scene), in which case the default
-	# CharacterBody2D.collision_layer == 1 and we explicitly set the player bit.
-	if collision_layer == 0:
+	# CharacterBody2D.collision_layer == 1 (bare-default) — explicitly set
+	# the player bit. Production .tscn authors layer=2 already; this branch
+	# is a no-op for the production path. Matches the BARE_DEFAULT_LAYER
+	# pattern used by Grunt/Charger/Shooter/Stratum1Boss/PracticeDummy._ready.
+	const BARE_DEFAULT_LAYER: int = 1
+	if collision_layer == 0 or collision_layer == BARE_DEFAULT_LAYER:
 		collision_layer = 1 << (PLAYER_LAYER_BIT - 1)
 	_saved_collision_layer = collision_layer
 	# Register in the "player" group so other systems (Pickup, Grunt's
@@ -306,6 +310,29 @@ func _physics_process(delta: float) -> void:
 		_combat_trace("Player.pos",
 			"pos=(%.0f,%.0f) state=%s" % [
 				global_position.x, global_position.y, _state
+			])
+		# Diagnostic-only instrumentation (ticket `86c9uq0ky` — Finding 2 NEW
+		# bug class investigation, 2026-05-16 Sponsor soak of `8e76c74`).
+		# Throttled alongside `Player.pos` so Sponsor's HTML5 console always
+		# has a same-tick datapoint of player collision presence — if Pickup +
+		# StratumExit report `monitoring=true` AND `cs_disabled=false` AND
+		# `overlapping_bodies=0` while the player is spatially adjacent, the
+		# question becomes "is the PLAYER physics body actually present in the
+		# world?" During dodge i-frames `collision_layer` is intentionally
+		# cleared to 0 (see `_enter_iframes`) — this trace surfaces that state
+		# directly so we can rule out "player invisible to Area2D queries during
+		# the soak window where the player walked around the pickups." If
+		# `cs_disabled=true` here, the bug is on the player side regardless of
+		# any Pickup-side diagnostics.
+		var pcs: CollisionShape2D = get_node_or_null("CollisionShape2D") as CollisionShape2D
+		var pcs_disabled: String = "<no_cs>"
+		if pcs != null:
+			pcs_disabled = str(pcs.disabled)
+		_combat_trace("Player.coll_diag",
+			"pos=(%.0f,%.0f) layer=%d mask=%d cs_disabled=%s iframes=%s" % [
+				global_position.x, global_position.y,
+				collision_layer, collision_mask,
+				pcs_disabled, str(_is_invulnerable),
 			])
 
 
@@ -918,7 +945,42 @@ func _exit_dodge() -> void:
 	set_state(STATE_IDLE)
 
 
+## **Re-entry guard (load-bearing — ticket 86c9uq0ky, Sponsor 2026-05-16 soak).**
+##
+## When this function runs while the player is ALREADY invulnerable, do NOT
+## overwrite `_saved_collision_layer`. The current `collision_layer` at that
+## point is the cleared value `0` (set by the prior `_enter_iframes` call),
+## not the real player layer bit. Re-saving it would clobber the genuine
+## restore value, and the subsequent `_exit_iframes` would restore the
+## player to `collision_layer = 0` — permanently invisible to Pickup +
+## StratumExit Area2D queries (mask=2 vs player-now-layer=0).
+##
+## **Empirical failure chain (without the guard)**, Sponsor diag `83267fd`:
+##   1. Boss-combat hit → `take_damage` line 585 → `_enter_iframes` →
+##      saves layer=2, clears to layer=0, arms HIT_IFRAMES_SECS timer
+##      against `_exit_iframes_if_not_dodging`.
+##   2. Player dodges DURING the hit-iframe window → `try_dodge` line 741 →
+##      `_enter_iframes` AGAIN. Pre-fix this re-saved `_saved_collision_layer
+##      = collision_layer = 0`. Layer-2 restore value LOST.
+##   3. Hit-iframe timer fires → `_exit_iframes_if_not_dodging` → no-op
+##      (state == STATE_DODGE).
+##   4. Dodge ends → `_exit_dodge` → `_exit_iframes` → `collision_layer =
+##      _saved_collision_layer = 0`. Trapped forever.
+##
+## Sponsor trace `[combat-trace] Player.coll_diag | pos=... layer=0 mask=1
+## cs_disabled=false iframes=false` after boss death confirmed this exact
+## end-state. Pickup (mask=2) + StratumExit body_entered never fire because
+## the Player CharacterBody2D is on layer 0.
+##
+## Regression pin: `tests/test_player_collision_layer_restore.gd`.
 func _enter_iframes() -> void:
+	if _is_invulnerable:
+		# Already in iframes — `_saved_collision_layer` already holds the
+		# real (pre-iframe) layer; do NOT overwrite it with the cleared 0.
+		# Idempotent on collision_layer too: already 0 from the prior call.
+		_is_invulnerable = true  # explicit no-op for readability
+		iframes_started.emit()
+		return
 	_is_invulnerable = true
 	_saved_collision_layer = collision_layer
 	# Drop the player layer bit so enemy hitboxes (mask: layer 2) miss us.
