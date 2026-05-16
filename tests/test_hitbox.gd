@@ -115,3 +115,36 @@ func test_hit_target_signal_carries_payload() -> void:
 	watch_signals(hb)
 	hb._try_apply_hit(enemy)
 	assert_signal_emitted_with_parameters(hb, "hit_target", [enemy, 7, null])
+
+
+# --- 8: team constants are the load-bearing trace-string contract ---------
+#
+# REGRESSION-86c9upffv. The `[combat-trace] Hitbox.hit | team=%s target=%s ...`
+# line (Hitbox.gd:197) embeds the StringName values of TEAM_PLAYER / TEAM_ENEMY
+# directly into the console-trace. The Playwright specs (mob-self-engagement,
+# soak-narrative-regression, ac3-death-persistence, regen-smoke) match against
+# `team=player` and `team=enemy` regexes — if a future refactor renames these
+# constants (e.g. to `&"mob"` / `&"hero"`), the StringName-based emit silently
+# drifts and every spec relying on the trace shape breaks.
+#
+# Why this matters: the PR #215 mob-self-engagement spec was authored against
+# `team=mob target=Player`, a string that never existed in production. The
+# regex never matched a real trace; the spec failed on every CI run since
+# merge but was hidden among other CI bounces until PR #244 surfaced it as a
+# named failure cluster (ticket 86c9upffv). Pinning the constant values here
+# means the next regex author can grep `TEAM_PLAYER` / `TEAM_ENEMY` and trust
+# the spec-side string. If someone refactors the constant value, THIS test
+# fails before CI green and the engine/spec drift cannot ship silently.
+func test_team_constants_match_trace_string_contract() -> void:
+	assert_eq(
+		String(Hitbox.TEAM_PLAYER), "player",
+		"TEAM_PLAYER value drives [combat-trace] Hitbox.hit | team=player " +
+			"— renaming this constant breaks every Playwright spec asserting " +
+			"player-attacks-mob (ac3-death-persistence, regen-smoke)."
+	)
+	assert_eq(
+		String(Hitbox.TEAM_ENEMY), "enemy",
+		"TEAM_ENEMY value drives [combat-trace] Hitbox.hit | team=enemy " +
+			"— renaming this constant breaks every Playwright spec asserting " +
+			"mob-attacks-player (mob-self-engagement, soak-narrative-regression)."
+	)
