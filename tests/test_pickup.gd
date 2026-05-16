@@ -187,3 +187,59 @@ func test_null_item_pickup_self_frees_defensively() -> void:
 		"null-item pickup does not emit picked_up")
 	assert_true(pickup.is_queued_for_deletion(),
 		"null-item pickup still self-frees (no orphan on ground)")
+
+
+# --- 6: REGRESSION-86c9unkr2 — double-defer for HTML5 physics-flush ------
+#
+# Sponsor's 2026-05-16 soak of `92b6206` (PR #236 build) showed boss-room
+# Pickups silently un-overlappable. The trace stream confirmed
+# `Pickup._activate_and_check_initial_overlap` ran but `body_entered` never
+# fired afterward — the C++ Area2D monitoring setter's `ERR_FAIL_COND_MSG`
+# silently fired in HTML5 despite the bare `call_deferred` from `_ready`.
+#
+# Fix: `_activate_and_check_initial_overlap` `await get_tree().physics_frame`
+# at the top before flipping monitoring. This guarantees the mutation lands
+# strictly outside any in-flight `flush_queries()` window.
+
+func test_activate_monitoring_flips_after_physics_frame_not_synchronously() -> void:
+	# REGRESSION-86c9unkr2: monitoring stays false synchronously after _ready;
+	# the await get_tree().physics_frame inside _activate_and_check_initial_overlap
+	# defers the actual flip to the next physics tick. Same pattern as StratumExit.
+	var pickup: Pickup = _make_pickup(_make_item())
+	# _init has run; monitoring/monitorable should be false (the encapsulated
+	# pattern's load-bearing defense).
+	assert_false(pickup.monitoring, "precondition: monitoring OFF after _init (before _ready)")
+	# Add to tree — _ready runs synchronously inside add_child, queuing
+	# call_deferred("_activate_and_check_initial_overlap"). Monitoring STILL
+	# off because the deferred call hasn't drained yet.
+	add_child_autofree(pickup)
+	assert_false(pickup.monitoring,
+		"REGRESSION-86c9unkr2: monitoring stays false synchronously after add_child — " +
+		"_ready's call_deferred hasn't drained yet, and the deferred call itself awaits a physics_frame")
+	# Drain one process_frame for the deferred call to land + run up to the await.
+	await get_tree().process_frame
+	# Monitoring is still false because the await physics_frame hasn't resolved.
+	# (In GUT context process_frame and physics_frame may interleave; we drain
+	# one more physics_frame to be sure the await resolves and the monitoring
+	# write lands.)
+	await get_tree().physics_frame
+	await get_tree().process_frame
+	assert_true(pickup.monitoring,
+		"REGRESSION-86c9unkr2: monitoring flips ON after the double-defer (call_deferred + await physics_frame)")
+	assert_true(pickup.monitorable, "monitorable parity preserved post-await")
+
+
+func test_activate_after_remote_free_is_safe() -> void:
+	# REGRESSION-86c9unkr2: the deferred-resume body must guard `is_inside_tree`
+	# defensively — a Pickup whose room is torn down between _ready and the
+	# physics_frame resume (test teardown, room transition) must not crash.
+	var pickup: Pickup = _make_pickup(_make_item())
+	add_child(pickup)
+	# Queue-free the pickup before the deferred _activate runs.
+	pickup.queue_free()
+	# Drain frames so the deferred + await + post-await code runs against the
+	# freed node. The is_inside_tree guard must prevent a crash.
+	await get_tree().physics_frame
+	await get_tree().process_frame
+	# If we reach here without crashing, the guard worked.
+	assert_true(true, "REGRESSION-86c9unkr2: deferred resume guards is_inside_tree on freed pickup")

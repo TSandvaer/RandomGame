@@ -145,27 +145,95 @@ func get_prompt_label() -> Label:
 ## (deferred — stay out of any residual physics-flush context in the
 ## call_deferred chain) so `_player_in_range` is set and the prompt appears.
 ## Same shape as `RoomGate._fire_traversal_if_unlocked`.
+##
+## **Double-defer (ticket `86c9unkr2` — Finding 2 STILL repro on PR #236 build
+## `92b6206`, 2026-05-16 soak):** the single `call_deferred("activate")` from
+## `Stratum1BossRoom._on_boss_died` lands in the same end-of-frame deferred
+## queue that also drains 2x Pickup `add_child` calls + particle adds + room
+## transitions. Sponsor's HTML5 trace stream shows the StratumExit + Pickup
+## monitoring flips silently failing despite the trace label saying "monitoring
+## flipped ON" (the label was hard-coded, not a readback). Adding
+## `await get_tree().physics_frame` here guarantees the monitoring mutation
+## lands AFTER at least one full physics tick has elapsed past any in-flight
+## `flush_queries()` window. Same fix landed on `Pickup._activate_and_check_initial_overlap`.
+##
+## **Sync/async-mix consequence — readability and test discipline:** with
+## `await`, `activate()` returns a Coroutine to its caller; callers that need
+## post-conditions (e.g. `_is_active`, `_interaction_area.monitoring`) on the
+## SAME tick must instead `await activate()` or `await get_tree().process_frame`
+## after invocation. `_is_active` flips synchronously at the top of the function
+## (before the await), so the idempotency guard still works against a re-entrant
+## call. Production callers (`Stratum1BossRoom._on_boss_died` via `call_deferred`)
+## fire-and-forget — they don't read post-state from the same callsite. Tests
+## must `await get_tree().process_frame` (or `physics_frame`) after `activate()`
+## to observe the monitoring transition.
 func activate() -> void:
 	if _is_active:
 		return
+	# Synchronous flip: idempotency latch + visual portal-color + prompt-tracking.
+	# Tests that observe `is_active()`, prompt visibility, and visual state on the
+	# SAME tick as `activate()` continue to pass without re-architecting (a real
+	# constraint — see test_stratum_exit.gd tests that don't await).
 	_is_active = true
-	_apply_active_state(true)
+	_apply_active_visual_state(true)
+	# Diagnostic trace (ticket `86c9unkr2`): readback of monitoring state lands
+	# in `_arm_interaction_area_after_flush` once the await resolves. We emit a
+	# synchronous marker here so the trace stream shows the activate() entry
+	# point separately from the deferred monitoring flip.
 	_combat_trace("StratumExit.activate",
-		"monitoring flipped ON — checking pre-existing body overlaps (knockback-overlap fix)")
+		"sync entry — visual flipped, awaiting physics_frame to arm interaction area (double-defer)")
+	# Async: arm the Area2D monitoring strictly outside any physics-flush window.
+	# `await get_tree().physics_frame` yields until the next physics tick
+	# boundary, which is by definition AFTER any in-flight `flush_queries()`
+	# call has completed. The single `call_deferred("activate")` from
+	# `Stratum1BossRoom._on_boss_died` was insufficient under HTML5 (Sponsor's
+	# 2026-05-16 soak of `92b6206` showed pickups + exit both un-overlappable).
+	# See `activate()` docstring above for the full pattern rationale.
+	_arm_interaction_area_after_flush()
+	exit_activated.emit()
+
+
+## Async portion of activate(): wait one full physics frame, then flip the
+## Area2D monitoring on. Separate from `activate()` so the synchronous parts
+## (idempotency latch + visual portal flip) land on the same tick as the
+## caller — only the physics-server-touching mutation is deferred.
+##
+## Standalone function (rather than inline `await` in `activate()`) so tests
+## can `await exit._arm_interaction_area_after_flush()` to wait deterministically
+## for the monitoring transition without re-engineering the public surface.
+## Idempotent — re-callable; the post-flush check + monitoring set are both
+## guarded.
+func _arm_interaction_area_after_flush() -> void:
+	await get_tree().physics_frame
+	if not is_inside_tree():
+		# Room queue_freed in the interim (test teardown, room transition).
+		return
+	if _interaction_area == null:
+		return
+	# Apply the monitoring flip now that we're strictly outside the flush window.
+	# `monitorable` flips together so the area can both detect AND be detected
+	# (the exit doesn't actually need `monitorable` since nothing queries IT,
+	# but `_apply_active_state` previously set both together — keep parity).
+	_interaction_area.monitoring = true
+	_interaction_area.monitorable = true
+	# Diagnostic trace with readback (ticket `86c9unkr2`): read `monitoring`
+	# BACK after the setter — if the C++ `ERR_FAIL_COND` (silent under HTML5)
+	# rejected the set, `monitoring` stays at false and `mon_actual=false`
+	# surfaces in the trace. Pre-fix the label was hard-coded "monitoring flipped
+	# ON" regardless of actual state — no signal whether the setter took effect.
+	_combat_trace("StratumExit.activate",
+		"mon_actual=%s mon_req=true — checking pre-existing body overlaps (knockback-overlap fix)" % str(_interaction_area.monitoring))
 	# **Pre-existing overlap re-check (ticket 86c9un4nh):** if the player was
 	# already inside the interaction area before monitoring turned on, fire the
 	# in-range detection manually. Deferred (via call_deferred on _on_body_entered
 	# equivalent) to stay out of any physics-flush context this activate() might
-	# run in (it is called via call_deferred from _on_boss_died, but an
-	# additional defer is belt-and-suspenders for future call-site changes).
-	if is_inside_tree() and _interaction_area != null:
-		for body in _interaction_area.get_overlapping_bodies():
-			if body is CharacterBody2D:
-				_combat_trace("StratumExit.activate",
-					"player already inside interaction area — firing _on_body_entered deferred")
-				call_deferred("_on_body_entered", body)
-				break
-	exit_activated.emit()
+	# run in.
+	for body in _interaction_area.get_overlapping_bodies():
+		if body is CharacterBody2D:
+			_combat_trace("StratumExit.activate",
+				"player already inside interaction area — firing _on_body_entered deferred")
+			call_deferred("_on_body_entered", body)
+			break
 
 
 ## Test-only: simulate the player crossing into / out of the interaction
@@ -267,13 +335,29 @@ func _build_prompt_label() -> void:
 	add_child(_prompt_label)
 
 
-func _apply_active_state(active: bool) -> void:
+## Synchronous portal-color + prompt visibility flip. Does NOT touch the
+## Area2D monitoring state — that lands in `_arm_interaction_area_after_flush`
+## via an `await get_tree().physics_frame` from `activate()` (ticket
+## `86c9unkr2` double-defer fix). Callers that need the deactivate path
+## (currently only `_ready`'s INACTIVE init) use `_apply_active_state(false)`
+## which DOES touch monitoring — initial setup runs before any physics flush
+## could be in flight, so a sync write is safe.
+func _apply_active_visual_state(active: bool) -> void:
 	if _portal_visual != null:
 		_portal_visual.color = PORTAL_COLOR_ACTIVE if active else PORTAL_COLOR_INACTIVE
+	_update_prompt_visibility()
+
+
+## Synchronous full state-flip — visual + monitoring together. ONLY safe to
+## call from contexts that are NOT inside a physics flush (e.g. `_ready` boot
+## init, where the engine has not started any flush_queries yet). The ACTIVE
+## path goes through `activate() → _arm_interaction_area_after_flush` instead,
+## which awaits a physics_frame before touching monitoring (HTML5-safe).
+func _apply_active_state(active: bool) -> void:
+	_apply_active_visual_state(active)
 	if _interaction_area != null:
 		_interaction_area.monitoring = active
 		_interaction_area.monitorable = active
-	_update_prompt_visibility()
 
 
 func _update_prompt_visibility() -> void:
@@ -284,14 +368,22 @@ func _update_prompt_visibility() -> void:
 	_prompt_label.visible = _is_active and _player_in_range and not _descend_triggered
 
 
-func _on_body_entered(_body: Node) -> void:
+func _on_body_entered(body: Node) -> void:
 	# Defensive: we only mask layer 2 (player) so any body crossing should
 	# be the player. Don't couple to Player class — keeps tests light.
 	_player_in_range = true
 	_update_prompt_visibility()
+	# Readback trace (ticket `86c9unkr2`): emit BEFORE the in-range flip if the
+	# monitoring state ever silently drifts. The body class + monitoring readback
+	# together let Sponsor's HTML5 trace stream tell "body_entered fired and we
+	# saw it" apart from "body_entered never reached us" — the latter is the
+	# bug class this PR is targeting.
+	var area_mon: String = "<null>"
+	if _interaction_area != null:
+		area_mon = str(_interaction_area.monitoring)
 	_combat_trace("StratumExit._on_body_entered",
-		"player_in_range=true is_active=%s descend_triggered=%s" % [
-			str(_is_active), str(_descend_triggered)])
+		"body=%s mon_actual=%s player_in_range=true is_active=%s descend_triggered=%s" % [
+			str(body), area_mon, str(_is_active), str(_descend_triggered)])
 
 
 func _on_body_exited(_body: Node) -> void:

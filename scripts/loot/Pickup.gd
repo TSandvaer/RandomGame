@@ -97,25 +97,56 @@ func _ready() -> void:
 ## transition; a Pickup spawned under the player (the killing-blow case)
 ## needs this explicit pass or it could never be collected. Mirrors
 ## `Hitbox._activate_and_check_initial_overlaps`.
+##
+## **Double-defer (ticket `86c9unkr2` — Finding 2 STILL repro on PR #236 build
+## `92b6206`, 2026-05-16 soak):** the bare `call_deferred` from `_ready` lands
+## end-of-frame in the deferred queue — usually outside the physics flush, but
+## the boss-room death chain queues MANY deferred calls in the same end-of-frame
+## window (StratumExit.activate, 2x Pickup add_child, Pickup._ready scheduling
+## another defer for _activate, particle adds, room transitions) and Sponsor's
+## HTML5 trace stream shows the monitoring flip silently failing despite the
+## label saying `monitoring=true` (the label was hard-coded, not a readback —
+## see fix below). Adding `await get_tree().physics_frame` guarantees a full
+## physics tick has elapsed BEFORE we touch `monitoring`, taking us strictly
+## outside any `flush_queries()` window. The readback trace (`mon_actual=%s`)
+## empirically confirms the post-set state — on the next soak Sponsor's console
+## will surface `mon_actual=true` if the fix worked or `mon_actual=false` if
+## the silent ERR_FAIL_COND still fires (different root cause).
 func _activate_and_check_initial_overlap() -> void:
+	if not is_inside_tree():
+		return
+	# Double-defer: wait one full physics frame so the monitoring flip lands
+	# strictly outside any physics-query flush window. The bare call_deferred
+	# from _ready was insufficient under HTML5 — see method docstring above.
+	# `await get_tree().physics_frame` returns a Signal; awaiting it yields
+	# until the next physics-tick boundary, which is by definition AFTER any
+	# in-flight flush_queries() call has completed.
+	await get_tree().physics_frame
+	# Re-validate tree-inclusion after the await: the Pickup could have been
+	# queue_freed in the interim (e.g. parent room transitioned out).
 	if not is_inside_tree():
 		return
 	# Order is load-bearing: monitoring must be true before
 	# `get_overlapping_bodies` returns anything.
 	monitoring = true
 	monitorable = true
-	# Diagnostic trace (ticket `86c9uemdg`): emit when monitoring activates so
-	# Sponsor's HTML5 soak can confirm the Pickup transitioned into a state
-	# where `body_entered` can fire. Distinguishes "pickup never spawned" (no
-	# `Pickup._ready` trace) from "pickup spawned but never armed" (no
-	# `Pickup._activate_and_check_initial_overlap` trace).
+	# Diagnostic trace (ticket `86c9uemdg` + `86c9unkr2` readback):
+	# `mon_actual=` reads the property BACK after the setter — if the C++
+	# `ERR_FAIL_COND` (silent under HTML5) rejected the set, `monitoring` stays
+	# at its prior `false` value and `mon_actual=false` surfaces in the trace.
+	# Pre-fix the label was hard-coded `monitoring=true` regardless of actual
+	# state, giving no signal whether the setter took effect. Distinguishes
+	# "pickup never spawned" (no `Pickup._ready` trace) from "pickup spawned
+	# but never armed" (no `Pickup._activate_and_check_initial_overlap` trace)
+	# from "pickup armed but setter rejected" (mon_actual=false).
 	var initial_overlaps: int = 0
 	if item != null:
 		for b in get_overlapping_bodies():
 			if b != null and b.is_in_group("player"):
 				initial_overlaps += 1
 	_combat_trace("Pickup._activate_and_check_initial_overlap",
-		"monitoring=true initial_overlap_player_count=%d" % initial_overlaps)
+		"mon_actual=%s mon_req=true initial_overlap_player_count=%d" % [
+			str(monitoring), initial_overlaps])
 	if item == null:
 		return
 	for body in get_overlapping_bodies():

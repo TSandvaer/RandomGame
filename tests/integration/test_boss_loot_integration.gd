@@ -270,3 +270,86 @@ func test_pickup_wired_to_inventory_after_three_frames() -> void:
 		assert_true(p.is_connected("picked_up", inv.on_pickup_collected),
 			"REGRESSION-86c9un4nh: picked_up wired to Inventory.on_pickup_collected after 3-frame delay — " +
 			"auto_collect_pickups runs synchronously before deferred add_child, wiring persists")
+
+
+# ---- Test 5: REGRESSION-86c9unkr2 boss-loot Pickup monitoring is active post-double-defer
+#
+# Pre-fix (PR #236), Sponsor's 2026-05-16 HTML5 soak of `92b6206` showed
+# boss-room Pickups silently un-overlappable — `body_entered` never fired
+# against them despite the player walking onto the iron_sword. The C++ Area2D
+# monitoring setter's `ERR_FAIL_COND_MSG` was silently rejecting the set under
+# HTML5 / `gl_compatibility` physics-flush timing.
+#
+# Fix (PR #240, this PR): `Pickup._activate_and_check_initial_overlap` now
+# `await get_tree().physics_frame` BEFORE writing monitoring=true. This GUT
+# integration test pins that boss-loot Pickups end up with `monitoring=true`
+# after the new defer chain settles — the production-shape end-to-end check.
+
+func test_boss_loot_pickups_have_active_monitoring_after_double_defer() -> void:
+	# REGRESSION-86c9unkr2: end-to-end pin that boss-spawned Pickups reach
+	# monitoring=true through the deferred-add + double-defer-activate chain.
+	# Frame budget: frame 1 = MobLootSpawner deferred add_child lands → Pickup._ready
+	# runs → schedules call_deferred("_activate_and_check_initial_overlap").
+	# Frame 2 = _activate runs synchronously up to `await get_tree().physics_frame`.
+	# Frame 3 = await resolves; monitoring=true writes.
+	var main: Main = _instantiate_main()
+	await get_tree().process_frame
+	main.load_room_index(8)
+	await get_tree().process_frame
+	var boss_room: Stratum1BossRoom = main.get_current_room() as Stratum1BossRoom
+	var boss: Stratum1Boss = boss_room.get_boss()
+	boss_room.complete_entry_sequence_for_test()
+	await get_tree().process_frame
+	_phase_walk_boss_to_death(boss)
+	# Drain enough frames to cover the full deferred chain. Use physics_frame
+	# specifically so the await physics_frame inside _activate resolves.
+	for i in range(5):
+		await get_tree().physics_frame
+		await get_tree().process_frame
+
+	var pickups: Array[Pickup] = _collect_pickups_in(boss_room)
+	assert_gt(pickups.size(), 0,
+		"REGRESSION-86c9unkr2: boss loot Pickups still in room post-defer")
+	for p in pickups:
+		assert_true(p.monitoring,
+			"REGRESSION-86c9unkr2: Pickup.monitoring=true after double-defer settles — " +
+			"the load-bearing surface against HTML5 silent ERR_FAIL_COND on monitoring setter")
+		assert_true(p.monitorable,
+			"REGRESSION-86c9unkr2: Pickup.monitorable=true parity post-defer")
+
+
+# ---- Test 6: REGRESSION-86c9unkr2 StratumExit monitoring is active post-double-defer
+
+func test_stratum_exit_interaction_area_monitoring_active_after_boss_death() -> void:
+	# REGRESSION-86c9unkr2: end-to-end pin that the boss-room StratumExit's
+	# interaction area reaches monitoring=true through:
+	#   boss_died → Stratum1BossRoom._on_boss_died → call_deferred("activate")
+	#     → activate() syncs _is_active + visual + call _arm_interaction_area_after_flush
+	#       → await get_tree().physics_frame → monitoring = true
+	# Frame budget: frame 1 = deferred activate runs → sync visual flip + arm helper called
+	#   → helper awaits physics_frame. Frame 2 = await resolves; monitoring = true writes.
+	var main: Main = _instantiate_main()
+	await get_tree().process_frame
+	main.load_room_index(8)
+	await get_tree().process_frame
+	var boss_room: Stratum1BossRoom = main.get_current_room() as Stratum1BossRoom
+	var boss: Stratum1Boss = boss_room.get_boss()
+	boss_room.complete_entry_sequence_for_test()
+	await get_tree().process_frame
+	_phase_walk_boss_to_death(boss)
+	# Drain frames covering: call_deferred → activate → await physics_frame → write.
+	for i in range(5):
+		await get_tree().physics_frame
+		await get_tree().process_frame
+
+	var exit: StratumExit = boss_room.get_stratum_exit()
+	assert_not_null(exit, "boss room has StratumExit")
+	assert_true(exit.is_active(),
+		"StratumExit.is_active() true post-boss-death (sync flip in activate())")
+	var area: Area2D = exit.get_interaction_area()
+	assert_not_null(area, "interaction area exists")
+	assert_true(area.monitoring,
+		"REGRESSION-86c9unkr2: StratumExit interaction_area.monitoring=true after double-defer — " +
+		"_arm_interaction_area_after_flush awaited physics_frame and wrote monitoring=true outside the flush")
+	assert_true(area.monitorable,
+		"REGRESSION-86c9unkr2: StratumExit interaction_area.monitorable=true parity post-defer")
