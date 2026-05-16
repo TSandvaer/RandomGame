@@ -1586,13 +1586,89 @@ export async function chaseAndClearMultiChaserRoom(
   if (gateTraversed) {
     // Case A — nothing to do.
   } else if (gateUnlocked) {
-    // Case B — gate is UNLOCKED; finish the traversal ourselves.
-    gateTraversed = await finishTraversalFromUnlocked(
-      page,
-      capture,
-      roomLabel,
-      playerPosPattern,
-      preTraversedCount
+    // Case B — RETIRED 2026-05-16 per `team/tess-qa/playwright-harness-design.md`
+    // §15 (harness workaround convention, "harness workarounds for known
+    // game-side bugs must fail loudly once the game-side fix lands").
+    //
+    // **Why this is now a hard failure.** The multi-chaser room's case B mix
+    // is empirically dominated by the B-INSIDE sub-case: chaser AI does NOT
+    // retreat through the gate (Grunts / Chargers close toward the player by
+    // construction), so the only mechanism that drives the player into the
+    // trigger during a multi-chaser engage is combat knockback + the
+    // westward spawn pull of chasers — both of which leave the player
+    // OVERLAPPING the trigger when the last chaser dies. That is exactly
+    // the bug shape PR #230 fixed game-side: `RoomGate._unlock()` now calls
+    // `call_deferred("_fire_traversal_if_unlocked")` when
+    // `get_overlapping_bodies()` finds a `CharacterBody2D` inside the
+    // trigger at unlock time, so the traversal auto-promotes to case A
+    // (already-traversed) one deferred frame later.
+    //
+    // The B-OUTSIDE sub-case — chase walks player west of trigger, then the
+    // mob is killed there → `_unlock` fires with no overlapping body — is
+    // **implausible by chaser AI** in the multi-chaser consumer. No chaser
+    // type leads the player west of the gate; no combat-knockback path
+    // pushes the player west of trigger from the spawn-side engage
+    // geometry. See `team/tess-qa/kiting-mob-chase-case-b-audit-2026-05-16.md`
+    // for the full asymmetry analysis between this consumer and
+    // `chaseAndClearKitingMobs` (single-Shooter — kiter retreat geometry
+    // makes B-outside reachable there, so that consumer keeps its case B
+    // branch as the legitimate game-mechanic resolution).
+    //
+    // Post-PR-#230, observing case B in this multi-chaser consumer means
+    // EITHER:
+    //   1. The player was inside the trigger at unlock and
+    //      `_fire_traversal_if_unlocked` did not fire = REGRESSION of the
+    //      PR #230 fix. The next CI failure surfaces the regression.
+    //   2. An exotic combat-knockback edge pushed the player west of the
+    //      trigger before the kill landed — empirically near-zero under
+    //      Room 05 geometry, but plausible if a future chaser variant
+    //      gets a retreat behavior or the spawn layout changes. If a
+    //      legitimate spec scenario produces this, update the spec to
+    //      re-engage the trigger explicitly (mirror the PR #239
+    //      gateTraversalWalk case B retirement release-valve).
+    //
+    // Either way, silent steer-and-finish is wrong: it masks regressions
+    // of the PR #230 fix indefinitely. Mirroring PR #239
+    // (`qa/harness-workaround-convention`, commit fcc7d13) which retired
+    // the same workaround shape for `gateTraversalWalk` case B.
+    const recent = capture
+      .getLines()
+      .slice(-30)
+      .map((l) => `  ${l.text}`)
+      .join("\n");
+    const gateLines = capture
+      .getLines()
+      .filter((l) => /\[combat-trace\] RoomGate\./.test(l.text))
+      .slice(-20)
+      .map((l) => `  ${l.text}`)
+      .join("\n");
+    throw new Error(
+      `[multi-chaser] ${roomLabel}: case B detected — gate_unlocked ` +
+        `fired during chase but gate_traversed did NOT auto-promote to ` +
+        `case A within the GATE_SETTLE_WINDOW_MS poll.` +
+        `\n\n**This is a REGRESSION signal.** Per PR #230 (Drew, ticket ` +
+        `86c9ujg8c — M2 W3 soak fix for RoomGate knockback-overlap), ` +
+        `RoomGate._unlock() now calls _fire_traversal_if_unlocked() via ` +
+        `call_deferred when a CharacterBody2D is overlapping the trigger ` +
+        `at unlock time — so the gate auto-traverses to case A (already-` +
+        `traversed) rather than landing in case B. In this multi-chaser ` +
+        `consumer, chaser AI does not retreat through the gate, so the only ` +
+        `combat-driven path into case B's preconditions is the B-INSIDE ` +
+        `sub-case (player overlapping trigger at unlock), which PR #230 ` +
+        `now consumes deterministically. Observing case B means either ` +
+        `(a) the PR #230 fix has regressed (the deferred ` +
+        `_fire_traversal_if_unlocked is not firing for an overlapping ` +
+        `CharacterBody2D), or (b) an exotic combat-knockback edge pushed ` +
+        `the player west of the trigger before the kill landed — rare ` +
+        `under Room 05 geometry; if a legitimate spec scenario produces ` +
+        `this, update the spec to re-engage the trigger explicitly.` +
+        `\n\nSilent steer-and-finish is retired per ` +
+        `team/tess-qa/playwright-harness-design.md §15 (harness workaround ` +
+        `convention), mirroring PR #239's gateTraversalWalk case B ` +
+        `retirement. Audit reference: ` +
+        `team/tess-qa/kiting-mob-chase-case-b-audit-2026-05-16.md.` +
+        `\n\nRecent RoomGate.* traces (last 20):\n${gateLines || "  (none)"}` +
+        `\n\nLast 30 trace lines:\n${recent}`
     );
   } else {
     // Case C — gate still OPEN; reposition the player at spawn so the
