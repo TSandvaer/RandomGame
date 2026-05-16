@@ -26,8 +26,11 @@
  * **Sequencing — Path A (specs land RED-then-GREEN):**
  *
  * Finding 1 is marked `test()` — mob aggro on hit is observable NOW via the
- * existing `Grunt.pos | state=chasing` trace and `Hitbox.hit | team=mob
+ * existing `Grunt.pos | state=chasing` trace and `Hitbox.hit | team=enemy
  * target=Player` trace; no game-side fix is pending that blocks the assertion.
+ * (Docstring `team=mob` references corrected to `team=enemy` in the drift-pin
+ * audit 2026-05-16, ticket 86c9ur5wf — the production engine emits team=enemy
+ * per Hitbox.TEAM_ENEMY = &"enemy", asserted by tests/test_hitbox.gd.)
  *
  * Findings 2, 3, 5 are `test.fixme` because they assert gate-unlock on
  * `mobs_cleared` (the currently buggy path where loot pickup OR full-HP
@@ -68,10 +71,21 @@
  *   - `RoomGate.gate_traversed` as the traversal harness signal.
  *   - `Engine.time_scale` is NOT directly observable from Playwright —
  *     Finding 4's assertion uses the `[StatAllocationPanel] panel_opened` print
- *     line (if it exists) OR the `[combat-trace] Hitbox.hit | team=mob
+ *     line (if it exists) OR the `[combat-trace] Hitbox.hit | team=enemy
  *     target=Player` ABSENCE (mob cannot reach and damage a stuck-at-spawn
  *     player if movement is truly blocked) as an indirect proxy. See the
  *     detailed assertion comment in spec 4.
+ *
+ *     **CAVEAT (drift-pin audit, ticket 86c9ur5wf).** The
+ *     `[StatAllocationPanel] panel_opened` print line DOES NOT EXIST in the
+ *     engine — `StatAllocationPanel.panel_opened` is a Godot signal with no
+ *     paired `print()`. When finding #4 flips from `test.fixme` to `test()`,
+ *     the assertion must EITHER (a) wait on Uma adding an explicit print
+ *     statement alongside `panel_opened.emit()`, OR (b) use a JS-bridge
+ *     readback (Playwright `page.evaluate` against Godot), OR (c) rely on
+ *     the proxy negative-assertion (no `Hitbox.hit | team=enemy
+ *     target=Player`). See `team/tess-qa/playwright-drift-audit-2026-05-16.md`
+ *     § "Follow-up ticket".
  *
  * References:
  *   - ticket 86c9ujet8 — this spec ticket
@@ -114,7 +128,7 @@ const ROOM_SETTLE_MS = 1_500;
 
 /**
  * Mob-aggro engagement window: time allowed (ms) for a Grunt that was just
- * hit to emit a `state=chasing` pos trace or deliver a `Hitbox.hit | team=mob
+ * hit to emit a `state=chasing` pos trace or deliver a `Hitbox.hit | team=enemy
  * target=Player` line. 10 s = 60px/s × ~2.3 s to close 140 px + generous
  * headroom for engine jitter and physics-settle delay.
  */
@@ -230,8 +244,12 @@ async function waitForNewLine(
 // Observable via:
 //   - `[combat-trace] Grunt.pos | ... state=chasing ...` appearing AFTER the
 //     first `[combat-trace] Hitbox.hit | team=player ... damage=N` line.
-//   - OR `[combat-trace] Hitbox.hit | team=mob target=Player` — if the grunt
+//   - OR `[combat-trace] Hitbox.hit | team=enemy target=Player` — if the grunt
 //     hit the passive player, it was definitively chasing.
+//     (Pinned by tests/test_hitbox.gd::test_team_constants_match_trace_string_contract
+//     for Hitbox team identifier + tests/test_playwright_trace_string_contract.gd
+//     ::test_grunt_state_chasing_string_value_matches_trace_contract for the
+//     Grunt state literal — drift-pin audit 2026-05-16, ticket 86c9ur5wf.)
 //
 // This test is `test()` (not test.fixme) because mob aggro in Room 2 was
 // working correctly in the `aa87439` soak — the finding was about a specific
@@ -694,7 +712,7 @@ test.describe("soak-narrative finding #3 — Room 2 gate traversal fires on firs
 //   - Assert: after `panel_opened` fires, `Player.velocity` is effectively
 //     zero. Since Playwright cannot read Godot world state directly, the
 //     proxy is a NEGATIVE assertion: over the 1.5s after `panel_opened`,
-//     NO `[combat-trace] Hitbox.hit | team=mob target=Player` line fires
+//     NO `[combat-trace] Hitbox.hit | team=enemy target=Player` line fires
 //     (a stuck-at-spawn player with velocity=0 cannot walk into mob hitboxes,
 //     and slowed mobs at time_scale=0.10 take far longer to close).
 //
@@ -762,8 +780,11 @@ test.describe("soak-narrative finding #4 — Room 5 level-up panel blocks player
       // const panelOpenIdx = /* index of panelOpenLine */;
       // await page.waitForTimeout(1_500);
       // const postPanelHits = capture.getLines().slice(panelOpenIdx).filter(l =>
-      //   /\[combat-trace\] Hitbox\.hit \| team=mob target=Player/.test(l.text)
+      //   /\[combat-trace\] Hitbox\.hit \| team=enemy target=Player/.test(l.text)
       // );
+      // (Regex updated to team=enemy per Hitbox.TEAM_ENEMY = &"enemy", per
+      //  drift-pin audit 2026-05-16 ticket 86c9ur5wf — the original team=mob
+      //  was a dead-code landmine that would silently no-op on flip.)
       // expect(
       //   postPanelHits.length,
       //   "Sponsor finding #4: while level-up panel is open, Player.velocity must be 0. " +
