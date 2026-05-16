@@ -20,10 +20,11 @@ extends CanvasLayer
 ## **Click model on grid cells:**
 ##   - Left-click inventory cell with item -> equip into the def's slot
 ##     (Uma IS-15). Empty cell click is a no-op.
-##   - Right-click inventory cell with item -> trash (item permanently
+##   - Right-click inventory cell with item -> discard (item permanently
 ##     removed; no ground drop in M1 — verb deliberately renamed from
 ##     "drop" so the label matches the behavior, per Sponsor M2 W3 soak
-##     finding 2026-05-16 + `team/uma-ux/inventory-drop-vs-trash-triage.md`).
+##     finding 2026-05-16 + `team/uma-ux/inventory-drop-vs-trash-triage.md`
+##     — triage recommended "Trash"; Sponsor picked "Discard").
 ##   - Left-click equipped slot with item -> unequip back to inventory
 ##     (Uma IS-16).
 ##
@@ -516,10 +517,11 @@ func _handle_inventory_click(index: int, button: int) -> void:
 				return
 			inv.equip(item, target)
 		MOUSE_BUTTON_RIGHT:
-			# Trash — permanently remove the item. No ground-drop spawn in M1
+			# Discard — permanently remove the item. No ground-drop spawn in M1
 			# (verb renamed from "drop" so the footer hint matches actual
 			# behavior; real drop-on-ground is a post-M1 ticket — see
-			# `team/uma-ux/inventory-drop-vs-trash-triage.md`).
+			# `team/uma-ux/inventory-drop-vs-trash-triage.md` — triage
+			# recommended "Trash"; Sponsor picked "Discard").
 			inv.remove(item)
 
 
@@ -899,7 +901,7 @@ func _build_inventory_grid() -> void:
 func _build_footer_hint() -> void:
 	var hint: Label = Label.new()
 	hint.name = "FooterHint"
-	hint.text = "[Tab] close   [LMB] equip/unequip   [RMB] trash   [Esc] quick close"
+	hint.text = "[Tab] close   [LMB] equip/unequip   [RMB] discard   [Esc] quick close"
 	hint.add_theme_color_override("font_color", COLOR_HINT)
 	hint.add_theme_font_size_override("font_size", 10)
 	hint.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)

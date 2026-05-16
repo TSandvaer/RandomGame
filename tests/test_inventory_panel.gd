@@ -9,10 +9,11 @@ extends GutTest
 ##   4. Click empty slot -> no-op.
 ##   5. Click equipped slot -> unequips.
 ##   6. Click inventory slot with item -> swaps to slot.
-##   7. Right-click in inventory -> trash (item permanently removed; for
+##   7. Right-click in inventory -> discard (item permanently removed; for
 ##      M1 just remove, no ground-drop spawn — verb renamed from "drop"
 ##      per Sponsor M2 W3 soak 2026-05-16 +
-##      `team/uma-ux/inventory-drop-vs-trash-triage.md`).
+##      `team/uma-ux/inventory-drop-vs-trash-triage.md` — triage
+##      recommended "Trash"; Sponsor picked "Discard").
 ##   8. Esc closes panel.
 
 const InventoryPanelScript: Script = preload("res://scripts/ui/InventoryPanel.gd")
@@ -165,25 +166,26 @@ func test_click_inventory_item_equips() -> void:
 
 
 # =======================================================================
-# Test 7 — Right-click in inventory -> trash (M1: permanently remove)
+# Test 7 — Right-click in inventory -> discard (M1: permanently remove)
 # =======================================================================
 #
-# Verb is "Trash", not "Drop": M1 does not spawn a Pickup at the player's
+# Verb is "Discard", not "Drop": M1 does not spawn a Pickup at the player's
 # feet, so the UI label "Drop" was misleading (Sponsor M2 W3 soak
-# 2026-05-16 finding; triage in `team/uma-ux/inventory-drop-vs-trash-triage.md`).
-# This test now pins the trash semantics — if a future PR adds real
+# 2026-05-16 finding; triage in `team/uma-ux/inventory-drop-vs-trash-triage.md`
+# — triage recommended "Trash"; Sponsor picked "Discard").
+# This test now pins the discard semantics — if a future PR adds real
 # ground-drop behavior, it should add a separate verb (e.g. Shift+RMB)
 # and this test stays as-is.
 
-func test_right_click_inventory_trashes_item() -> void:
+func test_right_click_inventory_discards_item() -> void:
 	var panel: InventoryPanel = _make_panel()
 	var item: ItemInstance = _make_weapon_item()
 	_inv().add(item)
 	panel.open()
 	panel.force_click_inventory_index_for_test(0, MOUSE_BUTTON_RIGHT)
 	# Item permanently removed (no equip, no ground spawn — M1 simplification,
-	# verb is "trash" not "drop").
-	assert_eq(_inv().get_items().size(), 0, "item trashed from inventory")
+	# verb is "discard" not "drop").
+	assert_eq(_inv().get_items().size(), 0, "item discarded from inventory")
 	assert_null(_inv().get_equipped(&"weapon"), "and not equipped")
 
 
