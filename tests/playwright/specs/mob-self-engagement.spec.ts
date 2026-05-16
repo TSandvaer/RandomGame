@@ -24,24 +24,24 @@
  *      movement, no attack, no key presses after the room loads.
  *   3. Wait for the engagement window (~10s melee, ~15s kite-then-shoot,
  *      ~5s boss).
- *   4. Assert: at least one `[combat-trace] Hitbox.hit | team=mob
+ *   4. Assert: at least one `[combat-trace] Hitbox.hit | team=enemy
  *      target=Player damage=N` line fires within the window — i.e. some mob
  *      reached the passive player and landed a hit on them.
  *
- * **Why `team=mob target=Player` is the load-bearing signal:** the
+ * **Why `team=enemy target=Player` is the load-bearing signal:** the
  * `Hitbox.gd::_try_apply_hit` shim emits the trace AFTER the hitbox
  * Area2D-overlapped the target AND the target's `take_damage()` accepted the
- * call. A `team=mob target=Player` line therefore proves both that (a) the
+ * call. A `team=enemy target=Player` line therefore proves both that (a) the
  * mob's spatial AI brought it into the player's hit-rect (so engagement
  * succeeded mechanically) AND (b) the mob's combat-loop actually fired its
  * attack (so the AI wasn't stuck idle / fleeing-only). A
- * `team=mob target=Player damage=0` line would still satisfy the
+ * `team=enemy target=Player damage=0` line would still satisfy the
  * engagement-window assertion at the Hitbox layer — but `Player.take_damage`
  * early-returns on `_is_invulnerable` BEFORE the trace fires, and a player
  * who's not been hit yet has `_is_invulnerable = false`, so the first hit
  * always lands and emits the trace. The post-hit 0.25s iframes (`Player.gd
  * HIT_IFRAMES_SECS`) are not the issue: the spec only needs the FIRST
- * `team=mob target=Player` line, and iframes only cap repeated hits.
+ * `team=enemy target=Player` line, and iframes only cap repeated hits.
  *
  * **Per-room engagement windows** (median + 50% headroom from Sponsor's
  * informal soak observations + the `scripts/mobs/*.gd` distance bands):
@@ -134,8 +134,15 @@ const ROOM01_CLEAR_TIMEOUT_MS = 90_000;
  * passive player." This is the load-bearing assertion across every test in
  * this spec class — see the file-level docstring for the rationale.
  */
+// NOTE (fix-86c9upffv): the production Hitbox.gd emits `team=enemy`, not
+// `team=mob`. Hitbox.gd constants are TEAM_PLAYER=&"player" / TEAM_ENEMY=
+// &"enemy" — there is no `&"mob"` value in the codebase. The original
+// regex (PR #215) used `team=mob` and never matched a real production
+// trace, so this spec failed for every room on every CI run since merge.
+// Pre-existing defect, surfaced (but not caused) by the PR #244 Phase 2A
+// migration. See ClickUp 86c9upffv for the empirical evidence.
 const MOB_HIT_PLAYER_TRACE_RE =
-  /\[combat-trace\] Hitbox\.hit \| team=mob target=Player damage=\d+/;
+  /\[combat-trace\] Hitbox\.hit \| team=enemy target=Player damage=\d+/;
 
 /**
  * Per-room engagement-window expectations. These windows include 50%
@@ -275,7 +282,7 @@ test.describe("mob self-engagement — passive player, mob must reach + land hit
   // (240, 200) at distances ~98px and ~99px respectively. Grunts at
   // `move_speed = 60 px/s` reach the player in ~1.6-1.7s after the room
   // settles. With the production Grunt collision rect + Player rect, first
-  // contact-frame fires `Hitbox.hit | team=mob target=Player` within
+  // contact-frame fires `Hitbox.hit | team=enemy target=Player` within
   // ~2.5-3s. Engagement window: 10s (3-4x headroom).
   //
   // **Sponsor manual-play observation:** Room 02 chasers engage correctly.
@@ -342,7 +349,7 @@ test.describe("mob self-engagement — passive player, mob must reach + land hit
 
       // Snapshot baseline count AFTER Room 02 has loaded — every Hitbox.hit
       // line from THIS point forward is scoped to Room 02 only. A pre-existing
-      // `team=mob` line from Room 01 (the dummy doesn't damage, so this is
+      // `team=enemy` line from Room 01 (the dummy doesn't damage, so this is
       // defensive) would otherwise satisfy the assertion falsely.
       const baselineCount = capture.getLines().length;
 
@@ -405,7 +412,7 @@ test.describe("mob self-engagement — passive player, mob must reach + land hit
         firstHit,
         `${spec.label}: passive player at DEFAULT_PLAYER_SPAWN must be ` +
           `hit by a mob within ${spec.engagementWindowMs}ms. No ` +
-          `[combat-trace] Hitbox.hit | team=mob target=Player line ` +
+          `[combat-trace] Hitbox.hit | team=enemy target=Player line ` +
           `observed in the window (${engageDurationMs}ms elapsed). ` +
           `Rationale: ${spec.rationale}. Roster: ${spec.mobs}. ` +
           `An always-flee / cornered-idle bug would produce this signature.`
@@ -626,7 +633,7 @@ test.describe("mob self-engagement — passive player, mob must reach + land hit
   // on the passive player by ~3-4s post-entry. 5s window is tight but
   // healthy — a stuck-in-IDLE or never-CHASING boss fails clearly. The
   // boss's swing wedge fires through the same `Hitbox.hit` shim as mob
-  // hits, so `team=mob target=Player` covers the assertion identically.
+  // hits, so `team=enemy target=Player` covers the assertion identically.
   test.fail(
     "S1 Boss Room — passive player: Stratum1Boss must reach and land a hit",
     buildPassivePlayerTest(

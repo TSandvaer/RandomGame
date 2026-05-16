@@ -98,6 +98,26 @@ Opt-out semantics mirror the GUT side: `test.use({ expectedUserWarnings: [/regex
 
 **A bug class is "covered" only when BOTH surfaces have a test for it** when the bug class can manifest in either lane. The Sponsor M2 RC meta-finding was that headless GUT and the Playwright suite both shipped green for 24 hours while the Sponsor's manual soak found three production warnings — every test path was scoped, none was universal. The two-surface warning gate is the structural answer.
 
+## Spec-string-vs-engine-emit drift (ticket `86c9upffv`)
+
+**The trap.** Playwright specs assert against `[combat-trace]` line shapes via regex. The trace strings are interpolated from engine-side `StringName` constants (e.g. `Hitbox.TEAM_PLAYER = &"player"` / `Hitbox.TEAM_ENEMY = &"enemy"`). A spec author who guesses the string from intuition rather than reading the constant ships a regex that **never matches a real production trace** — but Playwright reports "assertion failed" the same way as a real engine bug, so the misdiagnosis class is open.
+
+**The PR #215 cautionary tale.** `mob-self-engagement.spec.ts` was authored with `team=mob target=Player` — a string that has never existed in the codebase (Hitbox.gd has only `&"player"` and `&"enemy"`, no `&"mob"`). The spec failed for Room 02 + every `test.fail()` block on every CI run since merge, hidden among other CI bounces until PR #244 Phase 2A migration surfaced it as a named failure cluster (`86c9upffv`). `soak-narrative-regression.spec.ts` had the same defect in its OR-branch (dead code, latent landmine).
+
+**Pre-existing vs migration-induced — the diagnostic shape.** When a Playwright spec failure-list spikes after a fixture-level refactor (test-base.ts, console-capture.ts, etc.), the first triage question is always: **did the spec EVER pass before the refactor?** Pull the same spec's run on the merge-base SHA via `gh run view <run-id> --log | grep <spec-name>`. If the spec was already failing on the merge-base, the refactor is not the cause — it surfaced a pre-existing defect that other failures previously hid. The post-migration triage stays under one full reading of the CI log this way: empirically verify before hypothesising harness-side causes.
+
+**The drift-pin pattern (`test_team_constants_match_trace_string_contract`).** Every engine-side constant that feeds a trace string a Playwright spec depends on needs a GUT test pinning its value:
+
+```gdscript
+func test_team_constants_match_trace_string_contract() -> void:
+    assert_eq(String(Hitbox.TEAM_ENEMY), "enemy", "...")
+    assert_eq(String(Hitbox.TEAM_PLAYER), "player", "...")
+```
+
+If a future refactor renames the constant value (`&"mob"`, `&"hero"`, etc.), the GUT pin fails in headless CI BEFORE the Playwright spec gets a chance to drift silently green-on-no-match. The pin is the structural answer to the "spec author guessed wrong" failure class — it makes the engine ↔ spec contract explicit.
+
+**Apply this pattern whenever** a Playwright spec regex captures an interpolated `StringName` / `String` value from an engine `const`. Other live surfaces: `Mob._set_state` state names (`STATE_IDLE`, `STATE_CHASING`, `STATE_KITING`, `STATE_AIMING`, `STATE_POST_FIRE_RECOVERY`, `STATE_DEAD`), `Shooter._set_state` band labels, `TutorialEventBus.request_beat` beat ids. Each should have a pinned-constant GUT test if a Playwright regex matches against it.
+
 ## Visual primitives — see `team/TESTING_BAR.md` § "Visual primitives"
 
 Tier 1 (mandatory): target color ≠ rest color (`assert_ne`). Tier 2 (mandatory for parented modulate cascades): assertion lands on the visible-draw node, not the parent CharacterBody2D. Tier 3 (aspirational): framebuffer pixel-delta — deferred pending a renderer-painting CI lane. Full detail + rationale in `team/TESTING_BAR.md`.

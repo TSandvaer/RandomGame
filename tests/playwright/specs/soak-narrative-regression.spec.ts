@@ -346,11 +346,16 @@ test.describe("soak-narrative finding #1 — Room 2 mob-aggro observable after p
       //
       // The `Grunt.pos` trace emits every 0.25s and includes `state=chasing`
       // once the grunt has aggro'd. Observable AFTER the first player hit.
-      // We also accept `Hitbox.hit | team=mob target=Player` as direct proof
+      // We also accept `Hitbox.hit | team=enemy target=Player` as direct proof
       // that the grunt closed and attacked — which definitively proves aggro.
+      //
+      // NOTE (fix-86c9upffv): Hitbox.gd emits `team=enemy`, NOT `team=mob`.
+      // Pre-fix this OR-branch was dead code; the spec relied on the
+      // primary `Grunt.pos state=chasing` clause exclusively. Same defect
+      // class as mob-self-engagement.spec.ts:138 — fixed in this PR.
       const aggroLine = await waitForNewLine(
         capture,
-        /\[combat-trace\] (?:Grunt\.pos \| .*state=chasing|Hitbox\.hit \| team=mob target=Player)/,
+        /\[combat-trace\] (?:Grunt\.pos \| .*state=chasing|Hitbox\.hit \| team=enemy target=Player)/,
         hitLandedLineIdx,
         AGGRO_ON_HIT_WINDOW_MS
       );
@@ -381,7 +386,7 @@ test.describe("soak-narrative finding #1 — Room 2 mob-aggro observable after p
         `Sponsor finding #1: after the player lands a hit on a Room 02 Grunt, ` +
           `the Grunt must transition to STATE_CHASING (observable via ` +
           `[combat-trace] Grunt.pos | state=chasing) OR land its own hit ` +
-          `(team=mob target=Player) within ${AGGRO_ON_HIT_WINDOW_MS}ms. ` +
+          `(team=enemy target=Player) within ${AGGRO_ON_HIT_WINDOW_MS}ms. ` +
           `A missing aggro-on-hit response means the Grunt's AI ignores ` +
           `damage events and never enters the chase loop.`
       ).not.toBeNull();
