@@ -117,7 +117,7 @@
  *   - Closed P0 86c9q96m8 (equip-via-LMB-click was broken pre-fix)
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test-base";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import {
   clearRoom01Dummy,

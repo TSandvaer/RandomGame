@@ -32,7 +32,7 @@
  *   - .claude/docs/html5-export.md §"BuildInfo SHA verification"
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test-base";
 import * as path from "path";
 import { ConsoleCapture } from "../fixtures/console-capture";
 

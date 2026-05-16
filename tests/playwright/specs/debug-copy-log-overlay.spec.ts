@@ -27,7 +27,7 @@
  *     and silently truncates trace tails (M2 W3 finding)
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test-base";
 
 const BUTTON_SELECTOR = "#embergrave-debug-copy-log";
 
