@@ -80,6 +80,8 @@ If the guard quietly stops working (e.g. a future refactor breaks the signal wir
 
 See `tests/playwright/fixtures/test-base.ts` for the Playwright-side gate. The TypeScript fixture extends Playwright's base `test` with an auto-attached `ConsoleCapture` and a teardown assertion that fails on `USER WARNING:` / `USER ERROR:` console lines (Godot HTML5's `push_warning` / `push_error` prefix shape).
 
+**Playwright `ConsoleMessage.type()` returns `"warning"` (NOT `"warn"`) for `console.warn()` calls.** Verified empirically 2026-05-16 against Playwright 1.49 + Chromium (ticket `86c9upfex`). The original test-base.ts filter checked only for `"warn"`, which silently let every `USER WARNING:` line through — the gate was a no-op for warnings from PR #217 (ship) through PR #244 (Phase 2A migration). The negative-control canary at `universal-console-warning-gate.spec.ts:205` surfaced it via "Expected to fail, but passed" within hours of Phase 2A landing. **Filter rule: accept BOTH `"warning"` (current Playwright API) AND `"warn"` (defensive against future API / CDP renames).** Authors building helper code on top of `ConsoleCapture.getLinesByType(...)` should pass `"warning"`, not `"warn"`. Full enum: `"log" | "debug" | "info" | "error" | "warning" | "dir" | "dirxml" | "table" | "trace" | "clear" | "startGroup" | "startGroupCollapsed" | "endGroup" | "assert" | "profile" | "profileEnd" | "count" | "time" | "timeEnd"`.
+
 Specs adopt the gate by changing one import line:
 
 ```diff
