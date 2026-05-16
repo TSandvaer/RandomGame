@@ -67,6 +67,41 @@ Each is a small `head_include` addition once it surfaces. The whole class is "br
 
 Each is independently gated and independently cuttable — the same composability the contextmenu-suppress block has alongside the copy-log overlay.
 
+### Escape-sequence pitfall — Godot INI parser eats backslash escapes
+
+**The bug (PR #240 finding, Sponsor 2026-05-16 soak):** Godot's INI parser interprets backslash escape sequences in `export_presets.cfg` string values BEFORE writing them into the generated `index.html`. A literal `\n` in the `head_include` JS source becomes a **real newline character** at export time, which splits any JS string literal containing it across two physical lines:
+
+```js
+// What the .cfg author wrote:
+var text = buf.join('\n');
+// What the Godot INI parser produced in index.html:
+var text = buf.join('
+');
+```
+
+This is a SyntaxError. The whole IIFE crashes silently during `<head>` parse — the script-injected feature (copy-log overlay, contextmenu suppressor, future debug tools) is GONE in the export with zero visible error from the Godot build itself. The page just behaves as if the script were never there.
+
+**The fix:** double-escape every intended-for-JS backslash sequence. `\n` → `\\n`, `\t` → `\\t`, `\r` → `\\r`, `\\` → `\\\\`. The INI parser collapses `\\n` to `\n` (a literal two-character backslash-n), and the browser's JS parser then interprets that as the newline escape inside the JS string literal — which is what was intended.
+
+**Other escapes in the same trap class:** `\b`, `\f`, `\v`, `\0`, `\xNN`, `\uNNNN`, `\'`, `\"`. Anything the INI parser recognizes as an escape sequence will be collapsed at export time and bite the JS payload.
+
+**Verification ritual after editing `html/head_include`:**
+
+```bash
+# After exporting (gh workflow run release-github.yml ...):
+# Download the artifact, extract, then:
+grep "buf.join" build/web/index.html
+# The call MUST appear on a SINGLE LINE. If it's split across two
+# lines, the INI parser ate an unescaped `\n`. Open the .cfg, fix the
+# double-escape, re-export.
+```
+
+More generally: `grep` any JS string literal that contains a control character and confirm it sits on one physical line in the exported `index.html`. If you don't have a release artifact handy, an open-in-editor visual scan of `index.html` for unexpected newlines inside `<script>` blocks works too.
+
+**Why this is invisible to CI:** Godot's exporter doesn't validate the generated `<head>` JS — it just concatenates strings. The browser console shows a `SyntaxError` at runtime when the page loads, but if no E2E test exercises the JS feature (most Playwright specs don't depend on `?debug=1`), the failure is silent. Sponsor caught the M2 W3 IIFE crash because the Copy-log button stopped appearing — the only test surface was Sponsor's soak workflow itself.
+
+**Author discipline:** any non-trivial `head_include` edit should be paired with a release build + grep verification before merge. The same `head_include` constraint applies to any future Godot `.cfg`-embedded JS surface (custom HTML shell, PWA manifest comments, etc.).
+
 ## Godot input handling order: `_input()` vs `_unhandled_input()` for UI shortcuts
 
 A second 2026-05-16 soak finding (PR #235): the inventory's "Tab close" hint did not work — pressing Tab while the inventory was open cycled focus between inventory Buttons instead of closing the panel. The toggle binding was in `_unhandled_input()`, which fires AFTER Godot's GUI system has already consumed Tab for focus-traversal between Control nodes.
