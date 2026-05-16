@@ -615,3 +615,86 @@ A raw `latestPos(capture, pattern)` call with no bounds is a smell on any mob-po
 - **Architecture context.** `.claude/docs/combat-architecture.md` § "Shooter state machine — engagement bands + cornered fallback (ticket 86c9uehaq)" — covers the Harness contract preserved paragraph (the `Shooter.pos` trace shape `pos=(x,y) state=... dist_to_player=...` is unchanged across the band rebalance). The harness coverage of `Shooter.pos` is what THIS convention protects from staleness-induced misreads.
 - **Engine-clock context.** `.claude/docs/combat-architecture.md` § "Engine.time_scale interactions — harness assumption-vs-game-clock rule" — a sibling rule for the wall-clock-vs-game-clock divergence class. The `time_scale = 0.10` panel-open path is the most extreme case of throttled `.pos` cadence (10× stretch) and is mitigated by the Escape-press idiom in the helpers; the staleness-bounded convention here is the complementary defence when game-clock drift is less extreme but still bites.
 - **Process incident.** `team/log/process-incidents.md` § "2026-05-15 — Sample-size discipline for re-introducing flaky tests" — the sibling lesson from the same PR-#208/#212/#221 cycle. The convention here is the *technical* fix; the sample-size discipline is the *procedural* fix.
+
+---
+
+## 15. Convention: harness workarounds for known game-side bugs must fail loudly — 2026-05-16 (PR #231 §4 recommendation #4)
+
+**Status:** Hard rule, Sponsor-authorized 2026-05-16. Source: PR #231 (`team/tess-qa/playwright-soak-gap-analysis-2026-05-15.md`) §2 Bug 2 finding "Drop the case B harness workaround or convert it to a failure" + §4 recommendation #4. Generalised here from the specific `gateTraversalWalk` case B case to a class rule.
+
+### The rule
+
+> **Harness workarounds for known game-side bugs must fail loudly once the game-side fix lands.**
+>
+> When a Playwright harness fixture or helper contains a code path that exists specifically to work around a known game-side bug, the following lifecycle applies:
+>
+> 1. **While the game-side bug is open:** the workaround may live and silently resolve. A code comment MUST cite the ticket / PR tracking the underlying bug.
+> 2. **Once the game-side fix lands on `main`:** within the same PR (or a fast-follow PR), the workaround MUST be either:
+>    - **(a) Removed entirely** — the fixture relies on the game-side correct behavior, or
+>    - **(b) Converted to an explicit failure** — replace silent resolution with `expect.fail("regression: <bug description> is back")` or `throw new Error(...)`. The next regression surfaces as a CI failure, not a silent pass.
+> 3. **Scope:** this rule applies to workarounds for **game-side bugs only**. Environment workarounds (HTML5-vs-desktop timing, browser quirks, AudioContext-on-gesture, gl_compatibility frame-rate volatility, service-worker cache state, etc.) are **out of scope** and may continue to resolve silently.
+> 4. **Detection:** silent fallbacks in fixture code with words like "case B" / "fallback" / "if not, retry" / "workaround" SHOULD be reviewed against this rule.
+
+### Why this rule exists
+
+PR #231 §2 Bug 2 traced the Sponsor M2 W3 soak's "Room 02 / Room 06 gate stickiness" finding to a class of harness workaround. `gateTraversalWalk` case B (Drew, PR #224) was added to handle "player drifts into trigger during Room 03 chase + knockback" — at the time, the game had no mechanism to re-emit `gate_traversed` when the player was inside the trigger at unlock time, so the harness silently steered the player out and back in to finish the traversal. This made AC4 green.
+
+The hidden cost: the **same game-side scenario hit manual players** (Sponsor), who don't have the harness's steering logic. The Sponsor soak surfaced it as "had to walk into the door multiple times." The harness had been hiding the bug from CI for a full sprint.
+
+PR #230 fixed the game-side with `RoomGate._fire_traversal_if_unlocked()` — `_unlock()` now defers a traversal emission when `get_overlapping_bodies()` finds a `CharacterBody2D` inside the trigger at unlock time. Manual players AND the harness now hit the correct behavior automatically (case A, not case B).
+
+Per this convention, case B now becomes a **regression detector**: if the workaround fires post-PR-#230, EITHER the player was inside the trigger and `_fire_traversal_if_unlocked` didn't fire (= regression), OR the player drifted out before unlock (= rare, legitimate scenario that the spec should be updated to avoid). Either way, silent steer is wrong — fail loud and force the question.
+
+### What is and isn't a game-side bug workaround
+
+**In scope (silent → loud):**
+
+- A helper that catches a game-side state machine failing to transition correctly and manually nudges the state into the correct shape (e.g., `gateTraversalWalk` case B steering the player to finish a traversal the gate should have auto-fired).
+- A helper that retries an action because the first attempt's game-side response was missing or wrong, then proceeds as if the first attempt had succeeded.
+- A `try { } catch { }` that swallows an assertion the spec made about game state, then proceeds on a fallback path that produces the same observable result via a different code path.
+- A helper that detects "the game did X wrong, so I'll do Y instead and pretend X worked."
+
+**Out of scope (silent OK):**
+
+- Environment timing tolerances — `waitForTimeout(800)` for a Godot scene-load to settle, polling for an HTML5 audio context to unlock after user gesture, race-tolerant `waitForLine` budgets.
+- Renderer-divergence handling — case-splitting on `gl_compatibility` vs `forward_plus` behavior, HDR clamp compensation, Polygon2D-vs-ColorRect substitutions.
+- Service-worker cache state handling — `disable-cache` headers, fresh-tab launches between specs.
+- Game-mechanic-driven multi-outcome resolution — `kiting-mob-chase.ts`'s case A/B/C resolution models the **legitimate game behavior** of "Shooter walks player through gate during chase." All three outcomes are valid gameplay states; none represents a bug. The chase ends with the gate in one of three states because the kiter's pursuit path is unpredictable, not because the gate has a bug.
+- Best-effort optimizations driven by game state, not bugs — `clearRoom01Dummy`'s `playerWasAlreadyEquipped` skip is a Phase-F optimization because the player is genuinely already equipped (post-respawn / post-reload), not because the pickup pipeline is broken.
+
+The discriminator: **is the workaround compensating for the game producing the wrong observable, or for the game producing one of several correct observables?** The former is in scope; the latter is out of scope.
+
+### Workflow
+
+When you add a harness workaround for a known game-side bug:
+
+1. **Cite the ticket** in a code comment at the workaround site: `// WORKAROUND: ticket 86cXXXX — once fixed, this branch should fail-loud per `team/tess-qa/playwright-harness-design.md` §15.`
+2. **File a follow-up ticket** for the workaround retirement, blocked-on the game-side fix ticket. Add `harness-workaround-retirement` tag (or equivalent for your tracker).
+3. **When the game-side fix merges:** within the same PR or a fast-follow PR, retire the workaround per (a) remove or (b) convert-to-fail.
+
+When you review a Playwright PR:
+
+- Search the diff for `case B` / `fallback` / `workaround` / `silently` / `try { ... } catch { ... } /* proceed */` patterns.
+- For each silent fallback, ask "what game-side bug is this working around?"
+  - If "none, this is just timing" → out of scope, fine.
+  - If "ticket #XXX, currently open" → confirm the cite is present, otherwise request changes.
+  - If "ticket #XXX, fixed in PR #YYY which is on main" → REQUEST CHANGES, this workaround is now load-bearing for hiding regressions.
+
+When the game-side fix lands:
+
+- Audit fixture code for the now-stale workaround.
+- Convert per the convention in the same PR or as a fast-follow.
+
+### Reviewer checklist (additive to §13/§14)
+
+- [ ] Does the diff introduce or modify a silent fallback in fixture code?
+- [ ] If yes, does the fallback have a code-comment cite to the underlying game-side bug ticket?
+- [ ] Is the cited bug ticket currently open? If closed, REQUEST CHANGES.
+- [ ] Is the fallback resolving via a different code path than the game's correct path? If yes, surface the question — "should this fail loud instead?"
+
+### Cross-references
+
+- **Source.** `team/tess-qa/playwright-soak-gap-analysis-2026-05-15.md` §2 Bug 2 finding + §4 recommendation #4 — the original PR #231 analysis that motivated this rule.
+- **Game-side fix.** PR #230 — `RoomGate._fire_traversal_if_unlocked()` (deferred from `_unlock()` when player is overlapping at unlock time). Closes the bug class that `gateTraversalWalk` case B was working around.
+- **Inaugural retirement.** This PR (`qa/harness-workaround-convention`) converts `gateTraversalWalk` case B to a hard throw per branch (b) of the convention.
+- **Out-of-scope precedent.** `tests/playwright/fixtures/kiting-mob-chase.ts` case A/B/C resolution — models legitimate game-mechanic-driven multi-outcome, not a bug workaround. Kept as-is.
