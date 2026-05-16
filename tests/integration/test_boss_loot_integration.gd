@@ -234,3 +234,39 @@ func test_boss_loot_pickup_count_equals_loot_table_rolls_no_double_spawn() -> vo
 			entries * 2, entries, pickup_count,
 		])
 	assert_gt(pickup_count, 0, "boss does drop loot via Main's pipeline")
+
+
+# ---- Test 4: pickup_wiring survives multiple-frame delay -------------
+#
+# REGRESSION-86c9un4nh (Finding 2 trace pin): `auto_collect_pickups` wires
+# the `picked_up` signal SYNCHRONOUSLY on the boss-death frame, before the
+# deferred `add_child` lands. After 3 frames (2x deferred add_child + 1x
+# deferred _activate_and_check_initial_overlap), the pickup must still be
+# wired to `Inventory.on_pickup_collected`. This guards against any refactor
+# that accidentally moves `auto_collect_pickups` after the deferred `add_child`.
+func test_pickup_wired_to_inventory_after_three_frames() -> void:
+	var main: Main = _instantiate_main()
+	await get_tree().process_frame
+	main.load_room_index(8)
+	await get_tree().process_frame
+	var boss_room: Stratum1BossRoom = main.get_current_room() as Stratum1BossRoom
+	var boss: Stratum1Boss = boss_room.get_boss()
+	boss_room.complete_entry_sequence_for_test()
+	await get_tree().process_frame
+	_phase_walk_boss_to_death(boss)
+	# Wait 3 frames: frame 1 = deferred add_child; frame 2 = Pickup._ready's
+	# deferred _activate_and_check_initial_overlap; frame 3 = settle.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	var inv: Node = _inventory()
+	var pickups: Array[Pickup] = _collect_pickups_in(boss_room)
+	assert_gt(pickups.size(), 0,
+		"REGRESSION-86c9un4nh: boss loot Pickups still in room after 3 frames")
+	for p in pickups:
+		assert_true(p.has_signal("picked_up") and p.picked_up.get_connections().size() > 0,
+			"REGRESSION-86c9un4nh: Pickup.picked_up still wired after 3-frame settle")
+		assert_true(p.is_connected("picked_up", inv.on_pickup_collected),
+			"REGRESSION-86c9un4nh: picked_up wired to Inventory.on_pickup_collected after 3-frame delay — " +
+			"auto_collect_pickups runs synchronously before deferred add_child, wiring persists")

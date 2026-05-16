@@ -265,3 +265,95 @@ func test_room_exit_position_within_arena() -> void:
 	assert_lt(exit.position.x, 480.0)
 	assert_gte(exit.position.y, 0.0)
 	assert_lt(exit.position.y, 270.0)
+
+
+# ---- REGRESSION-86c9un4nh: knockback-overlap fix for activate() ----------
+#
+# Finding 3 (M2 W3 re-soak) — player standing inside exit area when
+# activate() runs. Body_entered never fires for pre-existing overlaps in
+# Godot 4; _player_in_range stays false; prompt never shows; E key does
+# nothing; player trapped.
+#
+# Fix: activate() calls get_overlapping_bodies() after monitoring turns on
+# and fires _on_body_entered via call_deferred if a CharacterBody2D is
+# already inside. Same shape as RoomGate._unlock() → _fire_traversal_if_unlocked
+# (PR #230 knockback-overlap fix).
+#
+# NOTE: headless GUT cannot drive real Area2D physics overlaps —
+# get_overlapping_bodies() returns [] without a physics server. These tests
+# use set_player_overlap_for_test to simulate the pre-existing overlap STATE
+# that the production path delivers via body_entered (or the re-check's
+# deferred _on_body_entered call). The HTML5 release-build Playwright spec
+# and Sponsor soak verify the real Area2D physics path.
+#
+# State-machine regression pinned:
+#   - Player was "inside" at activate() time (overlap state true)
+#     → prompt shows immediately after activate()
+#     → try_interact() succeeds
+#   - Player was NOT inside at activate() time (no overlap)
+#     → prompt stays hidden after activate()
+#     → try_interact() returns false
+
+func test_activate_with_pre_existing_player_overlap_shows_prompt_and_allows_interact() -> void:
+	# **REGRESSION-86c9un4nh** — the Sponsor scenario: player walked to the
+	# exit portal while the boss was alive (area inactive, body_entered never
+	# fired). Boss dies → call_deferred("activate") lands. At that moment the
+	# player is already standing on the exit. Without the fix, _player_in_range
+	# stays false; press-E does nothing. With the fix, activate() detects the
+	# pre-existing overlap and fires body_entered deferred → _player_in_range = true.
+	#
+	# Simulation: set_player_overlap_for_test injects the overlap state that the
+	# production fix's deferred _on_body_entered call produces. The prompt must
+	# show immediately after activate() and try_interact() must succeed.
+	var exit: StratumExit = _make_exit()
+	watch_signals(exit)
+	# Player walked into the exit area while boss was alive — area inactive.
+	# body_entered never fired (monitoring was off). Set overlap state directly
+	# (simulates the deferred _on_body_entered call result from the fix).
+	exit.set_player_overlap_for_test(true)
+	assert_false(exit.get_prompt_label().visible,
+		"precondition: prompt hidden on inactive exit even with player standing inside")
+	# Boss dies → call_deferred("activate") fires one frame later.
+	exit.activate()
+	assert_true(exit.is_active(),
+		"REGRESSION-86c9un4nh: exit active after activate()")
+	assert_true(exit.is_player_in_range(),
+		"REGRESSION-86c9un4nh: _player_in_range true when player was overlapping at activate() time")
+	assert_true(exit.get_prompt_label().visible,
+		"REGRESSION-86c9un4nh: prompt visible immediately when player was in area at activate() time " +
+		"(pre-existing overlap re-check in activate() surfaces the standing player)")
+	# Player presses E — must fire descend_triggered.
+	var fired: bool = exit.try_interact()
+	assert_true(fired,
+		"REGRESSION-86c9un4nh: try_interact succeeds when player was inside at activate() time")
+	assert_signal_emitted(exit, "descend_triggered",
+		"REGRESSION-86c9un4nh: descend_triggered fires — player can exit boss room")
+
+
+func test_activate_without_pre_existing_overlap_prompt_stays_hidden() -> void:
+	# Complementary to the above: normal post-boss-death flow. Player walks
+	# to the exit AFTER it activates. Prompt is hidden until body_entered fires.
+	var exit: StratumExit = _make_exit()
+	exit.activate()
+	assert_true(exit.is_active(), "exit active")
+	assert_false(exit.is_player_in_range(),
+		"REGRESSION-86c9un4nh: _player_in_range false when no body overlapping at activate()")
+	assert_false(exit.get_prompt_label().visible,
+		"REGRESSION-86c9un4nh: prompt hidden until player walks into area after activation")
+	# Player walks in after activation.
+	exit.set_player_overlap_for_test(true)
+	assert_true(exit.get_prompt_label().visible,
+		"prompt shows once player enters active exit area")
+	assert_true(exit.try_interact(), "try_interact succeeds")
+
+
+func test_activate_idempotent_with_pre_existing_overlap() -> void:
+	# Edge: calling activate() twice with player inside must not double-fire
+	# the body_entered deferred or emit exit_activated twice.
+	var exit: StratumExit = _make_exit()
+	watch_signals(exit)
+	exit.set_player_overlap_for_test(true)
+	exit.activate()
+	exit.activate()  # second call must be a no-op
+	assert_signal_emit_count(exit, "exit_activated", 1,
+		"REGRESSION-86c9un4nh: exit_activated emits exactly once even with repeated activate() + overlap")
