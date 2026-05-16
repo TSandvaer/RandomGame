@@ -588,7 +588,29 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	# Sponsor would notice as a visual artifact (Tess CR feedback bug 1).
 	_time_since_last_damage_taken = 0.0
 	_set_regenerating(false)
+	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - clean_amount)
+	# Diagnostic trace — Player HP curve under multi-chaser damage. Used by
+	# investigations of mid-combat Player death (e.g. ticket 86c9uf1x8 — Room
+	# 05 multi-chaser death recurrence). Format mirrors mob `<Mob>.take_damage`
+	# trace so harness post-mortem can correlate Player hits with mob hits on
+	# the same combat-trace timeline. `src` is the source node's class name
+	# when available (Charger / Grunt / Stratum1Boss / Hitbox), so a release-
+	# build trace stream can attribute the lethal hit to a specific mob class
+	# without further state inspection.
+	var src_name: String = "Unknown"
+	if source != null:
+		if source.has_method("get_class"):
+			src_name = source.get_class()
+		# Prefer the actual script name when the source is a Hitbox spawned
+		# by a mob (Hitbox.gd attaches an `owner_mob_class` if available).
+		if "name" in source and source.name != "":
+			src_name = String(source.name)
+	_combat_trace("Player.take_damage",
+		"amount=%d hp=%d->%d src=%s pos=(%.0f,%.0f)" % [
+			clean_amount, hp_before, hp_current, src_name,
+			global_position.x, global_position.y
+		])
 	damaged.emit(clean_amount, hp_current, source)
 	hp_changed.emit(hp_current, hp_max)
 	# Knockback applied as instantaneous velocity bump. Decays naturally
