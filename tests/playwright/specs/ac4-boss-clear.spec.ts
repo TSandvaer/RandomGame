@@ -857,20 +857,28 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         // gate_traversed and throws with explicit drift diagnostics if the
         // walk fails to reach the trigger.
         //
-        // **Case A/B/C resolution (ticket 86c9ugfzv):** the helper now
-        // accepts a `preRoomLineCount` snapshot and resolves the gate's
-        // state by scanning the combat-phase slice. Three outcomes:
+        // **Case A/C resolution (ticket 86c9ugfzv, case B retired
+        // 2026-05-16):** the helper accepts a `preRoomLineCount` snapshot
+        // and resolves the gate's state by scanning the combat-phase slice.
+        // Two outcomes:
         //   - Case A: gate auto-traversed during combat (chase + knockback
-        //     drove the player through the trigger twice). Helper returns
-        //     early; the spec asserts the causal sequence + skips the
-        //     two-part walk.
-        //   - Case B: gate auto-unlocked during combat but not traversed
-        //     (chase drifted player into trigger once + last mob died);
-        //     helper steers EAST-of-trigger then walks WEST to traverse.
-        //   - Case C: neither — normal phase 3-5 two-part walk.
-        // The case distinguishes via `result.resolutionCase`; the
-        // `bodyEnteredFiredOnPhase3` assertion only applies to case C
-        // (cases A/B don't run phase 3).
+        //     drove the player through the trigger; OR PR #230's game-side
+        //     `_fire_traversal_if_unlocked` deferred re-emit fired after the
+        //     last mob death). Helper returns early; the spec asserts the
+        //     causal sequence + skips the two-part walk.
+        //   - Case C: neither `gate_unlocked` nor `gate_traversed` fired in
+        //     the combat-phase slice — normal phase 3-5 two-part walk.
+        //
+        // **Case B retired** per the harness workaround convention
+        // (PR #231 §4 #4 → `team/tess-qa/playwright-harness-design.md`
+        // §15). The original case B silently steered the player to finish
+        // a traversal `RoomGate._unlock()` had not auto-emitted; PR #230
+        // (Drew, 86c9ujg8c) made the game emit `gate_traversed` deferred
+        // from `_unlock()` when the player is overlapping. The case-B
+        // preconditions now throw rather than silently resolve — fail
+        // surfaces the regression instead of hiding it. The
+        // `bodyEnteredFiredOnPhase3` assertion still applies only to
+        // case C (case A short-circuits before phase 3).
         const result = await gateTraversalWalk(
           page,
           canvas,
@@ -887,9 +895,10 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
 
         // Devon PR #171 load-bearing positive signal: _on_body_entered must
         // have fired during phase 3 to prove the trigger was reached —
-        // but only in case C ("open-walk"). Case A/B short-circuited before
-        // phase 3 because the gate was already (partially) resolved during
-        // combat.
+        // but only in case C ("open-walk"). Case A short-circuits before
+        // phase 3 because the gate was already fully resolved during combat
+        // (or via PR #230's deferred re-emit). Case B is retired and now
+        // throws before reaching this assertion.
         if (result.resolutionCase === "open-walk") {
           expect(
             result.bodyEnteredFiredOnPhase3,
@@ -901,8 +910,9 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         }
 
         // Causality assertion: gate_unlocked + gate_traversed both observed.
-        // (Applies to all three cases — even case A/B observed both events
-        // during combat / case B's finish walk.)
+        // (Applies to both remaining cases — case A observed both events
+        // during combat; case C observes them via phase 3 + phase 5.
+        // Case B retired — throws before reaching this assertion.)
         expect(
           result.gateUnlocked,
           `${roomLabel}: gateTraversalWalk should have observed gate_unlocked ` +
@@ -917,24 +927,25 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         // body_entered count assertion: applies only to the normal
         // open-walk path (case C). The original purpose was to assert "the
         // player crossed the trigger twice — phase 3 lock + phase 5
-        // traverse." Cases A/B observed `gate_unlocked` + `gate_traversed`
+        // traverse." Case A observed `gate_unlocked` + `gate_traversed`
         // empirically (the helper's `gateUnlocked` + `gateTraversed` checks
         // gate that), which independently proves the gate transitioned
         // LOCKED→UNLOCKED→TRAVERSED. The body_entered count is redundant
-        // proof in those cases.
+        // proof for case A.
         //
         // **Why we don't assert >= 2 across all cases (ticket 86c9ugfzv
-        // N=2 sweep finding):** in case B specifically, the
-        // `_on_body_entered → lock()` event fires DURING the room-load /
-        // settle window between the previous room's `gate_traversed` and
-        // this room's `preRoomBodyEnteredCount` snapshot — i.e. BEFORE the
-        // spec's count baseline. So the body_entered count delta measured
-        // from `preRoomBodyEnteredCount → postWalkBodyEnteredCount` is
-        // legitimately 0 even when the gate fully transitioned (the trace
-        // exists, but is in `[0, preRoomBodyEnteredCount)`, not in the
-        // measured window). The `result.gateUnlocked` + `result.gateTraversed`
-        // assertions above already prove the transition occurred; the
-        // body_entered count assertion is redundant for cases A/B.
+        // N=2 sweep finding — original analysis pre-dated PR #230 + case B
+        // retirement):** the `_on_body_entered → lock()` event can fire
+        // DURING the room-load / settle window between the previous room's
+        // `gate_traversed` and this room's `preRoomBodyEnteredCount`
+        // snapshot — i.e. BEFORE the spec's count baseline. So the
+        // body_entered count delta measured from `preRoomBodyEnteredCount`
+        // → `postWalkBodyEnteredCount` is legitimately 0 even when the
+        // gate fully transitioned (the trace exists, but is in `[0,
+        // preRoomBodyEnteredCount)`, not in the measured window). The
+        // `result.gateUnlocked` + `result.gateTraversed` assertions above
+        // already prove the transition occurred; the body_entered count
+        // assertion is redundant for case A.
         if (result.resolutionCase === "open-walk") {
           const postWalkBodyEnteredCount = capture
             .getLines()
