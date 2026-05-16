@@ -89,6 +89,55 @@ func on_mob_died(_mob: Node, death_pos: Vector2, mob_def: MobDef) -> Array[Node]
 	return spawned
 
 
+## TEST-ONLY — force-spawn a Pickup without going through `on_mob_died`.
+##
+## **Purpose (ticket 86c9ukc2e):** lets GUT tests exercise the
+## "pickup collected while mob still alive" negative-arm (PR #229 finding #2
+## counter-test) without needing a real mob_died event. The helper bypasses
+## the loot-table roll and the `mob_def`/`mob_died` gate entirely, directly
+## instantiating a Pickup from `PickupScene` at the requested position.
+## The caller is responsible for wiring via `Inventory.auto_collect_pickups([pickup])`
+## — the same convention `on_mob_died`'s callers use.
+##
+## **Naming convention:** the `_test_` prefix signals that this helper MUST
+## NOT be called from production code paths. It exists solely for GUT harness
+## use. No runtime feature flag is required — the naming convention + this
+## docstring are the guard.
+##
+## **Physics-flush safety:** if `parent` is non-null the pickup is added via
+## `call_deferred("add_child")` (same convention as `on_mob_died`) so callers
+## coming from a physics callback context don't panic. Tests that need the
+## pickup live in the same frame can `await get_tree().process_frame` once.
+##
+## **Why ItemInstance not item_id:** ContentRegistry is a RefCounted helper
+## (not an autoload), so GUT tests always construct their own ItemInstance via
+## ContentFactory. A Playwright fixture mapping an `item_id` string to an
+## ItemInstance would call `ContentRegistry.resolve_item` before invoking this
+## helper. The GUT-facing API keeps the seam slim.
+##
+## Parameters:
+##   item: ItemInstance    — the already-constructed item to place in the Pickup
+##   world_pos: Vector2    — absolute position for the spawned Pickup
+##   parent: Node          — scene-tree parent (room root or autofree Node2D in
+##                           tests); if null, pickup is returned un-parented
+##                           (caller owns lifecycle)
+##
+## Returns the configured Pickup (never null — caller supplies the ItemInstance).
+static func _test_force_spawn_pickup(
+		item: ItemInstance,
+		world_pos: Vector2,
+		parent: Node,
+) -> Pickup:
+	var pickup: Pickup = PickupScene.instantiate()
+	pickup.configure(item)
+	pickup.position = world_pos
+	if parent != null:
+		# Deferred add_child — same physics-flush safety as on_mob_died.
+		# Caller must await get_tree().process_frame before querying the tree.
+		parent.call_deferred("add_child", pickup)
+	return pickup
+
+
 ## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
 ## MobLootSpawner is a RefCounted so we need a SceneTree handle to reach the
 ## autoload — pull it from `parent_for_pickups` if available, else fall back
