@@ -223,6 +223,41 @@ func _arm_interaction_area_after_flush() -> void:
 	# ON" regardless of actual state — no signal whether the setter took effect.
 	_combat_trace("StratumExit.activate",
 		"mon_actual=%s mon_req=true — checking pre-existing body overlaps (knockback-overlap fix)" % str(_interaction_area.monitoring))
+	# Diagnostic-only instrumentation (ticket `86c9uq0ky` — Finding 2 NEW bug
+	# class investigation, 2026-05-16 Sponsor soak of `8e76c74`). Sibling to
+	# `Pickup._activate_diag`. PR #241's double-defer proved `mon_actual=true`
+	# post-flip — yet boss-room `body_entered` still never fires. This trace
+	# reads the full physics-server registration state: overlapping_bodies
+	# count, child CollisionShape2D `disabled` + shape resource validity,
+	# parent name, is_inside_tree, and the global_position of the interaction
+	# area (in case parent re-parenting shifted geometry off-screen). If
+	# `mon_actual=true` AND `cs_disabled=false` AND `cs_shape_set=true` AND
+	# `is_inside_tree=true` AND `overlapping_bodies=0` while the player is
+	# spatially adjacent (per `Player.pos`), the bug is downstream of every
+	# observable contract — i.e. a physics-server-side rejection that doesn't
+	# surface in any GDScript-readable property.
+	var cs: CollisionShape2D = null
+	for child in _interaction_area.get_children():
+		if child is CollisionShape2D:
+			cs = child as CollisionShape2D
+			break
+	var cs_disabled: String = "<no_cs>"
+	var cs_shape_set: String = "<no_cs>"
+	if cs != null:
+		cs_disabled = str(cs.disabled)
+		cs_shape_set = str(cs.shape != null)
+	var area_parent_name: String = "<no_parent>"
+	var ap: Node = _interaction_area.get_parent()
+	if ap != null:
+		area_parent_name = String(ap.name)
+	_combat_trace("StratumExit._arm_diag",
+		"overlapping_bodies=%d cs_disabled=%s cs_shape_set=%s monitoring=%s area_parent=%s area_in_tree=%s area_global_pos=(%.0f,%.0f)" % [
+			_interaction_area.get_overlapping_bodies().size(),
+			cs_disabled, cs_shape_set,
+			str(_interaction_area.monitoring),
+			area_parent_name, str(_interaction_area.is_inside_tree()),
+			_interaction_area.global_position.x, _interaction_area.global_position.y,
+		])
 	# **Pre-existing overlap re-check (ticket 86c9un4nh):** if the player was
 	# already inside the interaction area before monitoring turned on, fire the
 	# in-range detection manually. Deferred (via call_deferred on _on_body_entered
