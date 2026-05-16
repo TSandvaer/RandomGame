@@ -112,13 +112,13 @@ func test_v0_to_v1_preserves_all_v0_data() -> void:
 	assert_eq(loaded["character"]["hp_max"], 110)
 	# Stash: items survive with affix rolls intact.
 	assert_eq(loaded["stash"].size(), 2, "v0 stash items count preserved")
-	assert_eq(loaded["stash"][0]["id"], "weapon_iron_sword")
+	assert_eq(loaded["stash"][0]["id"], "iron_sword")
 	assert_eq(loaded["stash"][0]["tier"], 2)
 	assert_almost_eq(
 		float(loaded["stash"][0]["rolled_affixes"][0]["value"]), 0.075, 1e-6,
 		"affix rolled_value survives JSON parse + migration"
 	)
-	assert_eq(loaded["stash"][1]["id"], "armor_leather")
+	assert_eq(loaded["stash"][1]["id"], "leather_vest")
 
 
 func test_v0_to_v1_backfills_required_v1_fields_with_defaults() -> void:
