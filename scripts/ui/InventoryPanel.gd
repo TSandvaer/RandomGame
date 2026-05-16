@@ -254,12 +254,21 @@ func force_close_for_test() -> void:
 
 # ---- Input -----------------------------------------------------------
 
-## Handled BEFORE the GUI focus system (unlike `_unhandled_input`), so the
-## test-only force-close action reaches the panel even when a focusable grid
-## `Button` holds keyboard focus. Gated on `OS.has_feature("web")` — the
-## action is only ever acted on in the HTML5 export the Playwright harness
-## drives; desktop / headless GUT ignore it entirely (the F9 binding is inert
-## there). This mirrors the `DebugFlags.combat_trace` web-only gate.
+## Handled BEFORE the GUI focus system (unlike `_unhandled_input`), so both
+## the Tab-toggle and the test-only force-close action reach the panel even
+## when a focusable grid `Button` holds keyboard focus.
+##
+## **Why Tab must live here (ticket 86c9un3z4 — M2 W3 soak bug 2):**
+## Godot's GUI input system consumes `Tab` for focus-traversal between
+## focusable Controls (Buttons) before `_unhandled_input` ever fires. When the
+## player clicks an inventory cell, the cell's Button grabs focus; subsequent
+## Tab presses cycle the focus-ring rather than reaching the toggle handler.
+## `_input()` runs before the GUI focus system, so Tab reliably closes/opens
+## the panel regardless of which Button holds focus.
+##
+## The F9 test-force-close action is still gated on `OS.has_feature("web")`
+## (HTML5-only, Playwright harness). Tab-toggle has NO platform gate — it must
+## work on desktop and HTML5 equally.
 ##
 ## Matches the F9 key by `physical_keycode` directly (the proven pattern in
 ## `DebugFlags._input` for Ctrl+Shift+X) rather than via `is_action_pressed`
@@ -267,20 +276,14 @@ func force_close_for_test() -> void:
 ## being present in the exported `project.godot`, so the hook works even if
 ## the action map is stripped or the export preset filters it.
 func _input(event: InputEvent) -> void:
-	if not OS.has_feature("web"):
-		return
 	if not (event is InputEventKey):
 		return
 	var ke: InputEventKey = event as InputEventKey
 	if not ke.pressed or ke.echo:
 		return
-	if ke.physical_keycode == KEY_F9 or event.is_action_pressed(ACTION_TEST_FORCE_CLOSE):
-		get_viewport().set_input_as_handled()
-		force_close_for_test()
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	# Tab toggles regardless of open state. Esc only closes when open.
+	# Tab toggle — must be in _input (not _unhandled_input) so it fires before
+	# Godot's GUI focus-traversal system can consume the Tab keypress.
+	# Ticket 86c9un3z4 — M2 W3 soak bug 2: "Tab cycles focus, not closes".
 	if event.is_action_pressed(ACTION_TOGGLE):
 		get_viewport().set_input_as_handled()
 		if _open:
@@ -288,6 +291,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			open()
 		return
+	# F9 test-only direct-close hook — HTML5 / Playwright harness only.
+	if OS.has_feature("web"):
+		if ke.physical_keycode == KEY_F9 or event.is_action_pressed(ACTION_TEST_FORCE_CLOSE):
+			get_viewport().set_input_as_handled()
+			force_close_for_test()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Tab is now handled in _input() above (pre-GUI-focus) — see that method's
+	# docstring for why. _unhandled_input only handles Esc-close when open.
 	if not _open:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:

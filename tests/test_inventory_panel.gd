@@ -317,3 +317,72 @@ func test_lmb_click_equip_swap_drives_both_surfaces() -> void:
 	assert_eq((_inv().get_items()[0] as ItemInstance).def.id, &"panel_sword_a",
 		"swap pushes the previously-equipped sword A back into the grid (was a " +
 		"data-loss bug pre-fix — _unequip_internal(slot, false) silently dropped it)")
+
+
+# =======================================================================
+# Test 10 — Tab-toggle handled in _input (ticket 86c9un3z4 — M2 W3 bug 2)
+# =======================================================================
+#
+# Regression guard for "Tab cycles focus instead of closing inventory".
+# Root cause: toggle_inventory was handled in _unhandled_input(), which fires
+# AFTER Godot's GUI focus system consumes Tab for focus-traversal between
+# focusable Buttons. Fix: moved handler to _input() (pre-GUI-focus path).
+#
+# This test drives _input() directly with a synthetic Tab key event to assert
+# that the toggle is handled there — not relying on _unhandled_input(). It
+# exercises the open→close path (the soak-reported failure) and the
+# closed→open path (regression guard).
+
+func test_tab_toggle_handled_in_input_pre_gui_focus() -> void:
+	var panel: InventoryPanel = _make_panel()
+	assert_false(panel.is_open(), "panel closed at start")
+
+	# Synthetic Tab key press — physical_keycode = KEY_TAB (4194306).
+	# is_action_pressed("toggle_inventory") resolves in _input; we call
+	# _input() directly to prove the handler lives there, not in
+	# _unhandled_input (which a focused Button would swallow in HTML5).
+	var tab_press: InputEventKey = InputEventKey.new()
+	tab_press.pressed = true
+	tab_press.echo = false
+	tab_press.physical_keycode = KEY_TAB
+
+	# Closed → open via _input (not _unhandled_input).
+	panel._input(tab_press)
+	assert_true(panel.is_open(),
+		"Tab via _input() opens panel — pre-GUI-focus path. " +
+		"If this fails, the toggle handler was NOT moved to _input(), " +
+		"meaning a focused inventory Button can swallow the Tab keypress " +
+		"(M2 W3 soak bug 2 / ticket 86c9un3z4).")
+	assert_eq(Engine.time_scale, panel.get_time_slow_factor(),
+		"time-slow active after _input Tab-open")
+
+	# Open → close via _input.
+	panel._input(tab_press)
+	assert_false(panel.is_open(),
+		"Tab via _input() closes panel — toggle works in both directions")
+	assert_eq(Engine.time_scale, 1.0,
+		"time scale restored after _input Tab-close")
+
+
+func test_tab_toggle_in_input_does_not_fire_on_echo() -> void:
+	# Held-key echo events must NOT toggle the panel on every repeat.
+	var panel: InventoryPanel = _make_panel()
+	var tab_echo: InputEventKey = InputEventKey.new()
+	tab_echo.pressed = true
+	tab_echo.echo = true
+	tab_echo.physical_keycode = KEY_TAB
+	panel._input(tab_echo)
+	assert_false(panel.is_open(),
+		"echo (held-Tab) must not open the inventory — only fresh Tab presses toggle")
+
+
+func test_tab_toggle_in_input_does_not_fire_on_release() -> void:
+	# Key-release events must not toggle.
+	var panel: InventoryPanel = _make_panel()
+	var tab_release: InputEventKey = InputEventKey.new()
+	tab_release.pressed = false
+	tab_release.echo = false
+	tab_release.physical_keycode = KEY_TAB
+	panel._input(tab_release)
+	assert_false(panel.is_open(),
+		"Tab key-release must not open the inventory — only presses toggle")
