@@ -39,6 +39,34 @@ The `head_include` field embeds the script into the generated `index.html` `<hea
 
 Each is a small `head_include` addition once it surfaces. The whole class is "browser default behaviour leaks through Godot input handling" — the suppression mechanism is the same.
 
+## Debug-tooling via `head_include` (second use of the script-injection class)
+
+`head_include` is also the lowest-friction surface for **opt-in JS-side debug tooling** that has no GDScript equivalent. The second shipped example is the `?debug=1` Copy-log overlay (Sponsor M2 W3 soak workaround), which sits alongside the contextmenu suppressor in the same preset.
+
+**The problem it solves:** the browser's F12 Console panel truncates copy-paste output at ~50KB (browser-imposed clipboard cap on Console-panel selection). Sponsor's soak workflow involves pasting console traces into chat for diagnosis; the truncation silently cut off the boss-room tail of long traces. Godot has no way to write to the system clipboard from GDScript in HTML5 — but the JS `navigator.clipboard.writeText` API does, and a `<script>` block injected via `head_include` can bridge it.
+
+**Pattern:**
+
+1. **URL-param gate.** Read `new URLSearchParams(window.location.search)` at script entry; bail out if the flag isn't set. Zero overhead on normal play — the IIFE returns immediately.
+2. **Hook the console BEFORE Godot boots.** `console.log/warn/error/info` are reassigned to a wrapper that pushes into an in-memory `string[]` buffer AND calls the original. Hooking at `<head>` parse time ensures the boot lines (`[Save]`, `[BuildInfo]`, `[Main]`) land in the buffer too. Cap the buffer (we use 20k lines) so a long soak doesn't OOM the tab.
+3. **Floating overlay button.** Append a fixed-position `<button>` to `document.body` on `DOMContentLoaded`. Z-index high enough to sit above the Godot canvas.
+4. **Clipboard write.** On click, `navigator.clipboard.writeText(buffer.join('\n'))`. Flash the button label to `Copied (N lines)` on success, `Copy failed` on rejection. Includes a `document.execCommand('copy')` fallback path for browsers without the clipboard API.
+
+**Activation:** append `?debug=1` to the URL. Example: `http://localhost:8000/?debug=1`. Default (no param, or `?debug=0`) → script returns immediately; no overlay, no console hooks.
+
+**Why head_include, not a Godot UI panel:**
+- No GDScript change → no `gl_compatibility` renderer-risk gate to clear.
+- Works the same on every HTML5 build regardless of which scene is active or whether Godot has even finished booting (the button appears even if Godot crashes during boot — useful for diagnosing boot failures).
+- Bypasses the F12 truncation by going around the F12 panel entirely (system clipboard, not console selection).
+
+**Future debug-tooling additions on this surface** should follow the same shape: URL-param-gated IIFE in the `head_include`, single small piece of functionality per script block, no cross-block coupling. Reasonable next candidates (none committed yet):
+
+- `?fps=1` — overlay FPS counter (Godot has one but it lives inside the canvas; an HTML-side counter survives renderer crashes).
+- `?bench=1` — log frame-time stats to the same buffer, expose via a "Copy benchmark" button.
+- `?dump=<event>=1` — toggle individual `[trace]` categories on/off without rebuilding.
+
+Each is independently gated and independently cuttable — the same composability the contextmenu-suppress block has alongside the copy-log overlay.
+
 ## Godot input handling order: `_input()` vs `_unhandled_input()` for UI shortcuts
 
 A second 2026-05-16 soak finding (PR #235): the inventory's "Tab close" hint did not work — pressing Tab while the inventory was open cycled focus between inventory Buttons instead of closing the panel. The toggle binding was in `_unhandled_input()`, which fires AFTER Godot's GUI system has already consumed Tab for focus-traversal between Control nodes.
