@@ -13,7 +13,7 @@
     },
     "stash": [
       {
-        "id": "weapon_iron_sword",
+        "id": "iron_sword",
         "tier": 2,
         "rolled_affixes": [
           {"affix_id": "swift", "value": 0.075}
@@ -21,7 +21,7 @@
         "stack_count": 1
       },
       {
-        "id": "armor_leather",
+        "id": "leather_vest",
         "tier": 1,
         "rolled_affixes": [],
         "stack_count": 1
