@@ -114,7 +114,7 @@
  *   - scripts/levels/RoomGate.gd (gate state machine)
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test-base";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import { gateTraversalWalk } from "../fixtures/gate-traversal";
 import {

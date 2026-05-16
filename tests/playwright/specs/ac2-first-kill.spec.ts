@@ -59,7 +59,7 @@
  *   - tests/playwright/fixtures/room01-traversal.ts — clearRoom01Dummy
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test-base";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import {
   clearRoom01Dummy,

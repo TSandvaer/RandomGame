@@ -174,4 +174,66 @@ test.describe("universal console-warning gate — Sponsor 86c9uf0mm", () => {
       // catches it — narrow opt-out, broad gate.
     });
   });
+
+  // ===================================================================
+  // Negative-control canary — deliberately trigger the gate.
+  // ===================================================================
+  //
+  // **Disposition: `test.fail()` — this test is EXPECTED to fail at
+  // the afterEach gate.** It deliberately emits a `USER WARNING:` line
+  // from the browser via `page.evaluate(console.warn(...))`. The
+  // auto-fixture's afterEach hook MUST catch it and fail the test.
+  // Playwright sees the expected failure → reports the test as PASS.
+  //
+  // Why this matters: this is the structural canary that proves the
+  // gate is still wired and functional. Analogous to GUT-side
+  // `tests/test_no_warning_guard.gd` (see `.claude/docs/test-conventions.md`
+  // § "Paired test for the guard itself"). If a future refactor breaks
+  // the fixture's afterEach assertion, this `test.fail()` flips to a
+  // passing test (i.e. "expected to fail but passed" → Playwright
+  // reports failure) — the canary catches the broken gate.
+  //
+  // The `USER WARNING:` text is emitted via `page.evaluate` against
+  // the browser context, NOT via game code, so the canary is
+  // independent of any production push_warning path. The fixture only
+  // pattern-matches the `USER WARNING:` / `USER ERROR:` prefix on the
+  // captured console line — it doesn't care about origin.
+  //
+  // Authored 2026-05-16 as part of Phase 2A (ticket 86c9uf0mm) to
+  // give the migrated spec corpus a permanent self-test for the gate.
+  test.describe("negative-control canary — gate MUST fire on USER WARNING", () => {
+    test.fail(
+      "Deliberate USER WARNING emission triggers afterEach gate (canary)",
+      async ({ page, consoleCapture, context }) => {
+        test.setTimeout(60_000);
+        await context.route("**/*", (route) => route.continue());
+
+        const baseURL =
+          process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:8000";
+        await page.goto(baseURL, { waitUntil: "domcontentloaded" });
+        await consoleCapture.waitForLine(
+          /\[Main\] M1 play-loop ready/,
+          BOOT_TIMEOUT_MS
+        );
+
+        // Deliberately emit a USER WARNING line from the browser
+        // context. The fixture's ConsoleCapture catches it via
+        // page.on("console", ...) just like a real Godot push_warning
+        // call would. afterEach then scans for /^USER WARNING:/ and
+        // fails the test.
+        await page.evaluate(() => {
+          console.warn(
+            "USER WARNING: phase-2a-canary deliberate trigger from page.evaluate"
+          );
+        });
+
+        // Drain a beat so the console event lands in the capture
+        // buffer before teardown.
+        await page.waitForTimeout(500);
+
+        // No explicit assertion — the afterEach gate is the assertion.
+        // Because this is `test.fail()`, the gate firing = test passes.
+      }
+    );
+  });
 });

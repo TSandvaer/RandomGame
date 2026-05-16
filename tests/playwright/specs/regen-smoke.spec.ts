@@ -68,7 +68,7 @@
  *   - resources/level_chunks/s1_room01.tres — grunt spawn positions
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test-base";
 import { ConsoleCapture } from "../fixtures/console-capture";
 
 const BOOT_TIMEOUT_MS = 30_000;

@@ -119,7 +119,7 @@
  *   - ClickUp 86c9uerk8 — this ticket (W3-T13 scaffold)
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test-base";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import {
   clearRoom01Dummy,

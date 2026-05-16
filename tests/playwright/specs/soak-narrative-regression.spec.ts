@@ -88,7 +88,7 @@
  *   - team/tess-qa/playwright-harness-design.md
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test-base";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import {
   clearRoom01Dummy,

@@ -22,7 +22,7 @@
  * For full end-to-end verification, see Sponsor's manual M1 RC re-soak 6.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test-base";
 import { ConsoleCapture } from "../fixtures/console-capture";
 
 const BOOT_TIMEOUT_MS = 30_000;
