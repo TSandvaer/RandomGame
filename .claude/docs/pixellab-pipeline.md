@@ -219,6 +219,44 @@ Cost: zero generations, ~1 second of pixel-mcp time.
 
 ---
 
+## Doctrine-hex-in-prompt — partial success, area-dependent reliability
+
+PixelLab `create_character` **partially honors hex codes embedded in the description**, but
+with character-area-specific reliability. Validated 2026-05-17 on NPC Bounty-poster with prompt
+`"robed scribe NPC in dark brown #4A3F2E robes, parchment scroll #C9C2B2 in one hand, warm tan
+#A0856B skin tone visible inside hood, ..."`:
+
+| Hex requested | PixelLab produced | Match quality |
+|---|---|---|
+| `#A0856B` skin tone | `#AF8266` | **EXCELLENT** — ~5/channel distance, near-exact |
+| `#4A3F2E` cloth/robe | `#422D2B` | **PARTIAL** — got dark brown hue but warmer/redder shade than requested |
+| `#C9C2B2` parchment scroll | (not in quantized palette) | **MISSING** — small accent either ignored by PixelLab or merged into surrounding pixels by quantize |
+
+**Operational guidance:**
+
+- **Skin/face hex tokens land reliably.** PixelLab's training likely has strong "skin tone"
+  semantic anchoring. Include doctrine skin hex in the prompt — typically arrives within
+  perceptual nearest-neighbor distance of doctrine.
+- **Dominant body-color hex tokens land in the right hue family, but specific shade may drift.**
+  The doctrine intent (e.g. "warm brown robe") survives, but the specific RGB triple may be
+  off by 10-20/channel. Acceptable for raw-ship; if exact doctrine compliance matters, still
+  pipe through pixel-mcp doctrine-lock.
+- **Small-accent hex tokens (scrolls, gems, weapon edges) are unreliable.** Either PixelLab
+  doesn't render them strongly enough OR the small pixel count gets merged into surrounding
+  slots by `quantize_palette`. Don't expect accent hexes to survive.
+
+**Recommended hybrid: doctrine hexes IN prompt for skin + body, ship raw for accents.** This
+gives:
+1. PixelLab generates with closer-to-doctrine starting palette (less post-process drift)
+2. No `quantize_palette` + `set_palette` step needed for most characters
+3. Per-character accents that matter (e.g. red eye-glow) handled via separate
+   `create_character_state` variant or manual paint
+
+This is NOT a replacement for the pixel-mcp doctrine-lock pipeline — it's an upstream
+mitigation that reduces how often the lock step is needed.
+
+---
+
 ## Prompt engineering — PixelLab interprets constraints literally
 
 PixelLab `create_character` weights negative-shaped constraints (e.g. "obscuring", "hidden",
@@ -276,6 +314,63 @@ mcp__pixellab__create_character_state(
 ## Operational notes from M3 batch run (2026-05-17)
 
 Empirical observations from queueing 7 characters in parallel after Tier 2 upgrade:
+
+### PixelLab generation failures can be reproducible (not just transient)
+
+Distinct from silent garbage collection: some `create_character` jobs return an explicit
+`failed` status via `get_character`, with the error message "Generation failed. Please try
+again." These failures can be **deterministic** — the same prompt structure may fail on every
+retry, suggesting a specific token or combination triggers a backend rejection (content filter,
+unknown model token, or some other reproducible condition).
+
+**Validated 2026-05-17:** NPC Bounty-poster failed 2/2 retries with similar-but-not-identical
+prompts (one plain, one with embedded doctrine hexes). Both shared the descriptive structure
+`"friendly lean cloaked lore-keeper NPC with deep drawn hood, scholarly demeanor, dark fantasy
+town bounty-poster..."`. Other NPCs with similar shape (Vendor, Anvil-keeper, both also
+"friendly + cloaked/aproned + holding item + standing pose") generated cleanly first try.
+Difference candidates: `"lore-keeper"`, `"bounty-poster"`, `"scholarly"`, or some combination.
+
+**Diagnostic strategy:**
+
+1. If a `create_character` returns `failed`, retry ONCE (handles true transient failures).
+2. If the 2nd attempt also returns `failed`, **stop retrying with the same prompt** — assume
+   reproducible failure trigger. Each retry costs 1 generation and adds zero information.
+3. Simplify the prompt: drop domain-specific jargon (`"lore-keeper"`, `"bounty-poster"`) in
+   favor of plain descriptors (`"robed scribe with parchment scroll"`).
+4. Alternative: use `create_character_state` from a working sibling character (e.g. base a
+   Bounty-poster on a working Vendor with `edit_description="change to deeper hood, holding
+   parchment scroll, more scholarly pose"`).
+
+**Don't confuse failure modes:**
+
+- Silent garbage collection (entry vanishes from `list_characters`) ≠ explicit failure (entry
+  shows `failed` status with error message). Different recovery paths.
+
+---
+
+### PixelLab silently garbage-collects stuck queue entries
+
+If a queued `create_character` job sits in `pending` status for ≳30 min without ever moving to
+`processing`, PixelLab may **silently drop it** — no error returned, no completion notification,
+the character just vanishes from `list_characters` on the next poll. Validated 2026-05-17 with
+4 characters (Player + 3 hub NPCs) queued in a batch that included variant edits jumping ahead;
+the 4 base-character entries stayed pending for >30 min then disappeared between polls.
+
+**Suspected trigger:** queue position deprioritization combined with a backend timeout. The
+disappearance correlated with the free→Tier 2 subscription transition during the stuck window,
+suggesting the upgrade may have triggered a queue-state migration that lost in-flight pending
+entries.
+
+**Rule:** if a `pending` entry has not moved to `processing` after ~15 min of polling, assume
+it will vanish. Do NOT wait indefinitely. Either re-queue defensively or delete + re-queue
+explicitly.
+
+**Re-queue pattern:** when silent-dropped entries are detected (compare current `list_characters`
+output against the originally-queued ID set), re-call `create_character` with the same
+parameters. Cost: 1 gen per re-queue, but no recovery of the lost queue position — the new
+entry goes to the queue tail.
+
+---
 
 ### PixelLab queue limit — ~2 characters processing simultaneously
 
@@ -406,6 +501,56 @@ inspecting the raw at native resolution).
 
 The Shooter trial chose option 1 (re-quantize) → option 2 (manual paint) as the cheap path; full
 re-roll reserved if both fail.
+
+---
+
+## Doctrine-lock is per-character — check the doctrine-exemption policy before defaulting
+
+**Not every character gets doctrine-locked.** Some characters are designated cross-stratum
+constants and ship with their PixelLab-natural palette directly (no `quantize_palette` → doctrine
+remap pipeline). Default-pipelining EVERY character through doctrine-lock is wrong and will lose
+intended character beats that distinguish doctrine-exempt characters from stratum-themed mobs.
+
+**Validated 2026-05-17 on Player:** my default pipeline doctrine-locked the Player along with
+the rest of the M3 roster. Sponsor caught it — the Player's PixelLab-natural purple/blue palette
+(blue eyes, purple-grey cloth) got mapped to S1 doctrine browns and the eye-blue specifically
+vanished. The Player is **explicitly doctrine-exempt** per
+`team/uma-ux/palette-stratum-2.md` §5 sprite-reuse table line 190:
+
+> "Player ... **NO CHANGE** — cross-stratum constant per `palette.md`. The player is not
+> retinted per stratum. ... Player flame is the through-line; retinting the player would break
+> the diegetic logic."
+
+**Rule — before processing any character through the doctrine-lock pipeline:**
+
+1. Check `team/uma-ux/palette-stratum-2.md` §5 sprite-reuse table (or equivalent S3+ docs) for
+   the character's row.
+2. If the row says "NO CHANGE" or "doctrine-exempt" or "cross-stratum constant": **skip the
+   doctrine-lock pipeline entirely.** Ship the PixelLab raw south (or a minimal-edit version) as
+   the canonical `idle_s.png`.
+3. If the row says "RETINT OK" or "NEW AUTHORING" or has stratum-specific palette hexes:
+   doctrine-lock applies; use the per-stratum palette per the table's hex citations.
+
+**Known doctrine-exempt characters (Phase 1, expand as more land):**
+
+- **Player** — cross-stratum constant; ship PixelLab raw directly.
+
+**Known doctrine-locked characters (S1):**
+
+- Grunt, Charger, Shooter, Stratum1Boss, PracticeDummy — all use S1 doctrine palette
+  (`#5A4738` cloth base, `#A0856B` skin, `#D24A3C` aggro eye-glow, plus character-specific
+  accents like Shooter's bone-white `#C9C2B2` and Boss's Warden red `#7A1F29`).
+
+- Stoker (S2 retint of Grunt silhouette) — per `palette-stratum-2.md §5` line 191; uses S2
+  mob ramp (`#7A1F12` heat-corroded smock, `#7E5A40` sun-scorched skin) but shares Grunt
+  silhouette via palette swap. **Note:** the art-pass brief and the S2 palette doc disagree
+  on whether Stoker needs new authoring or retint suffices — this is currently flagged for
+  Priya/Uma resolution.
+
+**Hub-town NPCs** (Vendor, Anvil-keeper, Bounty-poster): no explicit doctrine-exemption stated;
+default to doctrine-lock with NPC-appropriate palette (warm bronze + parchment hood per the
+art-pass brief). Validated 2026-05-17 — Sponsor approved Vendor + Anvil-keeper doctrine-locked
+output.
 
 ---
 
