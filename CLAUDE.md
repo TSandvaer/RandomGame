@@ -61,6 +61,7 @@ For deep-dive reference, see the topic files in `.claude/docs/`:
 - [HTML5 Export](.claude/docs/html5-export.md) — `gl_compatibility` quirks (HDR clamp, Polygon2D, z-index), service-worker cache trap, BuildInfo SHA verification, visual-verification gate, release-build + artifact handoff pattern, diagnostic-build pattern, Sponsor soak ritual
 - [Audio Architecture](.claude/docs/audio-architecture.md) — 5-bus layout (`default_bus_layout.tres`), `AudioDirector` autoload with BGM/Ambient/crossfade players, S1→S2 entry-trigger wiring, boss-room crossfade pattern, HTML5 audio-playback gate (AudioContext user-gesture requirement)
 - [Test Conventions](.claude/docs/test-conventions.md) — universal warning gate (GUT `NoWarningGuard` + `WarningBus`, Playwright `test-base.ts` fixture), Godot 4.3 logger-API limitation that shapes the wrapper design, two-surface (GUT + Playwright) complementary coverage, visual-primitive testing tiers
+- [Pixel-mcp Pipeline](.claude/docs/pixel-mcp-pipeline.md) — pixel-mcp tool bugs (`draw_pixels` silently broken, `fill_area` global-replace trap), canonical RGB-first pipeline ordering, aspect-ratio two-step downsample, Windows path escape, doctrine palette lock worked example (S1 Grunt)
 
 ## Key references outside `.claude/docs/`
 

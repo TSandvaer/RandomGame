@@ -292,6 +292,14 @@ The Midjourney output is high-res (1024×1024). The game's target sprite is 32×
 4. **Inspect.** At target size, the silhouette should still be legible. If it's not — the source generation was too detailed; regenerate with stronger "readable silhouette" anchoring.
 5. **Save as PNG** to a scratch folder (NOT the repo yet — cleanup happens before commit).
 
+> **MJ output is square — use a two-step downscale for non-square targets.**
+> Midjourney outputs square images (typically 2048×2048). Scaling directly to a non-square target
+> (e.g. 32×48) distorts the character's aspect ratio. Instead: (1) scale to the smallest square
+> >= your longer target axis (e.g. 48×48 for a 32×48 target), then (2) crop to the final
+> dimensions (e.g. center-crop 48×48 → 32×48). See
+> `.claude/docs/pixel-mcp-pipeline.md §Aspect-ratio downsampling` for the canonical agent-side
+> procedure when using pixel-mcp tools.
+
 ### Step 3 — Palette-lock (Aseprite, ~15 min/character)
 
 Apply the §2 palette discipline. Concrete steps:
