@@ -73,6 +73,37 @@ This decomposition style is what actually drives Midjourney; reference-name cita
 
 ---
 
+## §1.5 — Per-character target dimensions
+
+Canvas dimensions affect silhouette legibility before any pixel editing. These are the **canonical
+target dimensions** for Phase 1. Adjust when evidence from a generation roll shows the silhouette
+is unreadable at the listed size (see decision rule below).
+
+| Character | Target (W×H) | Notes |
+|---|---|---|
+| Player | 32×48 | Taller than mobs; stands out in combat read |
+| Grunt | 32×32 | Humanoid; standard mob square |
+| Charger | 48×32 | Wider than tall; quadruped needs width budget |
+| Shooter | 32×32 | Humanoid; standard mob square |
+| Stratum1Boss | 48×48 | Larger than mobs to signal boss weight |
+| Stoker | 32×32 | Grunt retint; same dimensions |
+| PracticeDummy | 32×32 | Static target; square fine |
+| Hub-town NPCs | 32×40 | Slightly taller than mobs for NPC distinction |
+
+### Dimension adjustment rule
+
+If a generation roll produces an unreadable silhouette at the target dimensions:
+1. **Bump width by 16 px** for quadrupeds / wide-body archetypes (e.g. 32×32 → 48×32).
+2. **Bump height by 16 px** for tall/vertical archetypes (e.g. 32×32 → 32×48).
+3. **Never go below 32 px on either axis** — pixel density floor for doctrine legibility.
+4. **Document the bump** in the character's generation notes; flag Uma for palette-grid
+   consistency review if dimensions deviate from this table.
+
+The two-step scale → crop pattern (`.claude/docs/pixel-mcp-pipeline.md §Aspect-ratio downsampling`)
+handles any non-square target. Always use that pattern — never scale directly to a non-square.
+
+---
+
 ## §2 — Palette discipline (load-bearing)
 
 Midjourney CANNOT palette-lock natively. There is no "use only these hex codes" prompt that works reliably. The **Aseprite cleanup pass is what produces palette-coherent output;** without it, the project ships AI-typical hue drift and the visual identity dissolves.
@@ -159,10 +190,11 @@ fantasy aesthetic, readable silhouette, --ar 1:1 --style raw --no [anti-tokens]
 ```
 --no anti-aliasing, smooth, 3D render, photoreal, gloss, vector, cel-shaded,
 cute, chibi, anime, watercolor, watercolor edges, modern UI, HUD overlay,
-text, logo, frame, border, white background
+text, logo, frame, border, white background, ground shadow, complex fur,
+background, multiple poses, action lines
 ```
 
-The anti-aliasing token is critical — without it Midjourney outputs softened edges that defeat the pixel-art look. The "white background" anti-token forces the sprite onto a neutral field that's easier to mask in cleanup.
+The anti-aliasing token is critical — without it Midjourney outputs softened edges that defeat the pixel-art look. The "white background" anti-token forces the sprite onto a neutral field that's easier to mask in cleanup. `ground shadow`, `complex fur`, and `background` are added for downsample-bound sprites (32-48 px targets): MJ's default shadow merges with the body at small scale; complex fur texture disappears after nearest-neighbor resize; background elements compete with silhouette. `multiple poses` and `action lines` prevent MJ from generating pose-sheet or motion-blur outputs. See `.claude/docs/pixel-mcp-pipeline.md §MJ prompt-engineering for downsample-bound sprites` for the full token rationale.
 
 ### Per-character prompts (Phase 1 roster) — ILLUSTRATIVE STARTING POINTS
 
@@ -199,10 +231,19 @@ above, dark folk fantasy, readable silhouette, --ar 1:1 --style raw
 ```
 top-down RPG enemy sprite, 32-bit pixel art, low quadrupedal creature,
 matted fur in warm brown #5A4738, glowing red eyes #D24A3C, exposed teeth,
-muscular shoulders, mid-charge running pose, 1-pixel dark outline, hand-
-painted pixel feel, single warm light source, dark folk fantasy, readable
-silhouette, --ar 1:1 --style raw --no [anti-tokens]
+prominent muzzle, muscular shoulders, stocky proportions, four distinct paws,
+head-on facing camera, mid-charge running pose, bold 1-pixel dark outline,
+hand-painted pixel feel, simple silhouette, single warm light source,
+dark folk fantasy, readable silhouette at 48px wide,
+--ar 1:1 --style raw --no [anti-tokens]
 ```
+
+> **Quadruped rule (confirmed — Charger execution 2026-05-17):** `head-on facing camera`,
+> `four distinct paws`, `prominent muzzle`, and `stocky proportions` are mandatory for
+> quadrupeds at 32-48 px. Without them MJ defaults to a 3/4-angle pose that compresses both
+> pairs of legs into an unreadable blob at the target size. Pair with `ground shadow`,
+> `complex fur`, `background` in `--no`. See
+> `.claude/docs/pixel-mcp-pipeline.md §MJ prompt-engineering for downsample-bound sprites`.
 
 **Shooter (S1 skeletal-archer)**
 

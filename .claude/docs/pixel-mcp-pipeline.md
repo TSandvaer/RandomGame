@@ -78,6 +78,56 @@ the full slot-to-pixel mapping before the call.
 `quantize_palette`) after the sprite is visually correct. Never call `set_palette` to "fix" a
 color in indexed mode on a sprite with existing pixel content.
 
+**Mitigations — when positional `set_palette` is unavoidable** (e.g. doctrine-locking a
+PixelLab quantize-pass output): two techniques, ranked by quality, validated on the S1 Charger
+2026-05-17:
+
+1. **Per-slot nearest-neighbor mapping (BEST):** for each quantized slot, compute the
+   perceptually nearest doctrine color (Euclidean RGB distance is sufficient), then build a
+   doctrine palette in the SAME slot order as the quantized palette. Positional `set_palette`
+   then maps each slot to its nearest match. Recovers character beats (e.g. a red eye-glow
+   maps to the closest doctrine red, not a positionally-coincident dark shadow). This was
+   the validated winner on the Charger after Strategy 1 failed and Strategy 2 was skipped.
+2. **Luminance-sort both palettes (mitigation):** sort BOTH palettes by
+   `Y = 0.299R + 0.587G + 0.114B` before `set_palette`. Preserves dark→dark, light→light
+   mapping but loses hue alignment — an isolated red accent at mid luminance may still
+   cross-map to a brown of similar luminance.
+
+See [`pixellab-pipeline.md §"Doctrine palette compliance — pick a strategy"`](pixellab-pipeline.md)
+for full code samples and validation evidence.
+
+---
+
+## Frame-edge artifact — MJ-source PNGs carry a near-pure-black perimeter strip
+
+Midjourney outputs contain a **1-2 px near-pure-black perimeter strip** on the bottom and left
+edges (confirmed on two Charger generations: row 31 = solid `#1B1A1F`; cols 0-1 = similar). These
+pixels are NOT `#000000` — they are off-pure-black values that `fill_area` with `tolerance=0` does
+NOT catch (the outer-BG mask misses them because they don't match the target color exactly).
+
+**Consequence:** if the perimeter strip survives into the final sprite, indexed-color export bakes
+in stray near-black pixels that read as outline bleed or dirty edges at 32-px scale.
+
+**Safe fix — 4-perimeter-strip clear:**
+
+After background masking, before downsampling, explicitly overwrite the four edges with transparent:
+
+```python
+# After background mask, before scale_sprite — clear perimeter strip
+# Assumes canvas is W×H (e.g. 2048×2048); adjust for your resolution
+draw_rectangle(x=0, y=0, w=W, h=1, color="#00000000", filled=True)    # top row
+draw_rectangle(x=0, y=H-1, w=W, h=1, color="#00000000", filled=True)  # bottom row
+draw_rectangle(x=0, y=0, w=1, h=H, color="#00000000", filled=True)    # left col
+draw_rectangle(x=W-1, y=0, w=1, h=H, color="#00000000", filled=True)  # right col
+```
+
+Apply this after every `import_image` call on an MJ source PNG. Use actual pixel dimensions
+returned by `get_sprite_info` for W and H.
+
+**`tolerance=15` alternative:** `fill_area` with `tolerance=15` on a corner pixel can catch the
+near-black edge region, but risks bleeding into legitimate dark outline pixels on complex
+silhouettes. The explicit 4-strip clear is safer and has no false-positive risk.
+
 ---
 
 ## Canonical pipeline ordering
@@ -128,6 +178,67 @@ removes the excess.
 
 Choose the intermediate square size to be the **smallest integer multiple >= the longer target
 dimension** to minimize quality loss from the nearest-neighbor resize.
+
+---
+
+## MJ prompt-engineering for downsample-bound sprites
+
+When the game target is 32×32 or 48×32, the final sprite retains very few pixels — complex
+silhouettes collapse into unreadable blobs. Prompt-engineering the MJ source to produce
+**chunky, simple shapes** dramatically reduces re-rolls.
+
+### Positive tokens that survive downsampling
+
+| Token | Effect |
+|---|---|
+| `simple silhouette` | Pushes MJ away from detailed multi-part body parts |
+| `head-on facing camera` | Produces a symmetric front-facing pose; maximises width budget |
+| `four distinct paws` | Forces quadruped leg separation — avoids blob body |
+| `prominent muzzle` | Ensures the head reads as a distinct shape at small scale |
+| `stocky proportions` | Exaggerates readable mass; thin limbs disappear at 32 px |
+| `bold 1-pixel dark outline` | Hardens silhouette edge; survives nearest-neighbor resize |
+
+**Head-on pose rule (quadrupeds):** top-down RPG sprites of four-legged creatures almost always
+need a **head-on camera angle** rather than a 45° three-quarter view. The three-quarter view
+compresses one pair of legs behind the other at 32 px — you lose the quadruped read entirely.
+Lock in `head-on facing camera` for any non-humanoid with multiple limbs.
+
+### Anti-tokens that kill MJ defaults that don't survive downsampling
+
+Always add these to the `--no` block for downsample-bound sprites:
+
+| Token | Why |
+|---|---|
+| `ground shadow` | MJ default; shadow merges with the character blob at 32 px |
+| `complex fur` | High-frequency texture detail; gone after nearest-neighbor resize |
+| `background` | Any background element competes with silhouette at small scale |
+| `multiple poses` | Forces MJ to show one clean pose, not a pose-sheet |
+| `action lines` | Motion-blur artifacts collapse into dirty edge pixels |
+
+### Worked evidence
+
+**Grunt (32×48, humanoid):** standard skeleton + `readable silhouette` tokens were sufficient;
+humanoid silhouettes are MJ-native. No special positive tokens needed beyond the universal set.
+
+**Charger (32×32, quadruped):** first roll at 32×32 produced a blob; partially resolved at 48×32
+but still required re-rolls. Adding `head-on facing camera`, `four distinct paws`, `prominent
+muzzle`, and `stocky proportions` to the prompt, plus `ground shadow`, `complex fur`, `background`
+to `--no`, produced a clean quadruped read that survived the downsample.
+
+### Dimension floor by character complexity
+
+| Character type | Minimum dimension | Rationale |
+|---|---|---|
+| Humanoid (Grunt, NPC, Player) | 32×32 (prefer 32×48) | Vertical silhouette reads at 32 px |
+| Compact quadruped (Charger) | 48×32 or 32×32 with head-on prompt | Width budget tight; head-on mandatory |
+| Boss / elite mob | 48×48 or larger | Visual weight relative to 32-px mobs |
+
+If a 32×32 roll produces a blob at the cleanup inspect step, **bump to 48×32 before re-rolling.**
+Re-rolling at the same dimension with the same prompt rarely recovers the silhouette problem; the
+dimension change is often what unlocks a clean read.
+
+Cross-reference: `team/priya-pl/art-pass-ai-primary-brief.md §1.5` — canonical per-character
+target-dimension table.
 
 ---
 
@@ -195,11 +306,17 @@ via Uma's lane if no doctrine hex covers the needed dark.
 4. Back up the source `.aseprite` file before `scale_sprite`.
 5. Keep the canvas in RGB mode until all pixel editing is done; quantize once at the end.
 6. For non-square targets: scale to square intermediate, then crop.
+7. After `import_image`, clear the 4-perimeter strips with `draw_rectangle` before masking — MJ
+   sources carry a near-pure-black edge that `fill_area tolerance=0` misses.
 
 ---
 
 ## Cross-references
 
+- [`pixellab-pipeline.md`](pixellab-pipeline.md) — PixelLab source variant of this pipeline
+  (canvas-size trap, quantize dupe-slot mitigation, doctrine-compliance strategies including
+  per-slot nearest-neighbor and luminance-sort, cost model, `import_image` param trap); the
+  pixel-mcp trap rules documented in THIS file apply to both pipelines equally
 - `team/priya-pl/art-pass-ai-primary-brief.md §2` — palette discipline (hex-lock rules, no-invent
   rule, doctrine ramp sources, verification protocol)
 - `team/priya-pl/art-pass-ai-primary-brief.md §4` — generate → downscale → palette-lock →
