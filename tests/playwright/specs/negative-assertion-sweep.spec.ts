@@ -91,6 +91,7 @@
 import { test, expect } from "../fixtures/test-base";
 import { ConsoleCapture } from "../fixtures/console-capture";
 import { clearRoom01Dummy } from "../fixtures/room01-traversal";
+import { clickAimedAtSpawn } from "../fixtures/mouse-facing";
 
 const BOOT_TIMEOUT_MS = 30_000;
 const ROOM01_CLEAR_TIMEOUT_MS = 60_000;
@@ -355,7 +356,15 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
       }
       aimCycle++;
 
-      await canvas.click({ position: { x: clickX, y: clickY } });
+      // Mouse-direction attacks (PR #255, ticket 86c9uthf0): aim NE-of-spawn
+      // so swings land on Room01 dummy + Room02 NE-spawning grunts. Canvas-
+      // center is at world (640, 360) — far SE of player at (240, 200) — so
+      // a canvas-center click would aim every swing SE on the no-Camera2D
+      // viewport. This test's STATIC causality assertion doesn't care about
+      // kill outcome, but the 60s combat must still PRODUCE some gate
+      // activity to have anything to assert over; SE-aimed dud swings would
+      // leave the gate buffer empty and the test would pass vacuously.
+      await clickAimedAtSpawn(canvas, "NE");
       await page.waitForTimeout(ATTACK_INTERVAL_MS);
     }
 

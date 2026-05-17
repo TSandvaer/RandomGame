@@ -111,6 +111,7 @@ import {
 import {
   gateTraversalWalk,
 } from "../fixtures/gate-traversal";
+import { clickAimedAtSpawn } from "../fixtures/mouse-facing";
 
 // ---- Shared constants -------------------------------------------------------
 
@@ -302,7 +303,7 @@ test.describe("soak-narrative finding #1 — Room 2 mob-aggro observable after p
       await page.waitForTimeout(100);
 
       // One click fires a light attack NE.
-      await canvas.click({ position: { x: clickX, y: clickY } });
+      await clickAimedAtSpawn(canvas, "NE"); // Mouse-direction attacks (PR #255): aim NE-of-spawn, not canvas-center (which is SE on the no-Camera2D viewport).
       await page.waitForTimeout(300); // wait for hit to register
 
       // Snapshot: find the first player-to-mob Hitbox.hit.
@@ -317,7 +318,7 @@ test.describe("soak-narrative finding #1 — Room 2 mob-aggro observable after p
       if (!firstPlayerHitLine) {
         // Extend to a brief attack loop to guarantee a hit before checking aggro.
         for (let i = 0; i < 15; i++) {
-          await canvas.click({ position: { x: clickX, y: clickY } });
+          await clickAimedAtSpawn(canvas, "NE"); // Mouse-direction attacks (PR #255): aim NE-of-spawn, not canvas-center (which is SE on the no-Camera2D viewport).
           await page.waitForTimeout(220);
           const hit = capture
             .getLines()
@@ -503,7 +504,7 @@ test.describe("soak-narrative finding #2 — Room 1 gate unlocks on mobs_cleared
         await page.waitForTimeout(60);
 
         // Click-attack.
-        await canvas.click({ position: { x: clickX, y: clickY } });
+        await clickAimedAtSpawn(canvas, "NE"); // Mouse-direction attacks (PR #255): aim NE-of-spawn, not canvas-center (which is SE on the no-Camera2D viewport).
         await page.waitForTimeout(220);
 
         // Count new Grunt._die lines since Room 02 baseline.
@@ -629,7 +630,7 @@ test.describe("soak-narrative finding #3 — Room 2 gate traversal fires on firs
       let gruntsKilled = 0;
       const killDeadline = Date.now() + 90_000;
       while (gruntsKilled < 2 && Date.now() < killDeadline) {
-        await canvas.click({ position: { x: clickX, y: clickY } });
+        await clickAimedAtSpawn(canvas, "NE"); // Mouse-direction attacks (PR #255): aim NE-of-spawn, not canvas-center (which is SE on the no-Camera2D viewport).
         await page.waitForTimeout(220);
 
         // Walk NE briefly each cycle to stay close to mobs.
