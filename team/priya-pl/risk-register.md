@@ -184,3 +184,117 @@ R2 and R4 drop off the top-5 (probability lowered to med, no active firing). R3,
 - DECISIONS.md cross-link: any decision that resolves a risk should reference the risk ID in the `Affects` field.
 - **NEW (2026-05-03):** when a Sponsor-soak surfaces a P0 within the first 30 min of play, that's a real-time R6 escalation signal — re-score impact immediately, not at next retro. The combat-not-landing miss is the calibration data for "P0 in first 10 min = high impact, not med."
 - **NEW (2026-05-03):** R11 (integration-stub) and R12 (orchestrator-bottleneck) are process risks, not product risks. Their evidence column is the record of orchestrator behavior over heartbeat ticks — not just product bugs. Priya's risk-register refresh is the place to log the pattern, even when the immediate product harm is small.
+
+---
+
+# 2026-05-16 refresh — M2 W3 RC Finding 2 closed; AC4 cluster still open; week-ahead plan dispatched
+
+**Refresh trigger:** session-end 2026-05-16. PR #247 merged closes M2 W3 RC Finding 2 saga (boss-room Player.collision_layer iframe re-entry bug). AC4 white whale cluster (Rooms 05/06/07) is now the dominant pre-M2-RC blocker. Four risks flagged to Sponsor in dispatch brief; this refresh adds them as register entries.
+
+**Moves:**
+
+- **New (5):** R-AC4 (AC4 whack-a-mole pattern), R-DRIFT (spec-string-vs-engine-emit silent-pass — surfaced same-day via PRs #248 + #249), R-CANARY (universal-warning-gate canary high-impact), R-AUTO (AWAY autonomy bar too cautious), R-M3 (no M3 seed lock until Sponsor signals shape).
+- **Held:** R6 (Sponsor-found-bugs flood) — pre-mid-W3 fired hard at M2 RC soak (6 findings in one soak; documented in `m2-week-3-mid-retro.md §6`); structural mitigation (PR #216 three gates) now in force. Re-test against the M2 sign-off soak (post-AC4-closure handoff) is the next calibration data point.
+- **Demoted:** R11 (integration-stub) and R12 (orchestrator-bottleneck) — held in name; no firing in M2 W3 RC closure arc. R11's evolved framing (PR-scoped vs journey-scoped) is now captured by PR #216 journey-probe gate (structural countermeasure).
+
+**Top-5 active risks (2026-05-16, ordered by severity-this-week):**
+
+1. **R-DRIFT** (spec-string-vs-engine-emit silent-pass) — high / high — **fired today**; PRs #248 + #249 each fixed a multi-week silent-pass spec; class-wide scan pending. Most concerning of the new risks: inverts CI trust.
+2. **R-AC4** (AC4 whack-a-mole pattern) — high / med — actively firing; 3 open Drew-lane blockers. Partially downstream of R-DRIFT.
+3. **R6** (Sponsor-found-bugs flood) — high / high — held; M2 sign-off soak is the next calibration.
+4. **R-CANARY** (universal-warning-gate canary) — med / high — actively firing; mis-calibration here propagates across all spec runs. Same root class as R-DRIFT (gate also a drift case).
+5. **R-AUTO** (AWAY autonomy bar too cautious) — med / low — 0/11 reversals; calibration target 5-10%. Low impact but corrective action needed.
+
+**Watch-list (just-off-top-5):** R-M3 (M3 shape undecided) — low / med — held; activates the moment M2 RC ships and orchestrator needs to dispatch M3 W1 backlog.
+
+R1 (save migration) drops off top-5; no save-schema work in flight. R2 (Tess bottleneck) drops off top-5; queue depth at session-end is 1-2.
+
+---
+
+## R-AC4 — AC4 whack-a-mole pattern (NEW 2026-05-16)
+
+- **Probability:** high (actively firing)
+- **Impact:** med
+- **Why:** the AC4 spec has surfaced a new blocker on roughly every Drew dispatch since M1 close — see `ac4-white-whale-retro.md` for the 9-iteration history. The cluster mid-W3 has 3 open P0 blockers (Rooms 05/06/07 — tickets `86c9uf1x8` + `86c9uh2ue` + `86c9uh2kg`). Each prior Drew dispatch closed one blocker and exposed the next. The pattern is **partially unavoidable** (depth-first integration probing) and **partially structural** (three identifiable gaps codified in the retro).
+- **Mitigation:**
+    - **§1 Instrument-first discipline.** `diagnostic-traces-before-hypothesized-fixes` memory rule validated twice last session (PR #241 + PR #246 diag instrumentation found the iframe re-entry guard root cause). Continue per-dispatch enforcement.
+    - **§2 Self-Test Report ≥8-run statistical bar** (new). PR #198's "unwinnable" framing + PR #208's "3/3 deterministic" + PR #241's Class-A-only fix were all false positives from too-small samples. New rule: AC4-cluster retests require ≥8 release-build runs in Self-Test Report; smaller samples are hypothesis-evidence, not acceptance-evidence. Codification: `TESTING_BAR.md` § "Statistical bar for stochastic-cost specs" — one-line addition in next docs PR.
+    - **§3 Mandatory retrospective pause after N=3 consecutive dispatches** (new). After 3 consecutive AC4-cluster dispatches without spec-closure, Priya triggers a one-page audit (see `ac4-white-whale-retro.md §5`). Possible outputs: keep-going / restructure-spec-into-fresh-probes / pause-for-harness-redesign. The current 3-open-blocker cluster is the natural test of this discipline — if Drew closes Rooms 05/06/07 cleanly, the pause is unneeded; if a fourth blocker surfaces, the pause triggers before dispatch N+1.
+- **Trigger / signal:** Drew's instrument-first pass on Rooms 05/06/07 surfaces a fourth open blocker (Room 08 or Boss-room AC4 path). That's the threshold for triggering the §3 retrospective pause.
+- **Evidence:** see `team/priya-pl/ac4-white-whale-retro.md` §1 table — 9 iterations across ~12 dispatches, 3 of which shipped misdiagnosed fixes that subsequent diagnostic-trace work refuted (~4 wasted agent-cycles per Gap 1; ~3-4 per Gap 2).
+- **Owner:** Drew (executes the fixes), Priya (triggers the pause + audit), Tess (statistical bar enforcement during QA).
+
+## R-DRIFT — Spec-string-vs-engine-emit silent-pass (NEW 2026-05-16) — most concerning of the new entries
+
+- **Probability:** high (fired twice today; class-wide audit will likely surface more)
+- **Impact:** high (inverts CI trust)
+- **Why:** Surfaced same-day this session via two cross-author PRs:
+  - **PR #248 (Tess)** — universal warning gate has been a no-op for warnings since PR #217. Playwright `ConsoleMessage.type()` returns `"warning"`; fixture checked `"warn"`. Every `USER WARNING:` line silently swallowed for ~10 days.
+  - **PR #249 (Devon)** — `mob-self-engagement.spec.ts` regex `team=mob` never matched since PR #215. Engine emits `team=enemy`; no `"mob"` string was ever produced. ~10 days of silent-pass.
+  - **Class:** Playwright specs assert on free-form trace strings without verifying the engine actually emits that string. When the engine emit drifts or the spec was wrong from inception, the spec silently passes/fails for the wrong reason. **Tests are decorative until something forces empirical re-verification.** AC4's surfacing-pattern cost is partially downstream — sub-helper assertions hidden behind silent-pass spec mask real bugs until something else trips the assertion.
+- **Mitigation:**
+    - **Drift-pin GUT pattern** (Devon, PR #249) — `.claude/docs/test-conventions.md` § "Spec-string-vs-engine-emit drift" names the class. The GUT side asserts the engine actually emits the string the spec depends on; if the engine constant changes, the GUT test fails BEFORE Playwright silently passes.
+    - **Class-wide scan ticket** (next Tess dispatch after canary fix) — scan ALL existing Playwright specs against current engine constants. ~10-20 specs to audit; ~30 min each. Output: 0-N follow-up tickets for any silent-pass specs found.
+    - **Universal harness convention** — drift-pin GUT tests are mandatory for any Playwright spec asserting on a free-form engine-emit string. Codify in `team/tess-qa/playwright-harness-design.md`.
+- **Trigger / signal:** any spec found to be asserting on a string the engine doesn't emit OR ever did emit. Class-wide scan output is the calibration data.
+- **Evidence:** PRs #248 + #249 (cross-author review at session-end). Two distinct silent-pass specs surfaced same-day; suggests class is broader than two instances.
+- **Owner:** Tess (audit + canary + universal gate), Devon (drift-pin doc + peer review), Priya (gate via `playwright-harness-design.md` convention update).
+
+## R-CANARY — Universal-warning-gate canary high-impact (NEW 2026-05-16)
+
+- **Probability:** med (in flight; Tess investigating)
+- **Impact:** high
+- **Why:** PR #244 Phase 2A migration shipped a negative-control canary in `tests/playwright/specs/universal-console-warning-gate.spec.ts:205`. The canary uses `test.fail()` to invert outcome: a deliberate `USER WARNING:` emission via `page.evaluate(console.warn(...))` SHOULD trigger the universal warning gate's `afterEach` failure → `test.fail` satisfied → run passes. **Observed in CI: "Expected to fail, but passed."** Meaning the deliberate emission did NOT trigger the gate. **If the canary is broken, every "green CI" we see may be hiding warnings the gate silently misses.** The gate becomes a green-by-default rubber stamp rather than a real assertion. High-leverage; the calibration here propagates across all future spec runs.
+- **Mitigation:**
+    - Tess investigates root cause (she shipped the canary + fixture; ticket `86c9upfex` in flight).
+    - Hypothesis-rank from the ticket: page.evaluate scope leak / fixture regex mismatch / afterEach race / test.fail semantic mis-coupling.
+    - Fix-PR is small (likely 1-3 lines in the canary or fixture). Devon peer-reviews per `tess-cant-self-qa-peer-review`.
+    - Document outcome in `team/tess-qa/playwright-harness-design.md` § "how to write canary tests that survive test.fail semantics."
+- **Trigger / signal:** "Expected to fail, but passed" verdict from canary spec in CI. Already firing.
+- **Evidence:** PR #244 CI run https://github.com/TSandvaer/RandomGame/actions/runs/25963448926. Devon's pre-merge static analysis was wrong; actual CI proves the chain breaks somewhere.
+- **Owner:** Tess (investigates + fix), Devon (peer review).
+
+## R-AUTO — AWAY autonomy bar too cautious (NEW 2026-05-16)
+
+- **Probability:** med (already-firing)
+- **Impact:** low
+- **Why:** AWAY-mode autonomy reversal-rate is currently 0/11 (8 entries from the 2026-05-16 prior AWAY stretch + 3 from this session). Per `~/.claude/CLAUDE.md` "AWAY-mode autonomy" §5: target reversal rate is 5–10%. Below 5% means orchestrator is being too cautious (raising fewer items than it could); above 15% means foundation bar is too loose. **0% means the orchestrator is over-deferring** — paying round-trip cost on decisions that didn't need surfacing. Low-impact (the cost is dispatch latency, not bug-shipping), but corrective action needed for next AWAY stretch.
+- **Mitigation:**
+    - Orchestrator memo: `away-mode-autonomy-bar-recalibration` — lower the foundation bar slightly on reversible-mechanical decisions (e.g., dispatch routing, ticket creation, standard QA reviews). KEEP the high bar on never-auto-decide items (strategic priority shifts, subjective-feel calls, externally-visible actions, billing).
+    - Next AWAY stretch: target 1–3 reversals across ~10-15 entries to hit the 5–15% rate. Confirms the bar is in calibration range.
+    - Re-evaluate after the next stretch; if reversal rate is now 15%+, raise the bar back to prior level.
+- **Trigger / signal:** AWAY stretch concludes with reversal-rate ≤5% OR ≥15% across ≥10 entries.
+- **Evidence:** `.claude/decisions-while-away.md` — 11 entries, all `accepted by Thomas 2026-05-16`. 0 reversals.
+- **Owner:** orchestrator (calibration), Sponsor (review-and-mark — already provides the feedback signal).
+
+## R-M3 — M3 shape undecided (NEW 2026-05-16)
+
+- **Probability:** low (not active until M2 RC ships)
+- **Impact:** med
+- **Why:** once M2 W3 RC signs off, the M3 milestone-shape question becomes the dispatch-gating decision. Three viable shapes (content-track / boss-rush / narrative-arc — see `m3-shape-options.md`); current `mvp-scope.md §M3` v1-frozen paragraph defaults to content-track, but Sponsor has not explicitly confirmed the strategic shape since 2026-05-15 art-pass promotion. If M2 RC ships before Sponsor signals shape, orchestrator either dispatches against the default (content-track recommendation) or pauses M3 dispatch until shape locks. Pausing costs throughput; pre-deciding on Sponsor's behalf risks committing the team against the wrong shape.
+- **Mitigation:**
+    - **`m3-shape-options.md` authored this batch** — frames Shape A (content) / Shape B (boss-rush) / Shape C (narrative) as alternatives with tradeoffs + leading recommendation (Shape A).
+    - **Sponsor signs M3 shape at M2 sign-off conversation** — orchestrator surfaces the doc + the question at the same handoff where Sponsor confirms M2 RC. Lead-time: Sponsor has the shape decision in-hand when the soak signs off. Zero dispatch-pause cost.
+    - If Sponsor punts the shape question: default to Shape A per recommendation; flag Sponsor that orchestrator is dispatching M3 W1 backlog against Shape A; Sponsor redirect window is open until first M3 implementation PR lands.
+- **Trigger / signal:** M2 W3 RC signs off without Sponsor signaling M3 shape choice.
+- **Evidence:** `mvp-scope.md §M3` v1-frozen 2026-05-02; original paragraph is content-track-shaped; Sponsor's 2026-05-15 art-pass framing confirmed content-track direction but did not exclude alternatives.
+- **Owner:** Priya (authors options doc), orchestrator (routes the question at sign-off), Sponsor (decides).
+
+---
+
+## Risk-by-risk update table (2026-05-16 refresh)
+
+| ID | Name | Prior P/I | New P/I | Move | Evidence delta |
+|----|------|-----------|---------|------|----------------|
+| R1 | Save migration breakage | med / high | med / high | Held (off top-5) | No save-schema work in flight; v5 deferred to M3. |
+| R2 | Tess bottleneck | med / med | med / med | Held (off top-5) | Queue depth 1-2 at session-end. PR #216 cross-lane gate routes more work to dispatch authors; expected ~20-30% Tess load reduction validated. |
+| R6 | Sponsor-found-bugs flood | high / high | high / high | Held (top-5) | Fired hard at M2 RC soak (6 findings); PR #216 structural mitigation in force; next data point is M2 sign-off soak handoff (post-AC4-closure). |
+| R8 | Stash UI complexity | high / med-high | high / med-high | Held (M2-only — conditional carry to M3 if Sponsor signals) | No firing in M2 W3 (W3-T7 ember-bag tuning deferred Sponsor-conditional). |
+| R9 | Stratum-2 content triple-stack | high / med | high / med | Held (M2 RC; M3 carry partial) | Drew's W3 load was heaviest of M2 (T2 ✓, T3 parked, T4 parked). Mitigation held. |
+| R11 | Integration-stub-shipped-as-feature-complete | high / high | high / high | Held (off top-5) | No firing in M2 W3 RC arc. R11's evolved framing now captured by PR #216 journey-probe gate. |
+| R12 | Orchestrator-bottleneck-on-dispatch | high / med | high / med | Held (off top-5) | No firing in M2 W3 RC arc. Auto-status durability holding; dispatch cadence stable. |
+| **R-AC4** | AC4 whack-a-mole pattern | — | high / med | **New (top-5)** | 9 iterations / ~12 dispatches / 3 misdiagnoses (per `ac4-white-whale-retro.md`). 3 open Drew-lane blockers Rooms 05/06/07. |
+| **R-DRIFT** | Spec-string-vs-engine-emit silent-pass | — | high / high | **New (top-5; #1 by severity-this-week)** | PRs #248 + #249 fixed two multi-week silent-pass specs today. Class-wide scan pending. |
+| **R-CANARY** | Universal-warning-gate canary high-impact | — | med / high | **New (top-5)** | PR #244 CI: "Expected to fail, but passed." Canary regression-pin compromised. Same root class as R-DRIFT (gate also a drift case). |
+| **R-AUTO** | AWAY autonomy bar too cautious | — | med / low | **New (top-5)** | 0/11 reversal across two AWAY stretches; target 5-10%. |
+| **R-M3** | M3 shape undecided | — | low / med | **New (watch-list)** | Activates on M2 RC sign-off. Mitigation: `m3-shape-options.md` authored this batch. |
