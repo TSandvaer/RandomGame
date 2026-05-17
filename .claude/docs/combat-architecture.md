@@ -483,7 +483,18 @@ Per the convention codified as §15 in `team/tess-qa/playwright-harness-design.m
 
 **Generalisation — workaround-retirement convention (PR #239).** Any harness workaround for a known game-side bug must fail loudly once the game-side fix lands. Silent fallbacks turn the harness into a regression-hiding surface for the very class of bugs it was supposed to detect. The pattern: when a fix ships, audit the harness for workarounds that targeted the bug, convert them to hard throws with regression-signal error messages citing the fix PR, and remove now-dead workaround code. Track the convention in `team/tess-qa/playwright-harness-design.md` § 15.
 
-The case is exposed on `GateTraversalResult.resolutionCase` (`"already-traversed" | "open-walk"` — the `"unlocked-finish"` literal was dropped) so the spec can scope assertions per-case (the phase-3 `bodyEnteredFiredOnPhase3` assertion only applies to case C; case A short-circuits before phase 3 runs).
+The case is exposed on `GateTraversalResult.resolutionCase` (`"already-traversed" | "open-walk" | "unlocked-outside-finish"` — see below for the B-OUTSIDE addition) so the spec can scope assertions per-case (the phase-3 `bodyEnteredFiredOnPhase3` assertion only applies to case C; case A and case B-OUTSIDE short-circuit before phase 3 runs).
+
+**Case B-OUTSIDE re-introduction (ticket `86c9utcb7`, PR follow-up to #239).** PR #251's diagnostic traces against artifact `aea75a9` overturned PR #239's "case B is always a regression" framing: Room 03 case B is empirically deterministic and is NOT a regression. The Charger's `CHARGE_KNOCKBACK = 280 px/s` repeatedly shoves the player into-and-out-of the gate trigger across the 650ms `DEATH_TWEEN_WAIT` window — the trace stream shows 8× `state=locked` body_entered events during combat, then `Player.pos pos=(84,118)` or `(96,114)` at unlock instant. The trigger east edge is X=72; the player ends 12–24 px east of it. The game-side `_fire_traversal_if_unlocked` cannot help because `get_overlapping_bodies()` is empty at unlock — `gate_unlocked` correctly emits but `gate_traversed` does not.
+
+**The fix:** SPLIT case B by checking the freshest `Player.pos` trace BEFORE the `_unlock` line in the combat-phase slice:
+
+- **B-INSIDE** (player overlapping the trigger at unlock): `_fire_traversal_if_unlocked` SHOULD have fired the deferred traversal but did not. STILL THROWS — PR #230 regression detector preserved.
+- **B-OUTSIDE** (player NOT overlapping at unlock): the game-side deferred fire cannot help — manual players would also have to walk back in. The harness finishes the traversal by steering to the staging point just east of the trigger (X=120, Y=144) and walking pure-west across the rect — `body_entered` fires as the player crosses the east edge X=72, and `RoomGate._on_body_entered`'s UNLOCKED branch emits `gate_traversed` on the single transition.
+
+**Why this is §15-compliant.** The discriminator from `team/tess-qa/playwright-harness-design.md` §15 "Out of scope: game-mechanic-driven multi-outcome resolution" is: *"is the workaround compensating for the game producing the WRONG observable, or for the game producing one of several CORRECT observables?"* In B-OUTSIDE, the game observable is correct (gate UNLOCKED, player just east of trigger, no body_entered since no transition occurred). The traversal genuinely requires the player to walk back in. This is directly analogous to Consumer 1 case B in `kiting-mob-chase.ts` (kiter retreat geometry legitimately produces the same B-OUTSIDE shape), which §15 explicitly retained on the same rationale.
+
+**Game-side regression-pin.** `tests/test_room_gate.gd::test_unlock_with_no_overlap_emits_gate_unlocked_only` pins the game-side contract the B-OUTSIDE harness path RELIES ON: `_unlock` emits `gate_unlocked` exactly once and `gate_traversed` is NOT auto-emitted when no body overlaps. If a future PR changes that (e.g. makes `_unlock` always emit `gate_traversed` as a "convenience"), this test fails before the harness's B-OUTSIDE walk has a chance to surface the regression — and the harness would otherwise silently mask the behavioural change.
 
 **Harness mechanism note from the implementation:**
 
@@ -503,6 +514,7 @@ References:
 - ticket 86c9ugfzv (Drew, M2 W3) — the empirical surfacing PR; 8-run-sweep diagnostics are the canonical evidence
 - PR #230 (Drew, ticket 86c9ujg8c) — `RoomGate._unlock` knockback-overlap fix that made case B redundant
 - PR #239 (Tess, ticket 86c9ungc2) — case B retirement to `expect.fail`
+- PR ticket `86c9utcb7` (Drew, M2 W3) — case B SPLIT into B-INSIDE (regression detector) + B-OUTSIDE (legitimate §15 multi-outcome); empirically reachable in Room 03 under Charger knockback
 
 ## GUI focus-consumption vs. Playwright keypresses — close a focus-holding panel with a test-only hook
 
