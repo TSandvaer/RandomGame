@@ -15,7 +15,20 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ---
 
-## Current state — 2026-05-16 evening (M2 W3 RC Finding 2 saga closed; AC4 cluster still has 3 open P0s; week-ahead plan dispatched)
+## Current state — 2026-05-17 (M3 ACTIVE — Shape A locked; Tier 1 first-wave dispatch-ready)
+
+**This header supersedes the 2026-05-16 evening entry below. Per-role sections further down are append-only history. Read this header first on resume.**
+
+- **M3 milestone status: ACTIVE.** Sponsor picked **Shape A — content track** on 2026-05-17 ("Shape A sounds great"). Driver ticket `86c9ur5aq` flipped to `in progress` then to scoping mode. Authoritative source for the pick: `team/priya-pl/m3-shape-options.md`. Tier 1 breakdown: `team/priya-pl/m3-tier-1-plan.md` (NEW this run).
+- **Tier 1 = 4 sub-milestones (mirror of Shape A's four tracks) + 1 QA scaffold lane.** Sub-milestones: §1 (Devon save-schema v5 spike), §2 (Uma hub-town visual direction), §3 (Priya art-pass commission brief → Sponsor commissions 2-3 artists), §4 (Drew title-screen slot-picker spec), §QA (Tess M3 Tier 1 acceptance plan scaffold).
+- **First-wave dispatch-ready tickets (5):** M3-T1-1 (`86c9uth5h`, Devon v5 save-schema spike, P0), M3-T1-2 (`86c9uth6a`, Uma hub-town direction, P0), M3-T1-3 (`86c9uth7g`, Priya art-pass commission brief, P1), M3-T1-4 (`86c9uth85`, Drew title-screen slot-picker spec, P0), M3-T1-5 (`86c9uth9q`, Tess M3 Tier 1 acceptance plan scaffold, P0). All 5 are doc-PRs; no engine code in first wave; all can dispatch Day 1 in parallel.
+- **One Sponsor-input borderline-strategic item pre-positioned:** §4.11 external-estimate greenlight at M3-T1-3 PR-merge time. Lead-time ~2-3 weeks on artist quotes — starting clock now is the load-bearing reason §3 is in Tier 1 not Tier 2.
+- **Parallel work:** AC4 chain (PR #253 Drew Room 03 case-B in Tess QA) is **independent surface** from M3 — Tier 1 work proceeds without blocking. M3 W3 RC Finding 2 closed; AC4 progress depends on #253 QA outcome.
+- **DECISIONS.md entry pending:** Shape A pick will land in next Monday Priya weekly batch (per `team/priya-pl/decisions-batch-pr-template.md`). Draft line in this PR's final report.
+
+---
+
+## Current state — 2026-05-16 evening (M2 W3 RC Finding 2 saga closed; AC4 cluster still has 3 open P0s; week-ahead plan dispatched) — superseded by 2026-05-17 above
 
 **This header supersedes the 2026-05-15 W2-close entry below. Per-role sections further down are append-only history; their most recent entries are 2026-05-05 (M1 RC post-fix-wave era — historical). Read this header first on resume.**
 
