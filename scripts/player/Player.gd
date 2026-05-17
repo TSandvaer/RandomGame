@@ -121,6 +121,20 @@ const HEAVY_HITBOX_RADIUS: float = 22.0
 const HEAVY_HITBOX_LIFETIME: float = 0.14
 const HEAVY_RECOVERY: float = 0.40
 
+# Mouse-direction attacks (ticket 86c9uthf0). Sponsor 2026-05-17: player
+# attacks fire in the direction of the mouse cursor (Hades/Diablo convention).
+# `_facing` is continuously updated from the mouse vector in `_physics_process`
+# (gated by state — see `_update_mouse_facing`); WASD is decoupled from
+# facing entirely (player can walk one direction while aiming another).
+#
+# Dead-zone: if the mouse is closer to the player than MOUSE_FACING_DEADZONE_PX,
+# the vector is too short to normalise stably (jitter at the cursor-on-player
+# limit) — keep last `_facing` instead. The cursor leaving the canvas in HTML5
+# does NOT need special handling: Godot's `get_global_mouse_position()` returns
+# the LAST observed cursor position when the pointer leaves the canvas, which
+# is naturally stable (the value just freezes at the boundary).
+const MOUSE_FACING_DEADZONE_PX: float = 8.0
+
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 
@@ -286,6 +300,13 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
+
+	# Mouse-direction facing (ticket 86c9uthf0). Sponsor 2026-05-17: player
+	# attacks fire in the direction of the mouse cursor. `_update_mouse_facing`
+	# gates by state so a dodge / mid-swing facing does NOT continuously shift
+	# under mouse motion (edge case 3 in the ticket — facing must snapshot at
+	# swing-spawn). WASD movement is decoupled from facing in `_process_grounded`.
+	_update_mouse_facing()
 
 	match _state:
 		STATE_IDLE, STATE_WALK:
@@ -866,8 +887,10 @@ func _process_grounded(_delta: float) -> void:
 	var input_dir: Vector2 = _read_movement_input()
 	var sprinting: bool = Input.is_action_pressed("sprint")
 
+	# Mouse-direction attacks (ticket 86c9uthf0): WASD drives velocity ONLY.
+	# `_facing` is mouse-derived in `_update_mouse_facing` so the player can
+	# walk one direction while aiming another (Hades/Diablo convention).
 	if input_dir.length_squared() > 0.0:
-		_facing = input_dir
 		var speed: float = get_walk_speed() * (SPRINT_MULTIPLIER if sprinting else 1.0)
 		velocity = input_dir * speed
 		set_state(STATE_WALK)
@@ -875,12 +898,15 @@ func _process_grounded(_delta: float) -> void:
 		velocity = Vector2.ZERO
 		set_state(STATE_IDLE)
 
+	# Dodge still consumes input_dir (movement-direction dodge by design — the
+	# dodge feels weird if you press W and dodge backwards toward the mouse).
+	# Attacks pass Vector2.ZERO so try_attack uses the mouse-derived `_facing`.
 	if Input.is_action_just_pressed("dodge"):
 		try_dodge(input_dir)
 	elif Input.is_action_just_pressed("attack_light"):
-		try_attack(ATTACK_LIGHT, input_dir)
+		try_attack(ATTACK_LIGHT, Vector2.ZERO)
 	elif Input.is_action_just_pressed("attack_heavy"):
-		try_attack(ATTACK_HEAVY, input_dir)
+		try_attack(ATTACK_HEAVY, Vector2.ZERO)
 
 
 func _process_dodge(_delta: float) -> void:
@@ -899,6 +925,82 @@ func _process_attack(_delta: float) -> void:
 	# Dodge can interrupt recovery.
 	if Input.is_action_just_pressed("dodge"):
 		try_dodge(input_dir)
+
+
+# ---- Mouse-direction facing (ticket 86c9uthf0) -----------------------------
+
+## Per-frame facing update from the mouse cursor. Gated by state so the
+## facing snapshots at swing-spawn / dodge-init time and does NOT continuously
+## drift during attack-active or dodge-active frames (edge case 3 in the
+## ticket brief). Sprite rotation is updated in lockstep with `_facing` —
+## during a swing/dodge both the hitbox direction AND the body orientation
+## are frozen at spawn, then both resume tracking the cursor when the state
+## drops back to IDLE/WALK. State durations are short (300ms dodge, 180-400ms
+## attack recovery), so the visual "lock" reads as a swing pose rather than
+## a stuck sprite.
+##
+## Mouse-vector behaviour:
+##   - `< MOUSE_FACING_DEADZONE_PX` (8 px): vector too short to normalise
+##     stably; keep last `_facing`. Prevents jitter when the cursor is on
+##     top of the player.
+##   - Cursor off-canvas (HTML5): Godot's `get_global_mouse_position()`
+##     returns the LAST observed cursor position. No special handling
+##     needed — the value freezes at the boundary, so `_facing` stays
+##     stable across the off-canvas window.
+##
+## Bare-instantiated test contexts: `is_inside_tree()` guards the viewport
+## read so tests can construct a Player without a viewport.
+func _update_mouse_facing() -> void:
+	# State gate: facing snapshots at swing-spawn (try_attack) and dodge-init
+	# (try_dodge). Mid-swing and mid-dodge, leave `_facing` alone — the swing
+	# direction must not drift as the mouse moves during the active window.
+	if _state == STATE_ATTACK or _state == STATE_DODGE:
+		return
+	if not is_inside_tree():
+		return
+	var mouse_global: Vector2 = get_global_mouse_position()
+	_facing = _resolve_facing_from_mouse(mouse_global, global_position, _facing)
+	_update_sprite_rotation()
+
+
+## Pure helper extracted for unit-testability — given the mouse and player
+## world positions plus the last facing, returns the new facing vector after
+## applying the dead-zone. No viewport / tree dependency, so GUT tests can
+## drive every edge case directly without mocking `get_global_mouse_position`.
+##
+## Invariants pinned by `tests/test_player_mouse_facing.gd`:
+##   - Returns unit-length vector (`|return| == 1.0`) whenever the input
+##     delta exceeds the dead-zone.
+##   - Returns the input `last_facing` unchanged inside the dead-zone.
+##   - Exact-zero delta returns `last_facing` (no NaN from normalise(0)).
+static func _resolve_facing_from_mouse(mouse_global: Vector2, self_global: Vector2, last_facing: Vector2) -> Vector2:
+	var delta: Vector2 = mouse_global - self_global
+	if delta.length() < MOUSE_FACING_DEADZONE_PX:
+		return last_facing
+	return delta.normalized()
+
+
+## Sprite visual rotation. The Player.tscn `Sprite` is a 16×16 ColorRect
+## (symmetric square placeholder — see CLAUDE.md / docs/combat-architecture.md
+## doc-update on swing flow). Rotation lands on the node so an asymmetric
+## sprite drop-in (M2+ art swap) automatically picks up the orientation;
+## today the visual is symmetric and the rotation is mechanically observable
+## via `Sprite.rotation` but visually subtle.
+##
+## Subtract PI/2 to align the sprite's "top edge" with the facing direction.
+## With a symmetric square this is a no-op, but the offset is documented so
+## a future asymmetric sprite (sword tip pointing up by default in art) lands
+## with the tip toward the cursor without an art-side rotation tweak.
+func _update_sprite_rotation() -> void:
+	var sprite: Node = get_node_or_null("Sprite")
+	if sprite == null:
+		return
+	if not (sprite is CanvasItem):
+		return
+	# Anchor to facing.angle(). Subtract PI/2 in any future art-swap that
+	# defaults to "tip up" — for the M1 symmetric ColorRect the bare angle
+	# is correct.
+	(sprite as CanvasItem).rotation = _facing.angle()
 
 
 func _tick_timers(delta: float) -> void:

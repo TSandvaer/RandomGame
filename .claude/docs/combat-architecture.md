@@ -13,6 +13,26 @@ What this doc covers: the combat system's runtime topology — Player swing flow
 
 Damage routing: `Damage.compute_player_damage()` short-circuits to `FIST_DAMAGE = 1` when `weapon == null` (the player starts fistless **by design** per `DECISIONS.md 2026-05-02`). The `HEAVY_MULT = 0.6` multiplier path is bypassed when fistless — both light and heavy LMB/RMB deal 1 damage. Once a weapon is equipped, the multiplier path engages.
 
+### Mouse-direction facing (ticket 86c9uthf0, Sponsor 2026-05-17)
+
+Pre-ticket, swing direction came from the **keyboard `input_dir`** — `Player._facing = input_dir` in `_process_grounded`, and `try_attack(kind, input_dir)`. The player swung in the direction they were walking; standing still meant swinging in last-walked direction.
+
+Post-ticket, swing direction is **mouse-derived**:
+
+1. `_physics_process` calls `_update_mouse_facing()` BEFORE the state-dispatched handler runs. `_update_mouse_facing` reads `get_global_mouse_position() - global_position`, normalises it (via the pure static helper `_resolve_facing_from_mouse`), and assigns to `_facing`. The sprite child (`Sprite` ColorRect) is rotated to `_facing.angle()` in the same call via `_update_sprite_rotation`.
+2. `_process_grounded`'s attack-input branches pass `Vector2.ZERO` to `try_attack(kind, ...)`, which makes `try_attack` use the current (mouse-derived) `_facing` as the swing direction.
+3. WASD is decoupled from facing — `_process_grounded` no longer writes `_facing = input_dir`. The player can walk one direction while aiming another (Hades / Diablo convention).
+
+**Three load-bearing edge-case gates:**
+
+- **Dead-zone (`MOUSE_FACING_DEADZONE_PX = 8.0`).** If `|mouse - player| < 8 px`, `_resolve_facing_from_mouse` returns `last_facing` unchanged. Prevents jitter when the cursor sits on the player. Static helper is independently unit-tested (`tests/test_player_mouse_facing.gd`) so the math is pinned without viewport mocking.
+- **Off-canvas (HTML5).** Godot's `get_global_mouse_position()` returns the LAST observed cursor position when the pointer leaves the canvas — no special handling needed. The value freezes at the boundary so `_facing` stays stable across the off-canvas window.
+- **Mid-swing / mid-dodge snapshot.** `_update_mouse_facing` early-returns when `_state == STATE_ATTACK` or `STATE_DODGE`. This is the load-bearing gate for "swing direction snapshots at swing-spawn time, not continuously during recovery" — without it, a mouse drift during the swing's hitbox-active window would silently change `_facing` and downstream visuals (the wedge's `rotation` is set once at spawn, so it would not drift mid-swing, but `_facing.angle()` reads on the next swing would have shifted; sprite rotation would also drift, breaking the "look at the cursor at swing-spawn" visual contract). Dodge already sets `_facing = dodge_dir` in `try_dodge` — the gate preserves that through the active-dodge window.
+
+**Sprite handling — current placeholder is a 16×16 ColorRect (symmetric square).** Rotation is mechanically applied to the `Sprite` child node but visually undetectable (a rotated square is still a square). The wiring lands NOW so an asymmetric M2+ art swap automatically picks up the orientation — see `_update_sprite_rotation`'s comment about a possible future `-PI/2` offset for "tip up by default" art. Mechanical observability today is via the `[combat-trace] Player.try_attack | FIRED kind=<L|H> facing=(x,y)` line; the HTML5 Playwright spec `tests/playwright/specs/mouse-direction-attacks.spec.ts` greps the line and asserts the facing-vector quadrant matches the mouse position.
+
+**Harness downstream impact.** Existing Playwright specs that issue `canvas.click({position: {x: canvasCenterX, y: canvasCenterY}})` (the AC4 boss-clear, room-traversal smoke, kiting-mob-chase fixtures) implicitly clicked at canvas-center, which is approximately ON the player (camera-following). After the mouse-direction change, those clicks land inside the 8 px dead-zone → `_facing` stays at whatever it was last set to (the WASD-tap rose those fixtures cycle would have set it pre-ticket; post-ticket the WASD tap no longer writes `_facing`, so it stays at the initial `Vector2.DOWN` or last mouse-update value). The harness needs to either (a) `page.mouse.move(offsetFromCanvasCenter)` toward the intended swing direction before clicking, or (b) pass an offset in the click position so the click itself moves the mouse off canvas-center. Follow-up ticket — out of scope for this PR per `no mid-PR scope expansion`.
+
 ## Hitbox + Projectile encapsulated-monitoring rule
 
 [`scripts/combat/Hitbox.gd`](scripts/combat/Hitbox.gd) and [`scripts/projectiles/Projectile.gd`](scripts/projectiles/Projectile.gd) both follow this pattern:

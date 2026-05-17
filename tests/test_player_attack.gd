@@ -133,3 +133,76 @@ func test_attack_uses_facing_when_dir_zero() -> void:
 	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.ZERO)
 	# Hitbox at facing*reach -> -reach,0
 	assert_almost_eq(hb.position.x, -Player.LIGHT_REACH, 0.001)
+
+
+# --- 11: hitbox direction = mouse-derived facing (ticket 86c9uthf0) -------
+
+func test_hitbox_direction_matches_mouse_derived_facing() -> void:
+	# Sponsor 2026-05-17 AC1 + AC5: LMB melee swing direction must equal the
+	# Player→mouse vector. The mouse-facing pipeline lives in
+	# `_update_mouse_facing` (driven each `_physics_process` tick) — this test
+	# drives the pure helper directly to set `_facing`, then fires a
+	# Vector2.ZERO-dir attack (the shape that `_process_grounded` issues on
+	# `attack_light` / `attack_heavy` press) and confirms the resulting
+	# hitbox position is at `_facing * REACH`.
+	var p: Player = _make_player_in_tree()
+	# Simulate "mouse 100 px southeast of player at origin": _facing should
+	# resolve to (1/sqrt(2), 1/sqrt(2)).
+	p._facing = Player._resolve_facing_from_mouse(
+		Vector2(100.0, 100.0), Vector2.ZERO, Vector2.UP
+	)
+	var expected_axis: float = 1.0 / sqrt(2.0)
+	assert_almost_eq(p._facing.x, expected_axis, 0.001, "mouse-derived facing.x")
+	assert_almost_eq(p._facing.y, expected_axis, 0.001, "mouse-derived facing.y")
+	# Fire a light attack the SAME WAY _process_grounded does — Vector2.ZERO
+	# dir so try_attack uses the mouse-derived _facing.
+	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.ZERO)
+	assert_not_null(hb)
+	# Hitbox position = facing * LIGHT_REACH.
+	assert_almost_eq(hb.position.x, expected_axis * Player.LIGHT_REACH, 0.001,
+		"hitbox.x matches mouse-derived facing.x * reach")
+	assert_almost_eq(hb.position.y, expected_axis * Player.LIGHT_REACH, 0.001,
+		"hitbox.y matches mouse-derived facing.y * reach")
+	# Knockback is also facing-aligned (carried through _spawn_hitbox).
+	assert_almost_eq(hb.knockback.x, expected_axis * Player.LIGHT_KNOCKBACK, 0.001,
+		"knockback.x matches mouse-derived direction")
+	assert_almost_eq(hb.knockback.y, expected_axis * Player.LIGHT_KNOCKBACK, 0.001,
+		"knockback.y matches mouse-derived direction")
+
+
+# --- 12: heavy attack also uses mouse-derived facing ----------------------
+
+func test_heavy_hitbox_direction_matches_mouse_derived_facing() -> void:
+	# AC2: same as AC1 but for RMB heavy. The mouse-direction wiring is
+	# symmetric — both attack kinds route through `try_attack` and pick up
+	# `_facing` when dir=ZERO is passed.
+	var p: Player = _make_player_in_tree()
+	# Mouse 80 px due west.
+	p._facing = Player._resolve_facing_from_mouse(
+		Vector2(-80.0, 0.0), Vector2.ZERO, Vector2.UP
+	)
+	assert_eq(p._facing, Vector2.LEFT, "mouse due west → facing LEFT")
+	var hb: Hitbox = p.try_attack(Player.ATTACK_HEAVY, Vector2.ZERO)
+	assert_almost_eq(hb.position.x, -Player.HEAVY_REACH, 0.001,
+		"heavy hitbox at -HEAVY_REACH along facing")
+	assert_almost_eq(hb.position.y, 0.0, 0.001)
+
+
+# --- 13: facing snapshots at swing-spawn (mid-swing mouse changes ignored) -
+
+func test_attack_facing_snapshot_does_not_drift_mid_swing() -> void:
+	# Edge case 3 from the ticket: facing should snapshot at swing-spawn,
+	# not continuously update during STATE_ATTACK. The `_update_mouse_facing`
+	# gate on `_state == STATE_ATTACK` is what enforces this.
+	var p: Player = _make_player_in_tree()
+	p._facing = Vector2.RIGHT
+	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.ZERO)
+	assert_eq(p.get_state(), Player.STATE_ATTACK, "in STATE_ATTACK post-swing")
+	# Hitbox already snapshotted to RIGHT.
+	assert_almost_eq(hb.position.x, Player.LIGHT_REACH, 0.001)
+	# Pretend the mouse moves 90deg during recovery — call the per-frame
+	# update with the player still in STATE_ATTACK.
+	p._update_mouse_facing()
+	# _facing must remain RIGHT (no overwrite during STATE_ATTACK).
+	assert_eq(p._facing, Vector2.RIGHT,
+		"mid-swing mouse-facing update is suppressed; swing direction snapshotted")
