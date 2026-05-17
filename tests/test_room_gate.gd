@@ -371,3 +371,61 @@ func test_fire_traversal_if_unlocked_noop_when_not_unlocked() -> void:
 	g._fire_traversal_if_unlocked()  # must be a no-op (gate not UNLOCKED yet)
 	assert_signal_not_emitted(g, "gate_traversed",
 		"_fire_traversal_if_unlocked is a no-op when gate is LOCKED (not UNLOCKED)")
+
+
+# ---- B-OUTSIDE harness contract — ticket 86c9utcb7 ------------------------
+#
+# The case B-OUTSIDE harness path (`gateTraversalWalk` in
+# `tests/playwright/fixtures/gate-traversal.ts`) relies on this game-side
+# contract: when the last mob dies and `_unlock()` runs WITHOUT a body
+# overlapping the trigger, `gate_unlocked` MUST emit exactly once, but
+# `gate_traversed` MUST NOT auto-emit. The player has to walk back into the
+# trigger to fire `body_entered`, which the UNLOCKED-branch of
+# `_on_body_entered` then converts to `gate_traversed`.
+#
+# This is the empirically-observed Room 03 Charger-knockback shape (PR #251
+# traces): the player drifts ~12-24 px east of the trigger east edge by the
+# unlock instant, so `get_overlapping_bodies()` is empty and
+# `_fire_traversal_if_unlocked` is correctly never invoked. The harness
+# resolves this via a staged-east + walk-west finish-traversal (legitimate
+# §15 game-mechanic-driven multi-outcome — analogous to Consumer 1 case B
+# in `kiting-mob-chase.ts`).
+#
+# If this contract is ever changed (e.g. a future PR makes `_unlock` always
+# fire `gate_traversed` as a "convenience"), this test fails before the
+# harness's B-OUTSIDE walk has a chance to surface the regression — and the
+# harness would then be silently masking a behavioural change.
+
+func test_unlock_with_no_overlap_emits_gate_unlocked_only() -> void:
+	# `_unlock()` invoked with no body overlapping the trigger emits
+	# `gate_unlocked` but NOT `gate_traversed`. The B-OUTSIDE harness path
+	# is built on this guarantee: the gate stops at UNLOCKED, and the
+	# player must walk in again to fire `body_entered → gate_traversed`.
+	#
+	# Headless GUT note: bare-instanced RoomGate has no physics overlap
+	# regardless of body position, so `get_overlapping_bodies()` returns []
+	# inside `_unlock()`. That matches the production semantics for the
+	# B-OUTSIDE sub-case (player outside trigger ↔ empty overlap list).
+	var g: RoomGate = _make_gate()
+	var m: FakeMob = _make_fake_mob()
+	g.register_mob(m)
+	g.trigger_for_test(null)
+	assert_true(g.is_locked(), "gate locked precondition")
+	watch_signals(g)
+	m.die()
+	# CONNECT_DEFERRED decrement + `_unlock` chain runs at end-of-frame.
+	# Drain one frame for the decrement; `test_skip_death_wait=true` (set by
+	# `trigger_for_test`) makes `_unlock` fire synchronously inside the same
+	# decrement handler.
+	await _await_frame()
+	assert_true(g.is_unlocked(), "gate UNLOCKED after final mob dies")
+	assert_signal_emitted(g, "gate_unlocked",
+		"gate_unlocked emits when last mob dies")
+	assert_signal_emit_count(g, "gate_unlocked", 1,
+		"gate_unlocked emits exactly once")
+	# Critical: no auto-traversal. The B-OUTSIDE harness path REQUIRES that
+	# `gate_traversed` is NOT auto-emitted when no body overlaps at unlock.
+	assert_signal_not_emitted(g, "gate_traversed",
+		"gate_traversed must NOT auto-emit when no body overlaps at " +
+		"unlock — harness B-OUTSIDE path (ticket 86c9utcb7) requires the " +
+		"player to walk back into the trigger to fire gate_traversed.")

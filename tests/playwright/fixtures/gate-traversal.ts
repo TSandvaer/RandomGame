@@ -49,16 +49,21 @@
  *   - Case A: `gate_traversed` already fired during combat → return early
  *     (room counter has advanced; the spec MUST NOT call this helper again
  *     for the same room).
- *   - Case B: `gate_unlocked` fired but no `gate_traversed` → ORIGINALLY
- *     steered EAST-of-trigger then walked WEST to finish the traversal
- *     silently. **RETIRED 2026-05-16** per the harness workaround convention
- *     (`team/tess-qa/playwright-harness-design.md` §15, PR #231 §4 #4):
- *     PR #230 (Drew, ticket 86c9ujg8c) fixed the game-side via
- *     `RoomGate._fire_traversal_if_unlocked` deferred from `_unlock()` when
- *     the player is overlapping — so case B post-PR-#230 is a regression
- *     signal (the deferred fire didn't happen), not a recoverable harness
- *     state. Case B now throws. See the case B branch in `gateTraversalWalk`
- *     for the full rationale + cite chain.
+ *   - Case B: `gate_unlocked` fired but no `gate_traversed`. Split into two
+ *     sub-cases via the player's position at unlock time (ticket 86c9utcb7):
+ *       - **B-INSIDE** (player overlapping the trigger at unlock):
+ *         `_fire_traversal_if_unlocked` (PR #230) SHOULD have fired the
+ *         deferred traversal but did not. THROWS — this IS the PR #230
+ *         regression detector that PR #239 established.
+ *       - **B-OUTSIDE** (player NOT overlapping at unlock): the game-side
+ *         deferred fire cannot help because `get_overlapping_bodies()` is
+ *         empty at unlock instant. Legitimate game-mechanic-driven
+ *         multi-outcome (per `team/tess-qa/playwright-harness-design.md`
+ *         §15) — analogous to Consumer 1 case B in `kiting-mob-chase.ts`.
+ *         Finishes traversal via staged-east + walk-west.
+ *     Reachable empirically in Room 03 under Charger knockback (PR #251
+ *     traces, ticket 86c9utcb7): the player ends up 10–20 px east of the
+ *     trigger at unlock instant on every release-build run.
  *   - Case C: neither fired → existing phase 3-5 walk (the open-gate path).
  * See `.claude/docs/combat-architecture.md § "Harness coverage gap —
  * phase boundaries vs gameplay event ordering"` for the broader pattern.
@@ -339,18 +344,29 @@ export interface GateTraversalResult {
    *     inside the trigger at unlock time.
    *   - `"open-walk"` (case C): no combat-phase auto-unlock; helper ran
    *     the normal phase 3-5 two-part walk.
+   *   - `"unlocked-outside-finish"` (case B-OUTSIDE): combat-phase
+   *     `gate_unlocked` fired with the player NOT overlapping the trigger
+   *     at unlock time (per `Player.pos` trace closest to the `_unlock`
+   *     line). The game-side `_fire_traversal_if_unlocked` cannot help
+   *     because there is no `CharacterBody2D` in `get_overlapping_bodies()`
+   *     at unlock time — manual players would also have to walk back in.
+   *     The helper finishes the traversal by steering the player just east
+   *     of the trigger and walking west across it. See the case B branch
+   *     in `gateTraversalWalk` for the §15 game-mechanic-driven
+   *     multi-outcome rationale.
    * Defaults to `"open-walk"` when the caller omits `preRoomLineCount`
    * (legacy spec compatibility — see the GateTraversalOptions docstring).
    *
-   * **Case B (`"unlocked-finish"`) was RETIRED 2026-05-16** per the harness
-   * workaround convention (`team/tess-qa/playwright-harness-design.md` §15,
-   * PR #231 §4 recommendation #4). Observing the case B preconditions
-   * (combat-phase `gate_unlocked` without `gate_traversed`) now throws —
-   * it is a regression signal for PR #230's game-side fix, not a recoverable
-   * harness state. See the case B branch in `gateTraversalWalk` for the
-   * full rationale.
+   * **Case B-INSIDE (player overlapping at unlock time but no deferred
+   * traversal emission) STILL throws** — that IS a PR #230 regression.
+   * Only the B-OUTSIDE sub-case (player drifted out of the trigger before
+   * unlock — empirically deterministic in Room 03 under Charger knockback,
+   * per ticket 86c9utcb7) resolves via the finish-traversal walk.
    */
-  resolutionCase: "already-traversed" | "open-walk";
+  resolutionCase:
+    | "already-traversed"
+    | "open-walk"
+    | "unlocked-outside-finish";
   /** Total wall-clock duration of the helper invocation, in ms. */
   durationMs: number;
 }
@@ -556,40 +572,78 @@ export async function gateTraversalWalk(
     }
 
     if (combatPhaseUnlocked) {
-      // ---- Case B: unlocked-finish — RETIRED 2026-05-16 per the harness
-      // workaround convention (see `team/tess-qa/playwright-harness-design.md`
-      // §15 "Convention: harness workarounds for known game-side bugs must
-      // fail loudly", PR #231 §4 recommendation #4).
+      // ---- Case B: gate_unlocked fired during combat but gate_traversed
+      //              did NOT. Split into two sub-cases via the player's
+      //              position at unlock time (ticket 86c9utcb7).
       //
-      // **Why this is now a hard failure.** Case B's original silent
-      // steer-and-finish logic was a workaround for a game-side bug:
-      // `RoomGate._unlock()` did not re-emit `gate_traversed` when the
-      // player was inside the trigger at unlock time, so the harness had to
-      // walk the player out and back in manually. That hid the SAME bug
-      // class from production — Sponsor (no harness steering) hit it as
-      // "Room 2 / Room 6 walkout doesn't fire reliably" during the
-      // 2026-05-15 M2 W3 soak.
+      // **History.** PR #224 (Drew) added case B as a silent steer-and-finish
+      // helper for Room 03 Charger-knockback. PR #239 (Tess, harness
+      // workaround convention §15) retired case B as a hard throw on the
+      // premise that PR #230's game-side `_fire_traversal_if_unlocked`
+      // covered all reachable preconditions — case B should resolve to
+      // case A via the game's deferred re-emit.
       //
-      // PR #230 (Drew, ticket 86c9ujg8c) fixed the game-side:
-      // `RoomGate._unlock()` now calls `call_deferred("_fire_traversal_
-      // if_unlocked")` when `get_overlapping_bodies()` finds a
-      // `CharacterBody2D` inside the trigger at unlock time. The traversal
-      // emits one deferred frame later — case A territory, not case B.
+      // **Empirical refutation (PR #251 diagnostic, ticket 86c9utcb7).**
+      // Two release-build AC4 runs against artifact aea75a9 deterministically
+      // failed at Room 03 case B. The traces show:
+      //   - `Player.pos pos=(84,118)` at unlock time
+      //   - gate trigger east edge X=72
+      //   - player 12 px EAST of the trigger → not in `get_overlapping_bodies()`
+      //   - `_fire_traversal_if_unlocked` correctly does not fire (no
+      //     overlapping CharacterBody2D)
       //
-      // Post-PR-#230, observing case B means EITHER:
-      //   1. The player was inside the trigger at unlock and
-      //      `_fire_traversal_if_unlocked` did not fire = REGRESSION of the
-      //      PR #230 fix. The next CI failure surfaces the regression.
-      //   2. The player drifted out of the trigger BEFORE unlock, then drifted
-      //      back in afterwards. Legitimate (no auto-traverse expected) but
-      //      empirically rare; the spec's `clearRoomMobs` discipline (tight
-      //      NE-facing combat, no aim-sweep) keeps the player away from the
-      //      trigger between combat and the helper invocation. If a future
-      //      spec legitimately ends up in case B for non-bug reasons, that
-      //      spec is the one to update — not this helper.
+      // The game-side is correct. A manual player at the same position
+      // would also have to walk back into the trigger. This is the
+      // **B-OUTSIDE sub-case**: legitimate game-mechanic-driven multi-outcome,
+      // NOT a workaround for a game-side bug — directly analogous to
+      // `chaseAndClearKitingMobs` Consumer 1 case B which was kept under
+      // §15 (game-mechanic-driven multi-outcome — kiter-retreat geometry
+      // legitimately reaches the B-OUTSIDE sub-case; see
+      // `team/tess-qa/playwright-harness-design.md` §15 "Out of scope:
+      // game-mechanic-driven multi-outcome resolution").
       //
-      // Either way, silent steer-and-finish is wrong: it masks regressions
-      // of the PR #230 fix indefinitely.
+      // **The split:**
+      //   - B-INSIDE — player overlapping at unlock time (per Player.pos
+      //     trace closest to the `_unlock` line). `_fire_traversal_if_unlocked`
+      //     SHOULD have fired. STILL THROWS — PR #230 regression detector
+      //     preserved.
+      //   - B-OUTSIDE — player NOT overlapping at unlock time. Run the
+      //     finish-traversal walk (steer east of trigger, walk west across).
+      //     This is the legitimate Room 03 charger-knockback shape.
+      //
+      // Player.pos is throttled at 0.25 s game-time (~250-500 ms wall-time
+      // under HTML5). We pick the freshest Player.pos line BEFORE the
+      // unlock-emit line in the combat-phase slice. If no Player.pos line
+      // exists in the window (release-build smoke or harness running
+      // without the trace), we conservatively treat as B-INSIDE-regression
+      // and throw — no silent fallback for an unobservable state.
+      const unlockIdx = combatPhaseSlice.findIndex((l) =>
+        /\[combat-trace\] RoomGate\._unlock \| gate_unlocked emitting/.test(
+          l.text
+        )
+      );
+      const playerPosAtUnlock = (() => {
+        if (unlockIdx < 0) return null;
+        for (let i = unlockIdx; i >= 0; i--) {
+          const m = combatPhaseSlice[i].text.match(
+            /\[combat-trace\] Player\.pos \| pos=\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/
+          );
+          if (m)
+            return { x: parseInt(m[1], 10), y: parseInt(m[2], 10) };
+        }
+        return null;
+      })();
+      // RoomGate trigger geometry (mirrors `RoomGate.gd` defaults + the
+      // `kiting-mob-chase.ts` GATE_TRIGGER constant): centred at world
+      // (48, 144) with size (48, 80) → X∈[24, 72], Y∈[104, 184].
+      const TRIGGER = { xMin: 24, xMax: 72, yMin: 104, yMax: 184 };
+      const playerOverlappingAtUnlock =
+        playerPosAtUnlock !== null &&
+        playerPosAtUnlock.x >= TRIGGER.xMin &&
+        playerPosAtUnlock.x <= TRIGGER.xMax &&
+        playerPosAtUnlock.y >= TRIGGER.yMin &&
+        playerPosAtUnlock.y <= TRIGGER.yMax;
+
       const recent = capture
         .getLines()
         .slice(-30)
@@ -599,26 +653,103 @@ export async function gateTraversalWalk(
         .filter((l) => /\[combat-trace\] RoomGate\./.test(l.text))
         .map((l) => `  ${l.text}`)
         .join("\n");
-      throw new Error(
-        `[gate-traversal] ${roomLabel}: case B detected — gate_unlocked ` +
-          `fired during combat-phase slice but gate_traversed did NOT. ` +
-          `\n\n**This is a REGRESSION signal.** Per PR #230 (Drew, ticket ` +
-          `86c9ujg8c — M2 W3 soak fix for RoomGate knockback-overlap), ` +
-          `RoomGate._unlock() now calls _fire_traversal_if_unlocked() ` +
-          `via call_deferred when the player is overlapping the trigger ` +
-          `at unlock time — so the gate auto-traverses to case A (already-` +
-          `traversed) rather than landing in case B. Observing case B means ` +
-          `either (a) the PR #230 fix has regressed (the deferred ` +
-          `_fire_traversal_if_unlocked is not firing), or (b) the player ` +
-          `drifted out of the trigger before unlock and back in after — ` +
-          `rare under the spec's standard NE-tight-combat discipline; if a ` +
-          `legitimate spec scenario produces this, update the spec to ` +
-          `re-engage the trigger explicitly. Silent steer-and-finish is ` +
-          `retired per team/tess-qa/playwright-harness-design.md §15 ` +
-          `(harness workaround convention).` +
-          `\n\nCombat-phase RoomGate.* traces:\n${gateLines || "  (none)"}` +
-          `\n\nLast 30 trace lines:\n${recent}`
+
+      if (playerOverlappingAtUnlock || playerPosAtUnlock === null) {
+        // ---- B-INSIDE / B-UNKNOWN: throw (PR #230 regression detector) ----
+        //
+        // Player was inside the trigger at unlock time (or we cannot tell
+        // because no Player.pos trace exists in the combat-phase slice).
+        // `_fire_traversal_if_unlocked` SHOULD have fired but `gate_traversed`
+        // did not. This IS the PR #230 regression signal — DO NOT silently
+        // resolve.
+        throw new Error(
+          `[gate-traversal] ${roomLabel}: case B-INSIDE detected — ` +
+            `gate_unlocked fired during combat-phase slice with the player ` +
+            `${
+              playerPosAtUnlock === null
+                ? "in an unknown position (no Player.pos trace in the slice)"
+                : `at (${playerPosAtUnlock.x}, ${playerPosAtUnlock.y}) ` +
+                  `(INSIDE the trigger X∈[${TRIGGER.xMin},${TRIGGER.xMax}], ` +
+                  `Y∈[${TRIGGER.yMin},${TRIGGER.yMax}])`
+            } at unlock time, but gate_traversed did NOT fire.` +
+            `\n\n**This is a REGRESSION signal.** Per PR #230 (Drew, ticket ` +
+            `86c9ujg8c — M2 W3 soak fix for RoomGate knockback-overlap), ` +
+            `RoomGate._unlock() calls _fire_traversal_if_unlocked() ` +
+            `via call_deferred when the player is overlapping the trigger ` +
+            `at unlock time. The deferred fire is not landing — most likely ` +
+            `the PR #230 deferred-call branch regressed, or get_overlapping_bodies() ` +
+            `is empty for a non-position reason. Per §15 harness-workaround ` +
+            `convention, silent steer-and-finish would mask the regression. ` +
+            `Diagnose the game-side before patching the harness.` +
+            `\n\nCombat-phase RoomGate.* + Player.pos traces:\n${gateLines || "  (none)"}` +
+            `\n\nLast 30 trace lines:\n${recent}`
+        );
+      }
+
+      // ---- B-OUTSIDE: legitimate game-mechanic-driven multi-outcome.
+      //                 Run the finish-traversal walk. (Ticket 86c9utcb7.)
+      //
+      // The player drifted out of the trigger before the final mob died
+      // (empirically: Charger knockback at the end of Room 03 combat). The
+      // game's `_fire_traversal_if_unlocked` cannot help — `get_overlapping_
+      // bodies()` was empty at unlock instant. A manual player would also
+      // have to walk back into the trigger.
+      //
+      // Per §15 "Out of scope: game-mechanic-driven multi-outcome resolution"
+      // (`team/tess-qa/playwright-harness-design.md` §15), this is one of
+      // several legitimate game observables — not a workaround for a wrong
+      // game observable. The discriminator: "is the workaround compensating
+      // for the game producing the WRONG observable, or for the game
+      // producing one of several CORRECT observables?" Here, the game
+      // observable is correct (gate UNLOCKED, player just east of trigger
+      // by ~10–20 px), and traversal genuinely requires the player to walk
+      // back into the trigger. Directly analogous to `chaseAndClearKiting
+      // Mobs` Consumer 1 case B, which §15 explicitly retained.
+      //
+      // **The walk:** steer to the staging point just east of the trigger
+      // (guarantees the player is OUTSIDE → next walk produces a fresh
+      // non-overlap → overlap body_entered transition), then walk pure-west
+      // across the rect. `body_entered` fires as the player crosses the
+      // east edge (X=72) → the UNLOCKED gate emits `gate_traversed`
+      // (one body_entered on STATE_UNLOCKED).
+      console.log(
+        `[gate-traversal] ${roomLabel}: case B-OUTSIDE — gate_unlocked ` +
+          `fired during combat with player at (${playerPosAtUnlock.x}, ${playerPosAtUnlock.y}) — ` +
+          `OUTSIDE trigger X∈[${TRIGGER.xMin},${TRIGGER.xMax}], Y∈[${TRIGGER.yMin},${TRIGGER.yMax}]. ` +
+          `Per §15 game-mechanic-driven multi-outcome, finishing the ` +
+          `traversal via staged-east + walk-west.`
       );
+      const preTraversedCount = capture
+        .getLines()
+        .filter((l) => /\[combat-trace\] RoomGate\.gate_traversed/.test(l.text))
+        .length;
+      const finishOk = await finishTraversalFromUnlockedOutside(
+        page,
+        capture,
+        roomLabel,
+        preTraversedCount
+      );
+      if (!finishOk) {
+        const post = capture
+          .getLines()
+          .slice(-30)
+          .map((l) => `  ${l.text}`)
+          .join("\n");
+        throw new Error(
+          `[gate-traversal] ${roomLabel}: case B-OUTSIDE finish-traversal ` +
+            `walk did NOT produce a gate_traversed trace within budget. ` +
+            `Either body_entered did not fire (player stuck against east ` +
+            `wall, or settle window too short), or the UNLOCKED gate's ` +
+            `state-machine regressed.\n\nLast 30 trace lines:\n${post}`
+        );
+      }
+      return {
+        gateUnlocked: true,
+        gateTraversed: true,
+        bodyEnteredFiredOnPhase3: false,
+        resolutionCase: "unlocked-outside-finish",
+        durationMs: Date.now() - t0,
+      };
     }
 
     // Fall through to case C: no combat-phase unlock observed.
@@ -833,24 +964,200 @@ export async function gateTraversalWalk(
   };
 }
 
-// ---- Case B helpers (`finishTraversalFromUnlocked` + supporting position-
-//      steered staging) RETIRED 2026-05-16 per the harness workaround
-//      convention (PR #231 §4 #4 → `team/tess-qa/playwright-harness-design.md`
-//      §15). The previous case B branch silently steered the player east of
-//      the gate trigger and walked them back west to finish a traversal the
-//      game-side `RoomGate._unlock()` had not auto-emitted. PR #230 (Drew,
-//      ticket 86c9ujg8c) added the game-side `_fire_traversal_if_unlocked`
-//      deferred emission, so the entire workaround is now obsolete (case B
-//      preconditions resolve to case A via the game's own re-emit).
+// ---- Case B-OUTSIDE finish-traversal helper (ticket 86c9utcb7) ------------
 //
-//      Removed functions: `finishTraversalFromUnlocked`, `steerPlayerToPoint`,
-//      `latestPlayerPos`, `keysForDelta`, `waitForNewLine`. Removed constants:
-//      `PLAYER_POS_PATTERN`, `FINISH_STAGE_POINT`, `FINISH_STAGE_TOLERANCE_PX`,
-//      `FINISH_STAGE_STEER_BUDGET_MS`, `FINISH_STAGE_BURST_MS`,
-//      `FINISH_STAGE_WEST_WALK_MS`, `FINISH_STAGE_SETTLE_MS`.
+// **Why this helper exists.** The B-OUTSIDE sub-case is reachable in Room 03
+// (Grunt + Charger): Charger's `CHARGE_KNOCKBACK = 280 px/s` repeatedly
+// shoves the player into-and-out-of the gate trigger across the 0.65 s
+// `DEATH_TWEEN_WAIT` window. PR #251 traces show the player at e.g. (84,118)
+// or (96,114) at unlock time — 12–24 px EAST of the trigger east edge X=72.
+// The game-side `_fire_traversal_if_unlocked` (PR #230) cannot help because
+// `get_overlapping_bodies()` is empty at the unlock instant; the gate
+// correctly emits `gate_unlocked` but `gate_traversed` does not fire.
 //
-//      If a future game-side regression makes case B preconditions
-//      reachable again, restore from PR #224 (commit 8723b2e) — but per
-//      §15 the restoration MUST land paired with a fixed game-side
-//      ticket and the helper MUST flip back to fail-loud once that fix
-//      lands.
+// **What it does.** Steer the player to the staging point just east of the
+// trigger (guarantees they are OUTSIDE → next walk produces a fresh
+// non-overlap → overlap `body_entered` transition), then walk pure-west
+// across the rect. `body_entered` fires as the player crosses the east edge
+// (X=72), and `RoomGate._on_body_entered` emits `gate_traversed` on the
+// single transition (state==UNLOCKED → fire idempotent gate_traversed).
+//
+// **§15 scope.** This is NOT a workaround for a game-side bug. The game
+// observable is correct (gate UNLOCKED, player outside trigger by ~10–20 px,
+// no `body_entered` since no transition happened). Traversal genuinely
+// requires the player to walk back in — both manual players and the harness.
+// Per `team/tess-qa/playwright-harness-design.md` §15 "Out of scope:
+// game-mechanic-driven multi-outcome resolution", legitimate multi-outcome
+// resolution is explicitly allowed. Directly analogous to Consumer 1's case
+// B in `kiting-mob-chase.ts` (kiter retreat geometry legitimately produces
+// the same B-OUTSIDE shape).
+//
+// The B-INSIDE sub-case (player overlapping at unlock; deferred fire didn't
+// land) is the PR #230 regression detector and STILL throws upstream — see
+// the case-B branch in `gateTraversalWalk` above for the split logic.
+
+/**
+ * RoomGate trigger geometry mirrors `RoomGate.gd` defaults (centred at
+ * world (48, 144) with size (48, 80)).
+ */
+const FINISH_TRIGGER = { xMin: 24, xMax: 72, yMin: 104, yMax: 184 };
+
+/**
+ * Staging point for the finish-traversal walk: just EAST of the trigger
+ * rect (X=120 = 48 px east of east edge), vertically centred in the Y-band
+ * (Y=144 = trigger centre). Identical to `kiting-mob-chase.ts`
+ * `FINISH_TRAVERSAL_STAGE` — the same physical staging that the kiting
+ * Consumer 1 case B uses, with the same `body_entered` reasoning.
+ */
+const FINISH_STAGE_POINT = { x: 120, y: 144 };
+
+/** Tolerance (px) for "reached the finish-traversal staging point". */
+const FINISH_STAGE_TOLERANCE_PX = 28;
+
+/**
+ * Budget for steering to `FINISH_STAGE_POINT`. The player can be anywhere
+ * inside the room when case B-OUTSIDE triggers (typically (84,118)–(96,114)
+ * per PR #251 traces, but defensively budget for the worst-case "near west
+ * wall"). 6 s at WALK_SPEED=120 px/s covers 720 px — more than the room is
+ * wide.
+ */
+const FINISH_STAGE_BUDGET_MS = 6_000;
+
+/** Per-burst key-hold during staging. Mirrors RETURN_BURST_MS in kiting-mob-chase. */
+const FINISH_STAGE_BURST_MS = 250;
+
+/** Settle frame after each staging burst — lets STATE_ATTACK / velocity clear. */
+const FINISH_STAGE_SETTLE_MS = 80;
+
+/**
+ * Pure-west walk duration for the finish-traversal re-entry. From staging
+ * X≈120, walking west at 120 px/s for 1100 ms covers ~132 px — the player
+ * crosses the trigger's east edge (X=72) at ~t=400 ms (firing body_entered),
+ * and the gate emits gate_traversed mid-walk.
+ */
+const FINISH_STAGE_WEST_WALK_MS = 1_100;
+
+/** Max wait for the `gate_traversed` line after the west walk completes. */
+const FINISH_STAGE_TRAVERSED_WAIT_MS = 5_000;
+
+/** Player.pos regex — matches the throttled HTML5-only trace from Player.gd. */
+const PLAYER_POS_PATTERN_FINISH = /\[combat-trace\] Player\.pos /;
+
+/** Parse the freshest `Player.pos` line, or null if no trace is available. */
+function latestPlayerPosFinish(
+  capture: ConsoleCapture
+): { x: number; y: number } | null {
+  const lines = capture.getLines();
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!PLAYER_POS_PATTERN_FINISH.test(lines[i].text)) continue;
+    const m = lines[i].text.match(
+      /pos=\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/
+    );
+    if (m) return { x: parseInt(m[1], 10), y: parseInt(m[2], 10) };
+  }
+  return null;
+}
+
+/**
+ * Pick the 1–2 WASD keys whose combined direction best matches (dx, dy) in
+ * Godot screen-space (x → east, y → south). Mirrors `kiting-mob-chase.ts`
+ * `keysToward` so the geometry stays consistent.
+ */
+function keysForDeltaFinish(dx: number, dy: number): string[] {
+  const keys: string[] = [];
+  const ax = Math.abs(dx);
+  const ay = Math.abs(dy);
+  if (ax < 4 && ay < 4) return keys;
+  const major = Math.max(ax, ay);
+  if (ax >= major * 0.35) keys.push(dx > 0 ? "d" : "a");
+  if (ay >= major * 0.35) keys.push(dy > 0 ? "s" : "w");
+  return keys;
+}
+
+/** Hold a set of keys for `ms`, then release them in reverse order. */
+async function holdKeysFinish(
+  page: Page,
+  keys: string[],
+  ms: number
+): Promise<void> {
+  if (keys.length === 0) {
+    await page.waitForTimeout(ms);
+    return;
+  }
+  for (const k of keys) await page.keyboard.down(k);
+  await page.waitForTimeout(ms);
+  for (const k of [...keys].reverse()) await page.keyboard.up(k);
+}
+
+/**
+ * Finishes a traversal when the gate is UNLOCKED but the player is outside
+ * the trigger at unlock time (case B-OUTSIDE, ticket 86c9utcb7).
+ *
+ * Returns true if `gate_traversed` was observed after the walk, false
+ * otherwise. The caller throws on false.
+ */
+async function finishTraversalFromUnlockedOutside(
+  page: Page,
+  capture: ConsoleCapture,
+  roomLabel: string,
+  preTraversedCount: number
+): Promise<boolean> {
+  // Step 1: steer to the staging point just east of the trigger. Best-effort
+  // — if no Player.pos trace lands within the budget, we proceed anyway; the
+  // west walk in step 2 is robust to a slightly-off starting position.
+  const t0 = Date.now();
+  let cycle = 0;
+  while (Date.now() - t0 < FINISH_STAGE_BUDGET_MS) {
+    cycle++;
+    const player = latestPlayerPosFinish(capture);
+    if (player === null) {
+      // Throttled trace (0.25 s) hasn't landed yet — wait one cadence.
+      await page.waitForTimeout(FINISH_STAGE_BURST_MS);
+      continue;
+    }
+    const dx = FINISH_STAGE_POINT.x - player.x;
+    const dy = FINISH_STAGE_POINT.y - player.y;
+    const dist = Math.round(Math.hypot(dx, dy));
+    if (dist <= FINISH_STAGE_TOLERANCE_PX) {
+      console.log(
+        `[gate-traversal] ${roomLabel}: case B-OUTSIDE — reached staging ` +
+          `(${FINISH_STAGE_POINT.x},${FINISH_STAGE_POINT.y}) ` +
+          `dist=${dist}px after ${cycle} cycle(s).`
+      );
+      break;
+    }
+    const steerKeys = keysForDeltaFinish(dx, dy);
+    await holdKeysFinish(page, steerKeys, FINISH_STAGE_BURST_MS);
+    await page.waitForTimeout(FINISH_STAGE_SETTLE_MS);
+  }
+  await page.waitForTimeout(FINISH_STAGE_SETTLE_MS);
+
+  // Step 2: walk pure-WEST across the trigger. body_entered fires as the
+  // player crosses east edge X=72; the UNLOCKED gate emits gate_traversed
+  // on that single transition.
+  console.log(
+    `[gate-traversal] ${roomLabel}: case B-OUTSIDE — walk WEST ` +
+      `(${FINISH_STAGE_WEST_WALK_MS}ms) across trigger east edge ` +
+      `(X=${FINISH_TRIGGER.xMax}) to fire body_entered → gate_traversed.`
+  );
+  await page.keyboard.down("a");
+  await page.waitForTimeout(FINISH_STAGE_WEST_WALK_MS);
+  await page.keyboard.up("a");
+
+  // Wait for the gate_traversed trace — observed latency 50–200 ms post-walk
+  // in the analogous kiting-chase finish-traversal path, but Room 03 has the
+  // gate in UNLOCKED state already so the deferral is one frame at most.
+  try {
+    await capture.waitForLine(
+      /\[combat-trace\] RoomGate\.gate_traversed/,
+      FINISH_STAGE_TRAVERSED_WAIT_MS
+    );
+  } catch {
+    return false;
+  }
+  const postCount = capture
+    .getLines()
+    .filter((l) => /\[combat-trace\] RoomGate\.gate_traversed/.test(l.text))
+    .length;
+  return postCount > preTraversedCount;
+}

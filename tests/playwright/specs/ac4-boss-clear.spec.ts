@@ -183,7 +183,30 @@ const ROOM_SHOOTER_COUNTS = [
 
 test.describe("AC4 — Stratum-1 boss reach + clear", () => {
   // **STATUS: still test.fail(). Rooms 02-05 clear + traverse end-to-end
-  // deterministically after PR #207 + PR #208 + PR #212 + PR #224.
+  // deterministically after PR #207 + PR #208 + PR #212 + PR #224 +
+  // PR (this) Room 03 case B-OUTSIDE finish-traversal (ticket 86c9utcb7).
+  //
+  // **What this PR (ticket 86c9utcb7) fixes — Room 03 case B-OUTSIDE:** PR
+  // #251 diagnostic traces empirically showed that Charger knockback in
+  // Room 03 deterministically drifts the player 10–20 px east of the gate
+  // trigger east edge (X=72) at unlock instant. The game-side
+  // `_fire_traversal_if_unlocked` (PR #230) cannot help because
+  // `get_overlapping_bodies()` is empty at that moment — the gate correctly
+  // emits `gate_unlocked` and waits for the player to walk back in. PR #239
+  // had retired case B as a regression detector (correct for the B-INSIDE
+  // sub-case PR #230 addresses), but that retirement was empirically too
+  // aggressive for the B-OUTSIDE sub-case which is legitimate game-mechanic-
+  // driven multi-outcome (per `team/tess-qa/playwright-harness-design.md`
+  // §15 "Out of scope: game-mechanic-driven multi-outcome resolution",
+  // directly analogous to Consumer 1 case B kept in `kiting-mob-chase.ts`).
+  // This PR re-introduces a SPLIT case B in `gate-traversal.ts`:
+  //   - B-INSIDE (player overlapping at unlock) → STILL throws (PR #230
+  //     regression detector preserved)
+  //   - B-OUTSIDE (player NOT overlapping at unlock) → staged-east +
+  //     walk-west finish traversal (legitimate multi-outcome resolution)
+  // The discriminator reads the Player.pos trace closest to the `_unlock`
+  // line in the combat-phase slice. Room 03 is now deterministic on the
+  // empirical N=2 PR #251 evidence; the Self-Test Report pins N=8/8.
   //
   // **What PR #212 (ticket 86c9u9neq) fixed:** the Room 06 harness blocker
   // (Shooter chase pre-pass roams player 100+px from spawn → 2-Charger
@@ -897,8 +920,9 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         // have fired during phase 3 to prove the trigger was reached —
         // but only in case C ("open-walk"). Case A short-circuits before
         // phase 3 because the gate was already fully resolved during combat
-        // (or via PR #230's deferred re-emit). Case B is retired and now
-        // throws before reaching this assertion.
+        // (or via PR #230's deferred re-emit). Case B-INSIDE throws before
+        // reaching this assertion. Case B-OUTSIDE ("unlocked-outside-finish")
+        // does its own staged finish-traversal walk (no phase-3 path).
         if (result.resolutionCase === "open-walk") {
           expect(
             result.bodyEnteredFiredOnPhase3,
@@ -910,9 +934,11 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
         }
 
         // Causality assertion: gate_unlocked + gate_traversed both observed.
-        // (Applies to both remaining cases — case A observed both events
-        // during combat; case C observes them via phase 3 + phase 5.
-        // Case B retired — throws before reaching this assertion.)
+        // (Applies to all three resolved cases — case A observed both events
+        // during combat; case C observes them via phase 3 + phase 5;
+        // case B-OUTSIDE observed gate_unlocked during combat and emits
+        // gate_traversed via the staged finish-traversal walk.
+        // Case B-INSIDE throws before reaching this assertion.)
         expect(
           result.gateUnlocked,
           `${roomLabel}: gateTraversalWalk should have observed gate_unlocked ` +
