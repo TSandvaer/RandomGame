@@ -13,11 +13,11 @@ This doc is the natural extension of `team/devon-dev/save-schema-v4-plan.md`. Re
 - **Additive-only:** **N — first non-additive schema bump in the project's history.** `data.character` (Dictionary) → `data.characters` (Array of Dictionary) is a **rename + type-change**, violating v4 plan §4.1 rule 1. Three additional non-additive moves: `data.equipped` lifts from root → `data.characters[N].equipped`; `data.character.stash` lifts from per-character → root `data.shared_stash`; `data.character.ember_bags` lifts to `data.characters[N].ember_bags` (no shape change, just path change).
 - **Compat-shadow strategy:** **YES, pointer-shadow** — v5 keeps `data.character` (Dictionary, pointing at `data.characters[active_slot]`) and `data.equipped` (Dictionary, mirror of `data.characters[active_slot].equipped`) as **read-only compat shadows** for one schema generation. Deprecate at v6 (post-M3). See §4.4 for full rationale + the Devon-call.
 - **New top-level keys under `data{}`:** `characters: Array` (replaces `character`), `active_slot: int` (replaces "implicit single-character" semantics), `shared_stash: Array` (replaces `character.stash`), `meta.hub_town_seen: bool` (additive; first-visit gate).
-- **New per-character keys under `data.characters[N]`:** `slot_index: int`, `ember_shards: int`, `active_bounty: Dictionary | null`, `paragon_points: int`, `paragon_spent: Dictionary` (additive within the v5 multi-character structure).
+- **New per-character keys under `data.characters[N]`:** `slot_index: int`, `ember_shards: int`, `active_bounty: Dictionary | null`, `paragon_points: int`, `paragon_spent: Dictionary`, `hub_town_last_descended_stratum: int` (additive within the v5 multi-character structure; the last field added per Uma's `hub-town-direction.md §7` cross-reference).
 - **Size delta on a typical save:** +1.5 to +3 KB per additional character slot (mostly empty character payload + level/xp/stats default block). At 3 slots × ~1 KB each + shared_stash lift (existing data, no growth), median v5 save grows from ~10–15 KB (v4 mid-stash) to ~12–18 KB. Well within IndexedDB/OPFS browser-default quotas.
 - **JSON-encodable:** Y for every new field. Same primitives the v4 plan vetted — Dictionary / Array / int / float / String / bool.
 - **Migration shape:** `_migrate_v4_to_v5(data)` is the first migration to **rename + lift** rather than purely backfill. The function is still idempotent on already-v5 data (guarded by `has("characters")`), but it must consume v4 data on first run rather than only add fields.
-- **Open questions for Sponsor/Priya/Uma/orchestrator:** 5 (catalogued in §9). All but one are deferrable; the Devon-call (pointer-shadow) is decided in this doc (§4.4 — YES).
+- **Open questions for Sponsor/Priya/Uma/orchestrator:** 6 (catalogued in §9). The Devon-call (pointer-shadow) is decided in this doc (§4.4 — YES). Q-6 (`meta.hub_town_seen` scope: account vs per-character per Uma `hub-town-direction.md §7` PR #258) is pending Sponsor; default holds (account-scoped) unless reversed.
 
 ---
 
@@ -81,13 +81,14 @@ data:
 | `data.characters[N].slot_index` | int | `0` for migrated v4 character; subsequent slots get 1, 2, ... | Y | Stable per-character identifier. Title-screen slot-picker UI reads this to render slot rows. |
 | `data.active_slot` | int | `0` (the only existing character) | Y | Which character is currently being played. Subsequent loads pick this slot to resume. Recommended range 0..2 for 3-slot M3; schema permits any int (validated against `characters[].slot_index` at load time). |
 | `data.shared_stash` | Array of Dictionary | `data.character.stash` from v4 (i.e., the existing per-character stash lifts to the shared pool) | Y | Shared across all character slots. Same sparse-array shape as v4 `character.stash` (per v4 plan §2.3) — entries have `slot_index: int`, `id: String`, `tier: int`, `rolled_affixes: Array`, `stack_count: int`. |
-| `data.meta.hub_town_seen` | bool | `false` | Y | First-visit hint-strip gate per `m3-design-seeds.md §2 Save-schema implications`. **Account-scoped** (on `meta`, not on character) — once any character has visited the hub-town, subsequent characters skip the hint. |
+| `data.meta.hub_town_seen` | bool | `false` | Y | First-visit hint-strip gate per `m3-design-seeds.md §2 Save-schema implications`. **Account-scoped** (on `meta`, not on character) — once any character has visited the hub-town, subsequent characters skip the hint. **⚠ Scope pending Sponsor decision (2026-05-17):** Uma's `hub-town-direction.md §7` (PR #258) frames this instead as **per-save-slot** (each new character re-shows the hint diegetically — "each new character is encountering the cloister for the first time as themselves"). Devon's account-scoped default holds in this v5 spike UNLESS Sponsor reverses. If Sponsor reverses, the field moves to `data.characters[N].hub_town_seen` in a v5.x amendment — surrounding fields, migration chain, and pointer-shadow doctrine all unaffected; only this single field's home address shifts. Open question Q-6 in §9 logs the call. |
+| `data.characters[N].hub_town_last_descended_stratum` | int | `1` (S1) | Y | Per-character last-descended stratum index for the descent-portal default-highlight. Per Uma's `hub-town-direction.md §7` (PR #258). Stratum-picker UI reads this to pre-select the most-recent stratum row when the player opens the portal; player can override. Migrated v4 characters default to `1`; new M3 characters initialize to `1`. Read+write at descent-portal stratum-select time. Semantically distinct from `meta.deepest_stratum` ("last chosen" vs "deepest available"); no drift risk. |
 | `data.characters[N].ember_shards` | int | `0` | Y | Ember-shard currency per `m3-design-seeds.md §3`. Per-character (each character earns + spends their own). |
 | `data.characters[N].active_bounty` | `Dictionary` or `null` | `null` | Y | Active bounty quest state per `m3-design-seeds.md §2 + §3`. Per-character. Shape: `{ quest_id: String, target: String, progress: int }`. Null when no quest is active (default for migrated v4 characters; first character to talk to bounty-poster gets a real Dict). |
 | `data.characters[N].paragon_points` | int | `0` | Y | Earned Paragon points (Diablo-III shape per `m3-design-seeds.md §3 NG+ Paragon track`). Per-character. Caps at 100 in M3 (M4+ may raise). |
 | `data.characters[N].paragon_spent` | Dictionary | `{}` (empty map) | Y | Map of paragon-buff-id → ranks-spent. Per-character. Schema permits arbitrary keys; M3 game code validates against the locked Paragon-buff registry. |
 
-That's the v5 delta. **One non-additive structural change** (character: Dict → characters: Array) plus three path-lifts (equipped, stash, ember-bags) plus six purely additive fields.
+That's the v5 delta. **One non-additive structural change** (character: Dict → characters: Array) plus three path-lifts (equipped, stash, ember-bags) plus **seven** purely additive fields (`slot_index`, `active_slot`, `shared_stash`, `meta.hub_town_seen`, `ember_shards`, `active_bounty`, `paragon_points`, `paragon_spent`, `hub_town_last_descended_stratum` — nine additive fields total counting the new top-level `characters` Array container itself; "seven purely additive" excludes the structural-substitution fields).
 
 ### 2.4 v5 schema (compact)
 
@@ -110,6 +111,7 @@ data:
       active_bounty: Dictionary | null       # NEW
       paragon_points: int                    # NEW
       paragon_spent: Dictionary              # NEW
+      hub_town_last_descended_stratum: int   # NEW (per Uma's hub-town-direction.md §7)
     },
     # ... up to characters[2] in M3 (Sponsor may sign off N>3 in future) ...
   ]
@@ -122,7 +124,7 @@ data:
     runs_completed: int
     deepest_stratum: int
     total_playtime_sec: float
-    hub_town_seen: bool                      # NEW (account-scoped)
+    hub_town_seen: bool                      # NEW (account-scoped; scope pending Sponsor — see §2.3)
 ```
 
 ### 2.5 JSON-encodable verdict
@@ -154,7 +156,7 @@ function migrate_v4_to_v5(data: Dictionary) -> Dictionary:
     var existing_stash: Array = existing_character.get("stash", [])
     existing_character.erase("stash")
 
-    # Backfill the six new per-character fields.
+    # Backfill the new per-character fields.
     if not existing_character.has("ember_shards"):
         existing_character["ember_shards"] = 0
     if not existing_character.has("active_bounty"):
@@ -163,6 +165,8 @@ function migrate_v4_to_v5(data: Dictionary) -> Dictionary:
         existing_character["paragon_points"] = 0
     if not existing_character.has("paragon_spent"):
         existing_character["paragon_spent"] = {}
+    if not existing_character.has("hub_town_last_descended_stratum"):
+        existing_character["hub_town_last_descended_stratum"] = 1   # S1 default per Uma's hub-town-direction.md §7
 
     # --- Step 2: Build the new top-level structure ---
     data["characters"] = [existing_character]
@@ -305,7 +309,7 @@ These are the assertions the v4 → v5 migration test will pin. Tess will author
 | **INV-3** | `v4_equipped_lifts_to_per_character` | After loading a v4 fixture, `loaded["characters"][0]["equipped"]` equals the v4 fixture's root `data.equipped` map bit-identically. |
 | **INV-4** | `v4_stash_lifts_to_shared_stash` | After loading a v4 fixture, `loaded["shared_stash"]` equals the v4 fixture's `data.character.stash` array bit-identically. `loaded["characters"][0]` has NO `stash` key (it lifted out). |
 | **INV-5** | `v5_pointer_shadow_active_slot` | After loading a v4 fixture and re-saving, `loaded["character"] == loaded["characters"][loaded["active_slot"]]` (deep-equal). Same for `loaded["equipped"]` and `loaded["characters"][active_slot]["equipped"]`. (Drift detector.) |
-| **INV-6** | `v5_new_field_defaults` | After loading a v4 fixture, `loaded["characters"][0]["ember_shards"] == 0`, `loaded["characters"][0]["active_bounty"] == null`, `loaded["characters"][0]["paragon_points"] == 0`, `loaded["characters"][0]["paragon_spent"] == {}`, `loaded["meta"]["hub_town_seen"] == false`. |
+| **INV-6** | `v5_new_field_defaults` | After loading a v4 fixture, `loaded["characters"][0]["ember_shards"] == 0`, `loaded["characters"][0]["active_bounty"] == null`, `loaded["characters"][0]["paragon_points"] == 0`, `loaded["characters"][0]["paragon_spent"] == {}`, `loaded["characters"][0]["hub_town_last_descended_stratum"] == 1`, `loaded["meta"]["hub_town_seen"] == false`. *(Note: `meta.hub_town_seen` scope is pending Sponsor decision — see §2.3. If Sponsor reverses to per-character, this assertion moves to `loaded["characters"][0]["hub_town_seen"] == false`; the test family is otherwise unchanged.)* |
 | **INV-7** | `v5_idempotent_double_migration` | A v5 save round-tripped through `save → load → save → load` is bit-identical (no double-lift, no field drift, schema_version stays at 5, `characters[].slot_index` unchanged, pointer-shadows still match). |
 | **INV-8** | `v0_to_v5_chain_through_full_history` | A v0 fixture migrates v0→v1→v2→v3→v4→v5 and ends with the same character data + empty new-fields + correct `shared_stash` lift as a hand-authored v5 fixture with equivalent state. (Catches chain drift.) |
 
@@ -411,6 +415,7 @@ For Sponsor / Priya / Uma / orchestrator. Not all need resolution before M3 Tier
 3. **`active_slot` out-of-range handling.** If `active_slot` indexes past `characters.size()` (e.g., `active_slot: 2` but only 2 characters present), what happens? Suggest: clamp to `characters.size() - 1` at load + emit `WarningBus.warn(...)`. **Owner:** Devon (implement at M3 Tier 2; clamp + warn matches existing v3-newer-than-runtime warning idiom).
 4. **Shared-stash item-UID collision policy.** v4 stash entries are per-character; collision wasn't possible. v5 shared_stash is global; two characters might (in theory) drop into the stash items with the same `slot_index` if the per-character stash UI doesn't sequence indices through a shared counter. Suggest: shared_stash slot_indices are assigned by the stash-management code at insert-time using `shared_stash.size()` as the next index, not by the character. Schema is unaffected; the discipline lives in the UI/inventory code. **Owner:** Drew (stash UI dispatch, when authored).
 5. **`stash_ui_state` rename to `hub_town_ui_state` in v5?** v4's `stash_ui_state` is per-character. In v5 the hub-town generalizes the stash-room (`m3-design-seeds.md §2`). Should `stash_ui_state` rename to `hub_town_ui_state`, with `stash_room_seen` becoming `hub_town_seen` (but per-character vs the account-scoped meta `hub_town_seen`)? Suggest: keep `stash_ui_state` for v5 (rename is its own non-additive bump; not worth piggy-backing here). M4 may rename. **Owner:** Uma + Devon at M3 Tier 2 implementation review.
+6. **`hub_town_seen` scope — account vs per-character.** Pending Sponsor decision (2026-05-17). This v5 spike defaults to **account-scoped** on `meta.hub_town_seen` (rationale: "once any character has seen the hub-town hint, subsequent characters skip it" — same player at the keyboard, hint utility expires after the first viewing). Uma's `hub-town-direction.md §7` (PR #258) instead frames it as **per-save-slot** (rationale: "each new character is encountering the cloister for the first time as themselves" — diegetic-first framing). **Default holds in this spike** unless Sponsor redirects. If Sponsor reverses to per-character, the field moves to `data.characters[N].hub_town_seen` in a v5.x amendment — surrounding fields, migration chain, pointer-shadow doctrine, and the eight INV-* invariants are all unaffected. The shift is one-field, one-line in the migration function (move backfill from `data["meta"]["hub_town_seen"] = false` to `existing_character["hub_town_seen"] = false`). **Owner:** Sponsor decides; orchestrator routes; Priya logs into DECISIONS.md. Default action if no Sponsor input by M3 Tier 2 implementation start: account-scoped per this spike; v5.x amendment if reversed in-flight.
 
 ---
 
