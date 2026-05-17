@@ -799,7 +799,21 @@ export async function chaseAndClearKitingMobs(
     if (mob === null || player === null) {
       // No fresh position trace yet — give the build a beat to emit one,
       // and nudge with a short click-spam in case a mob is already adjacent.
-      await canvas.click({ position: { x: clickX, y: clickY } });
+      // **Mouse-direction attacks (PR #255, ticket 86c9uthf0).** Aim at a
+      // spawn-relative NE offset rather than canvas-center — canvas-center
+      // is at world (640, 360), far SE of the spawn-area player, so a
+      // canvas-center click would aim every nudge swing SE. NE is the
+      // typical mob-spawn direction; if the player has drifted from spawn,
+      // a few stray SE-aimed swings are still better than the dead-zone
+      // miss they would have produced pre-fix.
+      const v = { x: 0.707, y: -0.707 };
+      const offsetPx = 150;
+      await canvas.click({
+        position: {
+          x: 240 + v.x * offsetPx,
+          y: 200 + v.y * offsetPx,
+        },
+      });
       await page.waitForTimeout(ATTACK_INTERVAL_MS);
       continue;
     }
@@ -863,12 +877,18 @@ export async function chaseAndClearKitingMobs(
       await page.waitForTimeout(SETTLE_MS);
     } else {
       // ---- Engage burst — jam onto the kiter (held steer keys keep the
-      // player pressed against it AND keep `_facing` pointed at it) while
-      // click-spamming. Held input overrides projectile knockback so the
-      // player stays in swing range for the whole burst.
+      // player pressed against it) while click-spamming AT the kiter's
+      // position. Held input overrides projectile knockback so the player
+      // stays in swing range for the whole burst.
+      //
+      // **Mouse-direction attacks (PR #255, ticket 86c9uthf0).** The click
+      // position determines `_facing` (mouse vector from player). Click AT
+      // the kiter's known world position (`mob.x, mob.y`) so every swing's
+      // facing points at the kiter. Pre-PR-#255 the held direction keys
+      // drove facing; post-#255 only the mouse does.
       for (const k of steerKeys) await page.keyboard.down(k);
       for (let s = 0; s < ENGAGE_SWINGS; s++) {
-        await canvas.click({ position: { x: clickX, y: clickY } });
+        await canvas.click({ position: { x: mob.x, y: mob.y } });
         await page.waitForTimeout(ATTACK_INTERVAL_MS);
         if (killsSoFar() >= expectedMobs) break;
         if (Date.now() - t0 >= budgetMs) break;
@@ -1270,7 +1290,17 @@ export async function chaseAndClearMultiChaserRoom(
     if (player === null || mobReadings.length === 0) {
       // No position trace at all yet — give the build a beat to emit one,
       // and nudge with a short click-spam in case a mob is already adjacent.
-      await canvas.click({ position: { x: clickX, y: clickY } });
+      // **Mouse-direction attacks (PR #255, ticket 86c9uthf0).** Aim at a
+      // spawn-relative NE offset (typical chaser-spawn direction) — canvas-
+      // center clicks would aim SE on the no-Camera2D viewport and miss.
+      const v = { x: 0.707, y: -0.707 };
+      const offsetPx = 150;
+      await canvas.click({
+        position: {
+          x: 240 + v.x * offsetPx,
+          y: 200 + v.y * offsetPx,
+        },
+      });
       await page.waitForTimeout(ATTACK_INTERVAL_MS);
       continue;
     }
@@ -1365,8 +1395,13 @@ export async function chaseAndClearMultiChaserRoom(
         await page.waitForTimeout(CHASER_FACING_TAP_MS);
         for (const k of [...steerKeys].reverse()) await page.keyboard.up(k);
       }
+      // **Mouse-direction attacks (PR #255, ticket 86c9uthf0).** Click AT
+      // the target chaser's known world position so every swing's `_facing`
+      // points at that mob. The keyboard-tap above only matters for movement
+      // (which now stays put per the 30 ms tap rationale) — it does NOT set
+      // facing post-#255. The load-bearing aim is the world-coord click.
       for (let s = 0; s < ENGAGE_SWINGS_CHASER; s++) {
-        await canvas.click({ position: { x: clickX, y: clickY } });
+        await canvas.click({ position: { x: target.x, y: target.y } });
         await page.waitForTimeout(ATTACK_INTERVAL_MS);
         if (killsSoFar() >= expectedMobs) break;
         if (Date.now() - t0 >= budgetMs) break;

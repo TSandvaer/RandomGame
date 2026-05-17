@@ -123,6 +123,7 @@ import {
   clearRoom01Dummy,
   waitForRoom02Load,
 } from "../fixtures/room01-traversal";
+import { clickAimedAtSpawn } from "../fixtures/mouse-facing";
 
 const BOOT_TIMEOUT_MS = 30_000;
 const KILL_TIMEOUT_MS = 60_000;
@@ -506,7 +507,12 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
         // Two swings per direction — covers the LIGHT_RECOVERY (0.18s) gap.
         for (let a = 0; a < 2; a++) {
           if (Date.now() - phase25SwingStart >= 30_000) break sweepLoop;
-          await canvas.click({ position: { x: clickX, y: clickY } });
+          // Mouse-direction attacks (PR #255, ticket 86c9uthf0): aim NE-of-
+          // spawn so the swing wedge covers Room02's NE-spawning grunts.
+          // Canvas-center click would aim SE on the no-Camera2D viewport
+          // and the swing would miss every grunt → 0 hits in 30s → false
+          // failure of the LMB-equip dual-surface assertion.
+          await clickAimedAtSpawn(canvas, "NE");
           await page.waitForTimeout(ATTACK_INTERVAL_MS);
           // Look for hits AFTER the marked buffer position so we don't pick
           // up pre-Tab hits.

@@ -57,6 +57,7 @@ import {
   clearRoom01Dummy,
   waitForRoom02Load,
 } from "../fixtures/room01-traversal";
+import { clickAimedAtSpawn } from "../fixtures/mouse-facing";
 
 const BOOT_TIMEOUT_MS = 30_000;
 /** How long to wait for the dummy to die (Stage 2b). */
@@ -257,9 +258,12 @@ test.describe("room traversal smoke — Room 1 dummy poof and auto-advance to Ro
       await page.keyboard.up("d");
       await page.waitForTimeout(400);
 
-      await canvas.click({ position: { x: clickX, y: clickY } });
+      // Mouse-direction attacks (PR #255, ticket 86c9uthf0): aim NE-of-spawn
+      // so swings cover Room02's NE-spawning grunts. Canvas-center clicks
+      // would aim SE on the no-Camera2D viewport and miss the grunts.
+      await clickAimedAtSpawn(canvas, "NE");
       await page.waitForTimeout(400);
-      await canvas.click({ position: { x: clickX, y: clickY } });
+      await clickAimedAtSpawn(canvas, "NE");
       await page.waitForTimeout(600);
 
       const room2Lines = capture.getLines().slice(preRoom2Count);

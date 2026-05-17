@@ -13,6 +13,43 @@ What this doc covers: the combat system's runtime topology — Player swing flow
 
 Damage routing: `Damage.compute_player_damage()` short-circuits to `FIST_DAMAGE = 1` when `weapon == null` (the player starts fistless **by design** per `DECISIONS.md 2026-05-02`). The `HEAVY_MULT = 0.6` multiplier path is bypassed when fistless — both light and heavy LMB/RMB deal 1 damage. Once a weapon is equipped, the multiplier path engages.
 
+### Mouse-direction facing (ticket 86c9uthf0, Sponsor 2026-05-17)
+
+Pre-ticket, swing direction came from the **keyboard `input_dir`** — `Player._facing = input_dir` in `_process_grounded`, and `try_attack(kind, input_dir)`. The player swung in the direction they were walking; standing still meant swinging in last-walked direction.
+
+Post-ticket, swing direction is **mouse-derived**:
+
+1. `_physics_process` calls `_update_mouse_facing()` BEFORE the state-dispatched handler runs. `_update_mouse_facing` reads `get_global_mouse_position() - global_position`, normalises it (via the pure static helper `_resolve_facing_from_mouse`), and assigns to `_facing`. The sprite child (`Sprite` ColorRect) is rotated to `_facing.angle()` in the same call via `_update_sprite_rotation`.
+2. `_process_grounded`'s attack-input branches pass `Vector2.ZERO` to `try_attack(kind, ...)`, which makes `try_attack` use the current (mouse-derived) `_facing` as the swing direction.
+3. WASD is decoupled from facing — `_process_grounded` no longer writes `_facing = input_dir`. The player can walk one direction while aiming another (Hades / Diablo convention).
+
+**Three load-bearing edge-case gates:**
+
+- **Dead-zone (`MOUSE_FACING_DEADZONE_PX = 8.0`).** If `|mouse - player| < 8 px`, `_resolve_facing_from_mouse` returns `last_facing` unchanged. Prevents jitter when the cursor sits on the player. Static helper is independently unit-tested (`tests/test_player_mouse_facing.gd`) so the math is pinned without viewport mocking.
+- **Off-canvas (HTML5).** Godot's `get_global_mouse_position()` returns the LAST observed cursor position when the pointer leaves the canvas — no special handling needed. The value freezes at the boundary so `_facing` stays stable across the off-canvas window.
+- **Mid-swing / mid-dodge snapshot.** `_update_mouse_facing` early-returns when `_state == STATE_ATTACK` or `STATE_DODGE`. This is the load-bearing gate for "swing direction snapshots at swing-spawn time, not continuously during recovery" — without it, a mouse drift during the swing's hitbox-active window would silently change `_facing` and downstream visuals (the wedge's `rotation` is set once at spawn, so it would not drift mid-swing, but `_facing.angle()` reads on the next swing would have shifted; sprite rotation would also drift, breaking the "look at the cursor at swing-spawn" visual contract). Dodge already sets `_facing = dodge_dir` in `try_dodge` — the gate preserves that through the active-dodge window.
+
+**Sprite handling — current placeholder is a 16×16 ColorRect (symmetric square).** Rotation is mechanically applied to the `Sprite` child node but visually undetectable (a rotated square is still a square). The wiring lands NOW so an asymmetric M2+ art swap automatically picks up the orientation — see `_update_sprite_rotation`'s comment about a possible future `-PI/2` offset for "tip up by default" art. Mechanical observability today is via the `[combat-trace] Player.try_attack | FIRED kind=<L|H> facing=(x,y)` line; the HTML5 Playwright spec `tests/playwright/specs/mouse-direction-attacks.spec.ts` greps the line and asserts the facing-vector quadrant matches the mouse position.
+
+**Harness downstream impact — HARD RULE for Playwright specs (PR #255 respin, ticket 86c9uthf0).** Pre-ticket, Playwright specs aimed via WASD key chords and clicked at canvas-center to fire the attack — the click position was irrelevant to swing direction. Post-ticket, **the click position IS the swing direction** (mouse vector from player → click target), and WASD key chords no longer set `_facing`. Every spec that fires combat clicks must now go through the centralised aim helpers in [`tests/playwright/fixtures/mouse-facing.ts`](../../tests/playwright/fixtures/mouse-facing.ts) (or document an explicit player-relative aim derivation in-line). The original concern was a dead-zone hit — but the actual coordinate model is more subtle and worth nailing down:
+
+**The viewport-coords correction (Tess CHANGES_REQUESTED finding, 2026-05-17).** The Embergrave M1 build has **NO `Camera2D`**. Viewport is a fixed 1280×720 with `stretch=canvas_items` + `aspect=keep`, so `Player.global_position` equals the canvas-pixel position 1:1. `DEFAULT_PLAYER_SPAWN = (240, 200)` renders at canvas pixel (240, 200) — in the **upper-left QUADRANT** of the canvas, NOT the center. Canvas-center is at (640, 360), which is `(+400, +160)` from the player at spawn — strongly **SOUTHEAST**. So a `canvas.click({position: canvasCenter})` on a fresh-room player produces:
+- Mouse delta from player: `~(+400, +160)`, length ~430 px — well above the 8 px dead-zone (no jitter freeze).
+- Normalised facing: `~(+0.94, +0.37)` — dominant east component, mild south.
+- Swing wedge fires SE, missing the NE-spawning mobs in every Stratum-1 room.
+
+This is the actual failure mode that took down 9 specs in [PR run 25986831195](https://github.com/TSandvaer/RandomGame/actions/runs/25986831195) — not a dead-zone hit. The original spec's `cx + 300, cy - 300` north test produced `facing.x = 0.9` and `facing.y = -0.33` (Tess's empirical numbers) for exactly this reason: canvas-center was already SE of the player, and the −300 north offset only barely overcame the +160 south bias, leaving a dominant east component.
+
+**The hard rule.** Aim relative to the **player's position**, never to canvas-center:
+
+1. **Spawn-relative aim** — `clickAimedAtSpawn(canvas, direction, options?)`. Use when the player stays near `DEFAULT_PLAYER_SPAWN = (240, 200)` throughout combat (the typical Rooms 02–08 traversal pattern — `gateTraversalWalk` depends on near-spawn positioning anyway). Clicks at `(240 + dir.x * 150, 200 + dir.y * 150)` — well outside the dead-zone, mob-spawn-aligned for the standard NE/N spawn pattern.
+2. **World-coord aim** — `clickAtWorldPos(canvas, worldX, worldY)`. Use when the target's position is known (the Room01 PracticeDummy at world (~368, 144) — clicking AT the dummy aims the swing toward it regardless of where the player currently stands).
+3. **Player-relative aim with live position** — `clickAimedFromPlayer(canvas, capture, direction, options?)`. Use when the player has roamed from spawn (multi-chaser pursuit follow-up, post-chase wander). Reads the latest `[combat-trace] Player.pos | pos=(x,y)` line and offsets from there; falls back to spawn if no trace is available.
+
+The `MOUSE_FACING_DEADZONE_PX = 8.0` constant is mirrored from `Player.gd` into `mouse-facing.ts` so any future Player-side tweak surfaces as a single-file edit on the fixture side. Default offset (150 px) is well above the dead-zone with margin for player drift.
+
+**Drift-pin convention (sibling of PR #252 § 17 — harness workaround retirement).** A `canvas.click({position: {x: clickX, y: clickY}})` where `clickX, clickY` resolves to canvas-center inside a combat-driving loop is a regression marker — the click hits canvas-center → swing fires SE → no mobs die. New specs MUST import from `mouse-facing.ts`. Existing pre-#255 specs that delegate combat to the centralised helpers (`clearRoom01Dummy`, `chaseAndClearKitingMobs`, `chaseAndClearMultiChaserRoom`) inherit the fix automatically; specs with their own click loops (AC2 Phase 3, AC4 per-room chaser cycle, equip-flow Phase 2.5, negative-assertion-sweep Test 3, room-traversal-smoke Room02 cycle, soak-narrative-regression Room02 cycles) call `clickAimedAtSpawn(canvas, "NE")` (or the appropriate direction) directly.
+
 ## Hitbox + Projectile encapsulated-monitoring rule
 
 [`scripts/combat/Hitbox.gd`](scripts/combat/Hitbox.gd) and [`scripts/projectiles/Projectile.gd`](scripts/projectiles/Projectile.gd) both follow this pattern:

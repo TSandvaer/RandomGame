@@ -65,6 +65,7 @@ import {
   clearRoom01Dummy,
   waitForRoom02Load,
 } from "../fixtures/room01-traversal";
+import { clickAimedAtSpawn } from "../fixtures/mouse-facing";
 
 const BOOT_TIMEOUT_MS = 30_000;
 /** AC2 hard deadline: ≤60 s from `[Main] M1 play-loop ready` to first Room02 kill. */
@@ -190,7 +191,11 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
     ).toBeGreaterThan(5_000); // Need at least 5s to land a grunt kill.
 
     while (Date.now() - combatStart < remainingDeadlineMs) {
-      await canvas.click({ position: { x: clickX, y: clickY } });
+      // Mouse-direction attacks (PR #255, ticket 86c9uthf0): aim NE-of-spawn
+      // so the swing wedge covers Room02's NE-spawning grunts. Canvas-center
+      // (640, 360) is far SE of the player at (240, 200) on the no-Camera2D
+      // viewport — clicking there would aim SE and miss every grunt.
+      await clickAimedAtSpawn(canvas, "NE");
       attacks++;
       await page.waitForTimeout(ATTACK_INTERVAL_MS);
 
@@ -300,8 +305,10 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
     const tweenDeadline = Date.now() + 5_000;
     let queueFreeLine: string | null = null;
     while (Date.now() < tweenDeadline) {
-      // Continue clicking to keep engine ticks flowing
-      await canvas.click({ position: { x: clickX, y: clickY } });
+      // Continue clicking to keep engine ticks flowing. Aim NE-of-spawn
+      // (mouse-direction attacks — PR #255) so the swing still targets the
+      // already-dying grunt area in Room 02.
+      await clickAimedAtSpawn(canvas, "NE");
       const found = capture
         .getLines()
         .find((l) =>

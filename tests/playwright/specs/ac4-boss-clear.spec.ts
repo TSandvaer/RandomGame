@@ -123,6 +123,7 @@ import {
   returnPlayerToSpawn,
 } from "../fixtures/kiting-mob-chase";
 import { clearRoom01Dummy } from "../fixtures/room01-traversal";
+import { clickAimedAtSpawn } from "../fixtures/mouse-facing";
 
 const BOOT_TIMEOUT_MS = 30_000;
 /** Per-room combat budget — enough to kill 4 mobs at production HP. */
@@ -636,6 +637,13 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
           // toward spawn" correction, but the helper's gate-walk has its
           // own 50px tolerance built in.
           const facing = FACINGS[cycle % FACINGS.length];
+          // **Mouse-direction attacks (PR #255, ticket 86c9uthf0).** Direction
+          // keys no longer set `_facing` — the mouse vector does. The chord
+          // below is a no-op (preserved for diff-stability); the load-bearing
+          // aim is the spawn-relative click below. `facing.label` ('N' or 'E')
+          // drives the click direction so the swing wedge points NE/N where
+          // Room 02–08 chasers spawn (per resources/level_chunks/s1_room0N.tres
+          // mob spawn geometry at the top of this helper).
           await page.keyboard.down(facing.key);
           await page.waitForTimeout(30);
           await page.keyboard.up(facing.key);
@@ -643,7 +651,12 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
           cycle++;
 
           for (let a = 0; a < ATTACKS_PER_FACING; a++) {
-            await canvas.click({ position: { x: clickX, y: clickY } });
+            // Click at a spawn-relative offset in the current facing direction
+            // (N or E) instead of canvas-center. Canvas-center is at world
+            // (640, 360) — far SE of the player at (240, 200) on the
+            // no-Camera2D viewport — so a canvas-center click would aim every
+            // swing SE and miss the NE/N-spawning chasers entirely.
+            await clickAimedAtSpawn(canvas, facing.label as "N" | "E");
             await page.waitForTimeout(ATTACK_INTERVAL_MS);
 
             const deathsNow = capture
@@ -1028,7 +1041,11 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       let bossDied = false;
 
       while (Date.now() - bossStart < BOSS_CLEAR_TIMEOUT_MS) {
-        await canvas.click({ position: { x: clickX, y: clickY } });
+        // Boss spawns at (240, 135) per Stratum1BossRoom._spawn_boss; player
+        // at (240, 200). Boss is NORTH of player. Aim N so the swing wedge
+        // covers the boss (PR #255 mouse-direction attacks — canvas-center
+        // click would aim SE on the no-Camera2D viewport, missing the boss).
+        await clickAimedAtSpawn(canvas, "N");
         await page.waitForTimeout(ATTACK_INTERVAL_MS);
 
         const bossDeathLine = capture
