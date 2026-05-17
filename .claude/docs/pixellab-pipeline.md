@@ -179,6 +179,44 @@ known character-beat colors (high-saturation accents, glow tones, signature hues
 verify the algorithm's choice — if it's not the closest doctrine family member of the same
 hue family, override manually.
 
+**Refinement — doctrine-exaggeration when doctrine has only ONE color per hue family:**
+
+PixelLab typically generates 2-3 tones per accent family (e.g. bright-red eye-dot + pinkish-red
+eye-wash + dark-red shadow). Doctrine palettes often have only ONE color per hue family (e.g.
+just `#D24A3C` for "red"). Pure nearest-neighbor will map ALL the PixelLab accent tones to that
+single doctrine color, **exaggerating** the feature from "small dot + soft wash" into "solid
+bright area."
+
+Validated 2026-05-17 on Shooter v2 eye-variant: PixelLab generated bright `#BF1E22` eye-dots
+(small area) plus warm-pink `#CF695B` eye-wash (larger area, like flushed-skin shading). My
+first doctrine-lock mapped BOTH `#BF1E22` and `#CF695B` to `#D24A3C` aggro-glow → the entire
+face turned bright red. Sponsor correctly diagnosed: "no, doctrine made it face red; pixellab
+just made big eyes."
+
+**Fix — selective slot routing:**
+
+1. Identify the BRIGHTEST / most-saturated slot in the accent family — that's the "true
+   feature pixel" (the eye-dot, the gem accent, etc.). Map it to the doctrine accent color.
+2. Route the SOFTER / less-saturated slots in the same hue family to a NEUTRAL doctrine color
+   (bone, skin, shadow) — these are PixelLab's gradient/wash pixels, not the feature itself.
+3. This trades absolute hue accuracy on the wash for character-beat clarity. The result reads
+   as "feature in correct location with correct color" rather than "feature spreads into
+   surrounding region."
+
+**Worked example for Shooter eye-variant (5 PixelLab red-family slots → 2 doctrine slots):**
+
+| PixelLab slot | Source hex | Naive nearest | Selective routing | Outcome |
+|---|---|---|---|---|
+| 7 | `#CF695B` warm pink-wash | `#D24A3C` red | `#C9C2B2` bone-white | Wash dissolves into skull |
+| 9 | `#CF695B` dupe | `#D24A3C` red | `#C9C2B2` bone-white | Wash dissolves |
+| 10 | `#CF695B` dupe | `#D24A3C` red | `#C9C2B2` bone-white | Wash dissolves |
+| 12 | `#BF1E22` bright eye-dot | `#D24A3C` red | `#D24A3C` red ✓ | Eye preserved as bright accent |
+| 16 | `#D4B6AD` light pink (skull) | `#C9C2B2` bone | `#C9C2B2` bone ✓ | Skull stays bone-white |
+
+This is the **iteration-via-set_palette** pattern in action: the third `set_palette` call on
+the same indexed canvas (v3) corrected the over-routing without re-importing or re-quantizing.
+Cost: zero generations, ~1 second of pixel-mcp time.
+
 ---
 
 ## Prompt engineering — PixelLab interprets constraints literally
@@ -232,6 +270,142 @@ mcp__pixellab__create_character_state(
 - The edit is applied "consistently across rotations" — but consistency is best-effort; verify
   every direction, especially for asymmetric features.
 - Auto-waits up to 30s for the source to complete if still generating.
+
+---
+
+## Operational notes from M3 batch run (2026-05-17)
+
+Empirical observations from queueing 7 characters in parallel after Tier 2 upgrade:
+
+### PixelLab queue limit — ~2 characters processing simultaneously
+
+Batch-queueing 7 `create_character` calls in a single tool round did NOT result in 7 parallel
+processing. PixelLab serialized them: 2 active + 5 queued, then 2 active + 3 queued, etc.
+
+**Wall-time estimate:** `~5 min × ceil(N / 2)` for N parallel queues. For 7 chars ≈ 17-20 min
+to last completion. Plan workflow around this — don't block waiting for all to complete; start
+processing the early-finishers' doctrine-lock pipelines while later ones bake.
+
+**Optimization:** if you have a known order of priority, queue the highest-priority chars
+first; they hit PixelLab's queue head and complete first.
+
+### Prompt-literalism — first noun dominates the silhouette
+
+Reinforcement of the rule documented above. The Boss prompt
+`"hulking armored warden in heavy iron plate, deep red surcoat..."` produced **iron-dominant
+armor** with the surcoat reduced to a small accent. PixelLab anchored on "iron plate" as the
+body, treating "deep red surcoat" as a detail layer.
+
+**Pattern across M3 chars:**
+
+| Character | Prompt phrasing | Result |
+|---|---|---|
+| Grunt v1 | `"deep cowl hood completely obscuring face except glowing red eyes"` | Face fully hidden, no eyes |
+| Grunt v2 | `"two bright glowing red eyes piercing through hood shadow"` (eyes-first) | Eyes prominent ✓ |
+| Boss v1 | `"hulking armored warden in heavy iron plate, deep red surcoat"` | Iron dominates, surcoat lost |
+
+**Rule applied:** lead with the dominant intent-feature. For body-color dominance: `"deep red
+warden in iron-plated armor"` (red leads); for armor dominance: `"iron-plated warden with deep
+red surcoat"` (iron leads + accept the surcoat as accent).
+
+### `create_character_state` dramatically simplifies palette
+
+The variant tool produces a **far simpler palette** than the original `create_character` output.
+Empirical from Shooter v1 vs v2 (eye-variant): v1 had 38 distinct colors in the raw, quantized
+to 17 slots with red below the quantize floor. v2 (variant adding eyes) had only **8 distinct
+colors** in the raw, quantized cleanly to 8 slots, with red as a prominent slot.
+
+**Consequence:** doctrine-lock is EASIER on variants (fewer slots to map, clearer character
+beats), but you LOSE the intermediate tonal variation that the original generation had.
+Variants are visually flatter / more cartoony / less subtly shaded.
+
+**When to use variant vs re-roll:**
+- Variant (`create_character_state`): when you want to add/fix a specific feature on a
+  silhouette you already like. Trades tonal subtlety for guaranteed feature preservation.
+- Full re-roll (`create_character`): when you want fresh tonal variation or significant
+  silhouette changes. Risks losing the silhouette quality you had.
+
+### set_palette is idempotent on a stable indexed canvas
+
+After `quantize_palette` converts the sprite to indexed mode, the **pixel slot indices stay
+stable** until the sprite is re-quantized or re-imported. This means `set_palette` can be called
+**multiple times** with different doctrine assignments to iterate on the doctrine mapping
+without re-importing or re-quantizing.
+
+**Iteration pattern (validated 2026-05-17 on Shooter cloth-darkness fix):**
+
+```
+1. quantize_palette                       # creates indexed slots
+2. set_palette + export                   # try mapping v1
+3. visually verify                        # iterate
+4. set_palette + export                   # try mapping v2 with darker cloth
+5. visually verify                        # ship when right
+```
+
+Each `set_palette` + `export_sprite` cycle costs only a few hundred ms of pixel-mcp time and
+zero PixelLab generations. **Use this freely** during doctrine-tuning rather than burning
+generations on re-rolls when the silhouette is fine and only the color mapping needs work.
+
+### Nearest-neighbor breaks doctrine-ramp intent for mid-tones — bias toward dark
+
+Pure Euclidean RGB distance is **silhouette-blind**: it picks the perceptually closest doctrine
+color regardless of what role that color plays in the doctrine ramp. For mid-tones (mid-browns,
+mid-greys), this often picks the doctrine **highlight** color over the doctrine **base**
+because highlights and mid-tones are perceptually closer than bases.
+
+**Failure pattern (Shooter v1, 2026-05-17):**
+- PixelLab cloak mid-tone: `#8C593D` (140, 89, 61)
+- Nearest doctrine by Euclidean: `#7A6A4F` cloth highlight (d²=937)
+- Doctrine ramp intent: `#5A4738` cloth base for the body color
+- Result: cloak too light, off-doctrine despite "doctrine compliance"
+
+**Rule — bias mid-tones toward base/shadow when character should read DARK:**
+
+When the character's intent is dark/menacing (most S1 hostile mobs), consciously override the
+Euclidean nearest-neighbor for mid-tones and shadows toward the base/shadow side of the
+doctrine ramp, not the highlight side. Reserve the highlight slot for the actual lightest
+non-skin region.
+
+**Worked example for cloth-on-cloth doctrine on S1:**
+
+| Source slot characteristic | Use doctrine | NOT |
+|---|---|---|
+| Cloak body / dominant fill | `#5A4738` cloth base | `#7A6A4F` cloth highlight |
+| Cloak lit / mid highlight | `#5C4F38` cloth lit | `#9A7A4E` trim |
+| Cloak shadow / under-fold | `#4A3F2E` cloth shadow | `#2C261C` deep |
+| Cloak deepest shadow | `#2C261C` deep shadow | `#1B1A1F` darkest |
+| Pure outline / hole | `#1B1A1F` darkest | (don't lift to shadow) |
+
+The cleanest implementation: run nearest-neighbor as a starting point, then apply a **post-hoc
+bias-darker pass** for any source slot whose Euclidean winner was a doctrine `highlight` or
+`lit` color but whose source RGB is within the doctrine `base` color's distance range. Swap
+toward base.
+
+### Sub-2-pixel character beats may not survive quantize
+
+The Shooter trial revealed a new failure mode distinct from prompt-literalism: PixelLab DID
+render a small red eye-glow inside the skull sockets, but at 1-2 pixels per direction it was
+too sparse to register as a distinct cluster in `quantize_palette` (kmeans target_colors=16).
+Result: no red slot in the quantized palette; doctrine-lock could not preserve the beat
+because the source had effectively erased it through quantization.
+
+**Diagnostic:** after `quantize_palette`, scan the returned palette for the expected
+character-beat hex family (red for aggro-glow, gold for trim, etc.). If absent and you believe
+the raw had the beat: verify by reading the raw PNG bytes pre-quantize (or visually
+inspecting the raw at native resolution).
+
+**Fixes (in order of preference):**
+
+1. **Higher target_colors:** re-quantize with `target_colors=24` or `32` to give small accents
+   their own slot. Costs 0 generations; only pixel-mcp time.
+2. **Manual paint:** `draw_rectangle 1×1` at the known character-beat location with the
+   doctrine accent hex. Costs 0 gens; requires knowing pixel coords per direction (use
+   `get_pixels` to locate the right region first).
+3. **Re-roll with stronger character-beat emphasis:** apply prompt-literalism rule + brighter
+   accent words. Costs 1 gen per re-roll.
+
+The Shooter trial chose option 1 (re-quantize) → option 2 (manual paint) as the cheap path; full
+re-roll reserved if both fail.
 
 ---
 
