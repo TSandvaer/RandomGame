@@ -248,15 +248,20 @@ PixelLab charges credits per generation, not per tool call:
 | `animate_character` (custom action_description, 1 direction) | 20–40 generations |
 | `animate_character` (custom, full 8-direction set) | 60–300+ generations |
 
-**Plan-tier context (as of 2026-05-17):** Sponsor was on the **free trial plan (20 generations
-lifetime)** when this doc was written; Tier 2 ($24/mo) was being evaluated for full roster +
-animation phase. M3 art-pass roster (9 characters × idle + 3 template animations) ≈ 225
-generations — fits within one Tier 2 month, infeasible on free trial.
+**Plan-tier context (as of 2026-05-17):** Sponsor is on **Tier 2 ($24/mo)** with a
+**2000-generation monthly allowance** — confirmed and active after the Charger + Grunt
+free-trial validation passed. M3 art-pass roster (9 characters × idle + 3 template animations)
+≈ 225 generations, fitting comfortably in one Tier 2 month with ~10× headroom for re-rolls.
 
 **Rules for credit-conserving sessions:**
-- Standard `create_character` only — do NOT trigger pro mode without explicit Sponsor approval.
-- Template animations only — custom animations cost up to 37× more per direction.
-- Get Sponsor confirmation before any call > 5 generations.
+- Standard `create_character` by default — do NOT trigger pro mode (20-40 gens) without
+  explicit Sponsor approval; pro is for hero / boss / one-off detail work, not roster fill.
+- Prefer template animations to custom; custom animations cost up to 37× more per direction
+  and burn the monthly budget fast.
+- Get Sponsor confirmation before any single call > 40 generations (pro mode, custom 8-dir
+  animations, etc.).
+- Tier 2 budget is generous but resets monthly — track approximate burn against the
+  month-start baseline; flag if approaching 1500+ before month-end.
 
 ---
 
