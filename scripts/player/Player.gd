@@ -177,6 +177,40 @@ const SWING_FLASH_HALF_DURATION: float = 0.030  # 30ms each way → 60ms total
 # flash extending from the player at M1 placeholder fidelity.
 const SWING_WEDGE_Z_INDEX: int = 1
 
+# ---- M3W-2 AnimatedSprite2D constants ----------------------------------
+# Inherits the M3W-1 (PR #271, PracticeDummy) conventions verbatim per
+# `.claude/docs/combat-architecture.md §"M3W-1 realized implementation"`.
+
+## Hit-flash modulate tint for the AnimatedSprite2D path (M3W-1 convention).
+## ColorRect placeholders tweened color rest→white→rest; the painted PixelLab
+## sprite frames are already near-white, so a white tween is a visible no-op
+## (the PR #115 / #140 trap class). AnimatedSprite2D's `modulate` is
+## multiplicative — we tween toward a soft red wash so the painted sprite
+## tints visibly red on hit. All channels sub-1.0 per HTML5 HDR-clamp rule
+## (PR #137 lesson, codified in `.claude/docs/html5-export.md`). Constant
+## value MUST stay identical to `PracticeDummy.HIT_FLASH_TINT` so the M3 art
+## roster reads with a single hit-reaction color (M3W-1 inheritance contract).
+const HIT_FLASH_TINT: Color = Color(1.0, 0.50, 0.50, 1.0)  # soft red wash, HTML5-safe
+## Hit-flash timing envelope — mirror PracticeDummy (20ms in, 20ms hold, 40ms
+## out = 80ms total). Short enough to feel snappy; long enough that the eye
+## registers the wash on a 60fps render. 3-stage tween (in → hold → out) so a
+## second hit during the hold leaves a visible kill-and-restart artifact.
+const HIT_FLASH_IN: float = 0.020
+const HIT_FLASH_HOLD: float = 0.020
+const HIT_FLASH_OUT: float = 0.040
+
+## State-name → SpriteFrames anim-prefix map. Authored separately from
+## STATE_* constants because (a) STATE_IDLE shares its anim with STATE_WALK
+## (both → `walk`; idle is "walk frame 0 hold" placeholder until idle anim
+## ships as M3 follow-up per Priya's brief), and (b) STATE_ATTACK splits into
+## attack_light / attack_heavy at run-time based on `_current_attack_kind`.
+const ANIM_PREFIX_IDLE_AND_WALK: String = "walk"
+const ANIM_PREFIX_ATTACK_LIGHT: String = "attack_light"
+const ANIM_PREFIX_ATTACK_HEAVY: String = "attack_heavy"
+const ANIM_PREFIX_DODGE: String = "dodge"
+const ANIM_PREFIX_HIT: String = "hit"
+const ANIM_PREFIX_DIE: String = "die"
+
 # ---- Runtime state ------------------------------------------------------
 
 var _state: StringName = STATE_IDLE
@@ -200,6 +234,38 @@ var _is_invulnerable: bool = false
 
 # Attack bookkeeping
 var _attack_recovery_left: float = 0.0
+## Most-recent attack kind. The state machine uses a single STATE_ATTACK; the
+## kind (light/heavy) needs to be remembered so the AnimatedSprite2D anim
+## resolver can pick `attack_light_<dir>` vs `attack_heavy_<dir>` from the
+## `state_changed` signal. Set in `try_attack` BEFORE `set_state(STATE_ATTACK)`
+## so the signal handler sees the correct kind.
+var _current_attack_kind: StringName = ATTACK_LIGHT
+
+# ---- M3W-2 hit-flash + AnimatedSprite2D runtime ------------------------
+# Hit-flash 3-branch resolver — mirrors PracticeDummy.gd shape (M3W-1
+# inheritance contract per `.claude/docs/combat-architecture.md`).
+# Branches:
+#   1. AnimatedSprite2D child (production .tscn-loaded Player)  → tween modulate
+#      to HIT_FLASH_TINT and back (soft red wash on the painted sprite).
+#   2. ColorRect child (legacy / pre-M3W-2 fallback authored .tscn) → tween
+#      Sprite.color rest → white → rest. Kept for back-compat with any
+#      pre-M3W-2 test/scene that still authors ColorRect.
+#   3. No Sprite child (bare-instanced Player.new() test contexts) → tween
+#      self.modulate. Preserves Tier 1 reference-change invariant in GUT.
+var _hit_flash_tween: Tween = null
+var _hit_flash_target: CanvasItem = null
+var _hit_flash_uses_sprite: bool = false
+var _hit_flash_uses_animated_sprite: bool = false
+var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
+var _sprite_modulate_at_rest: Color = Color(1, 1, 1, 1)
+var _hit_flash_modulate_at_rest: Color = Color(1, 1, 1, 1)
+var _captured_hit_flash_rest: bool = false
+
+# AnimatedSprite2D cache — resolved lazily on first `_play_anim_for_state`
+# call so bare-instanced tests that don't have an AnimatedSprite2D child
+# silently no-op rather than crash.
+var _animated_sprite: AnimatedSprite2D = null
+var _animated_sprite_resolved: bool = false
 
 # Visual-feedback bookkeeping — track the active swing-wedge + flash tween
 # so we can apply the kill-and-restart pattern Uma's spec calls out: a second
@@ -296,6 +362,19 @@ func _ready() -> void:
 	# and `Inventory.on_pickup_collected` auto-equips the first weapon picked
 	# up. A save-restored equipped weapon is re-applied by save-restore.
 	# See: fix(combat|inventory) PR — iron_sword integration-surface fix.
+
+	# M3W-2: drive AnimatedSprite2D from the existing state_changed signal.
+	# The signal already exists (line 34) "useful for animation hooks and tests"
+	# — wiring it here keeps the state machine untouched. Idempotent connect
+	# guard: tests that bare-instance the Player and re-`_ready` don't double-
+	# connect.
+	if not state_changed.is_connected(_on_state_changed):
+		state_changed.connect(_on_state_changed)
+	# Seed the AnimatedSprite2D animation to the rest-state walk frame so the
+	# scene-loaded Player shows the correct facing on first render (before any
+	# state transition fires). `_on_state_changed` will re-drive on the first
+	# real transition.
+	_play_anim_for_state(_state)
 
 
 func _physics_process(delta: float) -> void:
@@ -634,6 +713,16 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 		])
 	damaged.emit(clean_amount, hp_current, source)
 	hp_changed.emit(hp_current, hp_max)
+	# M3W-2: play the hit anim + AnimatedSprite2D-modulate hit-flash on every
+	# non-fatal damage event. The hit anim is one-shot per direction (loop=false
+	# in Player.tres) so it plays once and the AnimatedSprite2D holds on the last
+	# frame; the next state transition (state_changed → walk/attack/etc.) will
+	# overwrite it. Skipped on fatal hit — `_die` plays `die_<dir>` instead.
+	# Hit-flash is a sibling of the swing-flash modulate tween — both target
+	# the AnimatedSprite2D (M3W-1 3-branch resolver shape).
+	if hp_current > 0:
+		_play_anim(ANIM_PREFIX_HIT)
+		_play_hit_flash()
 	# Knockback applied as instantaneous velocity bump. Decays naturally
 	# next physics tick (the state machine resets velocity from input).
 	if knockback.length_squared() > 0.0:
@@ -731,6 +820,12 @@ func _die() -> void:
 		"hp=0 pos=(%.0f,%.0f) — emitting player_died; M1 death rule will respawn in Room 01" % [
 			global_position.x, global_position.y
 		])
+	# M3W-2: play the die anim on the AnimatedSprite2D. `_die` runs to completion
+	# in the same frame the M1 death rule reloads Room 01, so the die anim may be
+	# visually short-lived in the production flow — but for harness clips and
+	# Sponsor-soak slow-mo it still reads as "the player crumpled, then the room
+	# reloaded." loop=false in Player.tres means it holds on the last frame.
+	_play_anim(ANIM_PREFIX_DIE)
 	player_died.emit(global_position)
 
 
@@ -854,6 +949,9 @@ func try_attack(kind: StringName, dir: Vector2 = Vector2.ZERO) -> Node:
 
 	var hitbox: Hitbox = _spawn_hitbox(d, damage, d * knockback_strength, reach, radius, lifetime)
 	_attack_recovery_left = recovery
+	# M3W-2: remember the attack kind BEFORE `set_state` fires `state_changed`
+	# so the animation resolver picks `attack_light_<dir>` vs `attack_heavy_<dir>`.
+	_current_attack_kind = kind
 	set_state(STATE_ATTACK)
 
 	# Visual-feedback cues per `team/uma-ux/combat-visual-feedback.md` §1:
@@ -1285,3 +1383,223 @@ func _read_movement_input() -> Vector2:
 	if v.length_squared() > 1.0:
 		v = v.normalized()
 	return v
+
+
+# ---- M3W-2 AnimatedSprite2D wiring -------------------------------------
+# Per `team/priya-pl/m3-scene-wiring-scope.md §M3W-2` + the M3W-1 (PR #271)
+# inheritance contract. Mirrors the PracticeDummy.gd 3-branch hit-flash
+# resolver shape and the `_play_anim` helper shape.
+
+## 8-octant facing quantizer. Returns one of `n / ne / e / se / s / sw / w / nw`
+## from a Vector2 facing direction. Uses the angle in radians from +X axis
+## (Vector2.RIGHT), where angles wrap [-PI, PI]. In Godot's screen-space
+## coordinate system, +Y is DOWN — so an angle of 0 = right (east), PI/2 =
+## down (south), PI = left (west), -PI/2 = up (north). The 8 octants split
+## the circle into PI/4 (45°) wedges; threshold edges chosen so each cardinal
+## sits dead-center of its wedge (north = angle in (-5PI/8, -3PI/8], etc.).
+##
+## Pure helper (static) for unit-testability — GUT tests drive arbitrary
+## facing vectors and assert the returned suffix without touching the
+## scene-tree state. Returns lowercase to match the SpriteFrames anim-key
+## convention (`walk_s`, `attack_light_ne`, ...).
+##
+## Invariants pinned by `tests/test_player_animation_wire.gd`:
+##   - 8 cardinal vectors (Vector2.RIGHT, RIGHT+DOWN normalized, DOWN, ...)
+##     return the matching suffix exactly (no spillover into adjacent octants).
+##   - Zero vector returns the default "s" (south — Godot's UP convention).
+##   - The 8 returned suffixes form a permutation of the canonical set.
+static func dir_suffix_for_facing(facing: Vector2) -> String:
+	if facing.length_squared() < 0.0001:
+		return "s"  # default — caller should pre-filter, but defensive
+	# atan2(y, x) gives angle from +X (east) measured counter-clockwise in
+	# math-space — but Godot's +Y is DOWN (screen-space) so the geometric
+	# orientation is flipped. Practical interpretation:
+	#   angle ==  0       → +X (east)
+	#   angle == +PI/2    → +Y (south, because Godot Y-down)
+	#   angle == ±PI      → -X (west)
+	#   angle == -PI/2    → -Y (north)
+	var angle: float = facing.angle()  # [-PI, PI]
+	# Discretise to 8 octants. Each octant spans PI/4 (45°). To center each
+	# cardinal/diagonal at its octant midpoint, shift by PI/8 then divide.
+	# Result is an int in [0, 7] indexing the canonical N→NE→E→SE→S→SW→W→NW
+	# rotation around the compass.
+	#
+	# Compass mapping (Godot screen-space):
+	#   bucket 0: east   (angle ≈ 0)
+	#   bucket 1: south-east  (angle ≈ +PI/4)
+	#   bucket 2: south  (angle ≈ +PI/2)
+	#   bucket 3: south-west  (angle ≈ +3PI/4)
+	#   bucket 4: west   (angle ≈ ±PI)
+	#   bucket 5: north-west  (angle ≈ -3PI/4)
+	#   bucket 6: north  (angle ≈ -PI/2)
+	#   bucket 7: north-east  (angle ≈ -PI/4)
+	var shifted: float = angle + PI / 8.0
+	# fposmod over 2*PI keeps us in [0, 2*PI); divide by PI/4 = bucket size.
+	var bucket: int = int(fposmod(shifted, TAU) / (PI / 4.0))
+	match bucket:
+		0:
+			return "e"
+		1:
+			return "se"
+		2:
+			return "s"
+		3:
+			return "sw"
+		4:
+			return "w"
+		5:
+			return "nw"
+		6:
+			return "n"
+		7:
+			return "ne"
+		_:
+			return "s"  # unreachable; defensive
+
+
+## State → anim-prefix resolver. STATE_IDLE + STATE_WALK both → `walk` (idle
+## is "walk frame 0 hold" placeholder per Priya's brief — no dedicated idle
+## anim in the #265 PixelLab batch). STATE_ATTACK splits on `_current_attack_kind`.
+func _anim_prefix_for_state(s: StringName) -> String:
+	if s == STATE_IDLE or s == STATE_WALK:
+		return ANIM_PREFIX_IDLE_AND_WALK
+	if s == STATE_DODGE:
+		return ANIM_PREFIX_DODGE
+	if s == STATE_ATTACK:
+		if _current_attack_kind == ATTACK_HEAVY:
+			return ANIM_PREFIX_ATTACK_HEAVY
+		return ANIM_PREFIX_ATTACK_LIGHT
+	# Unknown state — defensive fallback to walk; downstream code never
+	# transitions into a state outside the {idle,walk,dodge,attack} set.
+	return ANIM_PREFIX_IDLE_AND_WALK
+
+
+## state_changed signal handler — drive the AnimatedSprite2D into the right
+## anim for the new state. Direction is computed from current `_facing`.
+##
+## IDLE-vs-WALK detail: both prefixes resolve to `walk`, but for IDLE we want
+## frame 0 to hold (no motion); for WALK we want the loop. Player.tres marks
+## `walk_<dir>` with loop=true, so calling `play()` runs the cycle; for IDLE
+## we additionally call `stop()` + set `frame=0` so the sprite freezes on the
+## rest pose. The next state transition (IDLE → WALK) calls `play()` again
+## which resumes the cycle from frame 0.
+func _on_state_changed(_from_state: StringName, to_state: StringName) -> void:
+	_play_anim_for_state(to_state)
+
+
+## Public surface for state-driven anim playback. Resolves prefix from state
+## + appends 8-octant dir suffix from `_facing`. Used by `_on_state_changed`
+## AND by `_ready` to seed the initial animation.
+func _play_anim_for_state(s: StringName) -> void:
+	var prefix: String = _anim_prefix_for_state(s)
+	_play_anim(prefix)
+	# IDLE special-case: freeze on frame 0 of `walk_<dir>` so the sprite shows
+	# the rest pose rather than animating in place.
+	if s == STATE_IDLE:
+		if not _animated_sprite_resolved:
+			_resolve_animated_sprite()
+		if _animated_sprite != null:
+			_animated_sprite.stop()
+			_animated_sprite.frame = 0
+
+
+## Play an animation on the AnimatedSprite2D child. Lazy-resolves the child
+## so bare-instanced test players (no scene-tree, no AnimatedSprite2D child)
+## silently no-op. Animation key is `<prefix>_<dir>` where `<dir>` is the
+## 8-octant facing suffix. No-op if the resolved key isn't in the
+## SpriteFrames resource (e.g. tests that swap in their own AnimatedSprite2D
+## without SpriteFrames).
+##
+## Mirrors `PracticeDummy._play_anim` shape (M3W-1 inheritance contract).
+func _play_anim(prefix: String) -> void:
+	if not _animated_sprite_resolved:
+		_resolve_animated_sprite()
+	if _animated_sprite == null:
+		return
+	if _animated_sprite.sprite_frames == null:
+		return
+	var dir_suffix: String = dir_suffix_for_facing(_facing)
+	var anim_name: StringName = StringName("%s_%s" % [prefix, dir_suffix])
+	if not _animated_sprite.sprite_frames.has_animation(anim_name):
+		_combat_trace("Player._play_anim",
+			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		return
+	_animated_sprite.play(anim_name)
+	_combat_trace("Player._play_anim", "PLAY anim=%s" % anim_name)
+
+
+## Lazy AnimatedSprite2D resolver. Idempotent; subsequent calls are no-ops
+## after the first.
+func _resolve_animated_sprite() -> void:
+	if _animated_sprite_resolved:
+		return
+	var sprite: Node = get_node_or_null("Sprite")
+	if sprite is AnimatedSprite2D:
+		_animated_sprite = sprite
+	_animated_sprite_resolved = true
+
+
+## Hit-flash modulate tween — fires from `take_damage` on every non-fatal
+## hit. 3-branch resolver mirrors PracticeDummy.gd (M3W-1 inheritance):
+##
+##   1. AnimatedSprite2D — tween Sprite.modulate to HIT_FLASH_TINT and back
+##      (soft red wash on the painted sprite frames).
+##   2. ColorRect — tween Sprite.color rest → white → rest (legacy fallback;
+##      pre-M3W-2 Player.tscn used this — kept for back-compat with any
+##      test that swaps in a ColorRect Sprite).
+##   3. No Sprite child — tween self.modulate (bare-instanced test fallback;
+##      preserves Tier 1 reference-change invariant in GUT).
+##
+## Kill-and-restart on overlapping calls. Tier 1 reference-change invariant
+## (per `.claude/docs/test-conventions.md`) — a second hit during the flash
+## kills the in-flight tween and creates a fresh one with a new reference.
+func _play_hit_flash() -> void:
+	if _is_dead:
+		return
+	if _hit_flash_target == null:
+		var sprite: Node = get_node_or_null("Sprite")
+		if sprite is AnimatedSprite2D:
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = true
+			_sprite_modulate_at_rest = (sprite as AnimatedSprite2D).modulate
+		elif sprite is ColorRect:
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = false
+			_sprite_color_at_rest = (sprite as ColorRect).color
+		else:
+			_hit_flash_target = self
+			_hit_flash_uses_sprite = false
+			_hit_flash_uses_animated_sprite = false
+	if not _captured_hit_flash_rest:
+		_hit_flash_modulate_at_rest = modulate
+		_captured_hit_flash_rest = true
+	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
+		_hit_flash_tween.kill()
+	if not is_inside_tree():
+		return
+	_hit_flash_tween = create_tween()
+	if _hit_flash_uses_animated_sprite:
+		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
+		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
+		_combat_trace("Player._play_hit_flash",
+			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f)" % [
+				_hit_flash_tween.is_valid(),
+				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
+			])
+	elif _hit_flash_uses_sprite:
+		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
+		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, HIT_FLASH_OUT)
+		_combat_trace("Player._play_hit_flash",
+			"sprite tween_valid=%s" % _hit_flash_tween.is_valid())
+	else:
+		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(self, "modulate", _hit_flash_modulate_at_rest, HIT_FLASH_OUT)
+		_combat_trace("Player._play_hit_flash",
+			"modulate-fallback tween_valid=%s" % _hit_flash_tween.is_valid())
