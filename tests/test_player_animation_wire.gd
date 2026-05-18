@@ -190,13 +190,16 @@ func test_state_change_to_dodge_plays_dodge_dir() -> void:
 
 func test_state_change_to_walk_plays_walk_dir_loop() -> void:
 	# Forcing STATE_WALK via set_state drives walk_<dir> with is_playing()
-	# true (the anim loops).
+	# true (the anim loops). Post walk-feel-fix: dir comes from `velocity`,
+	# not `_facing`. We set both to north to keep this test's assertion
+	# matched and orthogonal from the walk-vs-facing decoupling tests below.
 	var p: Player = _make_scene_player()
 	p._facing = Vector2.UP
+	p.velocity = Vector2.UP * 120.0
 	p.set_state(Player.STATE_WALK)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
 	assert_eq(asprite.animation, StringName("walk_n"),
-		"STATE_WALK + facing north → 'walk_n'")
+		"STATE_WALK + velocity north → 'walk_n'")
 	assert_true(asprite.is_playing(),
 		"walk_n is_playing() — looping anim runs immediately")
 
@@ -314,12 +317,232 @@ func test_idle_state_stops_animated_sprite_on_frame_0() -> void:
 	# WALK → IDLE and checking is_playing() == false + frame == 0.
 	var p: Player = _make_scene_player()
 	p._facing = Vector2.DOWN
+	# Pre-fix: STATE_WALK alone produced walk_<facing-dir>. Post-fix: it
+	# resolves via velocity octant, so the test must drive velocity too.
+	p.velocity = Vector2.DOWN * 120.0  # walk speed south
 	p.set_state(Player.STATE_WALK)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
 	assert_true(asprite.is_playing(), "walk is playing (precondition)")
+	# IDLE entry — `_process_grounded` would write velocity = ZERO, mirror it.
+	p.velocity = Vector2.ZERO
 	p.set_state(Player.STATE_IDLE)
 	# IDLE handler calls stop() + frame = 0.
 	assert_false(asprite.is_playing(),
 		"STATE_IDLE stops the AnimatedSprite2D (rest pose)")
 	assert_eq(asprite.frame, 0,
 		"STATE_IDLE freezes on frame 0 of walk_<dir>")
+
+
+# ---- Walk-feel fix: anim dir follows velocity, not _facing -----------
+# Sponsor 2026-05-18 soak finding on PR #274 — "character looking at mouse
+# cursor while walking is weird". The fix decouples animation direction from
+# aim direction: WALK/IDLE → velocity octant (or held last); ATTACK/DODGE
+# → `_facing` octant (mouse-derived, unchanged from PR #255).
+#
+# These tests pin the decoupling so a future refactor can't silently
+# re-couple walk anim to `_facing`.
+
+func test_walk_anim_follows_velocity_not_facing() -> void:
+	# Player moving NORTH with mouse-facing EAST should play `walk_n`
+	# (movement direction), NOT `walk_e` (mouse direction).
+	var p: Player = _make_scene_player()
+	p._facing = Vector2.RIGHT  # mouse to the east
+	p.velocity = Vector2.UP * 120.0  # WASD pushing north (Y-up in Godot)
+	p.set_state(Player.STATE_WALK)
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("walk_n"),
+		"WALK + velocity north + facing east → 'walk_n' (movement wins)")
+
+
+func test_walk_anim_velocity_octant_for_all_8_directions() -> void:
+	# Every cardinal/diagonal velocity quantizes to the matching walk_<dir>
+	# anim regardless of `_facing`. Anchor `_facing` to east so any leak from
+	# the pre-fix `_facing`-based resolver would visibly produce "walk_e"
+	# instead of the expected direction.
+	var p: Player = _make_scene_player()
+	p._facing = Vector2.RIGHT  # constant mouse-facing east
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	var cases: Array = [
+		[Vector2.RIGHT, "e"],
+		[Vector2(1, 1).normalized(), "se"],
+		[Vector2.DOWN, "s"],
+		[Vector2(-1, 1).normalized(), "sw"],
+		[Vector2.LEFT, "w"],
+		[Vector2(-1, -1).normalized(), "nw"],
+		[Vector2.UP, "n"],
+		[Vector2(1, -1).normalized(), "ne"],
+	]
+	for c in cases:
+		var v: Vector2 = c[0]
+		var expected_dir: String = c[1]
+		# Transition through IDLE so set_state(STATE_WALK) is a real edge that
+		# fires state_changed. Same-state set_state would early-out.
+		p.velocity = Vector2.ZERO
+		p.set_state(Player.STATE_IDLE)
+		p.velocity = v * 120.0
+		p.set_state(Player.STATE_WALK)
+		assert_eq(asprite.animation, StringName("walk_%s" % expected_dir),
+			"velocity %s (facing east) → 'walk_%s'" % [v, expected_dir])
+
+
+func test_idle_holds_last_walk_direction_not_facing() -> void:
+	# Player walks NORTH, then stops while mouse points EAST. The held idle
+	# anim must be `walk_n` (last walk dir frame 0), NOT `walk_e` (cursor).
+	var p: Player = _make_scene_player()
+	# Phase 1: walk north.
+	p._facing = Vector2.UP
+	p.velocity = Vector2.UP * 120.0
+	p.set_state(Player.STATE_WALK)
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("walk_n"),
+		"phase 1: walking north → 'walk_n' (precondition)")
+	# Phase 2: stop walking, mouse swings east — IDLE must hold north.
+	p._facing = Vector2.RIGHT  # cursor moves east
+	p.velocity = Vector2.ZERO  # WASD released
+	p.set_state(Player.STATE_IDLE)
+	assert_eq(asprite.animation, StringName("walk_n"),
+		"phase 2: idle + cursor east holds 'walk_n' (not snap to 'walk_e')")
+	# IDLE special-case: frozen on frame 0.
+	assert_false(asprite.is_playing(), "idle frozen (not looping)")
+	assert_eq(asprite.frame, 0, "idle frozen on frame 0")
+
+
+func test_walk_dir_updates_when_velocity_octant_changes_mid_walk() -> void:
+	# Player walking north (WASD = W), then changes to east (WASD = D) without
+	# leaving STATE_WALK. The walk anim must switch from `walk_n` to `walk_e`
+	# on the NEXT physics tick — `state_changed` won't fire because the state
+	# didn't change. `_drive_walk_anim_if_moving` is the path that handles this.
+	var p: Player = _make_scene_player()
+	p._facing = Vector2.RIGHT  # mouse east (red herring — should NOT affect walk anim)
+	p.velocity = Vector2.UP * 120.0
+	p.set_state(Player.STATE_WALK)
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("walk_n"),
+		"phase 1: velocity north → 'walk_n' (precondition)")
+	# Phase 2: velocity rotates east mid-walk (still STATE_WALK).
+	p.velocity = Vector2.RIGHT * 120.0
+	p._drive_walk_anim_if_moving()  # called by _physics_process post-move_and_slide
+	assert_eq(asprite.animation, StringName("walk_e"),
+		"velocity east mid-walk → 'walk_e' (re-driven without state transition)")
+
+
+func test_walk_anim_does_not_restart_when_velocity_octant_unchanged() -> void:
+	# `_drive_walk_anim_if_moving` must NOT call play() when the resolved
+	# octant matches `_last_anim_dir` — otherwise the walk loop would freeze
+	# on frame 0 every physics tick (play() restarts from frame 0).
+	var p: Player = _make_scene_player()
+	p._facing = Vector2.DOWN
+	p.velocity = Vector2.DOWN * 120.0
+	p.set_state(Player.STATE_WALK)
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("walk_s"), "precondition: walk_s")
+	# Advance to a non-zero frame so we can detect a play()-restart.
+	asprite.frame = 2
+	# Same velocity, multiple ticks — should be a no-op.
+	p._drive_walk_anim_if_moving()
+	p._drive_walk_anim_if_moving()
+	p._drive_walk_anim_if_moving()
+	assert_eq(asprite.frame, 2,
+		"velocity unchanged → no play() restart (frame stays at 2)")
+
+
+func test_attack_anim_still_uses_facing_not_velocity() -> void:
+	# Mouse-direction attacks must still aim at cursor (PR #255 contract).
+	# Player walking south with mouse pointing east → attack_light must play
+	# `attack_light_e` (cursor direction), NOT `attack_light_s` (movement dir).
+	var p: Player = _make_scene_player()
+	p._facing = Vector2.RIGHT  # mouse east
+	p.velocity = Vector2.DOWN * 120.0  # walking south
+	p.set_state(Player.STATE_WALK)
+	# Fire light attack — try_attack sets _current_attack_kind THEN set_state.
+	p.try_attack(Player.ATTACK_LIGHT, Vector2.ZERO)
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("attack_light_e"),
+		"attack with mouse east + walking south → 'attack_light_e' (cursor wins)")
+
+
+func test_heavy_attack_anim_still_uses_facing_not_velocity() -> void:
+	# Same contract for heavy attacks.
+	var p: Player = _make_scene_player()
+	p._facing = Vector2.UP  # mouse north
+	p.velocity = Vector2.LEFT * 120.0  # walking west
+	p.set_state(Player.STATE_WALK)
+	p.try_attack(Player.ATTACK_HEAVY, Vector2.ZERO)
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("attack_heavy_n"),
+		"heavy attack with mouse north + walking west → 'attack_heavy_n'")
+
+
+func test_dodge_anim_uses_facing_after_try_dodge() -> void:
+	# `try_dodge(dir)` overwrites `_facing = dir` (movement-dodge by design),
+	# then sets STATE_DODGE. The dodge anim direction follows the dodge dir.
+	# This test guards that the walk-feel fix didn't accidentally redirect
+	# dodge anim to use velocity (which `try_dodge` ALSO sets, but to the
+	# same value as _facing — so the octant would coincide. We assert the
+	# anim is driven by _facing for documentation, not for distinguishing).
+	var p: Player = _make_scene_player()
+	p._facing = Vector2.RIGHT  # initial cursor east (irrelevant after try_dodge)
+	p.try_dodge(Vector2.LEFT)  # dodge west — try_dodge sets _facing = LEFT
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("dodge_w"),
+		"dodge west → 'dodge_w' (try_dodge sets _facing to dodge dir)")
+
+
+func test_hit_anim_uses_facing_not_velocity() -> void:
+	# take_damage plays hit_<dir>. The "threat direction" semantics use
+	# `_facing` (PR #255 cursor-direction). Walk-feel fix must not redirect
+	# hit anim to velocity octant.
+	var p: Player = _make_scene_player()
+	p._facing = Vector2.RIGHT  # mouse east
+	p.velocity = Vector2.DOWN * 120.0  # walking south (irrelevant for hit)
+	p.set_state(Player.STATE_WALK)
+	# Non-fatal hit.
+	p.take_damage(5, Vector2.ZERO, null)
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("hit_e"),
+		"hit with cursor east + walking south → 'hit_e' (cursor wins)")
+
+
+func test_die_anim_uses_facing_not_velocity() -> void:
+	# Same contract for _die. Walk-feel fix preserves cursor-direction die anim.
+	var p: Player = _make_scene_player()
+	p._facing = Vector2.UP
+	p.velocity = Vector2.LEFT * 120.0  # walking west (irrelevant)
+	p.set_state(Player.STATE_WALK)
+	p.take_damage(100, Vector2.ZERO, null)  # lethal
+	assert_true(p.is_dead(), "player dead after lethal hit (precondition)")
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("die_n"),
+		"_die with cursor north + walking west → 'die_n' (cursor wins)")
+
+
+func test_velocity_octant_threshold_treats_near_zero_as_idle() -> void:
+	# Velocity below VELOCITY_OCTANT_THRESHOLD (1.0) should be treated as
+	# "not moving" — the resolver holds `_last_anim_dir` instead of snapping
+	# to the noise vector's octant. Guards against floating-point drift
+	# producing flickery dir suffixes on near-zero velocity frames.
+	var p: Player = _make_scene_player()
+	# Seed: walk south, anchor _last_anim_dir = "s".
+	p._facing = Vector2.DOWN
+	p.velocity = Vector2.DOWN * 120.0
+	p.set_state(Player.STATE_WALK)
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("walk_s"), "precondition")
+	# Now drop into STATE_IDLE with a tiny non-zero velocity (e.g. from
+	# physics-bounce drift). Should still hold "walk_s", not snap.
+	p.velocity = Vector2(0.3, -0.4)  # length ~0.5, below 1.0 threshold
+	p.set_state(Player.STATE_IDLE)
+	assert_eq(asprite.animation, StringName("walk_s"),
+		"velocity below threshold treated as idle (holds last dir)")
+
+
+func test_seed_anim_in_ready_renders_walk_s_for_default_facing() -> void:
+	# Regression pin: a scene-loaded Player must show `walk_s` frame 0 on
+	# first render (default _facing = Vector2.DOWN, default _last_anim_dir
+	# = "s", initial state = IDLE). Pre-fix and post-fix both produce the
+	# same first-frame rest pose — this test pins post-fix parity.
+	var p: Player = _make_scene_player()
+	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
+	assert_eq(asprite.animation, StringName("walk_s"),
+		"seed-anim: default IDLE state + default facing south → 'walk_s'")
+	assert_false(asprite.is_playing(), "seed-anim: frozen on frame 0 (idle)")

@@ -267,6 +267,29 @@ var _captured_hit_flash_rest: bool = false
 var _animated_sprite: AnimatedSprite2D = null
 var _animated_sprite_resolved: bool = false
 
+# ---- M3W-2 walk-feel fix (Sponsor 2026-05-18 soak finding) -------------
+# `_facing` is mouse-derived (PR #255) and correct for attack/dodge aim. But
+# feeding it to `walk_<dir>` made the body pivot toward the cursor while
+# strafing sideways — Sponsor's "looking at mouse cursor while walking is
+# weird" finding on the M3W-2 PR #274 soak.
+#
+# Fix: decouple animation direction from aim direction in the anim resolver.
+#   - WALK / IDLE → movement direction (velocity octant). Idle holds last.
+#   - ATTACK / DODGE / HIT / DIE → mouse-derived `_facing` (unchanged).
+#
+# `_last_anim_dir` is the persisted movement octant. Initialized to "s" so
+# the seed-anim path in `_ready` matches the default `_facing = Vector2.DOWN`
+# (south) — pre-fix and post-fix produce the same first-frame rest pose.
+#
+# Velocity-octant threshold: 1.0 px/s is a sentinel for "not moving" that
+# survives floating-point drift. `_process_grounded` writes either
+# `velocity = Vector2.ZERO` (IDLE) or `velocity = input_dir * speed` (WALK,
+# speed ≥ get_walk_speed() == 120 px/s); 1.0 has no collision with either
+# regime. `_process_attack` writes drift velocity (input_dir * 60 px/s) but
+# attack state doesn't use velocity-octant anyway.
+const VELOCITY_OCTANT_THRESHOLD: float = 1.0
+var _last_anim_dir: String = "s"
+
 # Visual-feedback bookkeeping — track the active swing-wedge + flash tween
 # so we can apply the kill-and-restart pattern Uma's spec calls out: a second
 # attack fired during the previous attack's recovery replaces the old cue
@@ -396,6 +419,13 @@ func _physics_process(delta: float) -> void:
 			_process_attack(delta)
 
 	move_and_slide()
+
+	# M3W-2 walk-feel fix (Sponsor 2026-05-18 soak): if the player is still
+	# in STATE_WALK and the velocity octant changed mid-state (e.g. WASD
+	# direction change without leaving WALK), re-drive the walk_<dir> anim.
+	# `state_changed` only fires on state transitions, so without this the
+	# anim would lock to whatever direction triggered the WALK transition.
+	_drive_walk_anim_if_moving()
 
 	# Harness-observability trace (HTML5-only via the combat_trace shim).
 	# Throttled world-coord readback so Playwright specs can steer the player
@@ -1475,7 +1505,9 @@ func _anim_prefix_for_state(s: StringName) -> String:
 
 
 ## state_changed signal handler — drive the AnimatedSprite2D into the right
-## anim for the new state. Direction is computed from current `_facing`.
+## anim for the new state. Direction is resolved by `_resolve_anim_dir`:
+## movement-states (WALK / IDLE) use the velocity octant (or last-held for
+## IDLE); action-states (ATTACK / DODGE) use mouse-derived `_facing`.
 ##
 ## IDLE-vs-WALK detail: both prefixes resolve to `walk`, but for IDLE we want
 ## frame 0 to hold (no motion); for WALK we want the loop. Player.tres marks
@@ -1488,8 +1520,8 @@ func _on_state_changed(_from_state: StringName, to_state: StringName) -> void:
 
 
 ## Public surface for state-driven anim playback. Resolves prefix from state
-## + appends 8-octant dir suffix from `_facing`. Used by `_on_state_changed`
-## AND by `_ready` to seed the initial animation.
+## + appends 8-octant dir suffix via `_resolve_anim_dir`. Used by
+## `_on_state_changed` AND by `_ready` to seed the initial animation.
 func _play_anim_for_state(s: StringName) -> void:
 	var prefix: String = _anim_prefix_for_state(s)
 	_play_anim(prefix)
@@ -1505,10 +1537,11 @@ func _play_anim_for_state(s: StringName) -> void:
 
 ## Play an animation on the AnimatedSprite2D child. Lazy-resolves the child
 ## so bare-instanced test players (no scene-tree, no AnimatedSprite2D child)
-## silently no-op. Animation key is `<prefix>_<dir>` where `<dir>` is the
-## 8-octant facing suffix. No-op if the resolved key isn't in the
-## SpriteFrames resource (e.g. tests that swap in their own AnimatedSprite2D
-## without SpriteFrames).
+## silently no-op. Animation key is `<prefix>_<dir>` where `<dir>` is
+## resolved via `_resolve_anim_dir` (velocity octant for WALK/IDLE, `_facing`
+## octant for ATTACK/DODGE/HIT/DIE — see Sponsor 2026-05-18 soak finding).
+## No-op if the resolved key isn't in the SpriteFrames resource (e.g. tests
+## that swap in their own AnimatedSprite2D without SpriteFrames).
 ##
 ## Mirrors `PracticeDummy._play_anim` shape (M3W-1 inheritance contract).
 func _play_anim(prefix: String) -> void:
@@ -1518,7 +1551,7 @@ func _play_anim(prefix: String) -> void:
 		return
 	if _animated_sprite.sprite_frames == null:
 		return
-	var dir_suffix: String = dir_suffix_for_facing(_facing)
+	var dir_suffix: String = _resolve_anim_dir(prefix)
 	var anim_name: StringName = StringName("%s_%s" % [prefix, dir_suffix])
 	if not _animated_sprite.sprite_frames.has_animation(anim_name):
 		_combat_trace("Player._play_anim",
@@ -1526,6 +1559,83 @@ func _play_anim(prefix: String) -> void:
 		return
 	_animated_sprite.play(anim_name)
 	_combat_trace("Player._play_anim", "PLAY anim=%s" % anim_name)
+
+
+## Resolve animation direction suffix for the given anim prefix.
+##
+## **Decouple animation direction from aim direction** (Sponsor 2026-05-18
+## soak finding on PR #274). `_facing` is mouse-derived (PR #255) — correct
+## for attack/dodge aim, wrong for walk feel. Pre-fix the body pivoted toward
+## the cursor while strafing sideways ("looking at the mouse cursor while
+## walking is weird").
+##
+## Resolution table:
+##   - `walk` (STATE_WALK or STATE_IDLE) → velocity octant if moving, else
+##     `_last_anim_dir` (held-from-last-WALK). At IDLE entry velocity is
+##     `Vector2.ZERO` (set by `_process_grounded`), so this is the held case.
+##   - `attack_light` / `attack_heavy` / `dodge` / `hit` / `die` → `_facing`
+##     octant (mouse-derived, preserves PR #255 attack-aim contract AND the
+##     hit/die threat-direction wash).
+##
+## `_last_anim_dir` is mutated by this function as a side effect — every WALK
+## resolution that produces a fresh octant updates the held value so the next
+## IDLE entry sees the correct direction. Walk-then-stop holds the last walk
+## direction (not the cursor); walk-then-turn-while-walking re-resolves
+## per-frame via `_drive_walk_anim_if_moving`.
+##
+## Pure-ish: depends on `velocity` + `_facing` + `_last_anim_dir`; mutates
+## `_last_anim_dir`. Static-helper extraction is not viable here because the
+## mutation is load-bearing for the IDLE-holds-last semantics. The math
+## (`dir_suffix_for_facing`) is the static-helper surface and remains
+## unit-testable independently.
+func _resolve_anim_dir(prefix: String) -> String:
+	if prefix == ANIM_PREFIX_IDLE_AND_WALK:
+		# WALK/IDLE share the `walk` prefix. Use velocity if moving; else hold
+		# the last walk direction (don't snap to cursor on idle).
+		if velocity.length() > VELOCITY_OCTANT_THRESHOLD:
+			var v_dir: String = dir_suffix_for_facing(velocity)
+			_last_anim_dir = v_dir
+			return v_dir
+		return _last_anim_dir
+	# ATTACK / DODGE / HIT / DIE — face the cursor (PR #255 contract).
+	return dir_suffix_for_facing(_facing)
+
+
+## Re-drive the WALK animation when the velocity octant changes mid-state.
+## Called from `_physics_process` after the state-dispatch + `move_and_slide`.
+##
+## Why this is needed: `state_changed` fires only on STATE transitions, so a
+## player who stays in STATE_WALK while changing WASD direction (W → D) would
+## otherwise keep playing `walk_n` forever because no transition would fire.
+## This function re-resolves the anim direction each physics frame and calls
+## `play()` only when the resolved anim_name DIFFERS from the currently-
+## playing anim — avoiding a per-frame `play()` restart that would freeze
+## the sprite on frame 0 of the loop.
+##
+## STATE_WALK only. STATE_IDLE / ATTACK / DODGE all hold their direction by
+## design (idle keeps last walk dir; attack/dodge snapshot facing at entry).
+func _drive_walk_anim_if_moving() -> void:
+	if _state != STATE_WALK:
+		return
+	if not _animated_sprite_resolved:
+		_resolve_animated_sprite()
+	if _animated_sprite == null:
+		return
+	if _animated_sprite.sprite_frames == null:
+		return
+	if velocity.length() <= VELOCITY_OCTANT_THRESHOLD:
+		return
+	var v_dir: String = dir_suffix_for_facing(velocity)
+	if v_dir == _last_anim_dir:
+		# Same octant — animation is already correct. Do NOT re-play (would
+		# restart the loop and freeze the cycle on frame 0 every physics tick).
+		return
+	_last_anim_dir = v_dir
+	var anim_name: StringName = StringName("%s_%s" % [ANIM_PREFIX_IDLE_AND_WALK, v_dir])
+	if not _animated_sprite.sprite_frames.has_animation(anim_name):
+		return
+	_animated_sprite.play(anim_name)
+	_combat_trace("Player._play_anim", "PLAY anim=%s (walk-dir-change)" % anim_name)
 
 
 ## Lazy AnimatedSprite2D resolver. Idempotent; subsequent calls are no-ops
