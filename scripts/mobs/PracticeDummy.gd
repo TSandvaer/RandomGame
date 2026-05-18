@@ -94,6 +94,21 @@ const DEATH_PARTICLE_COUNT: int = 12  # 2x grunt — Uma "0.4 s ember-poof" read
 const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
 const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 
+## Hit-flash modulate tint for the AnimatedSprite2D path (M3W-1 convention).
+## ColorRect placeholders tweened color rest→white→rest; the painted PixelLab
+## sprite frames are already near-white, so a white tween is a visible no-op.
+## AnimatedSprite2D's `modulate` is multiplicative — we tween toward a soft
+## red wash so the painted sprite tints visibly red on hit. All channels
+## sub-1.0 per HTML5 HDR-clamp rule (PR #137 lesson, codified in
+## `.claude/docs/html5-export.md`).
+const HIT_FLASH_TINT: Color = Color(1.0, 0.50, 0.50, 1.0)  # soft red wash, HTML5-safe
+
+## Default facing for SpriteFrames animation key suffix. PracticeDummy is a
+## stationary target (no AI, no facing-rotation), so the played animation is
+## always the south-facing variant. M3W-2+ wires `<dir>` suffix to per-mob
+## facing-derivation; PD is the simplest reference (always `_s`).
+const DEFAULT_DIR_SUFFIX: String = "s"
+
 ## Layer bits (mirror project.godot + Grunt convention).
 const LAYER_WORLD: int = 1 << 0          # bit 1
 const LAYER_PLAYER: int = 1 << 1         # bit 2
@@ -117,14 +132,30 @@ var _is_dead: bool = false
 var _hit_flash_tween: Tween = null
 var _death_tween: Tween = null
 
-# Hit-flash target — mirrors Grunt: prefer the Sprite ColorRect child
-# (visible-draw color), fall back to self.modulate for bare-instanced
-# test dummies.
+# Hit-flash target — M3W-1 swap to AnimatedSprite2D introduces a third branch:
+#   1. AnimatedSprite2D child (production .tscn-loaded dummy)   → tween modulate
+#      with a red-wash tint (rest=Color(1,1,1,1) → HIT_FLASH_TINT → rest)
+#   2. ColorRect child (legacy / fallback authored .tscn)        → tween Sprite.color
+#      rest → white → rest (Grunt v1 pattern, kept for back-compat)
+#   3. No Sprite child (bare-instanced test dummies)             → tween self.modulate
+#      (legacy fallback, preserves Tier 1 reference-change invariant in GUT)
+# `_hit_flash_uses_sprite` is true iff branch (1) OR (2) — meaning the tween
+# targets the child node, not self. Branch (1) vs (2) is discriminated by
+# `_hit_flash_uses_animated_sprite` (true ⇒ AnimatedSprite2D modulate-tint path,
+# false ⇒ ColorRect color-tween path).
 var _hit_flash_target: CanvasItem = null
 var _hit_flash_uses_sprite: bool = false
+var _hit_flash_uses_animated_sprite: bool = false
 var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
+var _sprite_modulate_at_rest: Color = Color(1, 1, 1, 1)
 var _modulate_at_rest: Color = Color(1, 1, 1, 1)
 var _captured_modulate_at_rest: bool = false
+
+# AnimatedSprite2D cache — resolved lazily from get_node_or_null("Sprite") so
+# tests that instantiate the production scene get animation-playback hooks
+# even though the scene was instantiated by the test framework (not Main).
+var _animated_sprite: AnimatedSprite2D = null
+var _animated_sprite_resolved: bool = false
 
 
 func _ready() -> void:
@@ -175,6 +206,7 @@ func take_damage(amount: int, _knockback: Vector2, source: Node) -> void:
 	damaged.emit(clean_amount, hp_current, source)
 	if clean_amount > 0:
 		_play_hit_flash()
+		_play_anim("hit")
 	if hp_current == 0:
 		_die()
 
@@ -192,6 +224,12 @@ func _die() -> void:
 	# this frame. The 200ms death tween + ember-burst run AFTER, decoupled
 	# from the gameplay surface.
 	mob_died.emit(self, global_position, null)
+	# M3W-1 anim hookup: switch to the falling-backward death animation. Plays
+	# concurrently with the existing scale/alpha death tween — the AnimatedSprite2D
+	# advances its frames while the parent fades out + scales down. Once frame
+	# count exceeds the anim's 7 frames it naturally holds on the last frame
+	# (loop=false in PracticeDummy.tres) until queue_free.
+	_play_anim("die")
 	_spawn_iron_sword_pickup()
 	_spawn_death_particles()
 	_play_death_tween()
@@ -334,22 +372,50 @@ func _force_queue_free() -> void:
 
 # ---- Hit flash --------------------------------------------------------
 
-## White hit-flash on the Sprite ColorRect child (visible-draw target);
-## fallback to self.modulate for bare-instanced test dummies. Tween-shape
-## mirrors Grunt._play_hit_flash exactly (PR #140 fix — visible-draw node
-## tween, NOT cascading parent modulate).
+## Hit-flash on the Sprite child. M3W-1 introduces a third branch:
+##
+##   - AnimatedSprite2D child (production post-M3W-1 .tscn): tween the
+##     AnimatedSprite2D's `modulate` from rest → HIT_FLASH_TINT (soft red
+##     wash) → rest. The painted PixelLab sprite frames are near-white, so a
+##     white-to-white modulate tween would be a visible no-op (the same trap
+##     PR #115 hit on the parent CharacterBody2D modulate). Tinting toward red
+##     produces a visible red-wash flash that reads as "I just took a hit"
+##     while preserving the rest of the sprite's painted color. Sub-1.0 on
+##     every channel per HTML5 HDR-clamp rule (PR #137 lesson).
+##   - ColorRect child (legacy / pre-M3W-1 .tscn): tween color rest → white
+##     → rest. Kept for back-compat; Grunt/Charger/Shooter/Boss still use this
+##     until M3W-3 / M3W-4 swap them to AnimatedSprite2D.
+##   - No Sprite child (bare-instanced test dummy): tween self.modulate
+##     (preserves Tier 1 reference-change invariant in GUT — the parent-
+##     modulate tween is visually a no-op but still produces a valid tween
+##     ref change, which is what the tests assert).
+##
+## Tween-reference convention (Tier 1 corollary per
+## `.claude/docs/combat-architecture.md`): a second hit during the flash kills
+## the in-flight tween and creates a fresh one. Tests assert the tween
+## reference flipped, not `is_valid()` flipped (kill is async).
 func _play_hit_flash() -> void:
 	if _is_dead:
 		return
 	if _hit_flash_target == null:
 		var sprite: Node = get_node_or_null("Sprite")
-		if sprite is ColorRect:
+		if sprite is AnimatedSprite2D:
+			# M3W-1 path — production sprite is an AnimatedSprite2D.
 			_hit_flash_target = sprite
 			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = true
+			_sprite_modulate_at_rest = (sprite as AnimatedSprite2D).modulate
+		elif sprite is ColorRect:
+			# Pre-M3W-1 fallback (kept for back-compat).
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = false
 			_sprite_color_at_rest = (sprite as ColorRect).color
 		else:
+			# Bare-instanced test edge.
 			_hit_flash_target = self
 			_hit_flash_uses_sprite = false
+			_hit_flash_uses_animated_sprite = false
 	if not _captured_modulate_at_rest:
 		_modulate_at_rest = modulate
 		_captured_modulate_at_rest = true
@@ -359,7 +425,18 @@ func _play_hit_flash() -> void:
 		modulate = _modulate_at_rest
 		return
 	_hit_flash_tween = create_tween()
-	if _hit_flash_uses_sprite:
+	if _hit_flash_uses_animated_sprite:
+		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
+		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
+		_combat_trace("PracticeDummy._play_hit_flash",
+			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)" % [
+				_hit_flash_tween.is_valid(),
+				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
+				_sprite_modulate_at_rest.r, _sprite_modulate_at_rest.g, _sprite_modulate_at_rest.b
+			])
+	elif _hit_flash_uses_sprite:
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
@@ -373,6 +450,39 @@ func _play_hit_flash() -> void:
 		_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
 		_combat_trace("PracticeDummy._play_hit_flash",
 			"modulate-fallback tween_valid=%s" % _hit_flash_tween.is_valid())
+
+
+# ---- Animation playback (M3W-1) ---------------------------------------
+
+## Play an animation on the AnimatedSprite2D child. Resolves the child lazily
+## on first call so bare-instanced test dummies that swap in their own sprite
+## still work. No-op when no AnimatedSprite2D child exists (test edge or
+## legacy ColorRect dummy). `state` is the state-key prefix (e.g. "hit", "die")
+## — the full SpriteFrames animation name is `<state>_<dir>` where `<dir>` is
+## DEFAULT_DIR_SUFFIX ("s") since PD is stationary.
+##
+## M3W-1 convention — every downstream M3 character calls into a similar
+## helper: `_play_anim(state)` resolves the dir suffix from a per-character
+## facing helper. PracticeDummy hardcodes "_s" because it has no facing logic.
+func _play_anim(state: String) -> void:
+	if not _animated_sprite_resolved:
+		var sprite: Node = get_node_or_null("Sprite")
+		if sprite is AnimatedSprite2D:
+			_animated_sprite = sprite
+		_animated_sprite_resolved = true
+	if _animated_sprite == null:
+		return
+	var anim_name: StringName = StringName("%s_%s" % [state, DEFAULT_DIR_SUFFIX])
+	# Defensive — sprite_frames may not be assigned in bare-instanced tests
+	# that swap in their own AnimatedSprite2D without a SpriteFrames resource.
+	if _animated_sprite.sprite_frames == null:
+		return
+	if not _animated_sprite.sprite_frames.has_animation(anim_name):
+		_combat_trace("PracticeDummy._play_anim",
+			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		return
+	_animated_sprite.play(anim_name)
+	_combat_trace("PracticeDummy._play_anim", "PLAY anim=%s" % anim_name)
 
 
 # ---- Helpers ---------------------------------------------------------
