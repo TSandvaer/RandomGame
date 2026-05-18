@@ -1,0 +1,87 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "d3d753c3-d9b7-4b44-8515-1ec99ca498c4",
+        "name": "NPC Vendor (re-queue)",
+        "prompt": "friendly hooded merchant NPC in warm bronze brown cloak with parchment-toned hood, kind weathered face partially visible inside hood, neutral standing pose, holding open ledger book with both hands, calm peaceful demeanor, dark fantasy town vendor, top-down RPG, transparent background",
+        "size": {
+          "width": 68,
+          "height": 68
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-05-17T14:42:38.652221+00:00"
+      },
+      "folder": "NPC_Vendor_re-queue",
+      "frames": {
+        "rotations": {
+          "south": "NPC_Vendor_re-queue/rotations/south.png",
+          "south-east": "NPC_Vendor_re-queue/rotations/south-east.png",
+          "east": "NPC_Vendor_re-queue/rotations/east.png",
+          "north-east": "NPC_Vendor_re-queue/rotations/north-east.png",
+          "north": "NPC_Vendor_re-queue/rotations/north.png",
+          "north-west": "NPC_Vendor_re-queue/rotations/north-west.png",
+          "west": "NPC_Vendor_re-queue/rotations/west.png",
+          "south-west": "NPC_Vendor_re-queue/rotations/south-west.png"
+        },
+        "animations": {
+          "animating-46630dc5": {
+            "north-west": [
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north-west/frame_000.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north-west/frame_001.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north-west/frame_002.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north-west/frame_003.png"
+            ],
+            "south": [
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south/frame_000.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south/frame_001.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south/frame_002.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south/frame_003.png"
+            ],
+            "south-east": [
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south-east/frame_000.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south-east/frame_001.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south-east/frame_002.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south-east/frame_003.png"
+            ],
+            "south-west": [
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south-west/frame_000.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south-west/frame_001.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south-west/frame_002.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/south-west/frame_003.png"
+            ],
+            "west": [
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/west/frame_000.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/west/frame_001.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/west/frame_002.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/west/frame_003.png"
+            ],
+            "north": [
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north/frame_000.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north/frame_001.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north/frame_002.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north/frame_003.png"
+            ],
+            "north-east": [
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north-east/frame_000.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north-east/frame_001.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north-east/frame_002.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/north-east/frame_003.png"
+            ],
+            "east": [
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/east/frame_000.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/east/frame_001.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/east/frame_002.png",
+              "NPC_Vendor_re-queue/animations/animating-46630dc5/east/frame_003.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.0",
+  "export_date": "2026-05-17T20:35:12.100567"
+}

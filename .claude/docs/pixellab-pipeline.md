@@ -257,6 +257,105 @@ mitigation that reduces how often the lock step is needed.
 
 ---
 
+## Template animations can flip character facing direction mid-cycle
+
+PixelLab template animations can produce frames where the character's **facing direction
+inverts within a single 4-frame walk cycle** — e.g. frame 0 faces forward (south), frame 1
+faces backward (north), frame 2 forward, frame 3 backward. The walk-in-place pose oscillates
+between front-of-head and back-of-head views instead of maintaining a consistent facing while
+the legs animate.
+
+Validated 2026-05-17 on Player `walking-4-frames` south: 4 frames extracted from ZIP,
+inspected pixel-by-pixel — frames 0 and 2 showed the player's face clearly; frames 1 and 3
+showed only the back of the head (north-facing pose). Sponsor reported the in-viewer
+animation looked like the player "flips from back to front of the head" repeatedly. Confirmed
+visually by reading each PNG.
+
+**Why this happens (best guess):** PixelLab's template-to-character interpolation occasionally
+samples a pose from a different rotation when filling in animation frames, especially when the
+template's keypoint motion sweeps across the character's central axis. The "low top-down" view
+makes south/north pairs visually similar at the head-only zoom level — the model loses track
+of which side is "front".
+
+**Detection:** AFTER downloading the animation ZIP, inspect each `frame_NNN.png` per
+direction. If consecutive frames show inconsistent facing (face visible / face hidden /
+face visible / face hidden), the cycle is broken. Cannot detect from `get_character`
+metadata — frame count looks correct; only pixel inspection reveals the issue.
+
+**Fixes (in order of cost):**
+
+1. **Re-roll the broken direction with a different template** — `animate_character(...,
+   template_animation_id="walking-8-frames", directions=["south"])` is 1 gen. Try
+   `walking-8-frames`, then `walking`, then `walking-2-frames`, then `scary-walk` until you
+   get a stationary-facing walk cycle.
+2. **Use only the frames with correct facing** — if frames 0 and 2 are good, ship a 2-frame
+   walk for that direction (drop frames 1 and 3). Visually weaker but free.
+3. **Manual frame edit in Aseprite** — copy the correct-facing frame over the wrong-facing
+   one. Tedious; only viable for 1-2 broken frames per character.
+4. **Full character re-roll** — last resort if multiple templates flip on the same character.
+
+**Operational note:** the broken-cycle frames are NOT visible from `get_character` metadata
+(which only reports frame counts). Always inspect animation frames before shipping; the cost
+of a 1-direction re-roll is much lower than shipping a broken-cycle sprite into the game.
+
+**Hand-object continuity is NOT preserved across animation frames.**
+
+Validated 2026-05-17 on Player south walk (`walking` template): the sword (described in the
+character prompt as "holding short sword in right hand") visibly **swaps between right and
+left hand** across consecutive walk frames. The mannequin template treats hands symmetrically
+during animation interpolation; held-item-in-specific-hand is not a constraint the template
+engine respects.
+
+**Affects:** held weapons (swords, bows, hammers), held props (scrolls, books, lanterns), and
+any character-prompt detail tied to a specific arm/hand.
+
+**Detection:** post-download per-frame inspection. The static rotation PNGs render the prompt's
+hand-assignment correctly; the animation frames lose it.
+
+**Workarounds (all imperfect):**
+
+- **Accept it** — at pixel scale, small held items (1-2 px) may not read as a hand-swap to
+  players. Try in-game before committing to a fix.
+- **Manual frame edit** — paint-over in Aseprite to keep the item in the correct hand
+  consistently. Tedious; scales linearly with frame count.
+- **No-weapon character + separate weapon layer** — generate the character without the weapon,
+  add the weapon as a separate Aseprite sprite layer positioned per-direction. More authoring
+  work but solves the swap permanently.
+- **Different template choice** — some templates (e.g. those that don't swing the arms
+  symmetrically) may preserve hand-object position better. Trial-and-error.
+
+**Don't trust the static rotation as proof of animation quality.** A character whose idle PNG
+shows "sword in right hand" will still have the sword swap during walk; the rotation and
+animation streams are generated independently.
+
+---
+
+**Multi-template failure pattern — when 2+ templates fail on the same character/direction:**
+
+Validated 2026-05-17 on Player south: `walking-4-frames` flipped facing direction (back/front
+alternation); `walking-8-frames` produced a limp/wonky gait. **Different templates can fail in
+different ways on the same character/direction pair** — suggests the character's static pose
+itself is hard for PixelLab's template engine to interpret cleanly, not just a template-choice
+issue.
+
+**Diagnostic heuristic:** if 2 templates fail on the same direction, try ONE more template
+from a different family (e.g. `crouched-walking` after `walking-4-frames` + `walking-8-frames`
+fail). If the 3rd also fails, the cause is upstream (character-pose-specific). Stop burning
+gens on retries; pick a workaround:
+
+- **Direction borrowing:** use a working diagonal's animation cycle for the failing cardinal
+  direction (e.g. ship `south-east` walk frames as `south` walk — character appears slightly
+  angled but motion is clean).
+- **Idle as walk:** use the static idle pose for the failing direction's walk too — character
+  appears stationary while moving. Worst aesthetic but ships immediately.
+- **Manual frame edit:** copy a good frame over the bad one in Aseprite. Tedious; only viable
+  for 1-2 frames.
+
+Document the workaround in the character's commit message so future iteration knows the
+direction is using a substitute, not a true walking-template render.
+
+---
+
 ## Prompt engineering — PixelLab interprets constraints literally
 
 PixelLab `create_character` weights negative-shaped constraints (e.g. "obscuring", "hidden",
@@ -308,6 +407,96 @@ mcp__pixellab__create_character_state(
 - The edit is applied "consistently across rotations" — but consistency is best-effort; verify
   every direction, especially for asymmetric features.
 - Auto-waits up to 30s for the source to complete if still generating.
+
+---
+
+## Dispatch loops — end-of-loop bulk download is the right default
+
+When running a multi-tick dispatch loop (e.g. queue-driven `animate_character` advancement
+via away-mode ticks), the loop body can be dispatch-only (no per-completion harvest). At
+end-of-loop, download each character's ZIP once. The ZIPs are **cumulative** — each character's
+download at any moment contains ALL rotations + ALL animations completed so far — so one
+final download per character gets the complete set.
+
+**Why this is preferred over per-completion harvest:**
+
+1. **PixelLab CDN persists completed gens indefinitely** — unlike PENDING entries which can
+   be silently garbage-collected, COMPLETED animations stay accessible. No risk of losing
+   work between checkpoints.
+2. **Fewer tool calls** — 1 curl per character at end vs N curls (one per animation).
+3. **Cumulative ZIPs mean intermediate downloads are redundant.** The last download supersedes
+   all earlier ones.
+
+**End-of-loop harvest protocol:**
+
+```
+once all dispatches complete and all animations show done in list_characters:
+  for each character in the batch:
+    curl --fail -o tmp/<char>.zip "https://api.pixellab.ai/mcp/characters/<char_id>/download"
+    unzip tmp/<char>.zip -d assets/sprites/<char>/_pixellab_anims/
+```
+
+The dispatch loop itself stays simple: check in-flight done → dispatch next pending → repeat.
+
+**When per-completion harvest IS warranted:**
+
+- The loop might run for many hours and Sponsor wants intermediate visibility (e.g. to spot
+  a bad template choice early without waiting for completion of unrelated character anims).
+- The loop is interrupted by external events (auth changes, billing changes) that could
+  affect later access — never observed yet but a theoretical risk.
+- You need per-completion validation (palette inspect, frame-count sanity-check) to gate the
+  next dispatch.
+
+In those cases, fold a single `curl + unzip` step into the tick body after the
+"in-flight done" check.
+
+**Validated failure mode 2026-05-17 (the lesson that drove this rule):** dispatched 8 animations
+across Player + Grunt + Charger over ~30 min via 3-min ticks. Each tick checked "is the
+in-flight anim done? if yes, dispatch next." None of the ticks downloaded anything. When the
+loop was paused, the only local artifact was the queue tracking file with `done` markers —
+zero PNG frames on disk. Solution: a single batch download recovered everything (CDN persists).
+
+---
+
+## Animation frames are only exposed via ZIP download
+
+The `get_character` response surfaces idle-rotation URLs (8 per direction) AND lists animations
+as metadata (e.g. `"walking-4-frames (south, 4 frames)"`), but **does NOT expose individual
+animation-frame URLs the way it exposes rotation URLs.** To access animation frames, download
+the character ZIP and unzip.
+
+**Workflow:**
+
+```bash
+# 1. Get the ZIP URL from get_character output (in the "📥 Download" section)
+curl -fsSL -o character.zip "https://api.pixellab.ai/mcp/characters/<char_id>/download"
+
+# 2. Unzip
+unzip character.zip -d extracted/
+
+# 3. Animation frames live at:
+#    extracted/<character_name>/animations/animating-<uuid>/<direction>/frame_<NNN>.png
+#    Frames are sequentially numbered (frame_000.png, frame_001.png, ...) with zero-padding.
+```
+
+**Validated 2026-05-17** on Player walking-4-frames test: south-direction 4-frame walk cycle
+extracted cleanly via ZIP. Idle rotation PNGs are also bundled in the ZIP at
+`<character_name>/rotations/<direction>.png` (duplicates of the URL-accessible ones).
+
+**Caveats:**
+
+- The animation directory naming is **inconsistent across PixelLab versions** — observed in
+  the same ZIP 2026-05-17: some animations stored under `animating-<uuid>/` (no template name,
+  just UUID); others under `<template_name>_<animation_name>-<uuid>/` (semi-readable). Cannot
+  rely on parsing folder names for semantic mapping back to game-state animations.
+- **Always consult `metadata.json` at the ZIP root** for the authoritative
+  `folder_name → animation_name → template_animation_id` mapping. The `animation_name`
+  parameter passed at `animate_character` dispatch time is what survives — use it as the
+  semantic anchor when renaming folders for game use.
+- HTTP 423 returned if any animation is still pending — wait for all to complete before
+  downloading.
+- Always use `curl --fail` (per the docs warning) — without it, curl saves the error JSON
+  as if it were the ZIP.
 
 ---
 
@@ -369,6 +558,39 @@ explicitly.
 output against the originally-queued ID set), re-call `create_character` with the same
 parameters. Cost: 1 gen per re-queue, but no recovery of the lost queue position — the new
 entry goes to the queue tail.
+
+---
+
+### Tier-based concurrent job-slot limit (per-call atomicity)
+
+PixelLab enforces a **per-tier concurrent job-slot ceiling** and **rejects whole animation
+calls atomically** if there aren't enough slots free for ALL its directions. Validated 2026-05-17:
+
+| Tier | Concurrent job slots |
+|---|---|
+| Tier 1 ($12/mo, 2000 gens) | **8** |
+| Tier 2 (5000 gens) | 10 |
+| Tier 3 | 20 |
+
+**Atomicity:** an 8-direction `animate_character` call needs 8 free slots. If only 7 are free,
+the call **rejects entirely** with "Insufficient job slots for complete animation" — no partial
+queueing. Same applies to `create_character` (8 directions per char).
+
+**Consequence on Tier 1:** at most **one 8-direction animation can be queued at a time.** You
+cannot batch-dispatch a multi-animation plan with parallel `animate_character` calls. They
+must be serialized.
+
+**Strategies:**
+
+1. **Serial-by-animation:** dispatch one animate call, wait ~2-4 min for the 8 jobs to clear,
+   dispatch the next. ~3 min × N anims wall time.
+2. **Single-direction dispatch loop:** dispatch one direction at a time (`directions=["south"]`,
+   then `["east"]`, etc.). Uses 1 slot per call → up to 8 calls in flight. Faster wall time
+   than full-anim-at-a-time, but ~8× the tool calls.
+3. **Upgrade to Tier 2 or 3** if batch throughput matters more than monthly cost.
+
+Validated 2026-05-17 by attempted 32-anim parallel dispatch: only the first 7-direction call
+(Player walking-4-frames, south was pre-existing) succeeded; the remaining 31 ALL rejected.
 
 ---
 
@@ -567,10 +789,34 @@ PixelLab charges credits per generation, not per tool call:
 | `animate_character` (custom action_description, 1 direction) | 20–40 generations |
 | `animate_character` (custom, full 8-direction set) | 60–300+ generations |
 
-**Plan-tier context (as of 2026-05-17):** Sponsor is on **Tier 2 ($24/mo)** with a
+**Plan-tier context (as of 2026-05-17):** Sponsor is on **Tier 1 ($12/mo)** with a
 **2000-generation monthly allowance** — confirmed and active after the Charger + Grunt
-free-trial validation passed. M3 art-pass roster (9 characters × idle + 3 template animations)
-≈ 225 generations, fitting comfortably in one Tier 2 month with ~10× headroom for re-rolls.
+free-trial validation passed. **Tier 2 (5000 gens/month) upgrade is available** if usage
+approaches the limit; treat 2000 as soft cap and 5000 as ceiling for planning. M3 art-pass
+roster (9 characters × idle + 3 template animations) ≈ 225 generations, fitting comfortably
+in one Tier 1 month with ~10× headroom for re-rolls.
+
+**Cost calibration (validated 2026-05-17 via single-direction Player walking-4-frames test):**
+template `animate_character` cost confirmed at **1 generation per direction**. Dashboard went
+47 → 48 for a single south-direction 4-frame walk cycle. The per-frame count does NOT multiply
+the cost.
+
+**However: real-world session burn can run ~2.5× higher than naive (standard_create × N_chars)
+accounting** due to non-character-creation cost sources:
+
+- **`create_character_state` variants may be billed per-direction (8 each, not 1).** The docs
+  describe it as a single "edit", but empirical burn suggests per-direction billing similar to
+  template animation.
+- **Silently-GC'd queued entries appear to still consume credits** even though they produce no
+  usable output (see "PixelLab silently garbage-collects" section below).
+- **Explicit-failure entries also bill** — the failure-charge applies regardless of whether
+  pixels were returned.
+- **Re-queue retries add full cost** of a fresh create_character call.
+
+**When tracking against budget:** the per-operation table is accurate IF every operation
+succeeds first try AND you avoid variants. Real sessions with re-rolls, failures, and variants
+will run higher. Verify against the PixelLab dashboard rather than trusting in-session
+arithmetic; multiply naive estimates by ~1.5-2× as a safety factor.
 
 **Rules for credit-conserving sessions:**
 - Standard `create_character` by default — do NOT trigger pro mode (20-40 gens) without

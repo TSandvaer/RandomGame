@@ -1,0 +1,483 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "a6eddc72-3256-44c8-81e9-51065cd0e5ac",
+        "name": "Player (re-queue)",
+        "prompt": "heroic player character protagonist in dark leather armor with warm orange ember accent glow on belt and weapon, determined human face visible no hood, holding short sword in right hand, ready combat stance, dark fantasy adventurer, top-down RPG, transparent background",
+        "size": {
+          "width": 68,
+          "height": 68
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-05-17T14:42:33.805706+00:00"
+      },
+      "folder": "Player_re-queue",
+      "frames": {
+        "rotations": {
+          "south": "Player_re-queue/rotations/south.png",
+          "south-east": "Player_re-queue/rotations/south-east.png",
+          "east": "Player_re-queue/rotations/east.png",
+          "north-east": "Player_re-queue/rotations/north-east.png",
+          "north": "Player_re-queue/rotations/north.png",
+          "north-west": "Player_re-queue/rotations/north-west.png",
+          "west": "Player_re-queue/rotations/west.png",
+          "south-west": "Player_re-queue/rotations/south-west.png"
+        },
+        "animations": {
+          "animating-03b05e65": {
+            "south-east": [
+              "Player_re-queue/animations/animating-03b05e65/south-east/frame_000.png",
+              "Player_re-queue/animations/animating-03b05e65/south-east/frame_001.png",
+              "Player_re-queue/animations/animating-03b05e65/south-east/frame_002.png",
+              "Player_re-queue/animations/animating-03b05e65/south-east/frame_003.png",
+              "Player_re-queue/animations/animating-03b05e65/south-east/frame_004.png",
+              "Player_re-queue/animations/animating-03b05e65/south-east/frame_005.png"
+            ],
+            "north-east": [
+              "Player_re-queue/animations/animating-03b05e65/north-east/frame_000.png",
+              "Player_re-queue/animations/animating-03b05e65/north-east/frame_001.png",
+              "Player_re-queue/animations/animating-03b05e65/north-east/frame_002.png",
+              "Player_re-queue/animations/animating-03b05e65/north-east/frame_003.png",
+              "Player_re-queue/animations/animating-03b05e65/north-east/frame_004.png",
+              "Player_re-queue/animations/animating-03b05e65/north-east/frame_005.png"
+            ],
+            "north": [
+              "Player_re-queue/animations/animating-03b05e65/north/frame_000.png",
+              "Player_re-queue/animations/animating-03b05e65/north/frame_001.png",
+              "Player_re-queue/animations/animating-03b05e65/north/frame_002.png",
+              "Player_re-queue/animations/animating-03b05e65/north/frame_003.png",
+              "Player_re-queue/animations/animating-03b05e65/north/frame_004.png",
+              "Player_re-queue/animations/animating-03b05e65/north/frame_005.png"
+            ],
+            "east": [
+              "Player_re-queue/animations/animating-03b05e65/east/frame_000.png",
+              "Player_re-queue/animations/animating-03b05e65/east/frame_001.png",
+              "Player_re-queue/animations/animating-03b05e65/east/frame_002.png",
+              "Player_re-queue/animations/animating-03b05e65/east/frame_003.png",
+              "Player_re-queue/animations/animating-03b05e65/east/frame_004.png",
+              "Player_re-queue/animations/animating-03b05e65/east/frame_005.png"
+            ],
+            "south": [
+              "Player_re-queue/animations/animating-03b05e65/south/frame_000.png",
+              "Player_re-queue/animations/animating-03b05e65/south/frame_001.png",
+              "Player_re-queue/animations/animating-03b05e65/south/frame_002.png",
+              "Player_re-queue/animations/animating-03b05e65/south/frame_003.png",
+              "Player_re-queue/animations/animating-03b05e65/south/frame_004.png",
+              "Player_re-queue/animations/animating-03b05e65/south/frame_005.png"
+            ],
+            "south-west": [
+              "Player_re-queue/animations/animating-03b05e65/south-west/frame_000.png",
+              "Player_re-queue/animations/animating-03b05e65/south-west/frame_001.png",
+              "Player_re-queue/animations/animating-03b05e65/south-west/frame_002.png",
+              "Player_re-queue/animations/animating-03b05e65/south-west/frame_003.png",
+              "Player_re-queue/animations/animating-03b05e65/south-west/frame_004.png",
+              "Player_re-queue/animations/animating-03b05e65/south-west/frame_005.png"
+            ],
+            "west": [
+              "Player_re-queue/animations/animating-03b05e65/west/frame_000.png",
+              "Player_re-queue/animations/animating-03b05e65/west/frame_001.png",
+              "Player_re-queue/animations/animating-03b05e65/west/frame_002.png",
+              "Player_re-queue/animations/animating-03b05e65/west/frame_003.png",
+              "Player_re-queue/animations/animating-03b05e65/west/frame_004.png",
+              "Player_re-queue/animations/animating-03b05e65/west/frame_005.png"
+            ],
+            "north-west": [
+              "Player_re-queue/animations/animating-03b05e65/north-west/frame_000.png",
+              "Player_re-queue/animations/animating-03b05e65/north-west/frame_001.png",
+              "Player_re-queue/animations/animating-03b05e65/north-west/frame_002.png",
+              "Player_re-queue/animations/animating-03b05e65/north-west/frame_003.png",
+              "Player_re-queue/animations/animating-03b05e65/north-west/frame_004.png",
+              "Player_re-queue/animations/animating-03b05e65/north-west/frame_005.png"
+            ]
+          },
+          "taking_a_punch-ad5db402": {
+            "north-west": [
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-west/frame_000.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-west/frame_001.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-west/frame_002.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-west/frame_003.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-west/frame_004.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-west/frame_005.png"
+            ],
+            "west": [
+              "Player_re-queue/animations/taking_a_punch-ad5db402/west/frame_000.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/west/frame_001.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/west/frame_002.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/west/frame_003.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/west/frame_004.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/west/frame_005.png"
+            ],
+            "south": [
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south/frame_000.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south/frame_001.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south/frame_002.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south/frame_003.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south/frame_004.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south/frame_005.png"
+            ],
+            "south-west": [
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-west/frame_000.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-west/frame_001.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-west/frame_002.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-west/frame_003.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-west/frame_004.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-west/frame_005.png"
+            ],
+            "north-east": [
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-east/frame_000.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-east/frame_001.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-east/frame_002.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-east/frame_003.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-east/frame_004.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north-east/frame_005.png"
+            ],
+            "north": [
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north/frame_000.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north/frame_001.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north/frame_002.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north/frame_003.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north/frame_004.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/north/frame_005.png"
+            ],
+            "south-east": [
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-east/frame_000.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-east/frame_001.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-east/frame_002.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-east/frame_003.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-east/frame_004.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/south-east/frame_005.png"
+            ],
+            "east": [
+              "Player_re-queue/animations/taking_a_punch-ad5db402/east/frame_000.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/east/frame_001.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/east/frame_002.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/east/frame_003.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/east/frame_004.png",
+              "Player_re-queue/animations/taking_a_punch-ad5db402/east/frame_005.png"
+            ]
+          },
+          "animating-698b5818": {
+            "north-west": [
+              "Player_re-queue/animations/animating-698b5818/north-west/frame_000.png",
+              "Player_re-queue/animations/animating-698b5818/north-west/frame_001.png",
+              "Player_re-queue/animations/animating-698b5818/north-west/frame_002.png",
+              "Player_re-queue/animations/animating-698b5818/north-west/frame_003.png"
+            ],
+            "south-west": [
+              "Player_re-queue/animations/animating-698b5818/south-west/frame_000.png",
+              "Player_re-queue/animations/animating-698b5818/south-west/frame_001.png",
+              "Player_re-queue/animations/animating-698b5818/south-west/frame_002.png",
+              "Player_re-queue/animations/animating-698b5818/south-west/frame_003.png"
+            ],
+            "east": [
+              "Player_re-queue/animations/animating-698b5818/east/frame_000.png",
+              "Player_re-queue/animations/animating-698b5818/east/frame_001.png",
+              "Player_re-queue/animations/animating-698b5818/east/frame_002.png",
+              "Player_re-queue/animations/animating-698b5818/east/frame_003.png"
+            ],
+            "north-east": [
+              "Player_re-queue/animations/animating-698b5818/north-east/frame_000.png",
+              "Player_re-queue/animations/animating-698b5818/north-east/frame_001.png",
+              "Player_re-queue/animations/animating-698b5818/north-east/frame_002.png",
+              "Player_re-queue/animations/animating-698b5818/north-east/frame_003.png"
+            ],
+            "south-east": [
+              "Player_re-queue/animations/animating-698b5818/south-east/frame_000.png",
+              "Player_re-queue/animations/animating-698b5818/south-east/frame_001.png",
+              "Player_re-queue/animations/animating-698b5818/south-east/frame_002.png",
+              "Player_re-queue/animations/animating-698b5818/south-east/frame_003.png"
+            ],
+            "north": [
+              "Player_re-queue/animations/animating-698b5818/north/frame_000.png",
+              "Player_re-queue/animations/animating-698b5818/north/frame_001.png",
+              "Player_re-queue/animations/animating-698b5818/north/frame_002.png",
+              "Player_re-queue/animations/animating-698b5818/north/frame_003.png"
+            ],
+            "west": [
+              "Player_re-queue/animations/animating-698b5818/west/frame_000.png",
+              "Player_re-queue/animations/animating-698b5818/west/frame_001.png",
+              "Player_re-queue/animations/animating-698b5818/west/frame_002.png",
+              "Player_re-queue/animations/animating-698b5818/west/frame_003.png"
+            ]
+          },
+          "animating-0db420ab": {
+            "south": [
+              "Player_re-queue/animations/animating-0db420ab/south/frame_000.png",
+              "Player_re-queue/animations/animating-0db420ab/south/frame_001.png",
+              "Player_re-queue/animations/animating-0db420ab/south/frame_002.png",
+              "Player_re-queue/animations/animating-0db420ab/south/frame_003.png"
+            ]
+          },
+          "jab_attack-6e586140": {
+            "west": [
+              "Player_re-queue/animations/jab_attack-6e586140/west/frame_000.png",
+              "Player_re-queue/animations/jab_attack-6e586140/west/frame_001.png",
+              "Player_re-queue/animations/jab_attack-6e586140/west/frame_002.png"
+            ],
+            "east": [
+              "Player_re-queue/animations/jab_attack-6e586140/east/frame_000.png",
+              "Player_re-queue/animations/jab_attack-6e586140/east/frame_001.png",
+              "Player_re-queue/animations/jab_attack-6e586140/east/frame_002.png"
+            ],
+            "north-east": [
+              "Player_re-queue/animations/jab_attack-6e586140/north-east/frame_000.png",
+              "Player_re-queue/animations/jab_attack-6e586140/north-east/frame_001.png",
+              "Player_re-queue/animations/jab_attack-6e586140/north-east/frame_002.png"
+            ],
+            "south-west": [
+              "Player_re-queue/animations/jab_attack-6e586140/south-west/frame_000.png",
+              "Player_re-queue/animations/jab_attack-6e586140/south-west/frame_001.png",
+              "Player_re-queue/animations/jab_attack-6e586140/south-west/frame_002.png"
+            ],
+            "north": [
+              "Player_re-queue/animations/jab_attack-6e586140/north/frame_000.png",
+              "Player_re-queue/animations/jab_attack-6e586140/north/frame_001.png",
+              "Player_re-queue/animations/jab_attack-6e586140/north/frame_002.png"
+            ],
+            "north-west": [
+              "Player_re-queue/animations/jab_attack-6e586140/north-west/frame_000.png",
+              "Player_re-queue/animations/jab_attack-6e586140/north-west/frame_001.png",
+              "Player_re-queue/animations/jab_attack-6e586140/north-west/frame_002.png"
+            ],
+            "south-east": [
+              "Player_re-queue/animations/jab_attack-6e586140/south-east/frame_000.png",
+              "Player_re-queue/animations/jab_attack-6e586140/south-east/frame_001.png",
+              "Player_re-queue/animations/jab_attack-6e586140/south-east/frame_002.png"
+            ],
+            "south": [
+              "Player_re-queue/animations/jab_attack-6e586140/south/frame_000.png",
+              "Player_re-queue/animations/jab_attack-6e586140/south/frame_001.png",
+              "Player_re-queue/animations/jab_attack-6e586140/south/frame_002.png"
+            ]
+          },
+          "cross_punch_attack-5d4c0925": {
+            "east": [
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/east/frame_000.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/east/frame_001.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/east/frame_002.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/east/frame_003.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/east/frame_004.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/east/frame_005.png"
+            ],
+            "north-west": [
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-west/frame_000.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-west/frame_001.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-west/frame_002.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-west/frame_003.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-west/frame_004.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-west/frame_005.png"
+            ],
+            "north": [
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north/frame_000.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north/frame_001.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north/frame_002.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north/frame_003.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north/frame_004.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north/frame_005.png"
+            ],
+            "west": [
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/west/frame_000.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/west/frame_001.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/west/frame_002.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/west/frame_003.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/west/frame_004.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/west/frame_005.png"
+            ],
+            "south-west": [
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-west/frame_000.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-west/frame_001.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-west/frame_002.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-west/frame_003.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-west/frame_004.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-west/frame_005.png"
+            ],
+            "north-east": [
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-east/frame_000.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-east/frame_001.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-east/frame_002.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-east/frame_003.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-east/frame_004.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/north-east/frame_005.png"
+            ],
+            "south": [
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south/frame_000.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south/frame_001.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south/frame_002.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south/frame_003.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south/frame_004.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south/frame_005.png"
+            ],
+            "south-east": [
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-east/frame_000.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-east/frame_001.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-east/frame_002.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-east/frame_003.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-east/frame_004.png",
+              "Player_re-queue/animations/cross_punch_attack-5d4c0925/south-east/frame_005.png"
+            ]
+          },
+          "falling_backward-6f5adaa2": {
+            "south": [
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south/frame_000.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south/frame_001.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south/frame_002.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south/frame_003.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south/frame_004.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south/frame_005.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south/frame_006.png"
+            ],
+            "north-west": [
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-west/frame_000.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-west/frame_001.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-west/frame_002.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-west/frame_003.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-west/frame_004.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-west/frame_005.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-west/frame_006.png"
+            ],
+            "south-east": [
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-east/frame_000.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-east/frame_001.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-east/frame_002.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-east/frame_003.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-east/frame_004.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-east/frame_005.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-east/frame_006.png"
+            ],
+            "south-west": [
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-west/frame_000.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-west/frame_001.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-west/frame_002.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-west/frame_003.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-west/frame_004.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-west/frame_005.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/south-west/frame_006.png"
+            ],
+            "north": [
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north/frame_000.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north/frame_001.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north/frame_002.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north/frame_003.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north/frame_004.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north/frame_005.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north/frame_006.png"
+            ],
+            "north-east": [
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-east/frame_000.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-east/frame_001.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-east/frame_002.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-east/frame_003.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-east/frame_004.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-east/frame_005.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/north-east/frame_006.png"
+            ],
+            "west": [
+              "Player_re-queue/animations/falling_backward-6f5adaa2/west/frame_000.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/west/frame_001.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/west/frame_002.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/west/frame_003.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/west/frame_004.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/west/frame_005.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/west/frame_006.png"
+            ],
+            "east": [
+              "Player_re-queue/animations/falling_backward-6f5adaa2/east/frame_000.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/east/frame_001.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/east/frame_002.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/east/frame_003.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/east/frame_004.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/east/frame_005.png",
+              "Player_re-queue/animations/falling_backward-6f5adaa2/east/frame_006.png"
+            ]
+          },
+          "animating-59c262a9": {
+            "south": [
+              "Player_re-queue/animations/animating-59c262a9/south/frame_000.png",
+              "Player_re-queue/animations/animating-59c262a9/south/frame_001.png",
+              "Player_re-queue/animations/animating-59c262a9/south/frame_002.png",
+              "Player_re-queue/animations/animating-59c262a9/south/frame_003.png",
+              "Player_re-queue/animations/animating-59c262a9/south/frame_004.png",
+              "Player_re-queue/animations/animating-59c262a9/south/frame_005.png",
+              "Player_re-queue/animations/animating-59c262a9/south/frame_006.png",
+              "Player_re-queue/animations/animating-59c262a9/south/frame_007.png"
+            ]
+          },
+          "walking-afc9af0f": {
+            "south": [
+              "Player_re-queue/animations/walking-afc9af0f/south/frame_000.png",
+              "Player_re-queue/animations/walking-afc9af0f/south/frame_001.png",
+              "Player_re-queue/animations/walking-afc9af0f/south/frame_002.png",
+              "Player_re-queue/animations/walking-afc9af0f/south/frame_003.png",
+              "Player_re-queue/animations/walking-afc9af0f/south/frame_004.png",
+              "Player_re-queue/animations/walking-afc9af0f/south/frame_005.png"
+            ]
+          },
+          "walking-c7d7ed28": {
+            "south-east": [
+              "Player_re-queue/animations/walking-c7d7ed28/south-east/frame_000.png",
+              "Player_re-queue/animations/walking-c7d7ed28/south-east/frame_001.png",
+              "Player_re-queue/animations/walking-c7d7ed28/south-east/frame_002.png",
+              "Player_re-queue/animations/walking-c7d7ed28/south-east/frame_003.png",
+              "Player_re-queue/animations/walking-c7d7ed28/south-east/frame_004.png",
+              "Player_re-queue/animations/walking-c7d7ed28/south-east/frame_005.png"
+            ],
+            "north-west": [
+              "Player_re-queue/animations/walking-c7d7ed28/north-west/frame_000.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north-west/frame_001.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north-west/frame_002.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north-west/frame_003.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north-west/frame_004.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north-west/frame_005.png"
+            ],
+            "east": [
+              "Player_re-queue/animations/walking-c7d7ed28/east/frame_000.png",
+              "Player_re-queue/animations/walking-c7d7ed28/east/frame_001.png",
+              "Player_re-queue/animations/walking-c7d7ed28/east/frame_002.png",
+              "Player_re-queue/animations/walking-c7d7ed28/east/frame_003.png",
+              "Player_re-queue/animations/walking-c7d7ed28/east/frame_004.png",
+              "Player_re-queue/animations/walking-c7d7ed28/east/frame_005.png"
+            ],
+            "north": [
+              "Player_re-queue/animations/walking-c7d7ed28/north/frame_000.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north/frame_001.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north/frame_002.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north/frame_003.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north/frame_004.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north/frame_005.png"
+            ],
+            "west": [
+              "Player_re-queue/animations/walking-c7d7ed28/west/frame_000.png",
+              "Player_re-queue/animations/walking-c7d7ed28/west/frame_001.png",
+              "Player_re-queue/animations/walking-c7d7ed28/west/frame_002.png",
+              "Player_re-queue/animations/walking-c7d7ed28/west/frame_003.png",
+              "Player_re-queue/animations/walking-c7d7ed28/west/frame_004.png",
+              "Player_re-queue/animations/walking-c7d7ed28/west/frame_005.png"
+            ],
+            "south-west": [
+              "Player_re-queue/animations/walking-c7d7ed28/south-west/frame_000.png",
+              "Player_re-queue/animations/walking-c7d7ed28/south-west/frame_001.png",
+              "Player_re-queue/animations/walking-c7d7ed28/south-west/frame_002.png",
+              "Player_re-queue/animations/walking-c7d7ed28/south-west/frame_003.png",
+              "Player_re-queue/animations/walking-c7d7ed28/south-west/frame_004.png",
+              "Player_re-queue/animations/walking-c7d7ed28/south-west/frame_005.png"
+            ],
+            "north-east": [
+              "Player_re-queue/animations/walking-c7d7ed28/north-east/frame_000.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north-east/frame_001.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north-east/frame_002.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north-east/frame_003.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north-east/frame_004.png",
+              "Player_re-queue/animations/walking-c7d7ed28/north-east/frame_005.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.0",
+  "export_date": "2026-05-17T20:34:05.357796"
+}
