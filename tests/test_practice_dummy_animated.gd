@@ -194,7 +194,12 @@ func test_force_queue_free_still_completes_post_die_with_animated_sprite() -> vo
 	for _i in range(40):
 		await get_tree().process_frame
 	# Either freed or queued for deletion — both satisfy "pipeline completed".
-	assert_true(d.is_queued_for_deletion() or not is_instance_valid(d),
+	# Check is_instance_valid FIRST — if the node has been freed, calling
+	# is_queued_for_deletion crashes ("Cannot call method on previously freed
+	# instance"). The OR short-circuits when validity is false, leaving the
+	# expression as true (pipeline did complete, the node is gone).
+	var pipeline_complete: bool = not is_instance_valid(d) or d.is_queued_for_deletion()
+	assert_true(pipeline_complete,
 		"dummy queued for deletion / freed after _die (post-AnimatedSprite2D pipeline intact)")
 
 
