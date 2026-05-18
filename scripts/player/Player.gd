@@ -1108,27 +1108,41 @@ static func _resolve_facing_from_mouse(mouse_global: Vector2, self_global: Vecto
 	return delta.normalized()
 
 
-## Sprite visual rotation. The Player.tscn `Sprite` is a 16×16 ColorRect
-## (symmetric square placeholder — see CLAUDE.md / docs/combat-architecture.md
-## doc-update on swing flow). Rotation lands on the node so an asymmetric
-## sprite drop-in (M2+ art swap) automatically picks up the orientation;
-## today the visual is symmetric and the rotation is mechanically observable
-## via `Sprite.rotation` but visually subtle.
+## Sprite node rotation — pinned to 0.0 by design (M3W-2 art-pass).
 ##
-## Subtract PI/2 to align the sprite's "top edge" with the facing direction.
-## With a symmetric square this is a no-op, but the offset is documented so
-## a future asymmetric sprite (sword tip pointing up by default in art) lands
-## with the tip toward the cursor without an art-side rotation tweak.
+## **Rule: directional frames carry orientation; the AnimatedSprite2D node's
+## `rotation` property must stay 0 across ALL states.** The Player's
+## `AnimatedSprite2D` resolves a `<state>_<dir>` animation key via
+## `_resolve_anim_dir` — each cardinal/diagonal direction has its own art —
+## so rotating the node on top of that produces a double-rotation that reads
+## as "the sprite is looking at the mouse cursor" (Sponsor's 2026-05-18 soak
+## verbatim, the bounce-back finding on PR #274).
+##
+## Pre-M3 history: `Player.tscn`'s `Sprite` was a 16×16 ColorRect (symmetric
+## square placeholder). Rotating it to `_facing.angle()` was visually a no-op
+## but mechanically observable; it was kept as a forward-compat seam for an
+## asymmetric sprite drop-in. The M3W-2 swap to AnimatedSprite2D + directional
+## frames is that drop-in — and the answer to the seam is "per-direction
+## frames", not "node rotation". This function is kept as the single
+## documentation-bearing pin so a future change can't silently reintroduce
+## a node-rotation source.
+##
+## See `.claude/docs/combat-architecture.md` §"Sprite-node topology, Seam 2:
+## Player aim-rotation" — Resolution (PR #274, 2026-05-18) for the two-
+## parallel-surfaces lesson: `_resolve_anim_dir` (animation name selection)
+## AND this function (sprite-node rotation) had to be decoupled together.
 func _update_sprite_rotation() -> void:
 	var sprite: Node = get_node_or_null("Sprite")
 	if sprite == null:
 		return
 	if not (sprite is CanvasItem):
 		return
-	# Anchor to facing.angle(). Subtract PI/2 in any future art-swap that
-	# defaults to "tip up" — for the M1 symmetric ColorRect the bare angle
-	# is correct.
-	(sprite as CanvasItem).rotation = _facing.angle()
+	# Pin to 0.0 — directional frames carry the orientation. The swing-wedge
+	# (line 1307) rotates independently via its own `wedge.rotation = dir.angle()`
+	# and is correctly scoped to `_spawn_swing_wedge`. _facing still drives
+	# animation NAME selection via `_resolve_anim_dir`; the node TRANSFORM
+	# must stay identity.
+	(sprite as CanvasItem).rotation = 0.0
 
 
 func _tick_timers(delta: float) -> void:
