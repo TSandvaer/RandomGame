@@ -289,6 +289,7 @@ func _ready() -> void:
 	_resolve_player()
 	if skip_intro_for_tests:
 		_state = STATE_IDLE
+	_wire_audio_cues()
 
 
 # ---- Public API -------------------------------------------------------
@@ -926,6 +927,61 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 		df = get_tree().root.get_node_or_null("DebugFlags")
 	if df != null and df.has_method("combat_trace"):
 		df.combat_trace(tag, msg)
+
+
+# ---- M3W-7 audio-cue wiring -------------------------------------------
+
+## Connect existing combat signals to AudioDirector SFX plays.
+##   damaged(amount>0)            → SFX_MOB_HIT
+##   boss_died                    → SFX_BOSS_DIE (heavier than mob-die)
+##   swing_spawned                → SFX_ATTACK_TELEGRAPH for slam_telegraph,
+##                                   SFX_ATTACK_IMPACT for melee + slam_hit
+##                                   (branches on `kind` per swing_spawned
+##                                   contract — telegraph vs impact map cleanly)
+func _wire_audio_cues() -> void:
+	if not damaged.is_connected(_on_damaged_audio):
+		damaged.connect(_on_damaged_audio)
+	if not boss_died.is_connected(_on_boss_died_audio):
+		boss_died.connect(_on_boss_died_audio)
+	if not swing_spawned.is_connected(_on_swing_spawned_audio):
+		swing_spawned.connect(_on_swing_spawned_audio)
+
+
+func _resolve_audio_director() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_tree().root.get_node_or_null("AudioDirector")
+
+
+func _on_damaged_audio(amount: int, _hp_remaining: int, _source: Node) -> void:
+	if amount <= 0:
+		return
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	ad.play_sfx(&"sfx-mob-hit")
+
+
+func _on_boss_died_audio(_mob: Stratum1Boss, _pos: Vector2, _def: MobDef) -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	ad.play_sfx(&"sfx-boss-die")
+
+
+func _on_swing_spawned_audio(kind: StringName, _hitbox: Node) -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	# Boss swing_spawned fires with three kinds — split by semantic:
+	#   melee + slam_hit → impact-shaped cue (contact beat).
+	#   slam_telegraph   → telegraph-shaped cue (windup marker spawn).
+	# The constants are defined elsewhere in this file (SWING_KIND_MELEE,
+	# SWING_KIND_SLAM_TELEGRAPH, SWING_KIND_SLAM_HIT).
+	if kind == SWING_KIND_SLAM_TELEGRAPH:
+		ad.play_sfx(&"sfx-attack-telegraph")
+	else:
+		ad.play_sfx(&"sfx-attack-impact")
 
 
 ## §3 boss-climax shake: jiggle the boss's Sprite child by ±4 logical px on

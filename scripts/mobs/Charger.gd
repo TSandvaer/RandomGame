@@ -252,6 +252,7 @@ func _ready() -> void:
 	_apply_motion_mode()
 	_resolve_player()
 	_last_position = global_position
+	_wire_audio_cues()
 
 
 # ---- Public API -------------------------------------------------------
@@ -708,6 +709,60 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 		df = get_tree().root.get_node_or_null("DebugFlags")
 	if df != null and df.has_method("combat_trace"):
 		df.combat_trace(tag, msg)
+
+
+# ---- M3W-7 audio-cue wiring -------------------------------------------
+
+## Connect existing combat signals to AudioDirector SFX plays.
+##   damaged(final_amount>0)     → SFX_MOB_HIT
+##   mob_died                    → SFX_MOB_DIE
+##   charge_telegraph_started    → SFX_ATTACK_TELEGRAPH
+##   charge_hit_spawned          → SFX_ATTACK_IMPACT
+func _wire_audio_cues() -> void:
+	if not damaged.is_connected(_on_damaged_audio):
+		damaged.connect(_on_damaged_audio)
+	if not mob_died.is_connected(_on_mob_died_audio):
+		mob_died.connect(_on_mob_died_audio)
+	if not charge_telegraph_started.is_connected(_on_telegraph_audio):
+		charge_telegraph_started.connect(_on_telegraph_audio)
+	if not charge_hit_spawned.is_connected(_on_hit_spawned_audio):
+		charge_hit_spawned.connect(_on_hit_spawned_audio)
+
+
+func _resolve_audio_director() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_tree().root.get_node_or_null("AudioDirector")
+
+
+func _on_damaged_audio(final_amount: int, _hp_remaining: int, _source: Node) -> void:
+	if final_amount <= 0:
+		return
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	ad.play_sfx(&"sfx-mob-hit")
+
+
+func _on_mob_died_audio(_mob: Charger, _pos: Vector2, _def: MobDef) -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	ad.play_sfx(&"sfx-mob-die")
+
+
+func _on_telegraph_audio(_dir: Vector2) -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	ad.play_sfx(&"sfx-attack-telegraph")
+
+
+func _on_hit_spawned_audio(_hitbox: Node) -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	ad.play_sfx(&"sfx-attack-impact")
 
 
 # ---- Animation playback (M3W-3) --------------------------------------

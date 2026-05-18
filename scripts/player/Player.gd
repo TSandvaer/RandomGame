@@ -399,6 +399,24 @@ func _ready() -> void:
 	# real transition.
 	_play_anim_for_state(_state)
 
+	# M3W-7 audio-cue wiring — connect existing combat signals to AudioDirector
+	# SFX plays. Each connection is idempotent guarded so tests that bare-
+	# instance Player + re-`_ready` don't double-connect (which would fire the
+	# cue twice per beat). Routes:
+	#   attack_spawned(kind=light)  → SFX_PLAYER_ATTACK_LIGHT
+	#   attack_spawned(kind=heavy)  → SFX_PLAYER_ATTACK_HEAVY
+	#   damaged(amount>0)           → SFX_PLAYER_HIT
+	#   iframes_started             → SFX_PLAYER_DODGE
+	# All routes fire from gameplay signals that necessarily come AFTER a user
+	# gesture (keyboard/mouse input), satisfying the HTML5 audio-playback gate
+	# per `.claude/docs/audio-architecture.md`.
+	if not attack_spawned.is_connected(_on_attack_spawned_audio):
+		attack_spawned.connect(_on_attack_spawned_audio)
+	if not damaged.is_connected(_on_damaged_audio):
+		damaged.connect(_on_damaged_audio)
+	if not iframes_started.is_connected(_on_iframes_started_audio):
+		iframes_started.connect(_on_iframes_started_audio)
+
 
 func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
@@ -1007,6 +1025,55 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 		df = get_tree().root.get_node_or_null("DebugFlags")
 	if df != null and df.has_method("combat_trace"):
 		df.combat_trace(tag, msg)
+
+
+# ---- M3W-7 audio-cue handlers ----------------------------------------
+
+## Resolve the AudioDirector autoload, or null in a bare-instanced test
+## context where no autoloads are registered. Mirrors the look-up convention
+## used by `_combat_trace` above — defensive against test stubs.
+func _resolve_audio_director() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_tree().root.get_node_or_null("AudioDirector")
+
+
+## attack_spawned → SFX_PLAYER_ATTACK_LIGHT or SFX_PLAYER_ATTACK_HEAVY.
+## Branches on `kind` to pick the matching cue. The `kind` arg is
+## ATTACK_LIGHT or ATTACK_HEAVY — same StringName the test bar already pins.
+func _on_attack_spawned_audio(kind: StringName, _hitbox: Node) -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	if kind == ATTACK_LIGHT:
+		ad.play_sfx(&"sfx-player-attack-light")
+	elif kind == ATTACK_HEAVY:
+		ad.play_sfx(&"sfx-player-attack-heavy")
+
+
+## damaged → SFX_PLAYER_HIT. Only fires when amount > 0 (i-frame absorbs,
+## post-hit-iframes wholly-blocked hits, etc. emit damaged(0, ...) — those
+## should NOT trigger a hit-cue, matching the visual-flash short-circuit in
+## `take_damage`).
+func _on_damaged_audio(amount: int, _hp_remaining: int, _source: Node) -> void:
+	if amount <= 0:
+		return
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	ad.play_sfx(&"sfx-player-hit")
+
+
+## iframes_started → SFX_PLAYER_DODGE. The iframes_started signal fires at
+## dodge-roll i-frame window start (frame 2 of 6 per `audio-direction.md
+## §AD-05` spec) — same instant the cloth-whoosh should land. Also fires
+## from `_grant_iframes` (post-hit invuln) — that's an acceptable cue
+## extension since the post-hit grant is itself a dodge-like absorb.
+func _on_iframes_started_audio() -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	ad.play_sfx(&"sfx-player-dodge")
 
 
 # ---- State handlers -----------------------------------------------------
