@@ -1,0 +1,407 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "e92d6924-44b3-4968-a3fd-ee5aecfe5ea5",
+        "name": "Grunt v2 (S1 Embergrave, red-eyes)",
+        "prompt": "hooded brown-robed cultist with two bright glowing red eyes piercing through hood shadow, dark fantasy enemy, menacing red eye-glow clearly visible inside the hood, tattered full-length cloth robe, top-down RPG, transparent background",
+        "size": {
+          "width": 68,
+          "height": 68
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-05-17T13:49:13.080931+00:00"
+      },
+      "folder": "Grunt_v2_S1_Embergrave_red-eyes",
+      "frames": {
+        "rotations": {
+          "south": "Grunt_v2_S1_Embergrave_red-eyes/rotations/south.png",
+          "south-east": "Grunt_v2_S1_Embergrave_red-eyes/rotations/south-east.png",
+          "east": "Grunt_v2_S1_Embergrave_red-eyes/rotations/east.png",
+          "north-east": "Grunt_v2_S1_Embergrave_red-eyes/rotations/north-east.png",
+          "north": "Grunt_v2_S1_Embergrave_red-eyes/rotations/north.png",
+          "north-west": "Grunt_v2_S1_Embergrave_red-eyes/rotations/north-west.png",
+          "west": "Grunt_v2_S1_Embergrave_red-eyes/rotations/west.png",
+          "south-west": "Grunt_v2_S1_Embergrave_red-eyes/rotations/south-west.png"
+        },
+        "animations": {
+          "walking_menacingly-9f6281f2": {
+            "east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/east/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/east/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/east/frame_007.png"
+            ],
+            "west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/west/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/west/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/west/frame_007.png"
+            ],
+            "north-west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-west/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-west/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-west/frame_007.png"
+            ],
+            "north-east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-east/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-east/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north-east/frame_007.png"
+            ],
+            "south-east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-east/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-east/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-east/frame_007.png"
+            ],
+            "south": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south/frame_007.png"
+            ],
+            "south-west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-west/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-west/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/south-west/frame_007.png"
+            ],
+            "north": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/walking_menacingly-9f6281f2/north/frame_007.png"
+            ]
+          },
+          "animating-62b12920": {
+            "east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/east/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/east/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/east/frame_007.png"
+            ],
+            "west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/west/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/west/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/west/frame_007.png"
+            ],
+            "south": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south/frame_007.png"
+            ],
+            "north-west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-west/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-west/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-west/frame_007.png"
+            ],
+            "south-west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-west/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-west/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-west/frame_007.png"
+            ],
+            "north-east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-east/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-east/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north-east/frame_007.png"
+            ],
+            "north": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/north/frame_007.png"
+            ],
+            "south-east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-east/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-east/frame_006.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/animating-62b12920/south-east/frame_007.png"
+            ]
+          },
+          "cross_punch_attack-5b669f52": {
+            "north-west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-west/frame_005.png"
+            ],
+            "south-east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-east/frame_005.png"
+            ],
+            "north-east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north-east/frame_005.png"
+            ],
+            "south-west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south-west/frame_005.png"
+            ],
+            "south": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/south/frame_005.png"
+            ],
+            "west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/west/frame_005.png"
+            ],
+            "east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/east/frame_005.png"
+            ],
+            "north": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/cross_punch_attack-5b669f52/north/frame_005.png"
+            ]
+          },
+          "taking_a_punch-88d385af": {
+            "north": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north/frame_005.png"
+            ],
+            "west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/west/frame_005.png"
+            ],
+            "north-west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-west/frame_005.png"
+            ],
+            "south-east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-east/frame_005.png"
+            ],
+            "east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/east/frame_005.png"
+            ],
+            "south": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south/frame_005.png"
+            ],
+            "south-west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/south-west/frame_005.png"
+            ],
+            "north-east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/taking_a_punch-88d385af/north-east/frame_005.png"
+            ]
+          },
+          "falling_backward-27df2dbf": {
+            "south-west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-west/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-west/frame_006.png"
+            ],
+            "south-east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-east/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south-east/frame_006.png"
+            ],
+            "north-west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-west/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-west/frame_006.png"
+            ],
+            "north": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north/frame_006.png"
+            ],
+            "north-east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-east/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/north-east/frame_006.png"
+            ],
+            "west": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/west/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/west/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/west/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/west/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/west/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/west/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/west/frame_006.png"
+            ],
+            "east": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/east/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/east/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/east/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/east/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/east/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/east/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/east/frame_006.png"
+            ],
+            "south": [
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south/frame_000.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south/frame_001.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south/frame_002.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south/frame_003.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south/frame_004.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south/frame_005.png",
+              "Grunt_v2_S1_Embergrave_red-eyes/animations/falling_backward-27df2dbf/south/frame_006.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.0",
+  "export_date": "2026-05-17T20:34:06.768652"
+}

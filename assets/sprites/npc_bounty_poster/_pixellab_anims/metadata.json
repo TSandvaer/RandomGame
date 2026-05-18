@@ -1,0 +1,87 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "70806893-cd64-4e7d-b8ae-d01954e2cced",
+        "name": "NPC Bounty-poster (simplified + doctrine-hex test)",
+        "prompt": "robed scribe NPC in dark brown #4A3F2E robes, deep dark hood covering most of face, holding parchment scroll #C9C2B2 in one hand, warm tan #A0856B skin tone visible inside hood, neutral standing pose, calm demeanor, dark fantasy town, top-down RPG, transparent background",
+        "size": {
+          "width": 68,
+          "height": 68
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-05-17T15:46:02.644002+00:00"
+      },
+      "folder": "NPC_Bounty-poster_simplified_doctrine-hex_test",
+      "frames": {
+        "rotations": {
+          "south": "NPC_Bounty-poster_simplified_doctrine-hex_test/rotations/south.png",
+          "south-east": "NPC_Bounty-poster_simplified_doctrine-hex_test/rotations/south-east.png",
+          "east": "NPC_Bounty-poster_simplified_doctrine-hex_test/rotations/east.png",
+          "north-east": "NPC_Bounty-poster_simplified_doctrine-hex_test/rotations/north-east.png",
+          "north": "NPC_Bounty-poster_simplified_doctrine-hex_test/rotations/north.png",
+          "north-west": "NPC_Bounty-poster_simplified_doctrine-hex_test/rotations/north-west.png",
+          "west": "NPC_Bounty-poster_simplified_doctrine-hex_test/rotations/west.png",
+          "south-west": "NPC_Bounty-poster_simplified_doctrine-hex_test/rotations/south-west.png"
+        },
+        "animations": {
+          "animating-2f589481": {
+            "north-west": [
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north-west/frame_000.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north-west/frame_001.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north-west/frame_002.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north-west/frame_003.png"
+            ],
+            "south": [
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south/frame_000.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south/frame_001.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south/frame_002.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south/frame_003.png"
+            ],
+            "north-east": [
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north-east/frame_000.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north-east/frame_001.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north-east/frame_002.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north-east/frame_003.png"
+            ],
+            "south-east": [
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south-east/frame_000.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south-east/frame_001.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south-east/frame_002.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south-east/frame_003.png"
+            ],
+            "west": [
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/west/frame_000.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/west/frame_001.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/west/frame_002.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/west/frame_003.png"
+            ],
+            "north": [
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north/frame_000.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north/frame_001.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north/frame_002.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/north/frame_003.png"
+            ],
+            "east": [
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/east/frame_000.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/east/frame_001.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/east/frame_002.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/east/frame_003.png"
+            ],
+            "south-west": [
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south-west/frame_000.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south-west/frame_001.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south-west/frame_002.png",
+              "NPC_Bounty-poster_simplified_doctrine-hex_test/animations/animating-2f589481/south-west/frame_003.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.0",
+  "export_date": "2026-05-17T20:35:15.825911"
+}

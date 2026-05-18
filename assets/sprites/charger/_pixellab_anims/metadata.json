@@ -1,0 +1,341 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "a114419e-23e9-43c8-bb47-4ef8eb21cc61",
+        "name": "Charger (S1 Embergrave)",
+        "prompt": "menacing brown bear monster, dark fantasy stalker creature, glowing red eyes, low quadrupedal stance, shaggy fur, top-down RPG enemy, transparent background",
+        "size": {
+          "width": 68,
+          "height": 68
+        },
+        "template_id": "bear",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-05-17T13:31:43.757541+00:00"
+      },
+      "folder": "Charger_S1_Embergrave",
+      "frames": {
+        "rotations": {
+          "south": "Charger_S1_Embergrave/rotations/south.png",
+          "south-east": "Charger_S1_Embergrave/rotations/south-east.png",
+          "east": "Charger_S1_Embergrave/rotations/east.png",
+          "north-east": "Charger_S1_Embergrave/rotations/north-east.png",
+          "north": "Charger_S1_Embergrave/rotations/north.png",
+          "north-west": "Charger_S1_Embergrave/rotations/north-west.png",
+          "west": "Charger_S1_Embergrave/rotations/west.png",
+          "south-west": "Charger_S1_Embergrave/rotations/south-west.png"
+        },
+        "animations": {
+          "running-8142ff5e": {
+            "north-west": [
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north-west/frame_000.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north-west/frame_001.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north-west/frame_002.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north-west/frame_003.png"
+            ],
+            "north": [
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north/frame_000.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north/frame_001.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north/frame_002.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north/frame_003.png"
+            ],
+            "south-west": [
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south-west/frame_000.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south-west/frame_001.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south-west/frame_002.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south-west/frame_003.png"
+            ],
+            "west": [
+              "Charger_S1_Embergrave/animations/running-8142ff5e/west/frame_000.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/west/frame_001.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/west/frame_002.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/west/frame_003.png"
+            ],
+            "south": [
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south/frame_000.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south/frame_001.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south/frame_002.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south/frame_003.png"
+            ],
+            "south-east": [
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south-east/frame_000.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south-east/frame_001.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south-east/frame_002.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/south-east/frame_003.png"
+            ],
+            "north-east": [
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north-east/frame_000.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north-east/frame_001.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north-east/frame_002.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/north-east/frame_003.png"
+            ],
+            "east": [
+              "Charger_S1_Embergrave/animations/running-8142ff5e/east/frame_000.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/east/frame_001.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/east/frame_002.png",
+              "Charger_S1_Embergrave/animations/running-8142ff5e/east/frame_003.png"
+            ]
+          },
+          "acting_angry-060d0b5f": {
+            "south-east": [
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-east/frame_000.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-east/frame_001.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-east/frame_002.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-east/frame_003.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-east/frame_004.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-east/frame_005.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-east/frame_006.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-east/frame_007.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-east/frame_008.png"
+            ],
+            "south-west": [
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-west/frame_000.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-west/frame_001.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-west/frame_002.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-west/frame_003.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-west/frame_004.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-west/frame_005.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-west/frame_006.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-west/frame_007.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south-west/frame_008.png"
+            ],
+            "west": [
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/west/frame_000.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/west/frame_001.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/west/frame_002.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/west/frame_003.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/west/frame_004.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/west/frame_005.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/west/frame_006.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/west/frame_007.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/west/frame_008.png"
+            ],
+            "south": [
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south/frame_000.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south/frame_001.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south/frame_002.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south/frame_003.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south/frame_004.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south/frame_005.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south/frame_006.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south/frame_007.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/south/frame_008.png"
+            ],
+            "north": [
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north/frame_000.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north/frame_001.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north/frame_002.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north/frame_003.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north/frame_004.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north/frame_005.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north/frame_006.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north/frame_007.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north/frame_008.png"
+            ],
+            "north-west": [
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-west/frame_000.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-west/frame_001.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-west/frame_002.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-west/frame_003.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-west/frame_004.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-west/frame_005.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-west/frame_006.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-west/frame_007.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-west/frame_008.png"
+            ],
+            "north-east": [
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-east/frame_000.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-east/frame_001.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-east/frame_002.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-east/frame_003.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-east/frame_004.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-east/frame_005.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-east/frame_006.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-east/frame_007.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/north-east/frame_008.png"
+            ],
+            "east": [
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/east/frame_000.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/east/frame_001.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/east/frame_002.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/east/frame_003.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/east/frame_004.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/east/frame_005.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/east/frame_006.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/east/frame_007.png",
+              "Charger_S1_Embergrave/animations/acting_angry-060d0b5f/east/frame_008.png"
+            ]
+          },
+          "going_to_sleep-4728493a": {
+            "north-west": [
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-west/frame_000.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-west/frame_001.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-west/frame_002.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-west/frame_003.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-west/frame_004.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-west/frame_005.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-west/frame_006.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-west/frame_007.png"
+            ],
+            "east": [
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/east/frame_000.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/east/frame_001.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/east/frame_002.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/east/frame_003.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/east/frame_004.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/east/frame_005.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/east/frame_006.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/east/frame_007.png"
+            ],
+            "west": [
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/west/frame_000.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/west/frame_001.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/west/frame_002.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/west/frame_003.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/west/frame_004.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/west/frame_005.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/west/frame_006.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/west/frame_007.png"
+            ],
+            "south": [
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south/frame_000.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south/frame_001.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south/frame_002.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south/frame_003.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south/frame_004.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south/frame_005.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south/frame_006.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south/frame_007.png"
+            ],
+            "north": [
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north/frame_000.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north/frame_001.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north/frame_002.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north/frame_003.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north/frame_004.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north/frame_005.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north/frame_006.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north/frame_007.png"
+            ],
+            "south-east": [
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-east/frame_000.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-east/frame_001.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-east/frame_002.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-east/frame_003.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-east/frame_004.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-east/frame_005.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-east/frame_006.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-east/frame_007.png"
+            ],
+            "north-east": [
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-east/frame_000.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-east/frame_001.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-east/frame_002.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-east/frame_003.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-east/frame_004.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-east/frame_005.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-east/frame_006.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/north-east/frame_007.png"
+            ],
+            "south-west": [
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-west/frame_000.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-west/frame_001.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-west/frame_002.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-west/frame_003.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-west/frame_004.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-west/frame_005.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-west/frame_006.png",
+              "Charger_S1_Embergrave/animations/going_to_sleep-4728493a/south-west/frame_007.png"
+            ]
+          },
+          "jump_attack-aa4e7c70": {
+            "south": [
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south/frame_000.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south/frame_001.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south/frame_002.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south/frame_003.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south/frame_004.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south/frame_005.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south/frame_006.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south/frame_007.png"
+            ],
+            "south-east": [
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-east/frame_000.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-east/frame_001.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-east/frame_002.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-east/frame_003.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-east/frame_004.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-east/frame_005.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-east/frame_006.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-east/frame_007.png"
+            ],
+            "north-east": [
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-east/frame_000.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-east/frame_001.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-east/frame_002.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-east/frame_003.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-east/frame_004.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-east/frame_005.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-east/frame_006.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-east/frame_007.png"
+            ],
+            "west": [
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/west/frame_000.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/west/frame_001.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/west/frame_002.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/west/frame_003.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/west/frame_004.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/west/frame_005.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/west/frame_006.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/west/frame_007.png"
+            ],
+            "north": [
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north/frame_000.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north/frame_001.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north/frame_002.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north/frame_003.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north/frame_004.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north/frame_005.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north/frame_006.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north/frame_007.png"
+            ],
+            "north-west": [
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-west/frame_000.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-west/frame_001.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-west/frame_002.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-west/frame_003.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-west/frame_004.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-west/frame_005.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-west/frame_006.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/north-west/frame_007.png"
+            ],
+            "east": [
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/east/frame_000.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/east/frame_001.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/east/frame_002.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/east/frame_003.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/east/frame_004.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/east/frame_005.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/east/frame_006.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/east/frame_007.png"
+            ],
+            "south-west": [
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-west/frame_000.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-west/frame_001.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-west/frame_002.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-west/frame_003.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-west/frame_004.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-west/frame_005.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-west/frame_006.png",
+              "Charger_S1_Embergrave/animations/jump_attack-aa4e7c70/south-west/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.0",
+  "export_date": "2026-05-17T20:34:24.361253"
+}

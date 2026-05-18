@@ -1,0 +1,177 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "02471680-be01-4bd1-9420-1909565062fd",
+        "name": "PracticeDummy",
+        "prompt": "wooden training dummy practice target, straw-padded humanoid silhouette wrapped in faded burlap cloth, dark wood base post, no facial features no eyes, simple sturdy standing pose, inert non-hostile, top-down RPG, transparent background",
+        "size": {
+          "width": 68,
+          "height": 68
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-05-17T14:07:19.763887+00:00"
+      },
+      "folder": "PracticeDummy",
+      "frames": {
+        "rotations": {
+          "south": "PracticeDummy/rotations/south.png",
+          "south-east": "PracticeDummy/rotations/south-east.png",
+          "east": "PracticeDummy/rotations/east.png",
+          "north-east": "PracticeDummy/rotations/north-east.png",
+          "north": "PracticeDummy/rotations/north.png",
+          "north-west": "PracticeDummy/rotations/north-west.png",
+          "west": "PracticeDummy/rotations/west.png",
+          "south-west": "PracticeDummy/rotations/south-west.png"
+        },
+        "animations": {
+          "taking_a_punch-1f45c4b5": {
+            "west": [
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/west/frame_000.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/west/frame_001.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/west/frame_002.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/west/frame_003.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/west/frame_004.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/west/frame_005.png"
+            ],
+            "south": [
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south/frame_000.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south/frame_001.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south/frame_002.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south/frame_003.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south/frame_004.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south/frame_005.png"
+            ],
+            "south-west": [
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-west/frame_000.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-west/frame_001.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-west/frame_002.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-west/frame_003.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-west/frame_004.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-west/frame_005.png"
+            ],
+            "north": [
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north/frame_000.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north/frame_001.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north/frame_002.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north/frame_003.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north/frame_004.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north/frame_005.png"
+            ],
+            "north-west": [
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-west/frame_000.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-west/frame_001.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-west/frame_002.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-west/frame_003.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-west/frame_004.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-west/frame_005.png"
+            ],
+            "south-east": [
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-east/frame_000.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-east/frame_001.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-east/frame_002.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-east/frame_003.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-east/frame_004.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/south-east/frame_005.png"
+            ],
+            "north-east": [
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-east/frame_000.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-east/frame_001.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-east/frame_002.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-east/frame_003.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-east/frame_004.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/north-east/frame_005.png"
+            ],
+            "east": [
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/east/frame_000.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/east/frame_001.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/east/frame_002.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/east/frame_003.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/east/frame_004.png",
+              "PracticeDummy/animations/taking_a_punch-1f45c4b5/east/frame_005.png"
+            ]
+          },
+          "falling_backward-26fe5a45": {
+            "south-west": [
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-west/frame_000.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-west/frame_001.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-west/frame_002.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-west/frame_003.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-west/frame_004.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-west/frame_005.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-west/frame_006.png"
+            ],
+            "west": [
+              "PracticeDummy/animations/falling_backward-26fe5a45/west/frame_000.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/west/frame_001.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/west/frame_002.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/west/frame_003.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/west/frame_004.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/west/frame_005.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/west/frame_006.png"
+            ],
+            "south-east": [
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-east/frame_000.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-east/frame_001.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-east/frame_002.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-east/frame_003.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-east/frame_004.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-east/frame_005.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south-east/frame_006.png"
+            ],
+            "south": [
+              "PracticeDummy/animations/falling_backward-26fe5a45/south/frame_000.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south/frame_001.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south/frame_002.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south/frame_003.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south/frame_004.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south/frame_005.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/south/frame_006.png"
+            ],
+            "north-west": [
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-west/frame_000.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-west/frame_001.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-west/frame_002.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-west/frame_003.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-west/frame_004.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-west/frame_005.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-west/frame_006.png"
+            ],
+            "north": [
+              "PracticeDummy/animations/falling_backward-26fe5a45/north/frame_000.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north/frame_001.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north/frame_002.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north/frame_003.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north/frame_004.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north/frame_005.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north/frame_006.png"
+            ],
+            "north-east": [
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-east/frame_000.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-east/frame_001.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-east/frame_002.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-east/frame_003.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-east/frame_004.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-east/frame_005.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/north-east/frame_006.png"
+            ],
+            "east": [
+              "PracticeDummy/animations/falling_backward-26fe5a45/east/frame_000.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/east/frame_001.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/east/frame_002.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/east/frame_003.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/east/frame_004.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/east/frame_005.png",
+              "PracticeDummy/animations/falling_backward-26fe5a45/east/frame_006.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.0",
+  "export_date": "2026-05-17T20:35:09.438016"
+}
