@@ -1,0 +1,501 @@
+[gd_resource type="SpriteFrames" load_steps=105 format=3 uid="uid://b0embergrave_pd_sprite_frames"]
+
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south/frame_000.png" id="f_000"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south/frame_001.png" id="f_001"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south/frame_002.png" id="f_002"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south/frame_003.png" id="f_003"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south/frame_004.png" id="f_004"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south/frame_005.png" id="f_005"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-east/frame_000.png" id="f_006"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-east/frame_001.png" id="f_007"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-east/frame_002.png" id="f_008"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-east/frame_003.png" id="f_009"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-east/frame_004.png" id="f_010"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-east/frame_005.png" id="f_011"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/east/frame_000.png" id="f_012"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/east/frame_001.png" id="f_013"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/east/frame_002.png" id="f_014"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/east/frame_003.png" id="f_015"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/east/frame_004.png" id="f_016"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/east/frame_005.png" id="f_017"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-east/frame_000.png" id="f_018"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-east/frame_001.png" id="f_019"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-east/frame_002.png" id="f_020"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-east/frame_003.png" id="f_021"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-east/frame_004.png" id="f_022"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-east/frame_005.png" id="f_023"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north/frame_000.png" id="f_024"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north/frame_001.png" id="f_025"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north/frame_002.png" id="f_026"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north/frame_003.png" id="f_027"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north/frame_004.png" id="f_028"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north/frame_005.png" id="f_029"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-west/frame_000.png" id="f_030"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-west/frame_001.png" id="f_031"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-west/frame_002.png" id="f_032"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-west/frame_003.png" id="f_033"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-west/frame_004.png" id="f_034"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/north-west/frame_005.png" id="f_035"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/west/frame_000.png" id="f_036"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/west/frame_001.png" id="f_037"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/west/frame_002.png" id="f_038"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/west/frame_003.png" id="f_039"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/west/frame_004.png" id="f_040"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/west/frame_005.png" id="f_041"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-west/frame_000.png" id="f_042"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-west/frame_001.png" id="f_043"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-west/frame_002.png" id="f_044"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-west/frame_003.png" id="f_045"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-west/frame_004.png" id="f_046"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/hit/south-west/frame_005.png" id="f_047"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south/frame_000.png" id="f_048"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south/frame_001.png" id="f_049"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south/frame_002.png" id="f_050"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south/frame_003.png" id="f_051"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south/frame_004.png" id="f_052"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south/frame_005.png" id="f_053"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south/frame_006.png" id="f_054"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-east/frame_000.png" id="f_055"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-east/frame_001.png" id="f_056"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-east/frame_002.png" id="f_057"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-east/frame_003.png" id="f_058"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-east/frame_004.png" id="f_059"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-east/frame_005.png" id="f_060"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-east/frame_006.png" id="f_061"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/east/frame_000.png" id="f_062"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/east/frame_001.png" id="f_063"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/east/frame_002.png" id="f_064"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/east/frame_003.png" id="f_065"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/east/frame_004.png" id="f_066"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/east/frame_005.png" id="f_067"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/east/frame_006.png" id="f_068"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-east/frame_000.png" id="f_069"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-east/frame_001.png" id="f_070"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-east/frame_002.png" id="f_071"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-east/frame_003.png" id="f_072"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-east/frame_004.png" id="f_073"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-east/frame_005.png" id="f_074"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-east/frame_006.png" id="f_075"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north/frame_000.png" id="f_076"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north/frame_001.png" id="f_077"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north/frame_002.png" id="f_078"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north/frame_003.png" id="f_079"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north/frame_004.png" id="f_080"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north/frame_005.png" id="f_081"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north/frame_006.png" id="f_082"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-west/frame_000.png" id="f_083"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-west/frame_001.png" id="f_084"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-west/frame_002.png" id="f_085"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-west/frame_003.png" id="f_086"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-west/frame_004.png" id="f_087"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-west/frame_005.png" id="f_088"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/north-west/frame_006.png" id="f_089"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/west/frame_000.png" id="f_090"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/west/frame_001.png" id="f_091"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/west/frame_002.png" id="f_092"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/west/frame_003.png" id="f_093"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/west/frame_004.png" id="f_094"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/west/frame_005.png" id="f_095"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/west/frame_006.png" id="f_096"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-west/frame_000.png" id="f_097"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-west/frame_001.png" id="f_098"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-west/frame_002.png" id="f_099"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-west/frame_003.png" id="f_100"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-west/frame_004.png" id="f_101"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-west/frame_005.png" id="f_102"]
+[ext_resource type="Texture2D" path="res://assets/sprites/practice_dummy/_pixellab_anims/PracticeDummy/animations/die/south-west/frame_006.png" id="f_103"]
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_000")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_001")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_002")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_003")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_004")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_005")
+}],
+"loop": false,
+"name": &"hit_s",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_006")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_007")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_008")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_009")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_010")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_011")
+}],
+"loop": false,
+"name": &"hit_se",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_012")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_013")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_014")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_015")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_016")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_017")
+}],
+"loop": false,
+"name": &"hit_e",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_018")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_019")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_020")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_021")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_022")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_023")
+}],
+"loop": false,
+"name": &"hit_ne",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_024")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_025")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_026")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_027")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_028")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_029")
+}],
+"loop": false,
+"name": &"hit_n",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_030")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_031")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_032")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_033")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_034")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_035")
+}],
+"loop": false,
+"name": &"hit_nw",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_036")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_037")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_038")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_039")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_040")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_041")
+}],
+"loop": false,
+"name": &"hit_w",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_042")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_043")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_044")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_045")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_046")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_047")
+}],
+"loop": false,
+"name": &"hit_sw",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_048")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_049")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_050")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_051")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_052")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_053")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_054")
+}],
+"loop": false,
+"name": &"die_s",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_055")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_056")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_057")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_058")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_059")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_060")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_061")
+}],
+"loop": false,
+"name": &"die_se",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_062")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_063")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_064")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_065")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_066")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_067")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_068")
+}],
+"loop": false,
+"name": &"die_e",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_069")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_070")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_071")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_072")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_073")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_074")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_075")
+}],
+"loop": false,
+"name": &"die_ne",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_076")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_077")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_078")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_079")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_080")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_081")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_082")
+}],
+"loop": false,
+"name": &"die_n",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_083")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_084")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_085")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_086")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_087")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_088")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_089")
+}],
+"loop": false,
+"name": &"die_nw",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_090")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_091")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_092")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_093")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_094")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_095")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_096")
+}],
+"loop": false,
+"name": &"die_w",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_097")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_098")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_099")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_100")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_101")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_102")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_103")
+}],
+"loop": false,
+"name": &"die_sw",
+"speed": 8.0
+}]
