@@ -86,7 +86,7 @@ is unreadable at the listed size (see decision rule below).
 | Charger | 48×32 | Wider than tall; quadruped needs width budget |
 | Shooter | 32×32 | Humanoid; standard mob square |
 | Stratum1Boss | 48×48 | Larger than mobs to signal boss weight |
-| Stoker | 32×32 | Grunt retint; same dimensions |
+| Stoker | 32×32 | Grunt retint for M3 phase 1 ship; phase-2 re-author with miner-cap silhouette per `palette-stratum-2.md` §5 + DECISIONS.md 2026-05-18. |
 | PracticeDummy | 32×32 | Static target; square fine |
 | Hub-town NPCs | 32×40 | Slightly taller than mobs for NPC distinction |
 
@@ -266,7 +266,7 @@ dark folk fantasy, readable silhouette at 48px (slightly larger than mobs),
 --ar 1:1 --style raw --no [anti-tokens]
 ```
 
-**Stoker (S2 heat-blasted miner — retint of Grunt silhouette per `palette-stratum-2.md §5`)**
+**Stoker (S2 heat-blasted miner — Grunt-retint for M3 phase-1 ship per `palette-stratum-2.md §5` + DECISIONS.md 2026-05-18; phase-2 re-authoring with miner-cap silhouette deferred to M4 backlog)**
 
 ```
 top-down RPG enemy sprite, 32-bit pixel art, soot-blackened human miner in
@@ -439,7 +439,7 @@ The dominant cost is **frame-align** (Step 4). Single-frame generation is cheap 
 
 If labor estimates are too high:
 
-1. **Use Stoker as Grunt retint** (per `palette-stratum-2.md §5`). Same silhouette + animation cycle; only palette differs. Cuts ~2 hrs.
+1. **Use Stoker as Grunt retint** (per `palette-stratum-2.md §5` after the 2026-05-18 reconciliation; was originally listed as a "labor acceleration tactic" — is now the M3 phase-1 ship-state baseline, with phase-2 miner-cap re-authoring deferred to M4 backlog). Same silhouette + animation cycle; only palette differs. Cuts ~2 hrs.
 2. **Reuse hub-town NPC bodies across roles.** Three NPCs can share a torso template with different head + prop overlays. Cuts ~1.5 hrs.
 3. **Skip PracticeDummy attack animations.** It's a training dummy; idle + hit-react are sufficient. Cuts ~0.5 hrs.
 4. **Defer S2 retint to Phase 1.5.** Ship Phase 1 with S1 sprites only; S2 retint when S2 boss room lands. Cuts ~2.5 hrs.
@@ -491,7 +491,7 @@ Same scope as PR #257's commission brief — DIY-paced rather than commission-sc
 | Charger | idle / walk / attack-telegraph / attack / hit-react / die | 4/8/4/6/3/8 | ~33 base (× 4 dir = ~132) |
 | Shooter | idle / walk / attack-telegraph / attack / hit-react / die | 4/8/4/6/3/8 | ~33 base (× 4 dir = ~132) |
 | Stratum1Boss | idle / walk / attack-telegraph-A / attack-A / attack-telegraph-B / attack-B / hit-react / die | 4/8/4/6/4/8/3/12 | ~49 base (× 4 dir = ~196) |
-| Stoker (S2 retint of Grunt) | same as Grunt | same | ~33 base (palette-swap; no new authoring) |
+| Stoker (M3 phase-1: retint of Grunt; phase-2 re-author per DECISIONS.md 2026-05-18) | same as Grunt | same | ~33 base (palette-swap; no new authoring for phase 1) |
 | PracticeDummy | idle / hit-react / die | 4/3/8 | ~15 base (× 1 dir = ~15) |
 | Vendor NPC | idle / talk | 4/4 | ~8 |
 | Anvil-keeper NPC | idle / talk | 4/4 | ~8 |
