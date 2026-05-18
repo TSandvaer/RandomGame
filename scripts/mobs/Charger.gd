@@ -141,6 +141,17 @@ const DEATH_TARGET_SCALE: float = 0.6
 const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
 const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 
+## Hit-flash modulate tint for the AnimatedSprite2D path (M3W-1 / M3W-3 convention).
+## Mirrors `PracticeDummy.HIT_FLASH_TINT` verbatim. Sub-1.0 channels for HTML5
+## HDR-clamp safety; channel-sum delta ≥ 0.20 vs rest white.
+##
+## Charger note (per `anim-folder-map.md`): the bear PixelLab template ships NO
+## `hit` animation, so `_play_hit_flash` is THE only visible-feedback signal on
+## hit. The 3-branch resolver still works (modulate path is branch 1 for
+## AnimatedSprite2D); this just means the hit-flash is more load-bearing for
+## Charger than for siblings that ALSO play a `hit_<dir>` anim concurrently.
+const HIT_FLASH_TINT: Color = Color(1.0, 0.50, 0.50, 1.0)  # soft red wash, HTML5-safe
+
 ## Layer bits (mirror project.godot — same as Grunt).
 const LAYER_WORLD: int = 1 << 0          # bit 1
 const LAYER_PLAYER: int = 1 << 1         # bit 2
@@ -220,10 +231,19 @@ var _death_tween: Tween = null
 var _modulate_at_rest: Color = Color(1, 1, 1, 1)
 var _captured_modulate_at_rest: bool = false
 
-# Hit-flash target — Sprite child (Bug C fix). See Grunt.gd for full rationale.
+# Hit-flash target — M3W-3 3-branch resolver. See Grunt.gd + PracticeDummy.gd
+# for full rationale. Branch 1 (AnimatedSprite2D) is the production path post-M3W-3;
+# Branch 2 (ColorRect) is legacy fallback for bare tests; Branch 3 (self.modulate)
+# is the bare-no-Sprite-child fallback.
 var _hit_flash_target: CanvasItem = null
 var _hit_flash_uses_sprite: bool = false
+var _hit_flash_uses_animated_sprite: bool = false
 var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
+var _sprite_modulate_at_rest: Color = Color(1, 1, 1, 1)
+
+# AnimatedSprite2D cache (M3W-3) — resolved lazily from get_node_or_null("Sprite").
+var _animated_sprite: AnimatedSprite2D = null
+var _animated_sprite_resolved: bool = false
 
 
 func _ready() -> void:
@@ -545,6 +565,9 @@ func _die() -> void:
 	# room-clear logic still execute on this frame; the 200ms visual decay
 	# does not gate progression.
 	mob_died.emit(self, global_position, mob_def)
+	# M3W-3 anim: play `die_<dir>` (going-to-sleep / collapse). Concurrent with
+	# the parent CharacterBody2D's scale/alpha death-tween.
+	_play_anim(&"die")
 	_spawn_death_particles()
 	_play_death_tween()
 
@@ -591,20 +614,29 @@ func _cancel_attack_telegraph_tween() -> void:
 		_attack_telegraph_tween = null
 
 
-## §2 hit-flash. Bug C fix: tween Sprite child's `color` so the flash is
-## actually visible. See Grunt._play_hit_flash for full rationale.
+## §2 hit-flash. M3W-3 3-branch resolver — verbatim mirror of
+## `PracticeDummy._play_hit_flash` modulo the `Charger.` tag. AnimatedSprite2D
+## modulate-tween is the PRIMARY visible-feedback path for Charger because the
+## bear PixelLab template ships no `hit_<dir>` anim (see `anim-folder-map.md`).
 func _play_hit_flash() -> void:
 	if _is_dead:
 		return
 	if _hit_flash_target == null:
 		var sprite: Node = get_node_or_null("Sprite")
-		if sprite is ColorRect:
+		if sprite is AnimatedSprite2D:
 			_hit_flash_target = sprite
 			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = true
+			_sprite_modulate_at_rest = (sprite as AnimatedSprite2D).modulate
+		elif sprite is ColorRect:
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = false
 			_sprite_color_at_rest = (sprite as ColorRect).color
 		else:
 			_hit_flash_target = self
 			_hit_flash_uses_sprite = false
+			_hit_flash_uses_animated_sprite = false
 	if not _captured_modulate_at_rest:
 		_modulate_at_rest = modulate
 		_captured_modulate_at_rest = true
@@ -614,7 +646,18 @@ func _play_hit_flash() -> void:
 		modulate = _modulate_at_rest
 		return
 	_hit_flash_tween = create_tween()
-	if _hit_flash_uses_sprite:
+	if _hit_flash_uses_animated_sprite:
+		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
+		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
+		_combat_trace("Charger._play_hit_flash",
+			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)" % [
+				_hit_flash_tween.is_valid(),
+				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
+				_sprite_modulate_at_rest.r, _sprite_modulate_at_rest.g, _sprite_modulate_at_rest.b
+			])
+	elif _hit_flash_uses_sprite:
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
@@ -667,6 +710,63 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 		df.combat_trace(tag, msg)
 
 
+# ---- Animation playback (M3W-3) --------------------------------------
+
+## Play an animation on the AnimatedSprite2D child. Lazy-resolves the child on
+## first call. State-key prefixes: `walk`, `telegraph`, `atk`, `die`. No
+## `hit_<dir>` key exists in Charger.tres (bear PixelLab template has no
+## flinch anim); the hit-flash modulate-tween is the entire hit feedback.
+##
+## `<dir>` resolution prefers the locked `_charge_dir` during telegraph/charge/
+## recovery (the charger commits to a direction at telegraph-start and that
+## stays the visual "facing" through the whole pounce + post-pounce window),
+## falls back to "toward player" otherwise.
+func _play_anim(state: StringName) -> void:
+	if not _animated_sprite_resolved:
+		var sprite: Node = get_node_or_null("Sprite")
+		if sprite is AnimatedSprite2D:
+			_animated_sprite = sprite
+		_animated_sprite_resolved = true
+	if _animated_sprite == null:
+		return
+	if _animated_sprite.sprite_frames == null:
+		return
+	var dir_suffix: String = _compute_facing_dir_suffix()
+	var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
+	if not _animated_sprite.sprite_frames.has_animation(anim_name):
+		_combat_trace("Charger._play_anim",
+			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		return
+	if _animated_sprite.animation == anim_name and _animated_sprite.is_playing():
+		return
+	_animated_sprite.play(anim_name)
+	_combat_trace("Charger._play_anim", "PLAY anim=%s" % anim_name)
+
+
+## Direction suffix for the SpriteFrames anim key. Prefer `_charge_dir` when
+## a charge is in flight (TELEGRAPHING / CHARGING / RECOVERING); fall back to
+## "toward player" for SPOTTED / IDLE; final fallback to "s".
+func _compute_facing_dir_suffix() -> String:
+	if _state == STATE_TELEGRAPHING or _state == STATE_CHARGING or _state == STATE_RECOVERING:
+		if _charge_dir.length_squared() > 0.0001:
+			return _vec_to_dir_suffix(_charge_dir)
+	if _player != null and is_inside_tree():
+		var to_player: Vector2 = _player.global_position - global_position
+		if to_player.length_squared() > 0.0001:
+			return _vec_to_dir_suffix(to_player)
+	return "s"
+
+
+## Vector2 → 8-octant compass suffix (see Grunt._vec_to_dir_suffix for full
+## derivation rationale).
+static func _vec_to_dir_suffix(v: Vector2) -> String:
+	var angle: float = atan2(v.y, v.x)
+	var idx: int = int(floor((angle + PI / 8.0) / (PI / 4.0))) + 8
+	idx = idx % 8
+	const SUFFIXES: Array[String] = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]
+	return SUFFIXES[idx]
+
+
 func _spawn_death_particles() -> void:
 	var room: Node = get_parent()
 	if room == null:
@@ -714,6 +814,25 @@ func _set_state(new_state: StringName) -> void:
 		return
 	var old: StringName = _state
 	_state = new_state
+	# M3W-3 animation playback. Charger lacks a `hit_<dir>` anim per the bear
+	# PixelLab template (see `anim-folder-map.md`); hit-flash modulate is the
+	# only visual feedback on take_damage. STATE_RECOVERING reuses `atk_<dir>`
+	# (the post-pounce follow-through is conceptually still the attack — the
+	# charger lands, lies vulnerable for the recovery window, then either
+	# re-engages or idles). STATE_DEAD is driven directly from `_die` (so the
+	# play() call survives the state transition's potential re-resolve).
+	# STATE_IDLE: no anim trigger — bare bears in tests don't have a SpriteFrames
+	# resource, and a missing `idle_<dir>` key surfaces as a `MISS` trace; we'd
+	# rather hold the last-played anim than spam misses. Production .tscn-loaded
+	# chargers idle on `walk_s` (the scene-author default), which reads fine as
+	# a stand-still pose.
+	match new_state:
+		STATE_SPOTTED, STATE_CHARGING:
+			_play_anim(&"walk")
+		STATE_TELEGRAPHING:
+			_play_anim(&"telegraph")
+		STATE_RECOVERING:
+			_play_anim(&"atk")
 	state_changed.emit(old, new_state)
 
 
