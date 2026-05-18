@@ -500,6 +500,43 @@ extracted cleanly via ZIP. Idle rotation PNGs are also bundled in the ZIP at
 
 ---
 
+## Folder-rename + reverse-map — PixelLab UUID exports → game-side semantic names (M3W-1, PR #271)
+
+PixelLab ZIPs unpack with animation dirs named `animations/animating-<uuid>/` or `<template>_<name>-<uuid>/` — neither shape is grep-friendly from game-side code, and the UUID slug ties the game scene to a PixelLab-internal identifier. PR #271 (PracticeDummy, M3W-1 foundation) established the rename + reverse-map convention every downstream M3W character inherits.
+
+**Pattern:**
+
+1. Unzip per the workflow above into `assets/sprites/<character>/_pixellab_anims/`.
+2. Rename each `animating-<uuid>/` (or `<template>_<name>-<uuid>/`) dir to its semantic state name — `hit/`, `die/`, `idle/`, `walk/`, etc. The semantic name is what `<Character>.tres` references in `SpriteFrames` anim-keys (which append `_<dir>` per `.claude/docs/combat-architecture.md §"M3W-1 realized implementation"`).
+3. Commit `assets/sprites/<character>/_pixellab_anims/anim-folder-map.md` recording the original-UUID → semantic-name mapping. This is the **reverse-map** — auditors hitting a `<Character>.tres` anim-key can trace back to the originating PixelLab dispatch.
+4. **`metadata.json` stays byte-identical to the ZIP root** — it is the upstream-API authoritative source for `animation_name → template_animation_id`. The rename does NOT touch it. The pair (rename + `anim-folder-map.md` + unchanged `metadata.json`) is non-redundant: `metadata.json` is the upstream truth, `anim-folder-map.md` is the local rename truth, the renamed dirs are the PR-time legible shape.
+
+**`anim-folder-map.md` schema:**
+
+```markdown
+# <Character> PixelLab anim folder map
+
+Original PixelLab character_id: <char_id>
+Generated: YYYY-MM-DD
+
+| Original folder | Semantic name | template | animation_name | direction |
+|---|---|---|---|---|
+| `taking_a_punch-1f45c4b5` | `hit` | taking-a-punch | hit | (8 dirs) |
+| `falling_backward-26fe5a45` | `die` | falling-back-death | die | (8 dirs) |
+| ... | ... | ... | ... | ... |
+```
+
+Pull the `template` / `animation_name` columns from the ZIP's root `metadata.json` (authoritative — see the parent section's caveat about inconsistent folder naming across PixelLab versions).
+
+**Operational note — when to rename:**
+
+- **Before** building the `<Character>.tres` SpriteFrames resource. SpriteFrames references frame paths by string; renaming after the `.tres` is wired forces a second pass updating every anim-key.
+- **After** any per-frame inspection / facing-direction validation (per the "Template animations can flip character facing direction mid-cycle" caveat above). Rename only directions that passed inspection; flag failing directions in the map with a `STATUS: rerolled` note so the audit trail captures the reroll history.
+
+This is the **PixelLab side** of the M3W-1 SpriteFrames-layout contract documented in `.claude/docs/combat-architecture.md §"M3W-1 realized implementation"`. The game-side rule is "`<Character>.tres` lives at `assets/sprites/<character>/<Character>.tres`, anim-keys `<state>_<dir>`"; the rename + reverse-map is how the PixelLab exports get from raw-ZIP shape to that contract.
+
+---
+
 ## Operational notes from M3 batch run (2026-05-17)
 
 Empirical observations from queueing 7 characters in parallel after Tier 2 upgrade:

@@ -222,6 +222,33 @@ Tier 1 invariant from `team/TESTING_BAR.md`: visual-primitive tests must assert 
 5. Decide rotation strategy (continuous vs 8-dir) per entity; keep the `_update_sprite_rotation` call site, only change its body.
 6. HTML5 verification gate applies: AnimatedSprite2D + modulate tweens hit the same WebGL2 quirks documented in `.claude/docs/html5-export.md` (sub-1.0 channels, no HDR; see PR #137 / #140 precedent).
 
+### M3W-1 realized implementation — 3-branch resolver + HIT_FLASH_TINT (PR #271, PracticeDummy)
+
+PR #271 (M3W-1 PracticeDummy foundation) landed the AnimatedSprite2D swap on the first M3 mob and locked the conventions every downstream M3W PR must inherit. The pre-swap checklist above described the intent; this subsection records the as-shipped shape.
+
+**1. `_play_hit_flash` is a 3-branch resolver.** The pre-swap text proposed "force the modulate branch OR retype to CanvasItem"; PR #271 chose a **3-branch resolver** that handles all current call sites without per-mob editing:
+1. **AnimatedSprite2D** — tween `Sprite.modulate` to `HIT_FLASH_TINT` and back (the M3+ path). Sets `_hit_flash_uses_animated_sprite = true` AND `_hit_flash_uses_sprite = true` (the latter keeps existing-branch tests passing).
+2. **ColorRect** — tween `Sprite.color` (back-compat for any mob not yet swapped).
+3. **`self.modulate` fallback** — when no `Sprite` child exists (bare-instanced test mobs).
+
+Resolution is by `Sprite is AnimatedSprite2D` / `Sprite is ColorRect` type-check at first hit. Tests `tests/test_combat_visuals.gd` + `tests/test_practice_dummy_animated.gd` pin all three branches via the Tier 1 color-delta assert.
+
+**2. `HIT_FLASH_TINT = Color(1.0, 0.50, 0.50, 1.0)`** — soft red, sub-1.0 channels, channel-sum delta ≥ 0.20 vs `Color.WHITE`. Defined as a class constant on every mob script. **Sub-1.0 channels are HTML5-load-bearing** — `gl_compatibility` clamps modulate channels at 1.0 with no HDR headroom, so a `Color(2.0, 1.0, 1.0)` tween renders identically to white (PR #115 / PR #140 white-to-white no-op trap; see `.claude/docs/html5-export.md`).
+
+**Why a single constant, not per-mob:** identical hit-flash color across the roster is the readable-feedback contract; per-mob tints would confuse "I hit something" with "I hit a *specific* something" and break the visual grammar Sponsor signed off on at M1. The channel-sum delta floor (≥ 0.20) is the testability floor — smaller deltas regress under WebGL2 quantization.
+
+**3. SpriteFrames layout — single canonical location per character.**
+- Resource path: `assets/sprites/<character>/<Character>.tres` (e.g. `assets/sprites/practice_dummy/PracticeDummy.tres`).
+- Anim-key shape: `<state>_<dir>` (e.g. `idle_s`, `hit_s`, `die_s`). Eight directions; states grow as needed.
+- FPS: `8` on every animation. Higher FPS regresses readability at the 16-px scale; lower regresses hit-feel.
+- `loop = false` for one-shots (`hit_*`, `die_*`); `loop = true` for sustained (`idle_*`, `walk_*`).
+
+**4. AnimatedSprite2D scene-swap pattern.** Same node name (`Sprite`) — every existing `get_node("Sprite")` / `_hit_flash_target` / `_update_sprite_rotation` resolver keeps working. `texture_filter = TEXTURE_FILTER_NEAREST` to preserve pixel grid. Frame-0 hold on initial state (`stop()` after `play(<idle>)` so the sprite shows the static idle pose until the first state transition).
+
+**5. UUID-folder → semantic-name rename + reverse-map.** PixelLab ZIPs unpack into `animations/animating-<uuid>/` (or `<template>_<name>-<uuid>/`) dirs (see `.claude/docs/pixellab-pipeline.md`). Game-side, those are renamed to semantic state-direction names (`hit/`, `die/`, `idle/`, etc.) before `<Character>.tres` references them. The mapping is committed as `assets/sprites/<character>/_pixellab_anims/anim-folder-map.md` so the PixelLab → game-side wiring is auditable post-rename. `metadata.json` stays byte-identical to the ZIP root for upstream-API traceability.
+
+**Inheritance contract.** Downstream M3W PRs (M3W-2 Player, M3W-3 mob-trio, M3W-4 Boss, M3W-5 NPCs, M3W-6 Stoker palette-swap) MUST adopt this resolver shape, `HIT_FLASH_TINT` constant, SpriteFrames layout, scene-swap pattern, and folder-rename + reverse-map convention verbatim. Divergence creates per-mob hit-flash inconsistency, untestable color-delta floors, and orphan-folder asset rot. Reuse the PR #271 surfaces; do not re-derive.
+
 ## Shooter state machine — engagement bands + cornered fallback (ticket 86c9uehaq)
 
 [`scripts/mobs/Shooter.gd`](scripts/mobs/Shooter.gd) is the only Stratum-1 RANGED mob (Grunt + Charger + Stratum1Boss are melee). Its distance bands and engagement transitions encode a kiter-with-pursuit-and-cornered-fallback design that took two iterations to reach correctness — the constants are tightly coupled to projectile reach, and getting either band wrong manifests as one of three Sponsor-visible failure modes.
