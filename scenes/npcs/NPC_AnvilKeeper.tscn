@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3 uid="uid://b0embergrave_npc_anvil_keeper_scene"]
+
+[ext_resource type="SpriteFrames" path="res://assets/sprites/npc_anvil_keeper/NPC_AnvilKeeper.tres" id="1_anvil_frames"]
+
+[node name="NPC_AnvilKeeper" type="Node2D"]
+
+[node name="Sprite" type="AnimatedSprite2D" parent="."]
+texture_filter = 1
+sprite_frames = ExtResource("1_anvil_frames")
+animation = &"idle_s"
+autoplay = "idle_s"
+frame = 0
