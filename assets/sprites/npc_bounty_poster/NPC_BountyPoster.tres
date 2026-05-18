@@ -1,0 +1,173 @@
+[gd_resource type="SpriteFrames" load_steps=33 format=3 uid="uid://b0embergrave_npc_bounty_poster_frames"]
+
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south/frame_000.png" id="f_000"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south/frame_001.png" id="f_001"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south/frame_002.png" id="f_002"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south/frame_003.png" id="f_003"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south-east/frame_000.png" id="f_004"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south-east/frame_001.png" id="f_005"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south-east/frame_002.png" id="f_006"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south-east/frame_003.png" id="f_007"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/east/frame_000.png" id="f_008"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/east/frame_001.png" id="f_009"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/east/frame_002.png" id="f_010"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/east/frame_003.png" id="f_011"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north-east/frame_000.png" id="f_012"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north-east/frame_001.png" id="f_013"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north-east/frame_002.png" id="f_014"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north-east/frame_003.png" id="f_015"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north/frame_000.png" id="f_016"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north/frame_001.png" id="f_017"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north/frame_002.png" id="f_018"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north/frame_003.png" id="f_019"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north-west/frame_000.png" id="f_020"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north-west/frame_001.png" id="f_021"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north-west/frame_002.png" id="f_022"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/north-west/frame_003.png" id="f_023"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/west/frame_000.png" id="f_024"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/west/frame_001.png" id="f_025"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/west/frame_002.png" id="f_026"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/west/frame_003.png" id="f_027"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south-west/frame_000.png" id="f_028"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south-west/frame_001.png" id="f_029"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south-west/frame_002.png" id="f_030"]
+[ext_resource type="Texture2D" path="res://assets/sprites/npc_bounty_poster/_pixellab_anims/NPC_BountyPoster/animations/idle/south-west/frame_003.png" id="f_031"]
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_000")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_001")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_002")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_003")
+}],
+"loop": true,
+"name": &"idle_s",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_004")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_005")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_006")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_007")
+}],
+"loop": true,
+"name": &"idle_se",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_008")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_009")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_010")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_011")
+}],
+"loop": true,
+"name": &"idle_e",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_012")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_013")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_014")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_015")
+}],
+"loop": true,
+"name": &"idle_ne",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_016")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_017")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_018")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_019")
+}],
+"loop": true,
+"name": &"idle_n",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_020")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_021")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_022")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_023")
+}],
+"loop": true,
+"name": &"idle_nw",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_024")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_025")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_026")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_027")
+}],
+"loop": true,
+"name": &"idle_w",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_028")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_029")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_030")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_031")
+}],
+"loop": true,
+"name": &"idle_sw",
+"speed": 8.0
+}]

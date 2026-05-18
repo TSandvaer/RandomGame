@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3 uid="uid://b0embergrave_npc_vendor_scene"]
+
+[ext_resource type="SpriteFrames" path="res://assets/sprites/npc_vendor/NPC_Vendor.tres" id="1_vendor_frames"]
+
+[node name="NPC_Vendor" type="Node2D"]
+
+[node name="Sprite" type="AnimatedSprite2D" parent="."]
+texture_filter = 1
+sprite_frames = ExtResource("1_vendor_frames")
+animation = &"idle_s"
+autoplay = "idle_s"
+frame = 0

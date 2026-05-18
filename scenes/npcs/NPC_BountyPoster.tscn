@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3 uid="uid://b0embergrave_npc_bounty_poster_scene"]
+
+[ext_resource type="SpriteFrames" path="res://assets/sprites/npc_bounty_poster/NPC_BountyPoster.tres" id="1_bounty_frames"]
+
+[node name="NPC_BountyPoster" type="Node2D"]
+
+[node name="Sprite" type="AnimatedSprite2D" parent="."]
+texture_filter = 1
+sprite_frames = ExtResource("1_bounty_frames")
+animation = &"idle_s"
+autoplay = "idle_s"
+frame = 0
