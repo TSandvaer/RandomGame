@@ -66,3 +66,4 @@ venv/
 .claude/scheduled_tasks.lock
 .claude/scheduled_tasks.json
 .claude/auto-status.state
+.claude/auto-pixellab.state
