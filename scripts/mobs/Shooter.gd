@@ -119,6 +119,11 @@ const DEATH_TARGET_SCALE: float = 0.6
 const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
 const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 
+## Hit-flash modulate tint for the AnimatedSprite2D path (M3W-1 / M3W-3 convention).
+## Mirrors `PracticeDummy.HIT_FLASH_TINT` verbatim. Sub-1.0 channels for HTML5
+## HDR-clamp safety; channel-sum delta ≥ 0.20 vs rest white.
+const HIT_FLASH_TINT: Color = Color(1.0, 0.50, 0.50, 1.0)  # soft red wash, HTML5-safe
+
 ## Layer bits (mirror project.godot — same as Grunt/Charger).
 const LAYER_WORLD: int = 1 << 0
 const LAYER_PLAYER: int = 1 << 1
@@ -184,10 +189,17 @@ var _death_tween: Tween = null
 var _modulate_at_rest: Color = Color(1, 1, 1, 1)
 var _captured_modulate_at_rest: bool = false
 
-# Hit-flash target — Sprite child (Bug C fix). See Grunt.gd for full rationale.
+# Hit-flash target — M3W-3 3-branch resolver. See Grunt.gd / PracticeDummy.gd
+# for full rationale. Branch 1 (AnimatedSprite2D) is the production path post-M3W-3.
 var _hit_flash_target: CanvasItem = null
 var _hit_flash_uses_sprite: bool = false
+var _hit_flash_uses_animated_sprite: bool = false
 var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
+var _sprite_modulate_at_rest: Color = Color(1, 1, 1, 1)
+
+# AnimatedSprite2D cache (M3W-3) — resolved lazily from get_node_or_null("Sprite").
+var _animated_sprite: AnimatedSprite2D = null
+var _animated_sprite_resolved: bool = false
 
 # Test-only escape hatch: when true, _spawn_projectile skips the actual
 # Projectile.instantiate() + parent.add_child() side-effects. The state
@@ -251,9 +263,11 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	_combat_trace("Shooter.take_damage",
 		"amount=%d hp=%d->%d" % [clean_amount, hp_before, hp_current])
 	damaged.emit(clean_amount, hp_current, source)
-	# Visual: white hit-flash on every actual-damage take_damage (Uma §2).
+	# Visual: red-wash hit-flash + hit anim, kicked off only when actual damage
+	# was dealt.
 	if clean_amount > 0:
 		_play_hit_flash()
+		_play_anim(&"hit")
 	if knockback.length_squared() > 0.0:
 		velocity = knockback
 	if hp_current == 0:
@@ -575,6 +589,8 @@ func _die() -> void:
 	# at the START of the death sequence; the 200ms visual decay does not
 	# gate loot drop or room-clear logic.
 	mob_died.emit(self, global_position, mob_def)
+	# M3W-3 anim: play `die_<dir>` (falling-backward).
+	_play_anim(&"die")
 	_spawn_death_particles()
 	_play_death_tween()
 
@@ -620,20 +636,27 @@ func _cancel_attack_telegraph_tween() -> void:
 		_attack_telegraph_tween = null
 
 
-## §2 hit-flash. Bug C fix: tween Sprite child's `color` so the flash is
-## actually visible. See Grunt._play_hit_flash for full rationale.
+## §2 hit-flash. M3W-3 3-branch resolver — verbatim mirror of
+## `PracticeDummy._play_hit_flash` modulo the `Shooter.` tag.
 func _play_hit_flash() -> void:
 	if _is_dead:
 		return
 	if _hit_flash_target == null:
 		var sprite: Node = get_node_or_null("Sprite")
-		if sprite is ColorRect:
+		if sprite is AnimatedSprite2D:
 			_hit_flash_target = sprite
 			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = true
+			_sprite_modulate_at_rest = (sprite as AnimatedSprite2D).modulate
+		elif sprite is ColorRect:
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = false
 			_sprite_color_at_rest = (sprite as ColorRect).color
 		else:
 			_hit_flash_target = self
 			_hit_flash_uses_sprite = false
+			_hit_flash_uses_animated_sprite = false
 	if not _captured_modulate_at_rest:
 		_modulate_at_rest = modulate
 		_captured_modulate_at_rest = true
@@ -643,7 +666,18 @@ func _play_hit_flash() -> void:
 		modulate = _modulate_at_rest
 		return
 	_hit_flash_tween = create_tween()
-	if _hit_flash_uses_sprite:
+	if _hit_flash_uses_animated_sprite:
+		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
+		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
+		_combat_trace("Shooter._play_hit_flash",
+			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)" % [
+				_hit_flash_tween.is_valid(),
+				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
+				_sprite_modulate_at_rest.r, _sprite_modulate_at_rest.g, _sprite_modulate_at_rest.b
+			])
+	elif _hit_flash_uses_sprite:
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
@@ -693,6 +727,69 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 		df = get_tree().root.get_node_or_null("DebugFlags")
 	if df != null and df.has_method("combat_trace"):
 		df.combat_trace(tag, msg)
+
+
+# ---- Animation playback (M3W-3) --------------------------------------
+
+## Play an animation on the AnimatedSprite2D child. Lazy-resolves the child on
+## first call. State-key prefixes: `walk`, `telegraph`, `atk`, `hit`, `die`.
+##
+## `<dir>` resolution prefers `_last_aim_dir` while AIMING / FIRING /
+## POST_FIRE_RECOVERY (the shooter has locked an aim direction at that point and
+## the visual should follow that lock through the release). KITING uses the
+## *negation* of "toward player" because the shooter is walking AWAY — but for
+## the anim suffix we want the facing direction the body is presenting, which
+## for a kiter on a walking_sadly cycle is the direction it's moving (away from
+## player). Otherwise default to "toward player" for SPOTTED / IDLE.
+func _play_anim(state: StringName) -> void:
+	if not _animated_sprite_resolved:
+		var sprite: Node = get_node_or_null("Sprite")
+		if sprite is AnimatedSprite2D:
+			_animated_sprite = sprite
+		_animated_sprite_resolved = true
+	if _animated_sprite == null:
+		return
+	if _animated_sprite.sprite_frames == null:
+		return
+	var dir_suffix: String = _compute_facing_dir_suffix()
+	var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
+	if not _animated_sprite.sprite_frames.has_animation(anim_name):
+		_combat_trace("Shooter._play_anim",
+			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		return
+	if _animated_sprite.animation == anim_name and _animated_sprite.is_playing():
+		return
+	_animated_sprite.play(anim_name)
+	_combat_trace("Shooter._play_anim", "PLAY anim=%s" % anim_name)
+
+
+## Direction suffix for the SpriteFrames anim key. Aim-locked direction
+## (`_last_aim_dir`) wins during AIMING / FIRING / POST_FIRE_RECOVERY; the
+## kite direction (away from player) wins during KITING; otherwise "toward
+## player". Final fallback "s".
+func _compute_facing_dir_suffix() -> String:
+	if _state == STATE_AIMING or _state == STATE_FIRING or _state == STATE_POST_FIRE_RECOVERY:
+		if _last_aim_dir.length_squared() > 0.0001:
+			return _vec_to_dir_suffix(_last_aim_dir)
+	if _state == STATE_KITING and _player != null and is_inside_tree():
+		var away: Vector2 = global_position - _player.global_position
+		if away.length_squared() > 0.0001:
+			return _vec_to_dir_suffix(away)
+	if _player != null and is_inside_tree():
+		var to_player: Vector2 = _player.global_position - global_position
+		if to_player.length_squared() > 0.0001:
+			return _vec_to_dir_suffix(to_player)
+	return "s"
+
+
+## Vector2 → 8-octant compass suffix (see Grunt._vec_to_dir_suffix for full
+## derivation rationale).
+static func _vec_to_dir_suffix(v: Vector2) -> String:
+	var angle: float = atan2(v.y, v.x)
+	var idx: int = int(floor((angle + PI / 8.0) / (PI / 4.0))) + 8
+	idx = idx % 8
+	const SUFFIXES: Array[String] = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]
+	return SUFFIXES[idx]
 
 
 func _spawn_death_particles() -> void:
@@ -759,6 +856,20 @@ func _set_state(new_state: StringName) -> void:
 		dist = (_player.global_position - global_position).length()
 	_combat_trace("Shooter._set_state",
 		"%s -> %s dist=%.0f pos=(%.0f,%.0f)" % [old, new_state, dist, global_position.x, global_position.y])
+	# M3W-3 animation playback. State→anim mapping per `Shooter.gd`'s 3-band
+	# engagement design (see `.claude/docs/combat-architecture.md` §"Shooter
+	# state machine"). KITING walks away → walk anim. AIMING is the windup
+	# → telegraph anim. FIRING + POST_FIRE_RECOVERY is the release+follow-through
+	# → atk anim. SPOTTED is brief stationary "I see you" — reuse walk (frame-0
+	# hold) so we don't author a separate idle. DEAD anim is fired directly
+	# from `_die` so it survives the state transition's potential re-resolve.
+	match new_state:
+		STATE_SPOTTED, STATE_KITING:
+			_play_anim(&"walk")
+		STATE_AIMING:
+			_play_anim(&"telegraph")
+		STATE_FIRING, STATE_POST_FIRE_RECOVERY:
+			_play_anim(&"atk")
 	state_changed.emit(old, new_state)
 
 

@@ -130,6 +130,15 @@ const DEATH_TARGET_SCALE: float = 0.6
 const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
 const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 
+## Hit-flash modulate tint for the AnimatedSprite2D path (M3W-1 / M3W-3 convention).
+## Mirrors `PracticeDummy.HIT_FLASH_TINT` verbatim per the inheritance contract in
+## `.claude/docs/combat-architecture.md` § "M3W-1 realized implementation". Sub-1.0
+## on every channel for HTML5 HDR-clamp safety; channel-sum delta ≥ 0.20 vs rest white.
+## A uniform constant across the M3 mob roster — every mob's hit-flash reads the
+## same wash so "I hit something" is unambiguous (vs per-mob tints that would
+## confuse the visual grammar).
+const HIT_FLASH_TINT: Color = Color(1.0, 0.50, 0.50, 1.0)  # soft red wash, HTML5-safe
+
 ## Layer bits (mirror project.godot).
 const LAYER_WORLD: int = 1 << 0          # bit 1
 const LAYER_PLAYER: int = 1 << 1         # bit 2
@@ -172,21 +181,33 @@ var _death_tween: Tween = null
 var _modulate_at_rest: Color = Color(1, 1, 1, 1)
 var _captured_modulate_at_rest: bool = false
 
-# Hit-flash target — the Sprite ColorRect child (per Grunt.tscn). Cached on
-# first hit so the flash tween can target the *visible* color directly.
-# Fallback to `self` (CharacterBody2D modulate) for bare-instanced test mobs
-# that don't ship a Sprite child.
+# Hit-flash target — M3W-3 swap to AnimatedSprite2D introduces a third branch:
+#   1. AnimatedSprite2D child (production .tscn-loaded grunt)   → tween modulate
+#      with HIT_FLASH_TINT red-wash (rest → tint → rest). The painted PixelLab
+#      sprite frames are near-white, so a white-to-white tween would be a
+#      visible no-op (PR #115 / #140 trap class); the soft-red tint avoids this
+#      while preserving the rest of the sprite's painted color. Sub-1.0
+#      channels per HTML5 HDR-clamp rule.
+#   2. ColorRect child (legacy bare-instantiated tests)         → tween Sprite.color
+#      rest → white → rest (pre-M3W-3 Bug C fix pattern, kept for back-compat).
+#   3. No Sprite child (bare-instanced test grunts)             → tween self.modulate
+#      (preserves Tier 1 reference-change invariant in GUT — the parent-modulate
+#      tween is visually a no-op but produces a valid tween-ref change for tests).
 #
-# Bug C fix (Sponsor soak `embergrave-html5-f62991f`): the previous flash
-# tweened the parent CharacterBody2D's modulate from white -> white -> white,
-# a no-op that produced no visible flash on ANY platform (the trace line
-# `Grunt._play_hit_flash | rest=(1.00,1.00,1.00)` confirmed both rest AND
-# tween-target were white, double no-op). Tweening the Sprite ColorRect's
-# `color` property directly bypasses modulate cascading entirely and
-# guarantees a visible flash on every renderer.
+# `_hit_flash_uses_sprite` is true iff branch (1) OR (2). Branch (1) vs (2) is
+# discriminated by `_hit_flash_uses_animated_sprite`.
 var _hit_flash_target: CanvasItem = null
-var _hit_flash_uses_sprite: bool = false  # true -> tween Sprite.color, false -> self.modulate
+var _hit_flash_uses_sprite: bool = false
+var _hit_flash_uses_animated_sprite: bool = false
 var _sprite_color_at_rest: Color = Color(1, 1, 1, 1)
+var _sprite_modulate_at_rest: Color = Color(1, 1, 1, 1)
+
+# AnimatedSprite2D cache (M3W-3) — resolved lazily from get_node_or_null("Sprite")
+# so tests that instantiate the production scene get animation-playback hooks
+# even when constructed bare. `_animated_sprite_resolved` is true once we've
+# checked, so we don't repeat the cast on every state transition.
+var _animated_sprite: AnimatedSprite2D = null
+var _animated_sprite_resolved: bool = false
 
 ## NodePath (or Node ref) to the player. Optional — spawner sets this. If
 ## unset, the grunt looks for the first node in the "player" group at _ready.
@@ -273,11 +294,12 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	_combat_trace("Grunt.take_damage",
 		"amount=%d hp=%d->%d" % [clean_amount, hp_before, hp_current])
 	damaged.emit(clean_amount, hp_current, source)
-	# Visual: white hit-flash, kicked off only when actual damage was dealt
-	# (matches Uma `combat-visual-feedback.md` §2 — skip the i-frame /
+	# Visual: red-wash hit-flash + hit anim, kicked off only when actual damage
+	# was dealt (matches Uma `combat-visual-feedback.md` §2 — skip the i-frame /
 	# clamped-to-zero path).
 	if clean_amount > 0:
 		_play_hit_flash()
+		_play_anim(&"hit")
 	# Apply knockback as an instantaneous velocity bump. Decays naturally
 	# next physics tick when the AI sets velocity from chase.
 	if knockback.length_squared() > 0.0:
@@ -601,6 +623,12 @@ func _die() -> void:
 	# emit; queue_free is called on tween_finished, replacing the old
 	# call_deferred("queue_free") that fired instantly.
 	mob_died.emit(self, global_position, mob_def)
+	# M3W-3 anim: play `die_<dir>` (falling-backward). Concurrent with the
+	# parent CharacterBody2D's scale/alpha death-tween — the AnimatedSprite2D
+	# advances its 7-frame die anim while the parent fades + scales. Loop=false
+	# on `die_*` in Grunt.tres so the anim holds on the last frame until
+	# queue_free.
+	_play_anim(&"die")
 	# Spawn the ember-burst particles, parented to the room (NOT self) so
 	# the burst persists past queue_free.
 	_spawn_death_particles()
@@ -610,47 +638,56 @@ func _die() -> void:
 
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
 
-## §2 hit-flash: white flash for 80ms (20ms in + 20ms hold + 40ms out).
-## Second-hit-during-flash kills the running tween and restarts fresh from
-## start so flashes don't accumulate or extend.
-##
-## **Bug C fix:** tweens the **Sprite ColorRect child's `color` property**
-## (not the parent CharacterBody2D's `modulate`) so the flash is actually
-## visible. The mob `.tscn` files ship a Sprite child with a non-white tint
-## (e.g. Grunt's `Color(0.55, 0.18, 0.22, 1)` dark-red); tweening that color
-## from rest -> white -> rest produces a visible flash on every renderer
-## (HTML5 included). Bare-instanced test mobs without a Sprite child fall
-## back to the legacy modulate-tween path (still no-op visually but preserves
-## the tween-shape contract that test_combat_visuals.gd asserts).
+## §2 hit-flash. M3W-3 3-branch resolver per `.claude/docs/combat-architecture.md`
+## § "M3W-1 realized implementation" — production grunt is now AnimatedSprite2D,
+## ColorRect path retained for back-compat with bare-instanced tests, modulate
+## fallback for sprite-less test edges. See `PracticeDummy._play_hit_flash`
+## for the canonical pattern; this mirror is verbatim modulo the `Grunt.` tag.
 func _play_hit_flash() -> void:
 	if _is_dead:
 		return
-	# Resolve the flash target on first hit: prefer Sprite child (.tscn-loaded
-	# mobs), fall back to self/modulate (bare-instanced test mobs).
 	if _hit_flash_target == null:
 		var sprite: Node = get_node_or_null("Sprite")
-		if sprite is ColorRect:
+		if sprite is AnimatedSprite2D:
+			# M3W-3 path — production sprite is an AnimatedSprite2D.
 			_hit_flash_target = sprite
 			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = true
+			_sprite_modulate_at_rest = (sprite as AnimatedSprite2D).modulate
+		elif sprite is ColorRect:
+			# Pre-M3W-3 fallback (legacy bare-instanced test edge).
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = false
 			_sprite_color_at_rest = (sprite as ColorRect).color
 		else:
+			# Bare-instanced test grunt (no Sprite child).
 			_hit_flash_target = self
 			_hit_flash_uses_sprite = false
-	# Capture the starting modulate exactly once per life (legacy fallback path).
+			_hit_flash_uses_animated_sprite = false
 	if not _captured_modulate_at_rest:
 		_modulate_at_rest = modulate
 		_captured_modulate_at_rest = true
-	# Cancel any in-flight flash tween — restart from start.
 	if _hit_flash_tween != null and _hit_flash_tween.is_valid():
 		_hit_flash_tween.kill()
 	if not is_inside_tree():
-		# Defensive — tweens require a tree. Tests sometimes call into
-		# take_damage on a freshly-instanced bare node before add_child.
 		modulate = _modulate_at_rest
 		return
 	_hit_flash_tween = create_tween()
-	if _hit_flash_uses_sprite:
-		# White-flash on the Sprite ColorRect's color (Bug C fix).
+	if _hit_flash_uses_animated_sprite:
+		# Branch 1: AnimatedSprite2D modulate tween rest → HIT_FLASH_TINT → rest.
+		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
+		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
+		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
+		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
+		_combat_trace("Grunt._play_hit_flash",
+			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)" % [
+				_hit_flash_tween.is_valid(),
+				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
+				_sprite_modulate_at_rest.r, _sprite_modulate_at_rest.g, _sprite_modulate_at_rest.b
+			])
+	elif _hit_flash_uses_sprite:
+		# Branch 2: ColorRect color tween (legacy).
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
@@ -659,7 +696,7 @@ func _play_hit_flash() -> void:
 			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f) target=white" %
 			[_hit_flash_tween.is_valid(), _sprite_color_at_rest.r, _sprite_color_at_rest.g, _sprite_color_at_rest.b])
 	else:
-		# Legacy fallback (bare-instanced mobs in tests — preserves contract).
+		# Branch 3: self.modulate fallback (bare-instanced tests).
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
@@ -730,6 +767,80 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 		df.combat_trace(tag, msg)
 
 
+# ---- Animation playback (M3W-3) --------------------------------------
+
+## Play an animation on the AnimatedSprite2D child. Resolves the child lazily
+## on first call so bare-instanced test grunts (no Sprite child or ColorRect
+## fallback) no-op safely. `state` is the state-key prefix (`walk`, `atk`,
+## `atk_telegraph`, `hit`, `die`); the full SpriteFrames key is
+## `<state>_<dir>` where `<dir>` is derived from the grunt's intent — direction
+## toward the player when known, last-walk direction otherwise.
+##
+## M3W-3 convention — mirrors `PracticeDummy._play_anim` with a non-trivial
+## `<dir>` resolver (PD is stationary → hardcoded "s"). Grunt always faces the
+## player when one exists, so the chase / swing / die animations all read in
+## the right direction. If no player is bound (bare-instanced tests), defaults
+## to "s" so the call doesn't crash.
+func _play_anim(state: StringName) -> void:
+	if not _animated_sprite_resolved:
+		var sprite: Node = get_node_or_null("Sprite")
+		if sprite is AnimatedSprite2D:
+			_animated_sprite = sprite
+		_animated_sprite_resolved = true
+	if _animated_sprite == null:
+		return
+	if _animated_sprite.sprite_frames == null:
+		return
+	var dir_suffix: String = _compute_facing_dir_suffix()
+	var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
+	if not _animated_sprite.sprite_frames.has_animation(anim_name):
+		_combat_trace("Grunt._play_anim",
+			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		return
+	# Only restart if a different anim is queued — re-issuing the same anim
+	# on every physics tick (chase loop hits _set_state(CHASING) every tick)
+	# would visibly stutter at frame 0. AnimatedSprite2D.play() is idempotent
+	# on the SAME animation name (it skips the reset), but we still want the
+	# `_play_anim` trace to surface only on actual transitions.
+	if _animated_sprite.animation == anim_name and _animated_sprite.is_playing():
+		return
+	_animated_sprite.play(anim_name)
+	_combat_trace("Grunt._play_anim", "PLAY anim=%s" % anim_name)
+
+
+## Derive the 8-octant direction suffix for the SpriteFrames anim key. Uses
+## the vector toward the player when a player ref exists (Grunt chases the
+## player, so "facing" = "toward player"); falls back to "s" otherwise. This
+## matches the at-swing-time direction resolution already used in
+## `_finish_light_telegraph` + `_finish_heavy_telegraph` (the swings re-resolve
+## toward the player at fire time), so the played anim is always aimed where
+## the swing is going.
+func _compute_facing_dir_suffix() -> String:
+	if _player == null or not is_inside_tree():
+		return "s"
+	var to_player: Vector2 = _player.global_position - global_position
+	if to_player.length_squared() <= 0.0001:
+		return "s"
+	return _vec_to_dir_suffix(to_player)
+
+
+## Convert a Vector2 to its nearest 8-octant compass-direction suffix.
+## Uses atan2 with a 22.5° (π/8) half-width per octant. Quadrant boundary
+## convention: ties resolve south-biased (top-down 2D player-facing default).
+##   angle 0           = east (+x)
+##   angle +π/2        = south (+y, screen-down)
+##   angle -π/2        = north (-y, screen-up)
+## Returns one of: "n", "ne", "e", "se", "s", "sw", "w", "nw".
+static func _vec_to_dir_suffix(v: Vector2) -> String:
+	var angle: float = atan2(v.y, v.x)  # radians, [-π, π]
+	# Map to [0, 8) — 0=east, 1=se, 2=south, 3=sw, 4=west, 5=nw, 6=north, 7=ne.
+	# +π/8 offset shifts the boundary so east-leaning vectors snap to east.
+	var idx: int = int(floor((angle + PI / 8.0) / (PI / 4.0))) + 8
+	idx = idx % 8
+	const SUFFIXES: Array[String] = ["e", "se", "s", "sw", "w", "nw", "n", "ne"]
+	return SUFFIXES[idx]
+
+
 ## §3b ember burst: spawn a CPUParticles2D at this mob's global position,
 ## parented to the room (get_parent()) so the burst outlives the mob's
 ## queue_free. 6 particles for normal mobs (24 for the boss subclass).
@@ -787,6 +898,19 @@ func _set_state(new_state: StringName) -> void:
 		return
 	var old: StringName = _state
 	_state = new_state
+	# M3W-3 animation playback — map state → SpriteFrames anim key. `hit_<dir>`
+	# and `die_<dir>` are driven directly from `take_damage` / `_die` (one-shot
+	# beats that interrupt the state-anim); the state-driven mapping covers
+	# walk/atk_telegraph/atk. STATE_DEAD intentionally has no entry here — `_die`
+	# plays `die_<dir>` explicitly before transitioning (so the play() call
+	# survives the state transition's potential re-resolve).
+	match new_state:
+		STATE_IDLE, STATE_CHASING:
+			_play_anim(&"walk")
+		STATE_TELEGRAPHING_LIGHT, STATE_TELEGRAPHING_HEAVY:
+			_play_anim(&"atk_telegraph")
+		STATE_ATTACKING:
+			_play_anim(&"atk")
 	state_changed.emit(old, new_state)
 
 
