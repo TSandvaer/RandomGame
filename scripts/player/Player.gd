@@ -455,9 +455,23 @@ func _physics_process(delta: float) -> void:
 	_pos_trace_accum += delta
 	if _pos_trace_accum >= POS_TRACE_INTERVAL:
 		_pos_trace_accum = 0.0
+		# `sprite_rot=` is the harness-observability surface for the M3W-2
+		# walk-feel decouple regression (PR #274 Fix #2). The Sprite node's
+		# `rotation` property MUST stay 0.0 by design — `_update_sprite_rotation`
+		# pins it (see line ~1201). Browser-driven specs (see
+		# `tests/playwright/specs/player-walk-feel-decouple.spec.ts`) parse this
+		# field and assert ~0 across many frames; any future regression that
+		# re-couples node rotation to `_facing` (cursor-aim "the character is
+		# looking at the mouse" Sponsor-soak finding) is caught HTML5-side here.
+		# 6 decimals so any non-zero leak is visible — a single mis-set frame
+		# anywhere in the boot-or-walk window flips the spec red.
+		var _sprite_rot: float = 0.0
+		var _sprite_for_rot: Node = get_node_or_null("Sprite")
+		if _sprite_for_rot is CanvasItem:
+			_sprite_rot = (_sprite_for_rot as CanvasItem).rotation
 		_combat_trace("Player.pos",
-			"pos=(%.0f,%.0f) state=%s" % [
-				global_position.x, global_position.y, _state
+			"pos=(%.0f,%.0f) state=%s sprite_rot=%.6f" % [
+				global_position.x, global_position.y, _state, _sprite_rot
 			])
 		# Diagnostic-only instrumentation (ticket `86c9uq0ky` — Finding 2 NEW
 		# bug class investigation, 2026-05-16 Sponsor soak of `8e76c74`).
