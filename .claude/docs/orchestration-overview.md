@@ -77,7 +77,80 @@ gh pr create --title "..." --body "..."
 gh pr merge <num> --admin --squash --delete-branch
 ```
 
-Local branch deletion may fail in role worktrees (the branch is checked out there); harmless — auto-rotates on next dispatch.
+### Worktree cleanup before `gh pr merge --delete-branch`
+
+`gh pr merge <N> --admin --squash --delete-branch` does **three** things:
+
+1. Merges the PR on origin (the actual squash-merge).
+2. Deletes the remote branch (`origin/<agent-branch>`).
+3. Deletes the **local** branch in the cwd's repo.
+
+Step 3 fails when an agent worktree still has `<agent-branch>` checked out (Git refuses
+to delete a branch that's checked out anywhere in the repo). Steps 1 and 2 succeed —
+the PR is merged and origin is clean — but **`gh` exits non-zero on the step-3 failure**,
+which can short-circuit downstream tool-round steps. The most common casualty is the
+ClickUp status flip that's supposed to pair with the merge (memory
+`clickup-flip-paired-with-merge`): the merge happens, the ClickUp flip is skipped, and
+the ticket rots in "ready for qa test" until someone notices.
+
+**Recovery** (after a non-zero exit):
+
+```bash
+# Detach the worktree that's holding the branch:
+git -C <agent-worktree-path> switch --detach HEAD
+
+# Retry the merge — origin is already merged, so this just completes the cleanup:
+gh pr merge <N> --admin --squash --delete-branch
+# Expected output: "Pull request was already merged" — confirms step 1 already succeeded.
+
+# Then run the paired ClickUp flip that was short-circuited.
+```
+
+Note: `git checkout main` in the agent worktree is **not** a valid workaround —
+`main` is held by the orchestrator's own worktree and can only be checked out in one
+worktree at a time.
+
+**Prevention — agent self-detach before final report:** Agents whose work has been
+merged (or is about to be) should `git -C <their-worktree> switch --detach HEAD`
+before submitting their final report. This frees the branch for the orchestrator's
+merge tool-round to complete cleanly without the recovery dance. Dispatch briefs that
+end with "and merge" should include this step explicitly.
+
+Validated 2026-05-18 (PR #276 Stoker merge) — supersedes the older "harmless;
+auto-rotates on next dispatch" framing, which undersold the ClickUp-flip short-circuit
+risk.
+
+### Multi-line PR bodies / comments — always use `--body-file`, never heredoc or `--body "..."`
+
+When opening a PR or posting a multi-line PR comment via `gh`, **always pass the body via `--body-file <path>`**, never inline via heredoc or `--body "..."`. Markdown special characters (`#`, backticks, `<`, `>`, `*`, `_`, `$`, `!`) collide with shell quoting (both bash and PowerShell), producing escape errors, partial bodies, or — in the worst case — silent stalls that the stream watchdog kills after 600 s.
+
+**Correct (always-safe):**
+
+```bash
+# Write the body to a file first (or commit it under team/<role>-dev/):
+gh pr create --title "feat(...)..." --body-file team/devon-dev/pr-body.md
+gh pr comment <N> --body-file team/devon-dev/self-test.md
+```
+
+**Wrong (will stall on non-trivial markdown):**
+
+```bash
+# Heredoc — backtick + $ + < > all interact badly with shell parsing:
+gh pr create --title "..." --body "$(cat <<'EOF'
+## Summary
+- did `the thing`
+- fixed <bug>
+EOF
+)"
+
+# Same problem with --body "..." inline:
+gh pr create --title "..." --body "## Summary
+- did the thing"
+```
+
+**Why:** validated 2026-05-18 — Devon's first M3W-7 dispatch literally stalled mid-heredoc trying to embed a multi-line markdown PR body. The 600 s stream watchdog killed the agent before it could recover. The recovery dispatch using `--body-file` worked first try. The same trap applies to `gh pr comment`, `gh issue create`, `gh issue comment`, and any other `gh` command that takes `--body`.
+
+**Dispatch-brief discipline:** when authoring a dispatch brief that ends with "open a PR" or "post a Self-Test Report", include the `--body-file <path>` form in the example, not heredoc. Sub-agents copy the example shape — wrong examples burn agent cycles.
 
 For ClickUp updates and PR transitions, the standard cadence pairs each step with a ticket status move (see `clickup-status-as-hard-gate` memory).
 
