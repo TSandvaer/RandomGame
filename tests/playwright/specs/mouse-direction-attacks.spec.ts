@@ -46,11 +46,11 @@
  *
  * **What this spec deliberately does NOT cover:**
  *
- *   - Sprite-rotation visual rendering. The sprite is a 16×16 ColorRect —
- *     rotation is mathematically observable on the node but visually
- *     undetectable in a screenshot (a rotated square is still a square).
- *     The GUT side `test_sprite_rotation_updates_when_present` pins the
- *     wiring; an HTML5 visual check is documented in the Self-Test Report.
+ *   - Sprite-rotation visual rendering. Post-M3W-2 the AnimatedSprite2D
+ *     carries direction via per-frame art, so the Sprite node's `.rotation`
+ *     is pinned to 0 across all `_facing` angles. The GUT side
+ *     `test_sprite_rotation_stays_zero_across_facing` pins that invariance;
+ *     an HTML5 visual check is documented in the Self-Test Report.
  *   - Dead-zone (mouse on top of player). The GUT side covers it
  *     mechanically (`test_mouse_inside_deadzone_keeps_last_facing`); the
  *     browser-coord precision needed to land exactly within 8px of the
