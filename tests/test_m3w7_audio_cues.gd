@@ -16,7 +16,10 @@ extends GutTest
 ##        Player.attack_spawned(heavy)   → SFX_PLAYER_ATTACK_HEAVY
 ##        Player.damaged(>0)             → SFX_PLAYER_HIT
 ##        Player.damaged(0)              → NO SFX (i-frame absorb path)
-##        Player.iframes_started         → SFX_PLAYER_DODGE
+##        Player.dodge_started           → SFX_PLAYER_DODGE
+##        Player.iframes_started         → NO SFX (post-hit grant path —
+##                                         AD-05 dodge-whoosh is intentional-
+##                                         dodge ONLY, ticket 86c9vbhf1)
 ##        Grunt.damaged(>0)              → SFX_MOB_HIT
 ##        Grunt.mob_died                 → SFX_MOB_DIE
 ##        Grunt.light_telegraph_started  → SFX_ATTACK_TELEGRAPH
@@ -206,14 +209,37 @@ func test_player_damaged_zero_is_silent() -> void:
 		"Player.damaged(0) is silent (no cue played)")
 
 
-func test_player_iframes_started_plays_dodge_cue() -> void:
+func test_player_dodge_started_plays_dodge_cue() -> void:
+	# Ticket 86c9vbhf1 — dodge-whoosh routes off `dodge_started`, NOT
+	# `iframes_started`. Post-fix contract: only an intentional `try_dodge`
+	# fires the cue. See `test_player_iframes_started_alone_is_silent` below
+	# for the negative-control covering the take_damage post-hit-iframe path.
+	var player: Player = preload("res://scripts/player/Player.gd").new()
+	add_child_autofree(player)
+	var ad: Node = _get_audio_director()
+	ad.reset_sfx_pool_index_for_test()
+	player.dodge_started.emit()
+	assert_eq(ad.get_last_sfx_id(), StringName("sfx-player-dodge"),
+		"Player.dodge_started routes to sfx-player-dodge (per AD-05)")
+
+
+func test_player_iframes_started_alone_is_silent() -> void:
+	# REGRESSION GUARD — ticket 86c9vbhf1 / PR #278 review.
+	# `iframes_started` ALSO fires from `take_damage` (post-hit invuln grant,
+	# Uma's AC4 Room 05 balance pin §3.B). If a future refactor re-binds the
+	# audio handler back to `iframes_started`, every damage taken produces a
+	# dodge-whoosh — the bug PR #278 shipped. AD-05 is "intentional dodge
+	# ONLY"; bare `iframes_started.emit()` (without the paired `dodge_started`
+	# emit that `try_dodge` performs) must NOT play `sfx-player-dodge`.
 	var player: Player = preload("res://scripts/player/Player.gd").new()
 	add_child_autofree(player)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	player.iframes_started.emit()
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-player-dodge"),
-		"Player.iframes_started routes to sfx-player-dodge")
+	assert_eq(ad.get_last_sfx_id(), StringName(""),
+		"Player.iframes_started alone (post-hit-iframe-grant path) is silent — " +
+		"REGRESSION GUARD: dodge-whoosh fires ONLY from dodge_started per " +
+		"audio-direction.md §AD-05 and ticket 86c9vbhf1")
 
 
 func test_grunt_damaged_plays_mob_hit() -> void:

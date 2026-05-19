@@ -232,8 +232,11 @@ func _get_practice_dummy_scene() -> PackedScene:
 ##   - WASD beat: fired immediately at room-entry.
 ##   - dodge beat: fired on first movement detected via `_physics_process`
 ##     polling Player.velocity. Latched.
-##   - lmb_strike beat: fired on first dodge — `Player.iframes_started` is
-##     the first signal that fires inside `try_dodge`.
+##   - lmb_strike beat: fired on first dodge — `Player.dodge_started` is the
+##     dodge-exclusive signal (post-ticket 86c9vbhf1). Was `iframes_started`
+##     pre-fix, but that also fires from `take_damage`'s post-hit grant,
+##     which would have advanced the tutorial LMB beat on first damage taken
+##     — a latent bug. `dodge_started` only fires from `try_dodge`.
 ##   - rmb_heavy beat: fired on dummy `mob_died` (the dummy poofs after
 ##     the third LMB hit at FIST_DAMAGE=1).
 func _wire_tutorial_flow() -> void:
@@ -247,11 +250,11 @@ func _wire_tutorial_flow() -> void:
 	# room-entry whether or not the player has moved yet.
 	_emit_beat(BEAT_WASD)
 	if _player != null:
-		# Subscribe dodge → LMB beat (Player.iframes_started fires inside
+		# Subscribe dodge → LMB beat (Player.dodge_started fires inside
 		# try_dodge — the moment a dodge actually starts, before the cooldown
 		# tick). Connect-once guard via is_connected.
-		if not _player.iframes_started.is_connected(_on_player_iframes_started):
-			_player.iframes_started.connect(_on_player_iframes_started)
+		if not _player.dodge_started.is_connected(_on_player_dodge_started):
+			_player.dodge_started.connect(_on_player_dodge_started)
 	# Subscribe to the dummy's mob_died — dummy poof advances to RMB beat.
 	for m: Node in get_spawned_mobs():
 		if m is PracticeDummy:
@@ -279,13 +282,17 @@ func _physics_process(_delta: float) -> void:
 
 # ---- Tutorial flow signal handlers ----------------------------------
 
-## Player started a dodge i-frame window. Fires `lmb_strike` beat.
+## Player started an intentional dodge. Fires `lmb_strike` beat.
 ##
-## **Why iframes_started, not state_changed:** `state_changed` fires on
-## EVERY transition (idle ↔ walk happens dozens of times pre-first-attack);
-## `iframes_started` only fires inside `try_dodge`, which is exactly the
-## "player just dodged" semantics we want.
-func _on_player_iframes_started() -> void:
+## **Why dodge_started, not state_changed or iframes_started:**
+## `state_changed` fires on EVERY transition (idle ↔ walk happens dozens of
+## times pre-first-attack); `iframes_started` also fires from `take_damage`
+## (post-hit invuln grant, Uma's AC4 Room 05 balance pin §3.B) — would
+## advance the tutorial LMB beat on first damage taken, a latent bug.
+## `dodge_started` only fires from `try_dodge` after validation passes,
+## which is exactly the "player just intentionally dodged" semantics the
+## tutorial needs. See ticket 86c9vbhf1 + `audio-direction.md §AD-05`.
+func _on_player_dodge_started() -> void:
 	_emit_beat(BEAT_LMB)
 
 
