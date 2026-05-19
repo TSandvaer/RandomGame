@@ -346,8 +346,9 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
   //
   // **Game-side hardening (also this PR, defensive):** the `RoomGate`
   // death-wait Timer was changed to `process_callback = TIMER_PROCESS_IDLE`
-  // already, and a regression-pin GUT test (`test_room_gate_3mob_concurrent
-  // _death_unlock`) pins that the gate unlocks correctly when 3 mobs die
+  // already, and a regression-pin GUT test
+  // (`test_3mob_concurrent_death_with_death_wait_unlocks` in
+  // `tests/test_room_gate.gd`) pins that the gate unlocks correctly when 3 mobs die
   // in the same frame — even though that scenario was never the actual
   // failure mode. The pin guards against any future regression that
   // dropped one of three deferred decrements.
