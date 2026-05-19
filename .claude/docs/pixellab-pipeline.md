@@ -217,6 +217,98 @@ This is the **iteration-via-set_palette** pattern in action: the third `set_pale
 the same indexed canvas (v3) corrected the over-routing without re-importing or re-quantizing.
 Cost: zero generations, ~1 second of pixel-mcp time.
 
+### Strategy 4 — Luminance-band role routing + character-beat overrides ✓ (BEST for cross-stratum retints, validated 2026-05-18 on S1→S2 Stoker, PR #276)
+
+Strategies 1–3 all route by **color distance** (palette → palette, Euclidean RGB or
+CIEDE2000). That works when the source is a freshly-generated PixelLab character whose
+tonal structure is unknown and must be discovered.
+
+It **fails** when the source is an **already-doctrine-locked sprite being retinted to a
+new stratum**. Color distance is silhouette-blind across stratum doctrines — a "red
+eye-glow" pixel in S1 may have no red neighbor in S2 at all, so pure NN routes it to
+whatever's closest in RGB (cloth-base, leather, anything), and the role/tonal structure
+the source was authored with collapses.
+
+Strategy 4 routes by **luminance ROLE** (where the pixel sits in the tonal hierarchy)
+rather than by source hex distance. This works specifically because the source is already
+doctrine-locked — its tonal structure is **correct by construction**, so the
+highlight pixels really are highlights, mid pixels really are mids, etc. Mapping role →
+role rather than color → color preserves the silhouette across the retint.
+
+**Band-to-doctrine-role table** (S2 Stoker doctrine, illustrative):
+
+| Luminance Y | Role | S2 Stoker doctrine slot |
+|---|---|---|
+| Y ≥ 0.78 | Highlight | `#E8D9B0` warm cream |
+| 0.60 ≤ Y < 0.78 | Lit | `#C49960` warm tan |
+| 0.40 ≤ Y < 0.60 | Mid | `#8A5A2E` bronze |
+| 0.25 ≤ Y < 0.40 | Shadow | `#4E2F18` deep bronze |
+| Y < 0.25 (non-alpha) | Deep | `#2A180C` near-black |
+| outline (pre-tagged) | Outline | `#1A0E08` stratum outline |
+
+(Actual band thresholds + doctrine hexes live in `tools/bake_stoker_palette.py` — tune
+per stratum doctrine.)
+
+**Character-beat overrides bypass the routing.** Doctrine-critical accents (red
+eye-glow, iron-neutral metal) must never be reduced to "whatever luminance band they
+fall in" — those *are* the character beat and need explicit detection BEFORE the
+luminance dispatch. Validated HSV detection patterns:
+
+- **Red eye-glow:** `H ∈ [350°, 20°] AND S > 0.45 AND V > 0.4` → route to
+  doctrine accent (`#D24A3C` aggro-glow in S2 Stoker).
+- **Iron-neutral metal:** `S < 0.15 AND 0.25 < V < 0.65` → route to doctrine
+  iron slot (`#7A7468` neutral iron); preserves metal from being warmed into the
+  bronze family.
+
+**Implementation pattern** (from `tools/bake_stoker_palette.py`):
+
+```python
+def route_pixel(r, g, b, a):
+    if a == 0:
+        return (0, 0, 0, 0)
+    # Character-beat overrides FIRST — bypass luminance routing.
+    if is_red_glow(r, g, b):
+        return DOCTRINE["aggro_glow"]
+    if is_iron_neutral(r, g, b):
+        return DOCTRINE["iron"]
+    # Then luminance-band role dispatch.
+    y = 0.299*r + 0.587*g + 0.114*b
+    if y >= 0.78 * 255: return DOCTRINE["highlight"]
+    if y >= 0.60 * 255: return DOCTRINE["lit"]
+    if y >= 0.40 * 255: return DOCTRINE["mid"]
+    if y >= 0.25 * 255: return DOCTRINE["shadow"]
+    return DOCTRINE["deep"]
+```
+
+**Validation (2026-05-18, PR #276 Stoker):** 280 retinted PNGs across the Stoker
+animation set, 16/16 GUT tests green, Tess HTML5 sign-off. The naive Strategy-3 pure-NN
+alternative would have routed the red eye-glow into the cloth-base family (closest RGB
+neighbor with no red in S2 doctrine) and routed the iron buckle into warm-bronze
+(metal-warmth contamination) — both verified by trial before settling on Strategy 4.
+
+**When to use 3 vs 4:**
+
+| Scenario | Strategy |
+|---|---|
+| Fresh PixelLab generation → first doctrine-lock | **3** (per-slot NN + manual overrides) |
+| Doctrine-locked sprite → retint to sibling stratum | **4** (luminance-band + beat overrides) |
+| Doctrine-locked sprite → retint within same stratum | **3** (NN is fine, doctrine families overlap) |
+| Roles unknown / source has unclear tonal structure | **3** (discover via NN first) |
+| Roles known / source authored to doctrine | **4** (preserve role mapping) |
+
+**5-step validation pattern:**
+
+1. Identify character beats in source (eye-glow, signature metal/gem, etc.) and write
+   their HSV bounds.
+2. Define luminance bands + doctrine role mapping for the target stratum.
+3. Bake one frame, visual diff vs source — confirm silhouette + beats preserved.
+4. Bake full animation set; spot-check across animations (idle / hit / death frames
+   often surface band-threshold edge cases).
+5. GUT + Playwright + HTML5 visual-verification per the standard gate.
+
+**Reference impl:** `tools/bake_stoker_palette.py` (PR #276). Nit: hardcoded
+`REPO_ROOT` deferred to M4 — see ClickUp `86c9uze5j`.
+
 ---
 
 ## Doctrine-hex-in-prompt — partial success, area-dependent reliability
