@@ -33,10 +33,31 @@ extends CharacterBody2D
 ## and tests. New state name on the right.
 signal state_changed(from_state: StringName, to_state: StringName)
 
-## Emitted at the start of an i-frame window (fired by dodge). Hitbox
-## scripts listen to this to drop their owner from damage tables.
+## Emitted at the start of an i-frame window. Fired from BOTH `try_dodge()`
+## (intentional dodge) AND `take_damage()` (post-hit invuln grant — Uma's
+## AC4 Room 05 balance pin §3.B). Hitbox scripts listen to this to drop
+## their owner from damage tables.
+##
+## **Note:** consumers that need "the player intentionally dodged" semantics
+## (audio cue, tutorial beat) MUST listen to `dodge_started` instead — see
+## `team/uma-ux/audio-direction.md §AD-05`. `iframes_started` covers BOTH
+## the dodge i-frame window AND the post-hit invuln grant, so subscribing
+## the dodge-whoosh cue here fires it on every damage taken (the bug PR #278
+## shipped — ticket 86c9vbhf1).
 signal iframes_started()
 signal iframes_ended()
+
+## Emitted ONLY from `try_dodge()` after `can_dodge()` validation passes —
+## i.e. when the player intentionally rolls. Distinct from `iframes_started`
+## (which also fires from `take_damage`'s post-hit invuln grant). This is
+## the right signal for "player just dodged" semantics: dodge-whoosh audio
+## cue (`sfx-player-dodge` per `audio-direction.md §AD-05`), tutorial LMB
+## beat advancement, future dodge-VFX hooks.
+##
+## Ticket 86c9vbhf1 — Tess PR #278 review found dodge-whoosh fired on every
+## damage taken because the audio handler subscribed to `iframes_started`,
+## which also fires from `take_damage`. Split fixes that.
+signal dodge_started()
 
 ## Emitted whenever the player spawns an attack hitbox. Useful for VFX
 ## hooks and tests that want to verify an attack actually fired.
@@ -406,7 +427,13 @@ func _ready() -> void:
 	#   attack_spawned(kind=light)  → SFX_PLAYER_ATTACK_LIGHT
 	#   attack_spawned(kind=heavy)  → SFX_PLAYER_ATTACK_HEAVY
 	#   damaged(amount>0)           → SFX_PLAYER_HIT
-	#   iframes_started             → SFX_PLAYER_DODGE
+	#   dodge_started               → SFX_PLAYER_DODGE
+	# `dodge_started` (NOT `iframes_started`) is the dodge-whoosh trigger —
+	# ticket 86c9vbhf1. Subscribing on `iframes_started` fired the cue on
+	# every `take_damage` post-hit-iframe grant (Uma's AC4 Room 05 balance
+	# pin §3.B), which violates `audio-direction.md §AD-05` "dodge-whoosh
+	# plays ONLY on intentional dodge". Both signals still emit per dodge;
+	# only `dodge_started` is dodge-exclusive.
 	# All routes fire from gameplay signals that necessarily come AFTER a user
 	# gesture (keyboard/mouse input), satisfying the HTML5 audio-playback gate
 	# per `.claude/docs/audio-architecture.md`.
@@ -414,8 +441,8 @@ func _ready() -> void:
 		attack_spawned.connect(_on_attack_spawned_audio)
 	if not damaged.is_connected(_on_damaged_audio):
 		damaged.connect(_on_damaged_audio)
-	if not iframes_started.is_connected(_on_iframes_started_audio):
-		iframes_started.connect(_on_iframes_started_audio)
+	if not dodge_started.is_connected(_on_dodge_started_audio):
+		dodge_started.connect(_on_dodge_started_audio)
 
 
 func _physics_process(delta: float) -> void:
@@ -951,6 +978,15 @@ func try_dodge(dir: Vector2) -> bool:
 	_facing = d
 	_dodge_time_left = DODGE_DURATION
 	_dodge_cooldown_left = DODGE_COOLDOWN
+	# `dodge_started` fires ONLY here — after `can_dodge()` gating, before
+	# `_enter_iframes` so the cue lands at the same instant as the i-frame
+	# window opening (matches `audio-direction.md §AD-05` "frame 2 of 6 of
+	# the dodge animation"). `iframes_started` fires inside `_enter_iframes`
+	# below; both signals emit per intentional dodge, but only `dodge_started`
+	# fires here. `take_damage`'s post-hit `_enter_iframes` call emits ONLY
+	# `iframes_started`, not `dodge_started` — that's the bug-fix contract
+	# from ticket 86c9vbhf1.
+	dodge_started.emit()
 	_enter_iframes()
 	set_state(STATE_DODGE)
 	return true
@@ -1064,12 +1100,14 @@ func _on_damaged_audio(amount: int, _hp_remaining: int, _source: Node) -> void:
 	ad.play_sfx(&"sfx-player-hit")
 
 
-## iframes_started → SFX_PLAYER_DODGE. The iframes_started signal fires at
-## dodge-roll i-frame window start (frame 2 of 6 per `audio-direction.md
-## §AD-05` spec) — same instant the cloth-whoosh should land. Also fires
-## from `_grant_iframes` (post-hit invuln) — that's an acceptable cue
-## extension since the post-hit grant is itself a dodge-like absorb.
-func _on_iframes_started_audio() -> void:
+## dodge_started → SFX_PLAYER_DODGE. Fires at dodge-roll i-frame window
+## start (frame 2 of 6 per `audio-direction.md §AD-05` spec) — same instant
+## the cloth-whoosh should land. **Was `iframes_started` pre-ticket
+## 86c9vbhf1** — but `iframes_started` ALSO fires from `take_damage`'s
+## post-hit invuln grant (Uma's AC4 Room 05 balance pin §3.B), which means
+## every damage taken produced a whoosh. AD-05 is "intentional dodge ONLY";
+## `dodge_started` is the dodge-exclusive signal that satisfies it.
+func _on_dodge_started_audio() -> void:
 	var ad: Node = _resolve_audio_director()
 	if ad == null or not ad.has_method("play_sfx"):
 		return
