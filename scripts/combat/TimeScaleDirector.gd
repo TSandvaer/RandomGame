@@ -166,17 +166,31 @@ signal request_changed(reason: String, op: String)
 # ---- State -----------------------------------------------------------
 
 ## Active requests, keyed by `reason`. Each value is a Dictionary with
-## keys `scale: float`, `priority: int`, `timer: SceneTreeTimer` (or null
-## for no-auto-release).
-##
-## Dictionary (not Array) so re-requesting the same reason is structurally
-## a replace + the resolution computation reads keys without scanning.
+## keys `scale: float`, `priority: int`, `gen: int` (generation token; see
+## below). Dictionary (not Array) so re-requesting the same reason is
+## structurally a replace + the resolution computation reads keys without
+## scanning.
 var _requests: Dictionary = {}
 
 ## Memoized effective scale (mirrors `Engine.time_scale`; the director is
 ## the single writer). Stored so signal-emit can compare against the
 ## previous value without re-reading the engine.
 var _current_scale: float = 1.0
+
+## Monotonic generation counter for auto-release timer identity. Every
+## `_schedule_auto_release` call reads-and-increments this, stamps the
+## entry with the new value, and binds the value to the timeout callback.
+## When a timer fires, the handler compares its bound `gen` to the live
+## entry's `gen` — int equality is value-based, but the counter is
+## strictly monotonic so stale-vs-live is always distinguishable.
+##
+## Why int counter (not Dictionary identity / RefCounted marker): GDScript
+## Dictionary `==` is VALUE equality (Godot 4.3 docs), so a re-request
+## with identical {scale, priority} would produce a value-equal Dict and
+## the stale timer would treat itself as live — destroying the just-
+## refreshed request (PR #285 Tess CHANGES_REQUESTED, self-extending
+## freeze is the canonical break). A monotonic int has no such collision.
+var _generation_counter: int = 0
 
 
 # ---- Lifecycle -------------------------------------------------------
@@ -216,6 +230,16 @@ func request(reason: String, scale: float, duration: float, priority: int = PRIO
 		_warn("TimeScaleDirector.request: empty reason — refusing", "time_scale_director")
 		return
 
+	# Adversarial-probe guard: NaN / +Inf / -Inf would survive clampf as NaN
+	# (clampf(NaN, ...) returns NaN), poison Engine.time_scale, and corrupt
+	# every downstream consumer. Reject explicitly + loud.
+	if is_nan(scale) or is_inf(scale):
+		_warn(
+			("TimeScaleDirector.request: non-finite scale (%s) for reason '%s' — refusing"
+				% [str(scale), reason]),
+			"time_scale_director")
+		return
+
 	var clamped_scale: float = clampf(scale, MIN_NON_FREEZE_SCALE, MAX_SCALE)
 	if not is_equal_approx(clamped_scale, scale):
 		var msg: String = (
@@ -225,6 +249,7 @@ func request(reason: String, scale: float, duration: float, priority: int = PRIO
 		_warn(msg, "time_scale_director")
 
 	# Cancel any prior timer for this reason — re-request resets the clock.
+	# (Implemented via the gen-counter mismatch in `_on_auto_release`.)
 	var prior_existed: bool = _requests.has(reason)
 	if prior_existed:
 		_cancel_timer_for(reason)
@@ -232,7 +257,7 @@ func request(reason: String, scale: float, duration: float, priority: int = PRIO
 	var entry: Dictionary = {
 		"scale": clamped_scale,
 		"priority": priority,
-		"timer_active": false,
+		"gen": 0,  # filled by _schedule_auto_release if duration > 0
 	}
 	_requests[reason] = entry
 
@@ -260,7 +285,7 @@ func freeze(duration: float, reason: String = "freeze") -> void:
 	var entry: Dictionary = {
 		"scale": 0.0,
 		"priority": PRIORITY_FREEZE,
-		"timer_active": false,
+		"gen": 0,  # filled by _schedule_auto_release if duration > 0
 	}
 	_requests[reason] = entry
 
@@ -354,39 +379,45 @@ func _compute_effective_scale() -> float:
 	return lowest_scale_in_top
 
 
-## Schedule the auto-release SceneTreeTimer for a reason. Marks the entry
-## so a subsequent re-request can cancel cleanly. We rely on the timer's
-## timeout signal carrying the reason via a bound argument so a re-request
-## that already replaced the entry doesn't accidentally release the NEW
-## request when the OLD timer fires.
+## Schedule the auto-release SceneTreeTimer for a reason. Stamps the
+## entry with a fresh monotonic `gen` token so a re-request that
+## replaces the entry can be distinguished from this scheduling.
+##
+## A stale timer (from a prior request that has since been replaced)
+## carries the OLD `gen` value in its bound arg; on fire, the handler
+## compares it to the live entry's CURRENT `gen` and no-ops on mismatch.
 func _schedule_auto_release(reason: String, duration: float) -> void:
+	_generation_counter += 1
+	var gen: int = _generation_counter
 	var entry: Dictionary = _requests[reason]
-	entry["timer_active"] = true
-	# Bind reason + a "generation" token so a stale timer (from a prior
-	# request that has since been replaced) can no-op on fire. The token
-	# is the current entry Dictionary itself — if the entry has been
-	# replaced, the new entry is a DIFFERENT Dictionary instance.
-	var generation: Dictionary = entry
-	# `process_always = false` so the timer respects time-scale itself.
-	# CAREFUL: a timer scheduled while we're frozen at 0.0 would NEVER
-	# fire (timer is scaled by engine time). So we explicitly request the
-	# REAL-TIME timer behavior via `process_always = true` (timer ticks
-	# in real seconds regardless of `Engine.time_scale`).
+	entry["gen"] = gen
+	# `create_timer(time_sec, process_always, process_in_physics, ignore_time_scale)`:
+	#   - `process_always = true`  → timer continues even when SceneTree is paused
+	#     (so a director-scheduled release survives a pause-state).
+	#   - `process_in_physics = false` → idle-frame timer (matches scheduling site).
+	#   - `ignore_time_scale = true` → timer ticks in REAL seconds, ignoring
+	#     `Engine.time_scale`. This is the load-bearing argument: under a 0.0
+	#     freeze, a scaled timer would never tick out and the freeze would
+	#     leak forever. Pinned by `test_freeze_auto_release_works_despite_scale_0`.
 	var timer: SceneTreeTimer = get_tree().create_timer(duration, true, false, true)
-	timer.timeout.connect(_on_auto_release.bind(reason, generation))
+	timer.timeout.connect(_on_auto_release.bind(reason, gen))
 
 
-## Auto-release handler. Bound with the reason + the entry-Dictionary
-## generation token. If the live entry is a DIFFERENT Dictionary (because
-## a re-request replaced it), this timer is stale and no-ops.
-func _on_auto_release(reason: String, generation: Dictionary) -> void:
+## Auto-release handler. Bound with the reason + the monotonic generation
+## token stamped at schedule time. If the live entry's `gen` differs (because
+## a re-request bumped the counter + restamped), this timer is stale and
+## no-ops. Int equality is value-based but the counter is strictly monotonic,
+## so stale-vs-live is always distinguishable — including the
+## same-{scale, priority} self-extension case (e.g. extending a freeze).
+func _on_auto_release(reason: String, gen: int) -> void:
 	if not _requests.has(reason):
 		# Already released manually.
 		return
 	var live: Dictionary = _requests[reason]
-	if live != generation:
-		# Stale timer — a re-request replaced the entry; the new entry
-		# has its own (or no) timer. Drop this one silently.
+	if int(live.get("gen", 0)) != gen:
+		# Stale timer — a re-request replaced the entry and bumped the
+		# generation counter. The new entry has its own (or no) timer.
+		# Drop this one silently.
 		return
 	# Live + matching generation — auto-expire.
 	_requests.erase(reason)
@@ -396,13 +427,18 @@ func _on_auto_release(reason: String, generation: Dictionary) -> void:
 
 ## Cancel any in-flight timer for `reason`. We don't store the timer
 ## reference directly (SceneTreeTimer doesn't expose a cancel method
-## anyway); we rely on the generation-token mismatch in `_on_auto_release`
-## to no-op the stale fire. This helper exists for symmetry + future-
-## proofing if Godot adds explicit timer cancellation.
+## anyway); we rely on the monotonic-gen-token mismatch in
+## `_on_auto_release` to no-op the stale fire. This helper exists for
+## symmetry + future-proofing if Godot adds explicit timer cancellation,
+## and could be extended to forcibly bump the entry's `gen` (orphaning
+## the old timer) if a future caller needs synchronous cancellation
+## semantics.
 func _cancel_timer_for(reason: String) -> void:
-	# Currently a no-op (see comment). The generation-token guard in
-	# `_on_auto_release` is the actual cancellation mechanism. Kept as a
-	# named hook so callers don't need to know the implementation detail.
+	# Currently a no-op (see comment). The monotonic-gen-token guard in
+	# `_on_auto_release` is the actual cancellation mechanism — every
+	# `_schedule_auto_release` call bumps the counter, so a re-request's
+	# new schedule (or a release that clears the entry) renders the old
+	# timer's bound `gen` permanently stale.
 	pass
 
 

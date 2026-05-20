@@ -411,3 +411,92 @@ func test_t2_t3_conflict_phase_transition_wins_over_hit_pause() -> void:
 	assert_almost_eq(_director.current_scale(), 0.05, 0.001,
 		"after phase_transition releases, hit_pause is now the top of stack")
 	_director.release("hit_pause")
+
+
+# ---- AC12: generation-token identity (PR #285 Tess CHANGES_REQUESTED) ----
+#
+# These tests pin the bug *class* that motivated the gen-token fix:
+# value-equality on the generation token would let a stale auto-release
+# timer treat itself as live + erase the freshly-refreshed entry.
+#
+# `test_rerequest_cancels_prior_auto_release_timer` (AC6) only exercises
+# the value-DISTINCT case (0.5 → 0.4); these probes pin the value-EQUAL
+# boundary explicitly. Per Tess: these tests MUST fail against the prior
+# `live != generation` Dict-comparison guard and PASS against the
+# monotonic-int gen-counter fix.
+
+func test_rerequest_with_identical_scale_priority_does_not_self_erase() -> void:
+	# Re-request with IDENTICAL scale/priority/duration>0 to exercise the
+	# generation-token's value-vs-reference equality boundary. Under the
+	# prior Dict-comparison guard, the OLD entry and NEW entry would be
+	# value-equal Dicts (same scale, same priority, same {extra-field}),
+	# so the stale OLD timer's fire would compute `live != generation` as
+	# false → erase the LIVE entry. Fix: monotonic int gen counter — each
+	# schedule call gets a unique int, stale-vs-live always distinguishable.
+	_director.request("renew_same", 0.5, 0.05, 0)  # OLD: scale=0.5 prio=0
+	_director.request("renew_same", 0.5, 0.2, 0)   # NEW: same shape, longer timer
+	# Wait past the OLD timer's duration but BEFORE the new one expires.
+	await get_tree().create_timer(0.12, true, false, true).timeout
+	assert_true(_director.is_active("renew_same"),
+		"same-content re-request must survive stale OLD timer firing")
+	assert_almost_eq(_director.current_scale(), 0.5, 0.001,
+		"scale still pinned at 0.5; live entry was NOT erroneously erased")
+	_director.release("renew_same")
+
+
+func test_freeze_self_extension_via_rerequest_does_not_self_erase() -> void:
+	# Docstring contract (TimeScaleDirector.gd line 95-96):
+	# "A long-duration 'freeze' that needs extension can re-request itself."
+	#
+	# This must hold even when the extension uses identical
+	# reason/priority — both freeze entries are {scale=0.0, priority=2},
+	# i.e. value-equal Dicts. Pre-fix, the OLD timer's fire would erase
+	# the extended freeze. Post-fix (monotonic gen counter), the stale
+	# OLD timer's bound `gen` is strictly less than the LIVE entry's
+	# `gen`, so the stale fire no-ops cleanly.
+	_director.freeze(0.05, "extending_freeze")
+	_director.freeze(0.2, "extending_freeze")  # extend
+	await get_tree().create_timer(0.12, true, false, true).timeout
+	assert_true(_director.is_active("extending_freeze"),
+		"extended freeze must survive the original timer's stale fire")
+	assert_almost_eq(_director.current_scale(), 0.0, 0.001,
+		"freeze still active after extension")
+	_director.release("extending_freeze")
+
+
+# ---- AC13: NaN / Inf adversarial-probe rejection -----------------------
+#
+# Non-blocking Tess finding from PR #285 review: `request("x", NAN, ...)`
+# pre-fix would pass `clampf(NaN, ...)` → NaN, store entry with NaN
+# scale → write `Engine.time_scale = NaN` → catastrophic downstream.
+# Fix: explicit is_nan / is_inf reject + WarningBus warn. Cheap to add
+# while touching request().
+
+func test_nan_scale_is_rejected_with_warning() -> void:
+	_warn_guard.expect_warning("non-finite scale")
+	_director.request("nan_probe", NAN, 0.0)
+	assert_eq(_director.active_reasons().size(), 0,
+		"NaN scale rejected — no entry added")
+	assert_almost_eq(_director.current_scale(), 1.0, 0.001,
+		"Engine.time_scale untouched")
+	# Belt: the engine itself must not have been polluted with NaN.
+	assert_false(is_nan(Engine.time_scale),
+		"Engine.time_scale is NOT NaN")
+
+
+func test_positive_inf_scale_is_rejected_with_warning() -> void:
+	_warn_guard.expect_warning("non-finite scale")
+	_director.request("inf_probe", INF, 0.0)
+	assert_eq(_director.active_reasons().size(), 0,
+		"+Inf scale rejected — no entry added")
+	assert_almost_eq(_director.current_scale(), 1.0, 0.001,
+		"Engine.time_scale untouched")
+
+
+func test_negative_inf_scale_is_rejected_with_warning() -> void:
+	_warn_guard.expect_warning("non-finite scale")
+	_director.request("neg_inf_probe", -INF, 0.0)
+	assert_eq(_director.active_reasons().size(), 0,
+		"-Inf scale rejected — no entry added")
+	assert_almost_eq(_director.current_scale(), 1.0, 0.001,
+		"Engine.time_scale untouched")
