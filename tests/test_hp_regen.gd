@@ -232,6 +232,14 @@ func _reset_autoloads() -> void:
 	var sp: Node = Engine.get_main_loop().root.get_node_or_null("StratumProgression")
 	if sp != null and sp.has_method("reset"):
 		sp.reset()
+	# M3 Tier 2 T2/T3 — defensive reset: a prior test file's leaked
+	# `Engine.time_scale = 0.0` (from TimeScaleDirector.freeze in a boss-
+	# kill test) would stop the shimmer tween mid-flight. Reset to baseline
+	# at the start of every Main-instancing test in this file.
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
 
 
 func _save() -> Node:
