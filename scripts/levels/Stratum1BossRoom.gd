@@ -137,6 +137,11 @@ func _ready() -> void:
 	# branch). Deferring the boss spawn would make `get_boss()` return null at
 	# wire time and the boss would never get its XP / loot wiring.
 	_spawn_boss()
+	# M3-T2-W1-T1 — wire entry-sequence-completed signal to BGM crossfade.
+	# Subscribed BEFORE the deferred `_assemble_room_fixtures` runs the timer,
+	# so the wiring is present by the time the signal fires (T+1.8 s post-
+	# trigger). Idempotent triple-wire guard is inside `_wire_audio_cues`.
+	_wire_audio_cues()
 	# Defer the Area2D-fixture pass (door-trigger build + StratumExit spawn)
 	# AND the entry-sequence trigger out of the physics-flush window.
 	#
@@ -469,3 +474,44 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 		df = get_tree().root.get_node_or_null("DebugFlags")
 	if df != null and df.has_method("combat_trace"):
 		df.combat_trace(tag, msg)
+
+
+# ---- M3-T2-W1-T1 audio wiring -----------------------------------------
+
+## Wire `entry_sequence_completed` to the BGM crossfade so the boss-room
+## music kicks in at T+1.8 s post-trigger (Uma `boss-intro.md` Beat 5).
+## Idempotent on triple-wire — `Signal.is_connected` guard mirrors the
+## pattern used in `Stratum1Boss._wire_audio_cues`. Production wires once
+## from `_ready`; tests can call `_wire_audio_cues()` repeatedly without
+## stacking handlers.
+func _wire_audio_cues() -> void:
+	if not entry_sequence_completed.is_connected(_on_entry_sequence_completed_audio):
+		entry_sequence_completed.connect(_on_entry_sequence_completed_audio)
+
+
+## Handler — fires when the 1.8 s entry sequence elapses. Crossfades the
+## BGM bus to `mus-boss-stratum1.ogg` over the AudioDirector's default
+## 600 ms (Uma `boss-intro.md` Beat 5 / `audio-direction.md §3 ducking rule 4`).
+##
+## Pre-fight there's no S1 BGM playing (M1 ships without S1 ambient/BGM —
+## only the S2 entry + boss-room crossfade are wired). The crossfade
+## degenerates to a fade-in from silence; the role-swap inside AudioDirector
+## ensures future calls (e.g. boss-died `stop_all_music`) operate on the
+## right player. Same shape as S2's pattern.
+##
+## Resolves AudioDirector lazily via the scene tree so headless tests that
+## construct the room without an AudioDirector autoload don't crash —
+## handler is a soft no-op when AudioDirector is absent. The autoload is
+## present in production via `project.godot` so this branch never fires at
+## runtime; the resolver is defensive against the bare-test surface.
+func _on_entry_sequence_completed_audio() -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("crossfade_to_boss_stratum1"):
+		return
+	ad.crossfade_to_boss_stratum1()
+
+
+func _resolve_audio_director() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_tree().root.get_node_or_null("AudioDirector")

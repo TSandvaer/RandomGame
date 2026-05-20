@@ -384,6 +384,50 @@ func test_boss_swing_spawned_slam_hit_plays_impact() -> void:
 		"Boss slam_hit routes to sfx-attack-impact (contact, not telegraph)")
 
 
+# ---- Section 5b: M3-T2-W1-T7 phase-break + boss-wake stings ----------
+# Maps to Uma `boss-intro.md` BI-06 (boss-wake stinger) + BI-18 (phase-break
+# tritone sting). Wired in `Stratum1Boss._wire_audio_cues`.
+
+func test_boss_woke_plays_boss_wake_stinger() -> void:
+	# Uma BI-06: low brass + impact stinger fires once on boss wake
+	# (STATE_DORMANT → STATE_IDLE). Cue is `sfx-boss-wake`.
+	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	add_child_autofree(b)
+	var ad: Node = _get_audio_director()
+	ad.reset_sfx_pool_index_for_test()
+	b.boss_woke.emit()
+	assert_eq(ad.get_last_sfx_id(), StringName("sfx-boss-wake"),
+		"Stratum1Boss.boss_woke routes to sfx-boss-wake (Uma BI-06)")
+
+
+func test_phase_changed_plays_phase_break_sting() -> void:
+	# Uma BI-18: tritone tension chord fires once per phase boundary
+	# (66% → P2, 33% → P3). Cue is `sfx-phase-break`.
+	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	add_child_autofree(b)
+	var ad: Node = _get_audio_director()
+	# Test P2 boundary.
+	ad.reset_sfx_pool_index_for_test()
+	b.phase_changed.emit(Stratum1Boss.PHASE_2)
+	assert_eq(ad.get_last_sfx_id(), StringName("sfx-phase-break"),
+		"Stratum1Boss.phase_changed(P2) routes to sfx-phase-break (Uma BI-18)")
+	# Test P3 boundary as well — handler is phase-agnostic.
+	ad.reset_sfx_pool_index_for_test()
+	b.phase_changed.emit(Stratum1Boss.PHASE_3)
+	assert_eq(ad.get_last_sfx_id(), StringName("sfx-phase-break"),
+		"Stratum1Boss.phase_changed(P3) routes to sfx-phase-break (Uma BI-18)")
+
+
+func test_boss_wake_and_phase_break_cues_exist_in_sfx_paths() -> void:
+	# Regression guard against the cue-id ↔ SFX_PATHS map drift class. If a
+	# future PR renames the cue id without updating the map, this test
+	# fails before the silent-trace shows up in soak.
+	assert_true(AudioDirectorScript.SFX_PATHS.has(&"sfx-phase-break"),
+		"SFX_PATHS contains sfx-phase-break (M3-T2-W1-T7)")
+	assert_true(AudioDirectorScript.SFX_PATHS.has(&"sfx-boss-wake"),
+		"SFX_PATHS contains sfx-boss-wake (M3-T2-W1-T7)")
+
+
 # ---- Section 6: Wiring is idempotent (re-`_ready` doesn't double-connect)
 
 func test_grunt_re_ready_does_not_double_connect() -> void:
@@ -400,3 +444,19 @@ func test_grunt_re_ready_does_not_double_connect() -> void:
 		"damaged signal has exactly 1 audio handler after triple-wire")
 	assert_eq(g.mob_died.get_connections().size(), 1,
 		"mob_died signal has exactly 1 audio handler after triple-wire")
+
+
+func test_boss_wake_and_phase_break_wiring_idempotent_on_triple_wire() -> void:
+	# Triple-wire guard for the M3-T2-W1-T7 additions. If `_wire_audio_cues`
+	# is not idempotent on `phase_changed` / `boss_woke`, every re-wire stacks
+	# a handler and a single phase boundary plays the cue N times. The
+	# `is_connected` guards inside `_wire_audio_cues` are the structural
+	# fix; this test pins them.
+	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	add_child_autofree(b)
+	b._wire_audio_cues()
+	b._wire_audio_cues()
+	assert_eq(b.phase_changed.get_connections().size(), 1,
+		"phase_changed has exactly 1 audio handler after triple-wire")
+	assert_eq(b.boss_woke.get_connections().size(), 1,
+		"boss_woke has exactly 1 audio handler after triple-wire")
