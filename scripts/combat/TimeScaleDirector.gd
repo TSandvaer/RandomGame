@@ -218,12 +218,11 @@ func request(reason: String, scale: float, duration: float, priority: int = PRIO
 
 	var clamped_scale: float = clampf(scale, MIN_NON_FREEZE_SCALE, MAX_SCALE)
 	if not is_equal_approx(clamped_scale, scale):
-		_warn(
+		var msg: String = (
 			"TimeScaleDirector.request: scale %.3f for reason '%s' clamped to %.3f "
-			"(range [%.3f, %.3f]; for a true freeze use freeze(...))"
-				% [scale, reason, clamped_scale, MIN_NON_FREEZE_SCALE, MAX_SCALE],
-			"time_scale_director"
-		)
+			+ "(range [%.3f, %.3f]; for a true freeze use freeze(...))"
+		) % [scale, reason, clamped_scale, MIN_NON_FREEZE_SCALE, MAX_SCALE]
+		_warn(msg, "time_scale_director")
 
 	# Cancel any prior timer for this reason — re-request resets the clock.
 	var prior_existed: bool = _requests.has(reason)
