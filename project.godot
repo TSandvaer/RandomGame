@@ -30,6 +30,7 @@ Inventory="*res://scripts/inventory/Inventory.gd"
 TutorialEventBus="*res://scripts/ui/TutorialEventBus.gd"
 MobRegistry="*res://scripts/content/MobRegistry.gd"
 AudioDirector="*res://scripts/audio/AudioDirector.gd"
+TimeScaleDirector="*res://scripts/combat/TimeScaleDirector.gd"
 
 [audio]
 
