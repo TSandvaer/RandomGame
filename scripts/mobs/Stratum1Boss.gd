@@ -146,6 +146,49 @@ const SLAM_COOLDOWN: float = 4.0
 ## Wraps the world-time-slow that Devon's cinematic layer applies.
 const PHASE_TRANSITION_DURATION: float = 0.60
 
+# ---- M3 Tier 2 Wave 1 T2 + T3 cinematic-feel constants ----------------
+# T2 hit-pause + final-freeze (ticket 86c9wjy1t):
+# T3 phase-transition world-time-slow (ticket 86c9wjy46):
+# All Engine.time_scale mutations route through `TimeScaleDirector` (T11 / PR #285).
+# Direct `Engine.time_scale = X` writes are prohibited outside the director per
+# `.claude/docs/time-scale-director.md` "Migration policy".
+
+## Hit-pause duration on a player → boss damage-landing light swing (Priya AC).
+## Microscopic by design — 60 ms reads as "the world flinches" without
+## interrupting input flow. Mirrors VD-07 budget in `combat-visual-feedback.md`.
+const HIT_PAUSE_LIGHT_DURATION: float = 0.060
+
+## Hit-pause duration on a player → boss damage-landing heavy swing (Priya AC).
+## 100 ms — slightly longer than light because heavy carries more visual weight.
+const HIT_PAUSE_HEAVY_DURATION: float = 0.100
+
+## Final-freeze duration on boss `_die` (Priya AC + Uma F1). Fires AFTER
+## `boss_died.emit(...)` so subscribers (MobLootSpawner, BossRoom signal chain,
+## Main._on_mob_died) execute at scale=1.0 on the same frame. The 300 ms freeze
+## then lands on the next frame as a true `freeze()` request (priority=FREEZE,
+## scale=0.0). Real-time auto-release per the director's `ignore_time_scale=true`
+## SceneTreeTimer.
+const FINAL_FREEZE_DURATION: float = 0.300
+
+## TimeScaleDirector reason keys. Stable strings — re-using a reason REPLACES the
+## prior request (idempotent refresh, per the director's contract). Different
+## reasons for hit-pause vs final-freeze vs phase-transition so they coexist on
+## the stack cleanly (e.g. a phase-transition request can hold while a hit-pause
+## auto-expires — priority resolution picks the right scale).
+const TSD_REASON_HIT_PAUSE: String = "boss_hit_pause"
+const TSD_REASON_FINAL_FREEZE: String = "boss_final_freeze"
+const TSD_REASON_PHASE_TRANSITION: String = "boss_phase_transition"
+
+## T3 phase-transition slow-mo (Uma BI-16, BI-17). Engine.time_scale = 0.3 for
+## 0.6 s, then snaps back to 1.0 via the director's auto-release. The 0.2 s ramp
+## back in Uma's spec is intentionally NOT modeled here — the director resolves
+## by step-function and Priya's AC accepts the snap-back as the M3 Tier 2 shape.
+## A ramp-back would require a sub-request tween that interpolates a second
+## director entry; deferred to a polish follow-up if Sponsor flags the snap as
+## abrupt during soak.
+const PHASE_TRANSITION_SCALE: float = 0.3
+const PHASE_TRANSITION_SLOW_MO_DURATION: float = 0.60
+
 ## Speed (px/s) of the one-tick push-back velocity applied immediately after a
 ## melee swing fires. Gives move_and_slide() a non-zero vector to eject the
 ## boss from a player-overlap condition — the root cause of Bug 2 ("mob sticks
@@ -402,9 +445,67 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	if _state != STATE_TELEGRAPHING_SLAM and knockback.length_squared() > 0.0:
 		velocity = knockback
 	if hp_current == 0:
+		# Fatal hit → `_die()` fires the final-freeze (after `boss_died.emit`).
+		# Skip the per-hit hit-pause here: stacking a 60–100 ms micro-pause
+		# directly into a 300 ms freeze would be visually identical to the
+		# freeze alone but more code-paths than necessary. Final-freeze
+		# subsumes the hit-pause on the lethal blow.
 		_die()
 		return
+	# T2 hit-pause (ticket 86c9wjy1t) — non-fatal player → boss hits only.
+	# Routes through `TimeScaleDirector` per `.claude/docs/time-scale-director.md`
+	# § Migration policy (no direct Engine.time_scale writes).
+	# Suppressed on dormant / phase-transition / dead hits — those branches
+	# returned earlier in this function, so we only reach here on a real damage
+	# landing.
+	if clean_amount > 0:
+		_request_hit_pause_for(source)
+	# Phase-boundary latch + transition kick-off — runs LAST so the hit-pause
+	# above lands before the phase-transition slow-mo overlays its request on
+	# the director stack (PRIORITY_FREEZE on hit-pause trumps PRIORITY_NARRATIVE
+	# on phase-transition anyway, so ordering is documentation, not load-bearing).
 	_check_phase_boundaries()
+
+
+# ---- M3 Tier 2 Wave 1 T2 — hit-pause helper ----------------------------
+
+## Fire a hit-pause `freeze()` request on a damage-landing player swing. The
+## duration depends on the swing kind (light=60 ms, heavy=100 ms per Priya AC).
+## Source-kind is discovered via duck-typed dispatch on `Player.get_current_attack_kind()`
+## — falls back to the light duration if the accessor is absent (test stubs).
+##
+## A null `source` (bare-instance GUT tests using `b.take_damage(dmg, kb, null)`)
+## also falls back to the light duration. Production hits always carry a Player
+## source via `Hitbox.configure(...).source`.
+func _request_hit_pause_for(source: Node) -> void:
+	var director: Node = _resolve_time_scale_director()
+	if director == null:
+		# Bare-instance tests / pre-autoload contexts — no-op.
+		return
+	var duration: float = HIT_PAUSE_LIGHT_DURATION
+	if source != null and source.has_method("get_current_attack_kind"):
+		var kind: StringName = source.get_current_attack_kind()
+		if kind == &"heavy":
+			duration = HIT_PAUSE_HEAVY_DURATION
+	# `freeze()` is the canonical sugar for full-stop hit-pause:
+	#   - scale=0.0 (PRIORITY_FREEZE so it trumps every other ordinary request)
+	#   - real-time SceneTreeTimer (ignore_time_scale=true) — auto-release fires
+	#     at wall-clock duration even though Engine.time_scale is 0.0.
+	# Re-requesting "boss_hit_pause" REPLACES the prior request (idempotent
+	# refresh — a rapid-fire hit-spam in the same window just resets the clock).
+	director.freeze(duration, TSD_REASON_HIT_PAUSE)
+	_combat_trace("Stratum1Boss.hit_pause",
+		"freeze=%.3f reason=%s source=%s" % [duration, TSD_REASON_HIT_PAUSE,
+			"player" if source != null else "null"])
+
+
+## Resolve the `TimeScaleDirector` autoload, or null in a bare-instanced test
+## context where no autoloads are registered. Mirrors the lookup pattern of
+## `_combat_trace` / `_resolve_audio_director`.
+func _resolve_time_scale_director() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_tree().root.get_node_or_null("TimeScaleDirector")
 
 
 # ---- Physics tick -----------------------------------------------------
@@ -706,6 +807,32 @@ func _begin_phase_transition(target_phase: int) -> void:
 	_slam_recovery_left = 0.0
 	velocity = Vector2.ZERO
 	_set_state(STATE_PHASE_TRANSITION)
+	# T3 phase-transition world-time-slow (ticket 86c9wjy46 / Uma BI-16, BI-17).
+	# Routes through `TimeScaleDirector` per `.claude/docs/time-scale-director.md`
+	# § Migration policy. Engine.time_scale = 0.3 for 0.6 s, auto-released via
+	# real-time SceneTreeTimer so the slow-mo doesn't compound itself by
+	# slowing its own release timer (ignore_time_scale=true).
+	#
+	# PRIORITY_NARRATIVE so a concurrent T2 hit-pause (PRIORITY_FREEZE, scale=0.0)
+	# still trumps this — but no hit can land during phase-transition anyway
+	# (the take_damage early-return on STATE_PHASE_TRANSITION upstream), so the
+	# concurrent-resolution path is structural-correctness only.
+	#
+	# Idempotent on rapid hit-spam straddling the boundary in one tick: the
+	# `_phase_2_latched` / `_phase_3_latched` guards upstream in
+	# `_check_phase_boundaries` ensure `_begin_phase_transition` fires exactly
+	# once per boundary, so this request is also single-fire.
+	var director: Node = _resolve_time_scale_director()
+	if director != null:
+		director.request(
+			TSD_REASON_PHASE_TRANSITION,
+			PHASE_TRANSITION_SCALE,
+			PHASE_TRANSITION_SLOW_MO_DURATION,
+			director.PRIORITY_NARRATIVE)
+		_combat_trace("Stratum1Boss.phase_transition_slow_mo",
+			"scale=%.2f duration=%.2f reason=%s target_phase=%d" % [
+				PHASE_TRANSITION_SCALE, PHASE_TRANSITION_SLOW_MO_DURATION,
+				TSD_REASON_PHASE_TRANSITION, target_phase])
 
 
 func _finish_phase_transition() -> void:
@@ -744,6 +871,20 @@ func _die() -> void:
 	# climax decay. The cinematic layer + MobLootSpawner.on_mob_died run on
 	# this frame regardless of the +400ms hold + 200ms tween below.
 	boss_died.emit(self, global_position, mob_def)
+	# T2 final-freeze (ticket 86c9wjy1t / Uma BI-23 / F1) — 300 ms full-stop
+	# AFTER `boss_died.emit(...)` returns so every subscriber (MobLootSpawner,
+	# BossRoom signal chain, Main._on_mob_died → auto_collect_pickups) runs at
+	# scale=1.0 on the same frame. Real-time auto-release via the director's
+	# `ignore_time_scale=true` SceneTreeTimer — the freeze cannot strand
+	# because the auto-release fires on wall-clock regardless of scale.
+	# Re-using `TSD_REASON_FINAL_FREEZE` so a hypothetical second `_die` call
+	# (defensively guarded by `_is_dead`, but belt-and-suspenders) idempotently
+	# refreshes the freeze rather than stacking two entries.
+	var director: Node = _resolve_time_scale_director()
+	if director != null:
+		director.freeze(FINAL_FREEZE_DURATION, TSD_REASON_FINAL_FREEZE)
+		_combat_trace("Stratum1Boss.final_freeze",
+			"freeze=%.3f reason=%s" % [FINAL_FREEZE_DURATION, TSD_REASON_FINAL_FREEZE])
 	# M3W-4 anim: play `die_<dir>` (falling-backward). Plays concurrently with
 	# the boss-climax scale/alpha death tween — the AnimatedSprite2D advances its
 	# 7-frame die anim while the parent fades + scales. Loop=false on `die_*` in

@@ -260,6 +260,11 @@ var _attack_recovery_left: float = 0.0
 ## resolver can pick `attack_light_<dir>` vs `attack_heavy_<dir>` from the
 ## `state_changed` signal. Set in `try_attack` BEFORE `set_state(STATE_ATTACK)`
 ## so the signal handler sees the correct kind.
+##
+## Also read by receivers of the active swing's `Hitbox.take_damage` chain — the
+## Hitbox passes `_source = Player` as the third arg, so a downstream receiver
+## (e.g. `Stratum1Boss.take_damage` for T2 hit-pause duration selection) can
+## read this via the duck-typed accessor `get_current_attack_kind()` below.
 var _current_attack_kind: StringName = ATTACK_LIGHT
 
 # ---- M3W-2 hit-flash + AnimatedSprite2D runtime ------------------------
@@ -554,6 +559,16 @@ func can_attack() -> bool:
 ## Get the unit vector the player is facing. Used by attack spawners.
 func get_facing() -> Vector2:
 	return _facing
+
+
+## Returns the most-recent swing kind (`ATTACK_LIGHT` or `ATTACK_HEAVY`). Set
+## in `try_attack` before each swing; persists between swings. Receivers of the
+## active swing's `Hitbox.take_damage(amount, knockback, source=Player)` chain
+## read this via duck-typed dispatch (`source.has_method("get_current_attack_kind")`)
+## to pick per-kind feel responses — e.g. `Stratum1Boss.take_damage` picks the
+## T2 hit-pause duration (60 ms light, 100 ms heavy per Priya's AC).
+func get_current_attack_kind() -> StringName:
+	return _current_attack_kind
 
 
 ## Returns the currently-equipped weapon ItemDef, or null if unarmed.

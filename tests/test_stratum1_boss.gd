@@ -34,6 +34,26 @@ const MobLootSpawnerScript: Script = preload("res://scripts/loot/MobLootSpawner.
 const LootRollerScript: Script = preload("res://scripts/loot/LootRoller.gd")
 
 
+# ---- Test isolation ---------------------------------------------------
+# M3 Tier 2 Wave 1 T2/T3 (PR for tickets 86c9wjy1t / 86c9wjy46) — Stratum1Boss
+# now fires TimeScaleDirector requests on hit / die / phase-transition. Tests
+# that take the boss to 0 HP or cross a phase boundary leak director state
+# (and therefore Engine.time_scale) into subsequent tests. Reset on both ends.
+
+func before_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+
+
+func after_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+
+
 # ---- Helpers ----------------------------------------------------------
 
 class FakePlayer:

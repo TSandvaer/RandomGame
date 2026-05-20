@@ -42,6 +42,25 @@ const BossRoomScript: Script = preload("res://scripts/levels/Stratum1BossRoom.gd
 const PHYS_DELTA: float = 1.0 / 60.0
 
 
+# ---- Test isolation ---------------------------------------------------
+# M3 Tier 2 Wave 1 T2/T3 — Stratum1Boss now fires TimeScaleDirector requests
+# on hit / die / phase-transition. Reset director state on both ends so this
+# suite doesn't leak Engine.time_scale into others.
+
+func before_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+
+
+func after_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+
+
 # ---- Helpers ----------------------------------------------------------
 
 func _make_room() -> Stratum1BossRoom:

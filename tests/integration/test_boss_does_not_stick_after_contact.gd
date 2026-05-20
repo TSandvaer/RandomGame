@@ -27,6 +27,26 @@ const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 const PHYS_DELTA: float = 1.0 / 60.0
 
 
+# ---- Test isolation ---------------------------------------------------
+# M3 Tier 2 Wave 1 T2/T3 — Stratum1Boss now fires TimeScaleDirector requests
+# (hit-pause, final-freeze, phase-transition slow-mo). Tests in this file
+# drive boss damage + phase-transition; without reset the leaked scale=0.0
+# poisons downstream test files (e.g. test_hp_regen.gd's shimmer tween).
+
+func before_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+
+
+func after_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+
+
 # ---- Helpers ----------------------------------------------------------
 
 func _make_player_at(pos: Vector2) -> Player:

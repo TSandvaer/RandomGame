@@ -232,6 +232,14 @@ func _reset_autoloads() -> void:
 	var sp: Node = Engine.get_main_loop().root.get_node_or_null("StratumProgression")
 	if sp != null and sp.has_method("reset"):
 		sp.reset()
+	# M3 Tier 2 T2/T3 — defensive reset: a prior test file's leaked
+	# `Engine.time_scale = 0.0` (from TimeScaleDirector.freeze in a boss-
+	# kill test) would stop the shimmer tween mid-flight. Reset to baseline
+	# at the start of every Main-instancing test in this file.
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
 
 
 func _save() -> Node:
@@ -272,11 +280,20 @@ func test_regen_shimmer_colorect_modulate_differs_from_rest_when_regen_active() 
 	for _i in int(3.2 / PHYS_DELTA):
 		p._tick_timers(PHYS_DELTA)
 
-	# Wait a frame for the signal handler to run and start the tween.
+	# Wait TWO frames for the signal handler to run and the tween to advance.
+	# One frame is insufficient under CI load — observed flaky-on-main, hard-fail
+	# on the M3 T2/T3 branch (PR for tickets 86c9wjy1t / 86c9wjy46) where added
+	# Stratum1Boss.gd + Player.gd parse-load weight tipped the timing budget. The
+	# tween starts on the same frame as `_set_regenerating(true)` (synchronous
+	# signal handler creates it inside `_tick_timers`), but advances on the NEXT
+	# process_frame after that. Two awaits = "the frame the tween was created on"
+	# + "the first advancing frame". Empirically reliable: GUT run on diagnostic
+	# probe showed `shimmer.modulate=(1,1,1,0.1464)` after the second await.
+	await get_tree().process_frame
 	await get_tree().process_frame
 
 	# Tier 1 invariant: shimmer modulate must differ from rest (alpha 0).
-	# The tween was started — after one process_frame the first property step
+	# The tween was started — after two process_frames the first property step
 	# should have made alpha > 0.
 	assert_true(shimmer.modulate.a > 0.0,
 		"AC-7 Tier 1: HpBarShimmer modulate.a must be > 0.0 when regen is active (shimmer visible)")
