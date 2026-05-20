@@ -938,6 +938,16 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 ##                                   SFX_ATTACK_IMPACT for melee + slam_hit
 ##                                   (branches on `kind` per swing_spawned
 ##                                   contract — telegraph vs impact map cleanly)
+##
+## M3-T2-W1-T7 additions (ClickUp 86c9wjyak):
+##   boss_woke                    → SFX_BOSS_WAKE   (Uma BI-06 — Beat 3 stinger)
+##   phase_changed                → SFX_PHASE_BREAK (Uma BI-18 — tritone sting)
+##
+## The `phase_changed` signal already has an idempotent latch in the controller
+## (`_check_phase_boundaries`) — it emits exactly once per HP boundary even
+## under hit-spam — so the sting naturally fires once per boundary without
+## audio-side dedupe. Same for `boss_woke`: the boss starts in STATE_DORMANT
+## and `wake()` is guarded by the `STATE_DORMANT` state-check (idempotent).
 func _wire_audio_cues() -> void:
 	if not damaged.is_connected(_on_damaged_audio):
 		damaged.connect(_on_damaged_audio)
@@ -945,6 +955,10 @@ func _wire_audio_cues() -> void:
 		boss_died.connect(_on_boss_died_audio)
 	if not swing_spawned.is_connected(_on_swing_spawned_audio):
 		swing_spawned.connect(_on_swing_spawned_audio)
+	if not boss_woke.is_connected(_on_boss_woke_audio):
+		boss_woke.connect(_on_boss_woke_audio)
+	if not phase_changed.is_connected(_on_phase_changed_audio):
+		phase_changed.connect(_on_phase_changed_audio)
 
 
 func _resolve_audio_director() -> Node:
@@ -982,6 +996,26 @@ func _on_swing_spawned_audio(kind: StringName, _hitbox: Node) -> void:
 		ad.play_sfx(&"sfx-attack-telegraph")
 	else:
 		ad.play_sfx(&"sfx-attack-impact")
+
+
+## M3-T2-W1-T7 — Uma `boss-intro.md` BI-06 (boss-wake stinger).
+## Fires once on boss wake (STATE_DORMANT → STATE_IDLE transition).
+func _on_boss_woke_audio() -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	ad.play_sfx(&"sfx-boss-wake")
+
+
+## M3-T2-W1-T7 — Uma `boss-intro.md` BI-18 (phase-break tritone sting).
+## The signal already has an idempotent latch in `_check_phase_boundaries`
+## so this handler is called exactly once per HP boundary (66% / 33%),
+## even under hit-spam.
+func _on_phase_changed_audio(_new_phase: int) -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("play_sfx"):
+		return
+	ad.play_sfx(&"sfx-phase-break")
 
 
 ## §3 boss-climax shake: jiggle the boss's Sprite child by ±4 logical px on

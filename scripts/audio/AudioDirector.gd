@@ -57,6 +57,11 @@ const BUS_UI: StringName = &"UI"
 const STREAM_PATH_S2_BGM: String = "res://audio/music/stratum2/mus-stratum2-bgm.ogg"
 const STREAM_PATH_S2_BOSS: String = "res://audio/music/stratum2/mus-boss-stratum2.ogg"
 const STREAM_PATH_S2_AMBIENT: String = "res://audio/ambient/stratum2/amb-stratum2-room.ogg"
+## M3-T2-W1-T1 — S1 boss music. Uma's UNIQUE per-stratum decision
+## (`team/DECISIONS.md` 2026-05-15) means this is a DIFFERENT asset from
+## STREAM_PATH_S2_BOSS — same dark-folk-chamber palette but distinct
+## composition. See `audio/_src/composer/compose_stratum1.py`.
+const STREAM_PATH_S1_BOSS: String = "res://audio/music/stratum1/mus-boss-stratum1.ogg"
 
 ## M3W-7 — SFX cue id → resource path map. Cue ids are stable StringName
 ## constants; consumers (Player, Grunt, Charger, Shooter, Stratum1Boss) call
@@ -78,6 +83,10 @@ const SFX_MOB_DIE: StringName = &"sfx-mob-die"
 const SFX_BOSS_DIE: StringName = &"sfx-boss-die"
 const SFX_ATTACK_TELEGRAPH: StringName = &"sfx-attack-telegraph"
 const SFX_ATTACK_IMPACT: StringName = &"sfx-attack-impact"
+## M3-T2-W1-T7 — boss-room cinematic SFX (phase-break sting + boss-wake stinger).
+## Maps to Uma `boss-intro.md` BI-18 (phase break) and BI-06 (boss wake).
+const SFX_PHASE_BREAK: StringName = &"sfx-phase-break"
+const SFX_BOSS_WAKE: StringName = &"sfx-boss-wake"
 
 const SFX_PATHS: Dictionary = {
 	SFX_PLAYER_ATTACK_LIGHT: "res://audio/sfx/player/sfx-player-attack-light.ogg",
@@ -89,6 +98,8 @@ const SFX_PATHS: Dictionary = {
 	SFX_BOSS_DIE: "res://audio/sfx/mobs/sfx-boss-die.ogg",
 	SFX_ATTACK_TELEGRAPH: "res://audio/sfx/mobs/sfx-attack-telegraph.ogg",
 	SFX_ATTACK_IMPACT: "res://audio/sfx/mobs/sfx-attack-impact.ogg",
+	SFX_PHASE_BREAK: "res://audio/sfx/mobs/sfx-phase-break.ogg",
+	SFX_BOSS_WAKE: "res://audio/sfx/mobs/sfx-boss-wake.ogg",
 }
 
 ## SFX pool size. Each pool entry is one `AudioStreamPlayer` on the SFX bus;
@@ -129,6 +140,7 @@ var _ambient_fade_tween: Tween = null
 var _stream_s2_bgm: AudioStream = null
 var _stream_s2_boss: AudioStream = null
 var _stream_s2_ambient: AudioStream = null
+var _stream_s1_boss: AudioStream = null  # M3-T2-W1-T1
 
 # M3W-7 SFX pool — N AudioStreamPlayers rotating round-robin so concurrent
 # cues don't truncate each other. Per-cue streams are cached in `_sfx_streams`
@@ -215,6 +227,34 @@ func crossfade_to_boss_stratum2(fade_ms: int = DEFAULT_CROSSFADE_MS) -> void:
 	_last_bgm_path = STREAM_PATH_S2_BOSS
 	_combat_trace("AudioDirector.crossfade_to_boss_stratum2",
 		"stream=%s fade_ms=%d" % [STREAM_PATH_S2_BOSS, fade_ms])
+
+
+## M3-T2-W1-T1 — crossfade BGM to `mus-boss-stratum1` over `fade_ms`.
+## Mirror of `crossfade_to_boss_stratum2`. The room subscribes its
+## `entry_sequence_completed` signal to fire this at T+1.8 s post-trigger
+## (Uma `boss-intro.md` Beat 5: "boss music layer fades in over 0.6 s").
+##
+## Honors Uma's UNIQUE per-stratum boss-music decision (DECISIONS.md
+## 2026-05-15) — targets `mus-boss-stratum1.ogg`, NOT S2 boss music.
+##
+## Pre-fight state: no BGM is playing on S1 (M1 ships without S1 BGM
+## per audio-architecture.md §"S1 ambient stream" — only S2 entry +
+## the boss-room crossfade are wired). The "crossfade" therefore degenerates
+## to a fade-in from silence on the crossfade player, then a role-swap so
+## future calls (e.g. boss-died stop) operate on the right player. This
+## behavior matches `_crossfade_bgm`'s shape — the outgoing player tween
+## fades from SILENCE_DB to SILENCE_DB (no audible change), then the
+## crossfade player takes over.
+func crossfade_to_boss_stratum1(fade_ms: int = DEFAULT_CROSSFADE_MS) -> void:
+	if _last_bgm_path == STREAM_PATH_S1_BOSS and _bgm_player != null and _bgm_player.playing:
+		return
+	var stream: AudioStream = _get_stream_s1_boss()
+	if stream == null:
+		return
+	_crossfade_bgm(stream, fade_ms)
+	_last_bgm_path = STREAM_PATH_S1_BOSS
+	_combat_trace("AudioDirector.crossfade_to_boss_stratum1",
+		"stream=%s fade_ms=%d" % [STREAM_PATH_S1_BOSS, fade_ms])
 
 
 ## M3W-7 — fire a one-shot SFX cue by id. Routes to the SFX bus via a
@@ -451,6 +491,20 @@ func _get_stream_s2_boss() -> AudioStream:
 			return null
 		_set_stream_loop(_stream_s2_boss, true)
 	return _stream_s2_boss
+
+
+func _get_stream_s1_boss() -> AudioStream:
+	# M3-T2-W1-T1 — S1 boss music loader, mirror of `_get_stream_s2_boss`.
+	# Same lazy-load + loop-flag pattern; missing-asset surfaces via the
+	# regression-guard test that round-trips load() on every SFX_PATH +
+	# this stream constant.
+	if _stream_s1_boss == null:
+		_stream_s1_boss = load(STREAM_PATH_S1_BOSS) as AudioStream
+		if _stream_s1_boss == null:
+			push_warning("[AudioDirector] failed to load %s" % STREAM_PATH_S1_BOSS)
+			return null
+		_set_stream_loop(_stream_s1_boss, true)
+	return _stream_s1_boss
 
 
 func _get_stream_s2_ambient() -> AudioStream:

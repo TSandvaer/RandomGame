@@ -21,6 +21,16 @@ load-bearing minimum for "combat has audio identity":
   9. sfx-attack-impact.ogg    — mob swing-fire impact (used by Grunt swing_spawned,
                                 Charger charge_hit_spawned, Boss swing_spawned)
 
+M3-T2-W1-T7 additions (ClickUp 86c9wjyak)
+-----------------------------------------
+ 10. sfx-phase-break.ogg      — boss phase-transition tritone tension chord
+                                (~400 ms). Fires once per boundary crossing
+                                (66% / 33% HP) via Stratum1Boss.phase_changed.
+                                Uma boss-intro.md BI-18.
+ 11. sfx-boss-wake.ogg        — boss-intro Beat 3 stinger: low brass + impact
+                                (~600 ms). Fires once on Stratum1Boss.boss_woke.
+                                Uma boss-intro.md BI-06.
+
 Status disclosure (matches `audio-direction.md §6 placeholder synthesis disclosure`)
 -----------------------------------------------------------------------------------
 These are algorithmic placeholders, NOT freesound-sourced or hand-Foley
@@ -56,6 +66,8 @@ Outputs to:
     audio/sfx/mobs/sfx-boss-die.ogg
     audio/sfx/mobs/sfx-attack-telegraph.ogg
     audio/sfx/mobs/sfx-attack-impact.ogg
+    audio/sfx/mobs/sfx-phase-break.ogg
+    audio/sfx/mobs/sfx-boss-wake.ogg
 """
 
 from __future__ import annotations
@@ -265,6 +277,112 @@ def compose_attack_impact(rng: np.random.Generator) -> np.ndarray:
 
 
 # ----------------------------------------------------------------------
+# M3-T2-W1-T7 — phase-break + boss-wake stings
+# ----------------------------------------------------------------------
+
+def compose_phase_break(rng: np.random.Generator) -> np.ndarray:
+    """Phase-break sting: tritone tension chord (~400 ms).
+
+    Per `audio-direction.md` §"SFX — mobs" sfx-boss-phase-break row:
+    "tritone tension chord ... hand-composed (cello + double-stop) — only
+    acoustic source". Uma's spec is hand-composed cello but the M3 ship-
+    acceptable bar permits algorithmic placeholder per Route 5 fallback.
+
+    Tritone = augmented fourth = 6 semitones. We use D2 (73.42 Hz) + G#2
+    (103.83 Hz) — the most dissonant interval inside the cello range,
+    classically "the devil in music". Sustained 400 ms with a sharp
+    attack and slow decay so the phase-break moment lands hard then
+    bleeds into the world-time-slow window (T3, ships parallel).
+
+    Fires on Stratum1Boss.phase_changed (signal emits once per boundary).
+    """
+    duration_s = 0.40
+    n = int(SR * duration_s)
+    t = _t(n)
+    # Tritone bed: two cello-ish drones at D2 + G#2, harmonically rich.
+    def _bowed(freq_hz: float, gain: float) -> np.ndarray:
+        phase = 2.0 * math.pi * freq_hz * t
+        # Sub-stack approximating bowed string: fundamental + 5 harmonics.
+        h = (
+            1.00 * np.sin(phase)
+            + 0.55 * np.sin(2.0 * phase)
+            + 0.35 * np.sin(3.0 * phase)
+            + 0.18 * np.sin(4.0 * phase)
+            + 0.10 * np.sin(5.0 * phase)
+        )
+        h = _lowpass(h, 1100.0)
+        # Attack-heavy envelope: 30 ms attack, sustained at 80%, 150 ms release.
+        env = np.zeros(n)
+        a = int(SR * 0.030)
+        r = int(SR * 0.150)
+        s = max(0, n - a - r)
+        env[:a] = np.linspace(0.0, 1.0, a, endpoint=False)
+        env[a:a + s] = 0.80
+        if r > 0:
+            env[a + s:a + s + r] = np.linspace(0.80, 0.0, r, endpoint=False)
+        return gain * h * env
+
+    low = _bowed(73.42, gain=0.75)   # D2
+    high = _bowed(103.83, gain=0.60)  # G#2 (tritone)
+    # Bow-noise sheen: faint high-band noise for the rough-bow texture.
+    noise = rng.uniform(-1.0, 1.0, n).astype(np.float64)
+    sheen = _bandpass(noise, 2000.0, 4500.0) * np.exp(-t / 0.10) * 0.12
+    y = low + high + sheen
+    return _normalize(y)
+
+
+def compose_boss_wake(rng: np.random.Generator) -> np.ndarray:
+    """Boss-wake stinger: low brass note + impact stinger (~600 ms).
+
+    Per `audio-direction.md` §"SFX — mobs" sfx-boss-aggro row + `boss-intro.md`
+    §"Audio map" Beat 3: "low brass + impact stinger". The brass voice is
+    intentionally rhymed with Beat F2 boss-kill-horn (also low brass) — the
+    boss's entry and exit share a harmonic palette so the climax callbacks
+    the intro.
+
+    Brass note: A2 (110 Hz) fundamental with a fast attack and slow decay.
+    Layered with a hand-impact (low body thump + brief high-band crack)
+    for the "stone impact" tell — the boss stands up and the floor knows.
+
+    Fires on Stratum1Boss.boss_woke.
+    """
+    duration_s = 0.60
+    n = int(SR * duration_s)
+    t = _t(n)
+    # Brass note: A2 (110 Hz), rich harmonic stack, ADSR.
+    phase = 2.0 * math.pi * 110.0 * t
+    brass = (
+        1.00 * np.sin(phase)
+        + 0.65 * np.sin(2.0 * phase)
+        + 0.45 * np.sin(3.0 * phase)
+        + 0.28 * np.sin(4.0 * phase)
+        + 0.15 * np.sin(5.0 * phase)
+    )
+    brass = _lowpass(brass, 950.0)
+    # ADSR: 80 ms attack, 100 ms decay, 60% sustain, 350 ms release.
+    a = int(SR * 0.080)
+    d = int(SR * 0.100)
+    r = int(SR * 0.350)
+    s = max(0, n - a - d - r)
+    env = np.zeros(n)
+    env[:a] = np.linspace(0.0, 1.0, a, endpoint=False)
+    env[a:a + d] = np.linspace(1.0, 0.60, d, endpoint=False)
+    env[a + d:a + d + s] = 0.60
+    if r > 0:
+        env[a + d + s:a + d + s + r] = np.linspace(0.60, 0.0, r, endpoint=False)
+    brass = brass * env * 0.70
+
+    # Impact layer: heavy body thump + brief high-band crack at t=0.
+    body = np.sin(2.0 * math.pi * 60.0 * t) * _exp_decay(n, 0.08)
+    noise = rng.uniform(-1.0, 1.0, n).astype(np.float64)
+    crack = _bandpass(noise, 1500.0, 3500.0) * _exp_decay(n, 0.020)
+    impact = 0.55 * body + 0.35 * crack
+
+    y = brass + impact
+    return _normalize(y)
+
+
+# ----------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------
 
@@ -278,6 +396,9 @@ CUES = [
     ("audio/sfx/mobs/sfx-boss-die.ogg",              compose_boss_die,            23),
     ("audio/sfx/mobs/sfx-attack-telegraph.ogg",      compose_attack_telegraph,    24),
     ("audio/sfx/mobs/sfx-attack-impact.ogg",         compose_attack_impact,       25),
+    # M3-T2-W1-T7 additions (86c9wjyak)
+    ("audio/sfx/mobs/sfx-phase-break.ogg",           compose_phase_break,         31),
+    ("audio/sfx/mobs/sfx-boss-wake.ogg",             compose_boss_wake,           32),
 ]
 
 
