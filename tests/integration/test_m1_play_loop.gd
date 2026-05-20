@@ -229,6 +229,29 @@ func test_hud_canvas_mounts_with_required_widgets() -> void:
 			"AC2: HUD has '%s' widget mounted" % n)
 
 
+# ---- M3-T2-W2-T12: vignette CanvasLayer mounts at layer 5 ------------
+
+func test_vignette_canvas_mounts_below_hud_above_world() -> void:
+	# Vignette must mount via Main._build_vignette before HUD; layer 5 sits
+	# between world (layer 0) and HUD (layer 10) so the vignette darkens the
+	# world but leaves HUD readability intact at every opacity. Per Uma
+	# vignette-spec.md § "Layer ordering".
+	var main: Main = _instantiate_main() as Main
+	await get_tree().process_frame
+	var vignette: Vignette = main.get_vignette()
+	assert_not_null(vignette, "T12: Vignette CanvasLayer mounted via Main")
+	assert_true(vignette.is_inside_tree(), "T12: Vignette in tree")
+	var hud: CanvasLayer = main.get_hud()
+	assert_not_null(hud, "HUD also present")
+	assert_true(vignette.layer < hud.layer,
+		"T12: vignette layer < HUD layer (HUD reads through at every opacity)")
+	assert_true(vignette.layer > 0,
+		"T12: vignette layer > 0 (above world)")
+	# Default boot opacity matches Uma S1 baseline 30%.
+	assert_almost_eq(vignette.get_current_opacity(), 0.30, 0.001,
+		"T12: vignette boots at S1 baseline 30%%")
+
+
 # ---- AC3: InventoryPanel mounts hidden + Tab toggles --------------
 
 func test_inventory_panel_mounts_hidden_and_toggles_with_time_slow() -> void:

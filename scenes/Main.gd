@@ -78,6 +78,10 @@ const INVENTORY_PANEL_SCENE_PATH: String = "res://scenes/ui/InventoryPanel.tscn"
 const STAT_PANEL_SCENE_PATH: String = "res://scenes/ui/StatAllocationPanel.tscn"
 const DESCEND_SCREEN_SCENE_PATH: String = "res://scenes/screens/DescendScreen.tscn"
 const BOSS_DEFEATED_TITLE_CARD_SCENE_PATH: String = "res://scenes/ui/BossDefeatedTitleCard.tscn"
+## M3-T2-W2-T12 — global vignette CanvasLayer at layer 5 (above world, below
+## HUD). Wave-2 foundation for T13 boss-entry deepen + T16 boss-defeat
+## cinematic. Default boots at S1 baseline 30% per Uma vignette-spec.md.
+const VIGNETTE_SCENE_PATH: String = "res://scenes/ui/Vignette.tscn"
 
 ## Player spawn position — center of a 480x270 internal canvas (rooms are
 ## sized to that grid per Uma's visual-direction lock).
@@ -93,6 +97,12 @@ var _hud: CanvasLayer = null
 var _inventory_panel: CanvasLayer = null
 var _stat_panel: CanvasLayer = null
 var _descend_screen: CanvasLayer = null
+## M3-T2-W2-T12 — global vignette CanvasLayer (layer 5). Built in _ready
+## between world (layer 0) and HUD (layer 10). Exposes
+## `set_opacity_tween(value, duration, curve_preset)` + the three convenience
+## methods used by T13 + T16. Cross-stratum single object — does not rebuild
+## on stratum transition.
+var _vignette: Vignette = null
 var _current_room: Node = null
 var _current_room_index: int = 0
 var _boss_room: Stratum1BossRoom = null
@@ -173,6 +183,11 @@ func _ready() -> void:
 	# resolver callables, so it must exist before that runs (same _ready).
 	_content_registry = ContentRegistry.new().load_all()
 	_build_world_root()
+	# M3-T2-W2-T12: vignette CanvasLayer (layer 5) sits between world (layer 0)
+	# and HUD (layer 10). Build BEFORE HUD so the scene-tree order matches the
+	# layer order — a defensive habit even though CanvasLayer rendering is
+	# driven by `layer`, not child order.
+	_build_vignette()
 	_build_hud()
 	_build_inventory_panel()
 	_build_stat_panel()
@@ -240,6 +255,14 @@ func get_descend_screen() -> CanvasLayer:
 
 func get_hud() -> CanvasLayer:
 	return _hud
+
+
+## M3-T2-W2-T12 — vignette accessor. Returns null if scene failed to load
+## (the load-failure path pushes a warning in `_build_vignette`). Wave-3
+## consumers (T13/T16) prefer this getter over poking `_vignette` directly
+## from outside the class.
+func get_vignette() -> Vignette:
+	return _vignette
 
 
 ## Returns the HP bar shimmer ColorRect node. Used by the paired regen shimmer
@@ -836,6 +859,24 @@ func _build_inventory_panel() -> void:
 		return
 	_inventory_panel.name = "InventoryPanel"
 	add_child(_inventory_panel)
+
+
+## M3-T2-W2-T12 — global vignette CanvasLayer. Renders above world (layer 0)
+## and below every UI layer (HUD=10, defeat-card=50, InventoryPanel=80,
+## DescendScreen=100). Default boots at S1 baseline opacity 30% per Uma
+## vignette-spec.md. Wave-3 consumers (T13 boss-entry deepen, T16 boss-defeat
+## cinematic) reach the API via `get_vignette()` or `Main._vignette`.
+func _build_vignette() -> void:
+	var packed: PackedScene = load(VIGNETTE_SCENE_PATH) as PackedScene
+	if packed == null:
+		push_warning("[Main] Vignette scene missing at %s" % VIGNETTE_SCENE_PATH)
+		return
+	_vignette = packed.instantiate() as Vignette
+	if _vignette == null:
+		push_warning("[Main] Vignette did not instantiate as Vignette CanvasLayer")
+		return
+	_vignette.name = "Vignette"
+	add_child(_vignette)
 
 
 func _build_stat_panel() -> void:
