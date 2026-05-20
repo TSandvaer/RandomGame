@@ -1120,9 +1120,18 @@ func _on_descend_restart_run() -> void:
 	# the HTML5 AudioContext (see AudioDirector.gd § HTML5 audio-playback
 	# gate), so this is the safe first-cue spot regardless of browser.
 	var audio_director: Node = _audio_director()
+	# M3-T2-W2-T10 ordering note: `_load_room_at_index(0)` now triggers
+	# `play_stratum1_ambient()` because room 0 is a non-boss S1 room.
+	# Since the descend semantically reaches Stratum 2 (the M1 placeholder
+	# reload is the wiring shortcut, not the design), the S2 entry trigger
+	# must fire AFTER the room-load so the S2 ambient overwrites the S1
+	# ambient state that _load_room_at_index set. Once a real S2 scene
+	# transition lands (post-M2 W3) this re-ordering becomes unnecessary —
+	# the post-descend scene is a stratum-2 room which `_load_room_at_index`
+	# would correctly NOT trigger S1 ambient for.
+	_load_room_at_index(0)
 	if audio_director != null and audio_director.has_method("play_stratum2_entry"):
 		audio_director.play_stratum2_entry()
-	_load_room_at_index(0)
 	_persist_to_save()
 
 
