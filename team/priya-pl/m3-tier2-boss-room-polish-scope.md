@@ -1,22 +1,22 @@
-# M3 Tier 2 — Boss-Room Polish: Scope + Ranked Tier 2 Cut
+# M3 Tier 2 — Boss-Room Polish: Full Uma Spec, Wave-Ordered Ship Plan
 
-**Owner:** Priya · **Authored:** 2026-05-20 (M3 Tier 1 fully closed; Sponsor picked boss-room polish as Tier 2 direction) · **Status:** v1 — Sponsor-input pending on the cut at §4.
+**Owner:** Priya · **Authored:** 2026-05-20 (M3 Tier 1 fully closed; Sponsor picked boss-room polish as Tier 2 direction; Sponsor expanded scope to full `boss-intro.md` spec same day) · **Status:** v1.1 — full-spec, wave-ordered, dispatch-ready.
 
-This doc inventories the Stratum1Boss + Stratum1BossRoom **as-shipped state**, lists every plausible polish-area candidate, ranks them as ticket-shaped dispatches with rationale, recommends a Tier 2 ship-cut, and surfaces the open questions Sponsor must answer before the cut locks.
+This doc inventories the Stratum1Boss + Stratum1BossRoom **as-shipped state**, lists every plausible polish-area candidate, and lays out a **wave-ordered ship plan** to deliver the full Uma `boss-intro.md` cinematic layer (30 BI-criteria + F1–F4 climax + skip rule) over three parallelizable waves.
 
-**The headline finding:** the boss state machine is complete and the M3W-4 AnimatedSprite2D / hit-flash / attack-telegraph / self-shake pass landed clean, but **the cinematic layer Uma specified in `boss-intro.md` (door slam, ambient fade, nameplate, camera zoom, defeat title card, embers-rising dissolve) was never built.** The signals `entry_sequence_started`, `entry_sequence_completed`, `boss_defeated` fire to **zero subscribers** in production code (only tests subscribe). There is no `BossNameplate.tscn`, no `BossIntroSequence.tscn`, no `BossDefeatedSequence.tscn`, no `CameraShake` autoload. M1 shipped with the timing skeleton + boss combat + the SFX cues PR #278 wired — and not the cinematic surface that makes it feel like a boss.
+**The headline finding:** the boss state machine is complete and the M3W-4 AnimatedSprite2D / hit-flash / attack-telegraph / self-shake pass landed clean, but **the cinematic layer Uma specified in `boss-intro.md` (door slam, ambient fade, nameplate, camera zoom, defeat title card, embers-rising dissolve, skip-after-first-kill) was never built.** The signals `entry_sequence_started`, `entry_sequence_completed`, `boss_defeated` fire to **zero subscribers** in production code (only tests subscribe). There is no `BossNameplate.tscn`, no `BossIntroSequence.tscn`, no `BossDefeatedSequence.tscn`, no `Camera2D` in the M1 play loop. M1 shipped with the timing skeleton + boss combat + the SFX cues PR #278 wired — and not the cinematic surface that makes it feel like a boss.
 
-This means **Tier 2 polish has a wide canvas**: anywhere from "small feel tweaks on what already works" to "build the missing cinematic layer Uma already designed." Choosing where to draw the line is the load-bearing call in §4.
+**Sponsor decision 2026-05-20 (this doc's scope-driver):** ship the **full** cinematic layer. Not the 4-ticket "feel-load-bearing" subset; the whole spec. ~3 weeks of dispatch work across Devon + Drew + Uma + Sponsor PixelLab generation, organized as three fan-out-friendly waves so the team is never blocked on a single role.
 
 ---
 
 ## TL;DR
 
-1. **§1 inventory** — boss combat (state machine, melee, slam, phase transitions, death pipeline) is wired clean. M3W-4 visual layer (AnimatedSprite2D + red attack-telegraph + soft-red hit-flash + 4-logical-px self-shake + 24-particle death burst) shipped end-to-end. PR #278 SFX cues fire (mob-hit, boss-die, attack-telegraph, attack-impact). **Nothing in the cinematic layer is wired** — boss-intro signals fire to nobody; no BGM crossfade to boss music; no time-slow on phase transition; no defeat title card; no door slam; no nameplate.
-2. **§2 candidates** — 17 plausible polish-area candidates across 5 axes (feel/animation, telegraph clarity, intro beat, defeat beat, audio-visual coherence). Many are "Uma already designed this; nobody built it."
-3. **§3 ranked tickets** — 10 dispatch-shaped tickets, P0 to P3. Top 5 deliver the biggest perceived-quality lift per dev-hour; bottom 5 are real polish but acceptable-deferral.
-4. **§4 recommended cut — 4 tickets, ~2 weeks of dispatch:** boss-room BGM crossfade wiring (P0), hit-pause on player-on-boss hits (P0), phase-transition world-time-slow (P0), defeat title-card beat (P1). Defers door-slam, full nameplate, embers-rising dissolve, camera zoom to Tier 3 / backlog.
-5. **§5 open questions** — 4 items. Biggest: do we ship Uma's full `boss-intro.md` spec as-designed (heavy lift but already-designed), or curate the 5-7 highest-impact beats and let the rest sit?
+1. **§1 inventory** — boss combat (state machine, melee, slam, phase transitions, death pipeline) is wired clean. M3W-4 visual layer (AnimatedSprite2D + red attack-telegraph + soft-red hit-flash + 4-logical-px self-shake + 24-particle death burst) shipped end-to-end. PR #278 SFX cues fire (mob-hit, boss-die, attack-telegraph, attack-impact). **Nothing in the cinematic layer is wired** — boss-intro signals fire to nobody; no BGM crossfade to boss music; no time-slow on phase transition; no defeat title card; no door slam; no nameplate; no Camera2D.
+2. **§2 candidates** — 19 plausible polish-area candidates across 5 axes (feel/animation, telegraph clarity, intro beat, defeat beat, audio-visual coherence). Many are "Uma already designed this; nobody built it."
+3. **§3 ticket catalogue** — 16 dispatch-shaped tickets covering the full Uma spec. Each ticket: title + scope + owner + effort + AC + wave assignment + dependencies.
+4. **§4 wave plan** — 3 waves, ~2.5–3 weeks total dispatch. **Wave 1 (no spike gates, ~1 week):** T1 BGM crossfade, T2 hit-pause, T3 phase-transition slow, T4 defeat title card, T7 phase-break + boss-wake SFX, T11 `TimeScaleDirector` autoload (foundational). **Wave 2 (spike-resolved + design-direction items, ~1 week):** T5 slam telegraph indicator, T6 slam aftershock, T8 boss wake animation, T9 Camera2D autoload land, T10 S1 ambient stream, T12 vignette CanvasLayer. **Wave 3 (heavy lifts gated on Wave 2, ~1 week):** T13 boss nameplate, T14 door slam visual + audio, T15 HUD context-region red-treatment, T16 embers-rising sustained dissolve + camera ease-in, T17 skip-after-first-kill flag, T18 phase-imminent pulse.
+5. **§5 open questions** — 3 items (Sponsor-input still pending on tonal / direction calls — Uma boss name, hit-pause scope, vignette opacity ramp).
 
 ---
 
@@ -169,11 +169,11 @@ Every plausible improvement axis grouped by Uma's design taxonomy.
 
 ---
 
-## §3 — Ranked ticket list
+## §3 — Ticket catalogue (full Uma spec)
 
-Tickets sized as P0 (must-have for Tier 2), P1 (high-impact polish), P2 (deferrable polish), P3 (Tier 3+ / spike-gated).
+Tickets organized by their wave assignment in §4. Wave 1 = no spike gates, fan-out ready today. Wave 2 = spike-resolved foundations + design-direction items. Wave 3 = heavy lifts gated on Wave 2 foundations. Each ticket carries its own owner / effort / AC / dependencies; the wave plan in §4 is the dispatch sequence.
 
-### P0 — high impact, low-to-medium cost, no spike gate
+### Wave 1 — foundational, no spike gates
 
 #### T1 — feat(audio|boss-room): wire S1 boss BGM crossfade on entry-sequence-completed
 
@@ -181,6 +181,7 @@ Tickets sized as P0 (must-have for Tier 2), P1 (high-impact polish), P2 (deferra
 - **One-line scope:** Add `AudioDirector.crossfade_to_boss_stratum1()` (mirror of S2 method); ship `mus-boss-stratum1.ogg` placeholder via composer extension; subscribe `Stratum1BossRoom.entry_sequence_completed` to fire the crossfade. Pre-fight, no BGM is playing; this kicks off the boss BGM at T+1.8 with a 0.6 s fade-in.
 - **Suggested owner:** **Devon** (audio wiring + composer extension match his lane; light Uma touch on the placeholder direction if Uma cares to differentiate from S2). Could also be Drew if Devon is loaded.
 - **Effort:** **M** — composer extension (~30 min following S2 pattern), `AudioDirector` method add (~30 min mirror of S2), wire (single line in Stratum1BossRoom), paired test (~1 hr — mirrors `test_s2_audio_triggers.gd`), Self-Test Report + HTML5 audio-playback gate per `.claude/docs/audio-architecture.md`.
+- **Wave:** 1.
 - **Acceptance:**
   - `AudioDirector.crossfade_to_boss_stratum1(fade_ms)` method exists with S2-mirror semantics + idempotence + role-swap on finalize.
   - `mus-boss-stratum1.ogg` exists at `res://audio/music/stratum1/`; deterministic composer output (`compose_stratum1.py` or extension of existing).
@@ -194,7 +195,8 @@ Tickets sized as P0 (must-have for Tier 2), P1 (high-impact polish), P2 (deferra
 - **Working title:** `feat(combat|boss|player): hit-pause on player-on-boss hits and boss-died final-freeze`
 - **One-line scope:** Add a 60 ms `Engine.time_scale = 0.0` hit-pause on every Player→Boss successful hit-connect; add a 300 ms time-freeze on `boss_died.emit()` (after the signal fires — payload subscribers run at full speed). Restore via SceneTreeTimer.
 - **Suggested owner:** **Drew** (boss + combat lane; player-side Player.gd touch coordinates with Drew's combat side).
-- **Effort:** **M** — add `hit_pause(duration)` method to a small autoload or to `Stratum1Boss` itself (~1 hr); subscribe to Hitbox-hits-boss path (~1 hr; will need to identify the hit-connect signal — `Hitbox._on_body_entered` chain → Boss.damaged or a dedicated hit-connect on Hitbox); subscribe to `Stratum1Boss.boss_died` for the longer freeze (~30 min); paired tests for both shapes (~1.5 hr — assert `Engine.time_scale` transitions + recovery + that mob loot still spawns at freeze-time-0). Coordinate with §1.5 unknowns on the boss-died ordering contract.
+- **Effort:** **M** — refactor to use **T11 `TimeScaleDirector`** (no direct Engine.time_scale writes); subscribe to Hitbox-hits-boss path (~1 hr; will need to identify the hit-connect signal — `Hitbox._on_body_entered` chain → Boss.damaged or a dedicated hit-connect on Hitbox); subscribe to `Stratum1Boss.boss_died` for the longer freeze (~30 min); paired tests for both shapes (~1.5 hr — assert `Engine.time_scale` transitions + recovery + that mob loot still spawns at freeze-time-0). Coordinate with §1.5 unknowns on the boss-died ordering contract.
+- **Wave:** 1.
 - **Acceptance:**
   - Player-light-hit on boss → `Engine.time_scale` drops to 0.0 for 60 ms, restores to 1.0 over 1 frame.
   - Player-heavy-hit on boss → same shape, 100 ms duration (heavy = longer hit-pause; mirrors VD-07 budget).
@@ -203,24 +205,23 @@ Tickets sized as P0 (must-have for Tier 2), P1 (high-impact polish), P2 (deferra
   - Boss in `STATE_DORMANT` → no hit-pause (hit ignored anyway).
   - Paired GUT tests assert all four cases + recovery.
   - HTML5 Self-Test Report: subjectively feels "punchier"; no visible time-skips on subsequent player input.
-- **Dependencies:** None.
+- **Dependencies:** **T11 `TimeScaleDirector`** (Wave 1 foundational). Can land in parallel with T3.
 
 #### T3 — feat(boss|cinematic): phase-transition world-time-slow
 
 - **Working title:** `feat(boss|cinematic): phase-transition world-time-slow to 30% for 0.6 s on phase_changed`
 - **One-line scope:** On `Stratum1Boss.phase_changed(new_phase)`, set `Engine.time_scale = 0.3` for 0.6 s, then ramp back to 1.0 over 0.2 s. The boss is already stagger+damage-immune during this window (existing mechanic). Add ember-flash outline tween on the boss sprite during the slow + `phase_break_stratum1.ogg` sting cue. Maps to Uma BI-16, BI-17, BI-18.
 - **Suggested owner:** **Drew** (boss lane; cinematic-layer surface naturally bundles with T2's hit-pause work since both are `Engine.time_scale` modulation patterns).
-- **Effort:** **M** — phase-break visual tween (~1 hr; uses existing `_play_attack_telegraph` 3-branch resolver pattern); SFX cue add (~30 min — extend `compose_sfx_m3w7.py` for the placeholder); paired tests (~1.5 hr — assert time-scale transitions + the existing damage-immune-during-transition mechanic still holds + cue fires once per boundary). Coordinate with T2 hit-pause to avoid `Engine.time_scale` collision (if a hit-pause is mid-fire when phase-transition starts, the phase-transition wins).
+- **Effort:** **M** — phase-break visual tween (~1 hr; uses existing `_play_attack_telegraph` 3-branch resolver pattern); SFX moved to T7 (decoupled); time-slow via **T11 TimeScaleDirector** (no direct Engine.time_scale writes); paired tests (~1.5 hr — assert time-scale transitions + the existing damage-immune-during-transition mechanic still holds + visual tween fires once per boundary).
+- **Wave:** 1.
 - **Acceptance:**
-  - `phase_changed.emit(PHASE_2)` triggers 0.6 s of `Engine.time_scale = 0.3` followed by 0.2 s ramp to 1.0.
+  - `phase_changed.emit(PHASE_2)` triggers 0.6 s of `Engine.time_scale = 0.3` followed by 0.2 s ramp to 1.0 (via T11 director).
   - Same for `PHASE_3`.
   - Boss sprite ember-flash outline tween plays for the full 0.6 s window.
   - `sfx-phase-break` placeholder SFX cue fires once per boundary (no spam-fire from hit-spam thanks to existing idempotent latch).
-  - Hit-pause (T2) is suppressed during phase-transition window (no time-scale collision).
+  - Hit-pause (T2) is suppressed during phase-transition window (T11 stack resolution: phase-transition request wins over hit-pause request).
   - Paired GUT tests; HTML5 Self-Test Report shows time-slow visually.
-- **Dependencies:** T2 (for time-scale collision handling) — can land independently if T2 deferred but coordinate the time-scale ownership pattern.
-
-### P1 — high impact, medium cost
+- **Dependencies:** **T11 `TimeScaleDirector`** (Wave 1 foundational). Can land in parallel with T2.
 
 #### T4 — feat(ui|boss): defeat title card "The Warden falls." + "STRATUM 1 CLEARED" subtitle
 
@@ -228,6 +229,7 @@ Tickets sized as P0 (must-have for Tier 2), P1 (high-impact polish), P2 (deferra
 - **One-line scope:** Author `BossDefeatedTitleCard.tscn` — CanvasLayer with two Labels (wordmark font, off-white #E8E4D6) — that reads `MobDef.display_name` to template `"{name} falls."`, sub-labeled `STRATUM 1 CLEARED`. Subscribes to `Stratum1BossRoom.boss_defeated`. Fades in over 0.4 s at T+1.2 post-death, holds 0.8 s, fades out over 0.4 s. Uma F3.
 - **Suggested owner:** **Uma direction first** (font selection, copy review, layout sketch — 1-2 hr), **then Devon** (scene authoring + signal wiring — UI surface matches his HUD lane; ~3-4 hr).
 - **Effort:** **M-L** — Uma direction ~2 hr; Devon scene + wiring ~4 hr; paired GUT test for "title card scene exists + reads display_name correctly" + Playwright spec for "title card visible post-defeat" ~2 hr; HTML5 visual-verification gate per `.claude/docs/html5-export.md`.
+- **Wave:** 1.
 - **Acceptance:**
   - `BossDefeatedTitleCard.tscn` exists with two Labels (title + subtitle).
   - Title text templates `"{MobDef.display_name} falls."` — M1 stratum-1 boss `display_name` resolves to `"WARDEN OF THE OUTER CLOISTER"` per `boss-intro.md`. Subtitle reads `STRATUM 1 CLEARED`.
@@ -238,12 +240,47 @@ Tickets sized as P0 (must-have for Tier 2), P1 (high-impact polish), P2 (deferra
   - HTML5 release-build Self-Test Report includes screenshot + audible verification.
 - **Dependencies:** None (uses existing `MobDef.display_name`). Independent of T1/T2/T3.
 
+#### T7 — feat(audio|boss): wire phase-break sting (sfx-phase-break) and boss-wake stinger (sfx-boss-wake)
+
+- **Working title:** `feat(audio|boss): phase-break sting + boss-wake stinger SFX cues`
+- **One-line scope:** Extend `compose_sfx_m3w7.py` (or sibling) to ship two placeholder cues: `sfx-phase-break` (~400 ms tritone tension chord) and `sfx-boss-wake` (~600 ms low brass + impact). Add to `AudioDirector.SFX_PATHS` map. Wire `Stratum1Boss.phase_changed` → `play_sfx(SFX_PHASE_BREAK)`; wire `Stratum1Boss.boss_woke` → `play_sfx(SFX_BOSS_WAKE)`. Maps to Uma BI-06 + BI-18.
+- **Suggested owner:** **Devon** (audio composer + AudioDirector lane).
+- **Effort:** **S-M** — composer extension ~1 hr; AudioDirector + boss wiring ~1 hr; paired tests ~1 hr; HTML5 audio gate Self-Test Report.
+- **Wave:** 1.
+- **Acceptance:**
+  - Two new `sfx-phase-break.ogg` + `sfx-boss-wake.ogg` placeholders ship via deterministic composer.
+  - `SFX_PATHS` map updated.
+  - `phase_changed.emit()` triggers `sfx-phase-break` once per boundary.
+  - `boss_woke.emit()` triggers `sfx-boss-wake` once.
+  - Paired GUT tests assert correct cue per signal.
+  - HTML5 Self-Test Report audible verification.
+- **Dependencies:** Pairs naturally with T3 (visual phase-break) and T8 (wake animation). T3 + T7 + T8 share signal subscribers but no code-level block.
+
+#### T11 — feat(autoload|combat): TimeScaleDirector — global Engine.time_scale ownership + stacking
+
+- **Working title:** `feat(autoload|combat): TimeScaleDirector autoload — stacked time-scale ownership`
+- **One-line scope:** Author `TimeScaleDirector.gd` autoload that owns `Engine.time_scale` mutations through a small stack-based API (`request(reason, value, duration)` / `release(reason)` / `freeze(duration)`). Single owner means T2 hit-pause + T3 phase-transition slow + T16 boss-defeated freeze + future inventory/level-up slows all coordinate without clobbering each other. Highest-priority active request wins; on release, falls back to next-highest, finally back to 1.0.
+- **Suggested owner:** **Drew** (combat lane; pairs naturally with T2 + T3 which are also Drew).
+- **Effort:** **M** — autoload skeleton ~1 hr; stack + reason-keyed API ~1.5 hr; paired GUT tests covering stack push/pop, collision (hit-pause during phase-transition), and auto-release on timer ~2 hr; integration with T2 + T3 (refactor both to use the director) ~1 hr.
+- **Wave:** 1.
+- **Acceptance:**
+  - `TimeScaleDirector` registered in `project.godot` autoloads.
+  - API: `request(reason: String, scale: float, duration: float)`, `release(reason: String)`, `freeze(duration: float)` (sugar for scale=0.0).
+  - Stack semantics: lowest-scale-among-active-requests wins; on release, recompute from remaining stack.
+  - Auto-release on duration expiry via SceneTreeTimer; idempotent on double-release.
+  - Paired GUT tests assert stack behavior, collision resolution, auto-release.
+  - T2 + T3 + T16 refactored to use the director (no direct `Engine.time_scale =` writes outside the director).
+- **Dependencies:** Land BEFORE T2 + T3 + T16 (or land first PR with director + T2; subsequent tickets adopt). Recommended: T11 dispatches first in Wave 1, then T2 / T3 / T16 layer on top.
+
+### Wave 2 — spike-resolved foundations + design-direction items
+
 #### T5 — feat(boss|telegraph): visible slam-telegraph danger-zone indicator
 
 - **Working title:** `feat(boss|telegraph): visible slam-telegraph danger-zone Polygon2D circle`
 - **One-line scope:** Currently the slam telegraph fires a zero-damage Hitbox marker invisible to the player. Add a visible Polygon2D circle outline (radius 80 px matching `SLAM_HITBOX_RADIUS`, ember-orange `#FF6A2A` at alpha 0.5, 2 px line width). Fade-in over 80 ms at telegraph start, hold for telegraph duration, fade-out on slam-fire. Communicates the "back off" read.
 - **Suggested owner:** **Drew** (boss lane; mirrors `_play_attack_telegraph` shape).
 - **Effort:** **S-M** — Polygon2D authoring ~1 hr; integration into `_begin_slam_telegraph` (~30 min); ensure parent-relative so the indicator follows boss position during telegraph (~30 min); paired GUT test (~1 hr); HTML5 visual-verification gate.
+- **Wave:** 2.
 - **Acceptance:**
   - Slam-telegraph state spawns a visible circle indicator on the boss centered at slam-origin.
   - Indicator radius matches `SLAM_HITBOX_RADIUS` (80 px).
@@ -254,14 +291,13 @@ Tickets sized as P0 (must-have for Tier 2), P1 (high-impact polish), P2 (deferra
   - HTML5 Self-Test Report shows the indicator visually.
 - **Dependencies:** None.
 
-### P2 — medium impact, medium-to-high cost
-
 #### T6 — feat(boss|feel): slam aftershock — ember-cracks burst on slam-fire impact
 
 - **Working title:** `feat(boss|feel): slam aftershock ember-burst on slam-fire`
 - **One-line scope:** On slam-fire (after the damage hitbox spawns), emit a 12-particle CPUParticles2D burst at the slam's outer radius — ember-light to ember-deep ramp, 200 ms lifetime, outward velocity 40-80 px/s. Layered on top of the existing slam visual (no replacement). Mirrors the boss-death burst pattern at half-volume.
 - **Suggested owner:** **Drew** (boss lane).
 - **Effort:** **S** — mirror the `_spawn_death_particles` shape with smaller numbers; integration in `_fire_slam_hit` (~1 hr total).
+- **Wave:** 2.
 - **Acceptance:**
   - Slam-fire spawns a 12-particle CPU ember burst centered at slam origin.
   - Ramp + lifetime + velocity values within `combat-visual-feedback.md §3` budget.
@@ -270,27 +306,13 @@ Tickets sized as P0 (must-have for Tier 2), P1 (high-impact polish), P2 (deferra
   - Paired GUT test asserts burst spawns on `swing_spawned(SLAM_HIT)` emission.
 - **Dependencies:** None.
 
-#### T7 — feat(audio|boss): wire phase-break sting (sfx-phase-break) and boss-wake stinger (sfx-boss-wake)
-
-- **Working title:** `feat(audio|boss): phase-break sting + boss-wake stinger SFX cues`
-- **One-line scope:** Extend `compose_sfx_m3w7.py` (or sibling) to ship two placeholder cues: `sfx-phase-break` (~400 ms tritone tension chord) and `sfx-boss-wake` (~600 ms low brass + impact). Add to `AudioDirector.SFX_PATHS` map. Wire `Stratum1Boss.phase_changed` → `play_sfx(SFX_PHASE_BREAK)`; wire `Stratum1Boss.boss_woke` → `play_sfx(SFX_BOSS_WAKE)`. Maps to Uma BI-06 + BI-18.
-- **Suggested owner:** **Devon** (audio composer + AudioDirector lane).
-- **Effort:** **S-M** — composer extension ~1 hr; AudioDirector + boss wiring ~1 hr; paired tests ~1 hr; HTML5 audio gate Self-Test Report.
-- **Acceptance:**
-  - Two new `sfx-phase-break.ogg` + `sfx-boss-wake.ogg` placeholders ship via deterministic composer.
-  - `SFX_PATHS` map updated.
-  - `phase_changed.emit()` triggers `sfx-phase-break` once per boundary.
-  - `boss_woke.emit()` triggers `sfx-boss-wake` once.
-  - Paired GUT tests assert correct cue per signal.
-  - HTML5 Self-Test Report audible verification.
-- **Dependencies:** Independent of T3 (T3 covers visual phase-break; T7 covers audio). T3 + T7 ship together cleanly if both pick up.
-
 #### T8 — feat(boss|feel): boss intro stand-up animation (Beat 3 wake-anim)
 
 - **Working title:** `feat(boss|art|feel): boss stand-up wake animation (Uma BI-06)`
 - **One-line scope:** Author `wake_<dir>` animation key in `Stratum1Boss.tres` SpriteFrames (~6-8 frames, ~0.5 s); play it from `Stratum1Boss.wake()` before state-transition to IDLE; transition state to IDLE on `AnimatedSprite2D.animation_finished` for the wake key.
 - **Suggested owner:** **Sponsor (PixelLab generation) + Drew (integration)** — per the M3 art-pass collaboration shape memory: Sponsor executes AI generation + cleanup; Drew wires the frames into the .tres + the wake() state-handoff.
 - **Effort:** **M** — Sponsor PixelLab generation ~1-2 hr; Drew integration ~2 hr (anim key add, wake-anim-finished signal handoff, paired test that asserts state transitions correctly). HTML5 visual-verification gate.
+- **Wave:** 2 (Drew integration); art-gen can start in Wave 1 if Sponsor capacity allows.
 - **Acceptance:**
   - `wake_n`, `wake_e`, `wake_s`, `wake_w` (or 8-direction) animation keys exist in `Stratum1Boss.tres`.
   - `wake()` plays the wake anim; state transitions to IDLE only after `animation_finished` fires.
@@ -299,92 +321,192 @@ Tickets sized as P0 (must-have for Tier 2), P1 (high-impact polish), P2 (deferra
   - HTML5 visual-verification Self-Test Report.
 - **Dependencies:** **PixelLab art generation** — Sponsor-executed per `.claude/docs/pixellab-pipeline.md`.
 
-### P3 — Tier 3 / Tier 4 / spike-gated (NOT recommended for Tier 2)
+#### T9 — feat(camera): Camera2D autoload — land in M1 play loop
 
-#### T9 — spike(camera): Camera2D autoload for boss-room (and broader) cinematic use
-
-- **Working title:** `spike(camera): Camera2D autoload — survey + design`
-- **One-line scope:** Devon spikes the question "can a Camera2D autoload land in the M1 play loop without breaking HTML5 export, room-load pipeline, or HUD anchoring?" Produces a design doc (`team/devon-dev/camera2d-spike.md`) + a sample PR that adds + removes a Camera2D so the diff is reviewable. Tier 2 work doesn't depend on Camera2D, but Uma BI-05 (camera zoom 1.25× during intro) and F2 (camera ease-in to 1.5× during dissolve) both require it. Tier 3 ticket for actual landing.
+- **Working title:** `feat(camera): Camera2D autoload — survey, design, land`
+- **One-line scope:** Devon surveys the question "can a Camera2D autoload land in the M1 play loop without breaking HTML5 export, room-load pipeline, or HUD anchoring?" Produces a brief design doc (`team/devon-dev/camera2d-spike.md`) **AND** lands the Camera2D autoload itself. This unlocks Wave 3 work that needs it (T16 embers-rising + camera ease-in to 1.5×) and the intro-camera-zoom subset of T13 (BI-05). Wave 2 lands the camera + a minimal `request_zoom(target, duration)` API; T13/T16 layer on top.
 - **Suggested owner:** **Devon**.
-- **Effort:** **S-M** — spike doc + sample PR. Should not actually land Camera2D in main.
-- **Acceptance:** Design doc landed; identifies risks + integration shape.
-- **Dependencies:** None.
+- **Effort:** **M-L** — spike doc ~1 hr; Camera2D autoload + room-load integration ~2-3 hr; minimal `request_zoom` API ~1.5 hr; HUD anchoring verification ~1 hr; HTML5 export verification (critical — Camera2D + gl_compatibility has been a historical sharp edge; see `.claude/docs/html5-export.md`); paired GUT tests + Playwright spec ~2 hr.
+- **Wave:** 2 (foundational for Wave 3 T16 + the camera-zoom subset of T13).
+- **Acceptance:**
+  - `Camera2D` registered as autoload OR added to Main scene with global access pattern; Devon picks the shape.
+  - Default behavior: player-anchored at 1.0× zoom (no behavior change from pre-Camera2D).
+  - `request_zoom(target_scale: float, duration: float, anchor: Vector2)` API exists; idempotent.
+  - HUD anchors continue rendering at screen-space (not world-space) — HUD does not zoom with camera.
+  - HTML5 release-build Self-Test Report confirms camera renders cleanly + no z-index / polygon regressions.
+  - Paired GUT test asserts zoom request + anchor shift + return-to-player.
+- **Dependencies:** None. Land BEFORE T16 (Wave 3). Coordinates with `_play_climax_shake` self-shake — Devon decides if the self-shake redirects to a `CameraShake` autoload or stays boss-side for now (low priority; not blocking).
 
 #### T10 — feat(audio|s1-ambient): Stratum-1 ambient stream + entry-fade-out + defeat-resume
 
 - **Working title:** `feat(audio|s1-ambient): Stratum-1 ambient stream + entry-fade-out + defeat-resume`
-- **One-line scope:** Foundation for Uma BI-03 (ambient cuts to 0% on entry) + F4 (ambient resumes at 60% post-defeat). Composer ships `amb-stratum1-room.ogg` placeholder; AudioDirector adds `play_stratum1_ambient()` + `stop_stratum1_ambient()`. **Cross-cuts boss-room polish** — touches every Stratum-1 room, not just boss-room. Tier 3 because it goes beyond boss-room scope and should be scoped alongside Uma's overall S1 ambient direction.
+- **One-line scope:** Foundation for Uma BI-03 (ambient cuts to 0% on entry) + F4 (ambient resumes at 60% post-defeat). Composer ships `amb-stratum1-room.ogg` placeholder; AudioDirector adds `play_stratum1_ambient()` + `stop_stratum1_ambient()`. Cross-cuts boss-room polish — touches every Stratum-1 room, not just boss-room. Uma direction first on the ambient texture (tone-match S2 ambient or distinct stratum identity?), then Devon implementation.
 - **Suggested owner:** **Uma direction first**, then Devon implementation.
-- **Effort:** **L** — direction + composer + integration + paired tests + Self-Test Report.
-- **Acceptance:** S1 ambient plays on all S1 room loads; fades on boss-room entry; resumes at 60% on boss-defeated; idempotent across room-cycle.
+- **Effort:** **L** — direction ~1 hr; composer ~2 hr; integration ~2 hr; paired tests ~1.5 hr; Self-Test Report.
+- **Wave:** 2.
+- **Acceptance:** S1 ambient plays on all S1 room loads; fades on boss-room entry; resumes at 60% on boss-defeated; idempotent across room-cycle. Paired GUT test asserts fade-out → 0% on `entry_sequence_started`; fade-in → 60% on `boss_defeated`.
 - **Dependencies:** Uma direction.
 
-#### Plus additional Tier 3 backlog (not ticket-ized in detail here, listed for completeness):
+#### T12 — feat(ui|vignette): global vignette CanvasLayer with opacity-ramp API
 
-- Door slam visual (new asset; needs Uma direction + Drew authoring + camera integration for the lock-bar ember-flash).
-- Boss nameplate (`BossNameplate.tscn`, full BI-07 through BI-15 spec; ~3-5 days of UI/HUD work + heavy paired testing).
-- Vignette layer (global CanvasLayer; Uma direction + Drew implementation).
-- HUD context-region red-treatment (Devon HUD-scaffolding extension).
-- Skip-after-first-kill flag (per-character save state; Devon save-schema touch).
-- Embers-rising dissolve (full 0.9 s sustained rise + camera ease-in to 1.5×; gated on Camera2D spike).
-- Below-10% HP pulsing border (on boss sprite without nameplate, or on nameplate if nameplate ships).
+- **Working title:** `feat(ui|vignette): vignette CanvasLayer + opacity-ramp API`
+- **One-line scope:** Author global vignette CanvasLayer (radial dark-fade to room edges, palette-locked per `palette.md`). Default stratum-1 vignette opacity 30%. API: `set_vignette_opacity(value, duration)` ramps over duration. Used by T13 boss intro (ramp to 70% on entry) and T16 boss-defeated (ramp to 80% during dissolve, return to 30% post-titlecard). Uma direction first on the vignette shape, color, and opacity curve.
+- **Suggested owner:** **Uma direction first**, then Drew implementation.
+- **Effort:** **M** — Uma direction ~1.5 hr; Drew CanvasLayer + shader/gradient + API ~3 hr; paired GUT test (~1 hr); HTML5 visual-verification gate (vignette is rendering-stack-sensitive; see `.claude/docs/html5-export.md`).
+- **Wave:** 2.
+- **Acceptance:**
+  - `Vignette.tscn` CanvasLayer registered in Main; renders ABOVE world but BELOW HUD/UI canvases.
+  - Default opacity matches `palette.md` stratum-1 spec (30%).
+  - `set_vignette_opacity(value, duration)` ramps smoothly; idempotent across rapid calls.
+  - HTML5 release-build Self-Test Report confirms vignette renders without HDR-clamp / z-index regressions.
+  - Paired GUT test asserts opacity transitions.
+- **Dependencies:** Uma direction.
+
+### Wave 3 — heavy lifts, gated on Wave 2 foundations
+
+#### T13 — feat(ui|boss): boss nameplate (BI-07 through BI-15)
+
+- **Working title:** `feat(ui|boss): BossNameplate.tscn — 480×56 top-center, 3-phase segmented HP bar`
+- **One-line scope:** Author the full nameplate per Uma `boss-intro.md` § "Boss nameplate spec" — 480×56 px, top-center anchored 12 px from screen edge, `#1B1A1F` at 92% with 1 px ember-orange `#FF6A2A` border, threat glyph `[!]`, boss name from `MobDef.display_name` (16 px caps off-white), `THREAT: ELITE` muted parchment, 3-segment 432×12 HP bar with 2 px ember separators, phase labels (10 px caps active=bright, completed=muted, future=disabled). Segments are visually equal (each 1/3 width) — phase HP weights internal to the boss controller. Active segment uses `#7A2A26` with ghost-damage drain. Slides down from screen top over 0.4 s on `entry_sequence_completed`. Subscribes to `phase_changed` + `damaged` signals. Uma BI-07 through BI-14.
+- **Suggested owner:** **Devon** (HUD scaffolding lane).
+- **Effort:** **L** — Devon authoring + signal wiring + ghost-damage drain + 3-segment driver ~6-8 hr; paired GUT tests for slide-in, segment fill, phase-transition flash, ghost-drain timing ~3-4 hr; Playwright spec for HTML5 visibility ~1 hr; HTML5 visual-verification gate.
+- **Wave:** 3.
+- **Acceptance:** All BI-07 through BI-14 in Uma's tester checklist pass (see `team/uma-ux/boss-intro.md`). Plus: ghost-damage drain reads identical to regular mob nameplate; idempotent across phase-transition spam; HTML5 Self-Test Report.
+- **Dependencies:** **T18** (below-10% pulse — BI-15 — naturally lands on the nameplate; ship T18 in same PR or immediate follow-up). No dep on T9 Camera2D (nameplate is HUD-anchored).
+
+#### T14 — feat(level|boss-room): door slam visual + audio + lock-state
+
+- **Working title:** `feat(level|boss-room|audio): door slam visual + ember-flash + door_slam_heavy.ogg`
+- **One-line scope:** Replace the current door-trigger Area2D (which has no visual) with a `BossRoomDoor.tscn` — animated door sprite with `unlocked` / `slamming` / `locked` / `unlocking` animation keys. Plays slam animation + `door_slam_heavy.ogg` SFX on `entry_sequence_started`. 1-frame ember-flash on lock-bar at end of slam. Plays unlock + `door_unlock_chime.ogg` on `boss_defeated`. Uma BI-01, BI-02, F3 door-unlock.
+- **Suggested owner:** **Uma direction first** (door visual style, palette-lock per `palette.md`), **then PixelLab art generation by Sponsor** (door sprite + lock-bar + 4 animation states; per `.claude/docs/pixellab-pipeline.md`), **then Drew integration** (scene authoring, signal wiring, room-tscn replacement of the trigger-only Area2D), **then Devon audio cues** (composer extension for door_slam_heavy + door_unlock_chime).
+- **Effort:** **L** — Uma direction ~2 hr; Sponsor PixelLab ~2-3 hr; Drew integration ~4 hr; Devon audio composer + wiring ~2 hr; paired tests ~2 hr; HTML5 visual + audio verification.
+- **Wave:** 3.
+- **Acceptance:** BI-01, BI-02 pass; F3 door-unlock pass. Door visually slams + locks on entry; unlocks + chimes on defeat; no regression to the existing `entry_sequence_started` trigger (door is now visible-state, not the gate).
+- **Dependencies:** Sponsor PixelLab generation (per `m3-art-pass-collaboration-shape`).
+
+#### T15 — feat(ui|hud): HUD context-region red `STRATUM 1 · BOSS` treatment
+
+- **Working title:** `feat(ui|hud): HUD top-right context-region — red boss treatment`
+- **One-line scope:** Extend HUD scaffolding with a top-right context-region label. Default state: `STRATUM 1` in muted parchment. On `entry_sequence_completed`: swap to `STRATUM 1 · BOSS` with red treatment (per Uma direction; palette-lock). On `boss_defeated`: return to default. Uma BI-20.
+- **Suggested owner:** **Uma direction first** (red palette swatch + treatment shape — current HUD-disabled-color `#605C50` is too muted, the active-phase-segment red `#7A2A26` may be the right anchor), **then Devon implementation**.
+- **Effort:** **M** — Uma direction ~1 hr; Devon HUD-scaffolding extension + signal wiring ~3 hr; paired tests + Playwright ~2 hr; HTML5 visual-verification gate.
+- **Wave:** 3.
+- **Acceptance:** BI-20 passes. Region transitions on `entry_sequence_completed` + `boss_defeated`. Region renders at screen-space (no zoom interaction with T9 Camera2D).
+- **Dependencies:** Uma direction.
+
+#### T16 — feat(boss|cinematic): embers-rising sustained dissolve + camera ease-in to 1.5× + warm horn
+
+- **Working title:** `feat(boss|cinematic): embers-rising sustained dissolve + camera ease-in (Uma F2)`
+- **One-line scope:** Replace the current 24-particle single-emission death-burst with a 0.9 s **sustained** ember rise (continuous emitter, brighter + faster than the death-flow player-dissolve, ember-orange + ember-light); camera eases in to 1.5× over 0.9 s centered on boss's last position (uses T9 Camera2D API); vignette deepens to 80% (uses T12 vignette API); sustained warm horn note `boss_kill_horn.ogg` rises across the 0.9 s. Uma F2.
+- **Suggested owner:** **Drew** (boss death pipeline + cinematic-layer surface) + **Devon** (audio composer for `boss_kill_horn.ogg`).
+- **Effort:** **L** — refactor `_spawn_death_particles` to sustained emitter ~2 hr; camera ease-in integration ~1.5 hr; vignette deepening integration ~1 hr; warm horn composer ~1.5 hr; integration with boss-died freeze (T2/T11) timing ~1 hr; paired tests ~2 hr; HTML5 visual + audio verification (this is the cinematic climax — Sponsor will judge it directly).
+- **Wave:** 3.
+- **Acceptance:** F2 + BI-24 pass. Embers rise sustained over 0.9 s (not single explosive emission); camera at 1.5× zoom; vignette at 80%; horn peaks as embers exit screen; on completion, camera returns to player-anchored over 0.4 s (per Uma F3 ramp-out) and vignette returns to default.
+- **Dependencies:** **T9 Camera2D** (foundational), **T12 vignette** (foundational), **T11 TimeScaleDirector** (death freeze coordination). All Wave 2.
+
+#### T17 — feat(save|boss): skip-after-first-kill flag (BI-21, BI-22)
+
+- **Working title:** `feat(save|boss): per-character first-boss-kill flag + intro skip`
+- **One-line scope:** Add `Player.first_boss_kill_seen: bool` to save schema. Set to `true` on first-ever `boss_defeated.emit()` per character. On subsequent boss intros, allow movement-key press during Beats 2-4 to collapse the intro to door-slam + nameplate-fast-slide + boss-music-fast-fade (per Uma "Skip rule"). First-ever fight is NOT skippable (flag is false).
+- **Suggested owner:** **Devon** (save-schema lane).
+- **Effort:** **M** — save schema migration ~1.5 hr (with backward-compat for existing saves: missing field = false = first kill not seen); skip-handler in `Stratum1BossRoom` intro sequence ~2 hr; paired tests (first kill non-skippable, second kill skippable, save persistence) ~2 hr.
+- **Wave:** 3.
+- **Acceptance:** BI-21 + BI-22 pass. First-ever kill not skippable; subsequent kills skippable on movement key during Beats 2-4. Save survives reload.
+- **Dependencies:** None directly, but stacks with T13 nameplate timing (the skip collapses the nameplate slide).
+
+#### T18 — feat(ui|boss-nameplate): below-10% HP pulse on active phase segment (BI-15)
+
+- **Working title:** `feat(ui|boss-nameplate): below-10% pulse + phase-imminent visual cue`
+- **One-line scope:** When the active phase segment drops below 10% of that phase's HP allocation, render a 1 px ember-orange outline pulse at 1.5 Hz on the active segment. Telegraphs "phase transition imminent." Tied to the nameplate surface from T13. Uma BI-15.
+- **Suggested owner:** **Devon** (HUD lane; pairs with T13).
+- **Effort:** **S-M** — pulse driver + threshold detection ~2 hr; paired test (~1 hr); HTML5 visual-verification.
+- **Wave:** 3 (ship in same PR as T13 if Devon prefers, or as immediate follow-up).
+- **Acceptance:** BI-15 passes. Pulse fires at 1.5 Hz when active segment <10%; stops on phase-transition; idempotent across hit-spam.
+- **Dependencies:** **T13** (nameplate surface).
 
 ---
 
-## §4 — Recommended Tier 2 cut
+## §4 — Wave plan (full Uma spec, fan-out-friendly)
 
-**Ship: T1 + T2 + T3 + T4. Defer everything else to Tier 3 / backlog.**
+**Sponsor decision 2026-05-20:** ship the full `boss-intro.md` spec. ~2.5–3 weeks of dispatch organized into three waves of 4–6 tickets each, designed so multiple agents can land Wave-N work in parallel without cross-ticket blocks.
 
-### Why this cut
+### Wave 1 — foundational, no spike gates (target ~1 week)
 
-These four tickets share three properties that make them the right Tier 2:
+| # | Ticket | Owner | Effort | Notes |
+|---|---|---|---|---|
+| T11 | `feat(autoload|combat): TimeScaleDirector` | Drew | M | **Land FIRST** in Wave 1; T2/T3 adopt it on top |
+| T1 | `feat(audio|boss-room): S1 boss BGM crossfade` | Devon | M | Independent; ships in parallel |
+| T2 | `feat(combat|boss|player): hit-pause + final-freeze` | Drew | M | Depends on T11 |
+| T3 | `feat(boss|cinematic): phase-transition world-time-slow` | Drew | M | Depends on T11 |
+| T4 | `feat(ui|boss): defeat title card` | Uma direction → Devon | M-L | Independent; Uma direction can start day 1 |
+| T7 | `feat(audio|boss): phase-break + boss-wake SFX` | Devon | S-M | Independent; pairs with T3 on phase-changed signal |
 
-1. **No spike gate.** None of them depends on a Camera2D autoload, a global vignette layer, a HUD context-region scaffolding, or a new door visual. All four wire to **existing signals on existing scenes** with **existing audio infrastructure** (or trivial extensions of it).
-2. **High perceived-quality lift.** Three of the four (T1 BGM crossfade, T2 hit-pause, T3 world-time-slow) are the cinematic-layer features Sponsors-of-action-games consistently flag as "this is what makes a boss feel like a boss." The fourth (T4 title card) is the moment-of-celebration Uma calls out as "the only place in M1 where the world stops to honor the player" — and currently the player kills the boss and the world keeps moving like a grunt died.
-3. **Dispatch-shaped today.** Each ticket has a clear owner, scope, acceptance, and HTML5 verification path. None of them needs another design round before authoring starts. The author can pick it up and ship without back-and-forth.
+**Wave 1 total:** 6 tickets, ~7–9 days of distributed work; ~1 calendar week given parallel-dispatch (T11 lands day 1; T1 + T4 direction run parallel; T2/T3 land day 2–4 atop T11; T7 fills Devon capacity day 3–5).
 
-### Effort estimate for the cut
+**Wave 1 cinematic delivery:** boss music kicks in, hits feel weighty, phase transitions feel like beats, the kill lands as ceremony, phase-break + boss-wake audio cues fire. Closes Uma BI-06 (audio), BI-16, BI-17, BI-18, F1 (title-card subset), F3 (title-card subset). The "emotionally-load-bearing subset" of the spec.
 
-| Ticket | Owner | Effort | Days |
+### Wave 2 — spike-resolved foundations + design-direction (target ~1 week)
+
+| # | Ticket | Owner | Effort | Notes |
+|---|---|---|---|---|
+| T9 | `feat(camera): Camera2D autoload — land` | Devon | M-L | Foundational for Wave 3 T16; spike + land same ticket |
+| T12 | `feat(ui|vignette): vignette CanvasLayer + API` | Uma direction → Drew | M | Foundational for Wave 3 T16 + intro vignette |
+| T10 | `feat(audio|s1-ambient): S1 ambient stream` | Uma direction → Devon | L | Foundation for BI-03 + F4 |
+| T8 | `feat(boss|art|feel): boss stand-up wake animation` | Sponsor PixelLab + Drew | M | Sponsor PixelLab can start Wave 1 |
+| T5 | `feat(boss|telegraph): visible slam-telegraph indicator` | Drew | S-M | Independent; mirrors existing attack-telegraph pattern |
+| T6 | `feat(boss|feel): slam aftershock ember-burst` | Drew | S | Independent; small particle-system add |
+
+**Wave 2 total:** 6 tickets, ~10–12 days of distributed work; ~1 calendar week given parallel-dispatch + Wave 1 wrap-overlap (T9 + T12 + T10 are direction-then-implement, naturally absorb 2–3 day calendar slip).
+
+**Wave 2 cinematic delivery:** S1 ambient ducks on entry + resumes on defeat (BI-03, F4); vignette deepens (BI-04 partial); Camera2D in M1 play loop (foundational for BI-05 + F2); slam telegraph + aftershock (combat-feel polish); boss stand-up wake animation (BI-06 visual).
+
+### Wave 3 — heavy lifts gated on Wave 2 (target ~1 week)
+
+| # | Ticket | Owner | Effort | Notes |
+|---|---|---|---|---|
+| T13 | `feat(ui|boss): BossNameplate.tscn` | Devon | L | Largest single surface; BI-07 through BI-14 |
+| T18 | `feat(ui|boss-nameplate): below-10% HP pulse` | Devon | S-M | Ships in T13 PR or immediate follow-up; BI-15 |
+| T14 | `feat(level|boss-room|audio): door slam visual + audio` | Uma → Sponsor PixelLab → Drew → Devon | L | BI-01, BI-02, F3 |
+| T15 | `feat(ui|hud): STRATUM 1 · BOSS HUD treatment` | Uma → Devon | M | BI-20 |
+| T16 | `feat(boss|cinematic): embers-rising sustained dissolve + camera ease-in` | Drew + Devon | L | F2 climax beat; depends on T9 + T12 + T11 |
+| T17 | `feat(save|boss): skip-after-first-kill flag` | Devon | M | BI-21, BI-22 |
+
+**Wave 3 total:** 6 tickets (incl. T18 ship-with-T13), ~11–14 days of distributed work; ~1 calendar week given parallel-dispatch + that T14 + T15 + T17 absorb Sponsor PixelLab + Uma direction in parallel with Devon/Drew implementation.
+
+**Wave 3 cinematic delivery:** full nameplate (BI-07 through BI-15); door slam visual (BI-01, BI-02); HUD context-region (BI-20); cinematic climax (F2 sustained ember rise + camera ease-in); intro skip (BI-21, BI-22). At Wave 3 close, all 30 BI-criteria + F1–F4 are wired.
+
+### Total effort + risk
+
+| Wave | Tickets | Distributed days | Calendar (parallel) |
 |---|---|---|---|
-| T1 — S1 boss BGM crossfade | Devon | M | ~1 day (dispatch + Self-Test) |
-| T2 — Hit-pause on player-hits-boss + final-freeze | Drew | M | ~1.5 days |
-| T3 — Phase-transition world-time-slow | Drew | M | ~1.5 days |
-| T4 — Defeat title card | Uma direction (1 day) + Devon implementation (1.5 days) | M-L | ~2.5 days |
+| 1 | 6 (T11, T1, T2, T3, T4, T7) | ~7–9 | ~1 week |
+| 2 | 6 (T9, T12, T10, T8, T5, T6) | ~10–12 | ~1 week |
+| 3 | 6 (T13, T18, T14, T15, T16, T17) | ~11–14 | ~1 week |
+| **Total** | **18 tickets** | **~28–35 days** | **~3 weeks** |
 
-**Total Tier 2 cut: ~6-7 days of dispatch work** across Devon + Drew + Uma. Realistically calendar-week-and-a-half given parallel-dispatch (T1 + T2 + T3 + T4 can run mostly in parallel — T2 and T3 want to coordinate on `Engine.time_scale` ownership but otherwise no cross-ticket blocks).
+**Highest-risk surfaces (where the wave plan could slip):**
+- **T9 Camera2D in HTML5** — gl_compatibility has been a historical sharp edge (see `.claude/docs/html5-export.md`); if the spike surfaces a z-index / scaling regression, Wave 3 T16 slips by a week. Mitigation: T9 ticks first in Wave 2; if blocked, T16 falls back to no-camera-ease-in variant (boss self-shake remains the placeholder).
+- **T13 nameplate ghost-damage drain** — visually-load-bearing; HTML5 visual-verification will be the gate. Mitigation: paired GUT tests assert timing; Playwright spec asserts visibility; Sponsor soak is the final word.
+- **T14 door visual + Sponsor PixelLab** — sequential dependency (Uma direction → PixelLab → Drew integration → Devon audio). 4-link chain; longest critical path in Wave 3. Mitigation: Uma direction can start in Wave 1 so PixelLab queues during Wave 2.
+- **T11 TimeScaleDirector adoption refactor** — T2 + T3 + T16 all refactor onto it; T11 must land cleanly first or the wave-1 dispatch order breaks. Mitigation: T11 is the first Wave 1 dispatch; T2/T3 wait one day.
 
-### What this cut explicitly defers
+### Honest grade on the wave plan
 
-**Deferred to Tier 3 / backlog (with rationale):**
+This plan ships the **full** cinematic layer Uma designed — 30 BI-criteria + F1–F4 closure + skip-rule. Calendar-week-per-wave is **achievable but optimistic**: realistically the team should plan for ~3 weeks calendar with 1–2 days of slip absorbed across the chain. The waves are **parallelization-shaped** — every wave fans out to 5–6 agents in flight at peak, matching the team-roster + sub-agent dispatch pattern. No single role is the bottleneck for an entire wave (Wave 1 spreads across Drew + Devon + Uma; Wave 2 same; Wave 3 same).
 
-- **T5 (slam telegraph visible indicator)** — high-impact but not as foundational as T1-T4. Worth shipping next milestone or as the first Tier 3 add-on.
-- **T6 (slam aftershock)** — small lift; can pick up alongside T5 in Tier 3.
-- **T7 (phase-break + boss-wake SFX)** — pairs naturally with T3's phase-transition work; if the dispatch round has Devon capacity after T1 + T4, fold T7 in. Otherwise Tier 3.
-- **T8 (boss stand-up wake animation)** — gated on Sponsor PixelLab generation; not a fast-dispatch ticket. Backlog until Sponsor signals capacity.
-- **T9 (Camera2D spike)** — foundation for later cinematic work but not Tier 2 itself.
-- **T10 (S1 ambient stream)** — cross-cuts beyond boss-room; should be scoped with Uma's broader S1 audio direction.
-- **Boss nameplate + door slam + vignette + HUD context-region + skip flag + embers-rising dissolve + below-10% HP pulse** — Tier 3+ heavy lifts. Each individually is medium-large effort with design dependencies that haven't been picked up yet.
-
-### Honest grade on the cut
-
-This cut delivers the **emotionally-load-bearing pieces of Uma's `boss-intro.md`** (boss music kicks in, hits feel weighty, phase transitions feel like beats, the kill lands as ceremony) **without taking on the heavy-lift design surfaces** (nameplate, door slam, camera-zoom, vignette, dissolve) that need separate art / direction passes.
-
-It is **not the full `boss-intro.md` spec.** It is roughly 5-7 of the 30 BI-criteria. Uma's full vision is a Tier 3-5 commitment if Sponsor wants it. This cut is "biggest perceived-quality bang per dev-hour for a 1.5-week Tier 2."
-
-If Sponsor wants the **full** boss-intro spec as Tier 2, the cut expands to ~3 weeks of dispatch (adding T7, T8, and the nameplate authoring at minimum). Flagged in §5 as the load-bearing open question.
+This is the spec ship. Sponsor's call to expand is the right call; the cinematic layer is what makes a boss feel like a boss, and shipping the full spec rather than the 5-7-criteria subset closes the M1 quality story properly.
 
 ---
 
-## §5 — Open questions for Sponsor
+## §5 — Open questions remaining (tonal / direction, not scope)
 
-1. **Scope: 4-ticket "feel-load-bearing" cut OR full `boss-intro.md` spec?** This doc recommends the 4-ticket cut (~1.5 weeks). Full spec is ~3+ weeks and lands the nameplate, door slam, wake animation, full audio map, phase-break sting + boss-wake stinger. Sponsor decides the scope envelope; the 4-ticket cut is what Priya can defend as "Tier 2 right-sized."
+The scope-envelope question (4-ticket cut vs full spec) is **resolved 2026-05-20: full spec**. The remaining open items are tonal / direction calls that don't block Wave 1 dispatch but want Sponsor input before the relevant wave lands:
 
-2. **T4 title card copy: ship Uma's "WARDEN OF THE OUTER CLOISTER" name OR rename?** Uma's `boss-intro.md` proposes the working title; Drew has authority to rename via `MobDef.display_name`. Currently the MobDef `display_name` field is not exposed in `stratum1_boss.tres` (would need a check + add). **Recommended:** ship Uma's working title; Drew can rename pre-implementation if he prefers.
+1. **T4 title card copy: ship Uma's "WARDEN OF THE OUTER CLOISTER" name OR rename?** Uma's `boss-intro.md` proposes the working title; Drew/Sponsor has authority to rename via `MobDef.display_name`. Currently the MobDef `display_name` field is not exposed in `stratum1_boss.tres` (would need a check + add). **Recommended:** ship Uma's working title; Sponsor can rename pre-Wave-3 if he prefers a different name. Lockable in Wave 1 (T4) without affecting downstream waves.
 
-3. **T2 hit-pause: does the 60 ms freeze extend to player-vs-Grunt / Charger / Shooter hits, or boss-only?** Hit-pause is universally valuable for combat feel; boss-only is the safer Tier 2 scope, but extending to all mob hits would be a holistic combat-feel pass. **Recommended:** Tier 2 = boss-only; defer all-mob hit-pause to a separate combat-feel ticket if Sponsor wants it.
+2. **T2 hit-pause: does the 60 ms freeze extend to player-vs-Grunt / Charger / Shooter hits, or boss-only?** Hit-pause is universally valuable for combat feel; boss-only is the safer Tier 2 scope, but extending to all mob hits would be a holistic combat-feel pass. **Recommended:** Tier 2 = boss-only; defer all-mob hit-pause to a separate combat-feel ticket if Sponsor wants it. Confirm with Drew in Wave 1.
 
-4. **Tier 2 readiness for Sponsor-art-pass parallel work?** M3 design seeds Track 3 (character-art external estimate) is gated on Sponsor commissioning quotes. If Sponsor is mid-commission during Tier 2, are the boss-room polish dispatches still the right Tier-2 use of orchestrator + agent time, or should we hold Tier 2 dispatches and run a smaller "follow-up backlog" tick while the art-pass landscape clarifies? **Recommended:** Tier 2 boss-room polish + art-pass quote-commission run in parallel without conflict (different agents; different surfaces). Confirm.
+3. **T12 vignette palette + opacity curve.** Uma direction needed before T12 ships in Wave 2. Specifically: vignette tint (cooler boss-room tone vs neutral darken), opacity ramp shape (linear vs eased), and whether the 80% Wave 3 deepening (F2) feels right or wants a different peak. Defer to Uma direction; not Sponsor-blocking but Uma needs a sketch before Wave 2 dispatch.
 
 ---
 
@@ -405,10 +527,12 @@ If Sponsor wants the **full** boss-intro spec as Tier 2, the cut expands to ~3 w
 
 ## Non-obvious findings
 
-(For the maintain-docs Stop hook to consider for `.claude/docs/` capture if surface-worthy.)
+(For the maintain-docs Stop hook to consider for `.claude/docs/` capture. With the full spec in scope, all three findings now have concrete in-flight tickets — defer capture until the implementation PRs land and surface the architectural shapes, then capture from the as-built code rather than from the scope doc.)
 
-1. **The boss controller already documents the cinematic-layer gap.** `Stratum1Boss.gd._begin_phase_transition` and `_play_climax_shake` both contain explicit `// when Devon adds the Camera2D / cinematic layer` comments. The controller is **architected for** a cinematic layer that was never built — signals fire to nobody, the time-slow comment exists with no time-scale modulation, the self-shake is documented as a Camera2D placeholder. This is a clean baseline for Tier 2: the surface contracts are stable; Tier 2 wires subscribers + new methods rather than reshaping the controller. Worth a note in `combat-architecture.md` § boss "intended subscribers exist but are not implemented in M1" so future tasks don't assume the lack of subscribers means the contract is broken — it means the cinematic-layer slot is open.
+1. **The boss controller already documents the cinematic-layer gap.** `Stratum1Boss.gd._begin_phase_transition` and `_play_climax_shake` both contain explicit "when Devon adds the Camera2D / cinematic layer" comments. The controller is **architected for** a cinematic layer that was never built — signals fire to nobody, the time-slow comment exists with no time-scale modulation, the self-shake is documented as a Camera2D placeholder. **Capture timing:** capture in `combat-architecture.md` § boss when **Wave 1 closes** — once T2/T3/T4 wire subscribers, the doc can read "subscribers added in M3 Tier 2; pre-T2 the cinematic-layer slot was open and the comments referred to it" as a closed loop rather than an open question.
 
-2. **The "Engine.time_scale ownership" pattern is implicit but unenforced.** T2 hit-pause and T3 phase-transition slow both want to mutate `Engine.time_scale`. There's no current owner of `Engine.time_scale` and no global "who set this last" tracker. If Tier 2 ships these as separate tickets without coordination, the second-applied transition can clobber the first. The fix is straightforward (one small `TimeScaleDirector` autoload that stacks/resolves transitions) but worth calling out as a Tier-2-internal contract. Worth a note in `combat-architecture.md` if T2 + T3 ship.
+2. **`Engine.time_scale` ownership pattern.** T11 `TimeScaleDirector` autoload IS the documented contract. **Capture timing:** capture in `combat-architecture.md` when **T11 lands** (Wave 1 day 1). The director's API contract + stack semantics + reason-keyed release pattern are the kind of cross-system contract `.claude/docs/` exists for; future combat-feel work (level-up time-slow, inventory pause, all-mob hit-pause) will adopt it. Likely a fresh `.claude/docs/time-scale-director.md` rather than a section in combat-architecture.
 
-3. **No `Camera2D` exists in the M1 play loop.** Multiple Uma BI-criteria (BI-05 camera zoom, F2 camera ease-in) require it. The boss self-shake exists as a documented workaround. This is the biggest structural gap behind Uma's `boss-intro.md` — many cinematic beats land on the camera, and we don't have one. Tier 3+ work should treat "Camera2D autoload" as a foundational milestone, not just a polish add. Worth a note in `combat-architecture.md` or a fresh `.claude/docs/camera-layer.md` if Tier 3 picks it up.
+3. **`Camera2D` in M1 play loop.** T9 lands the Camera2D autoload + API in Wave 2. **Capture timing:** capture in a fresh `.claude/docs/camera-layer.md` when **T9 closes** — the HTML5 export quirks (gl_compatibility + camera + HUD anchor patterns) are non-obvious enough that the doc justifies its own file, and a fresh implementation is the right moment to document.
+
+All three captures are **in-implementation-PR scope**; not orphan doc work. The maintain-docs Stop hook on each of T11 / T9's merge PR is the right capture moment.
