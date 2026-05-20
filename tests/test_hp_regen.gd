@@ -258,12 +258,6 @@ func _save() -> Node:
 func test_regen_shimmer_colorect_modulate_differs_from_rest_when_regen_active() -> void:
 	var main: Main = _instantiate_main() as Main
 	assert_not_null(main, "Main.tscn must instantiate as Main")
-	# [diag T2/T3 86c9wjy1t] trace Engine state at test start
-	print("[diag-shimmer] pre-process_frame Engine.time_scale=%.3f" % Engine.time_scale)
-	var d_pre: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
-	if d_pre != null:
-		print("[diag-shimmer] pre director active_reasons=%s current_scale=%.3f" % [
-			str(d_pre.active_reasons()), d_pre.current_scale()])
 	await get_tree().process_frame
 
 	var shimmer: ColorRect = main.get_hp_bar_shimmer()
@@ -286,21 +280,20 @@ func test_regen_shimmer_colorect_modulate_differs_from_rest_when_regen_active() 
 	for _i in int(3.2 / PHYS_DELTA):
 		p._tick_timers(PHYS_DELTA)
 
-	# [diag T2/T3 86c9wjy1t] trace state before await
-	print("[diag-shimmer] pre-tween-await Engine.time_scale=%.3f is_regenerating=%s shimmer.modulate=%s" % [
-		Engine.time_scale, str(p.is_regenerating), str(shimmer.modulate)])
-	var d_mid: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
-	if d_mid != null:
-		print("[diag-shimmer] mid director active_reasons=%s current_scale=%.3f" % [
-			str(d_mid.active_reasons()), d_mid.current_scale()])
-	# Wait a frame for the signal handler to run and start the tween.
+	# Wait TWO frames for the signal handler to run and the tween to advance.
+	# One frame is insufficient under CI load — observed flaky-on-main, hard-fail
+	# on the M3 T2/T3 branch (PR for tickets 86c9wjy1t / 86c9wjy46) where added
+	# Stratum1Boss.gd + Player.gd parse-load weight tipped the timing budget. The
+	# tween starts on the same frame as `_set_regenerating(true)` (synchronous
+	# signal handler creates it inside `_tick_timers`), but advances on the NEXT
+	# process_frame after that. Two awaits = "the frame the tween was created on"
+	# + "the first advancing frame". Empirically reliable: GUT run on diagnostic
+	# probe showed `shimmer.modulate=(1,1,1,0.1464)` after the second await.
 	await get_tree().process_frame
-	# [diag T2/T3 86c9wjy1t] trace state after await
-	print("[diag-shimmer] post-tween-await Engine.time_scale=%.3f shimmer.modulate=%s" % [
-		Engine.time_scale, str(shimmer.modulate)])
+	await get_tree().process_frame
 
 	# Tier 1 invariant: shimmer modulate must differ from rest (alpha 0).
-	# The tween was started — after one process_frame the first property step
+	# The tween was started — after two process_frames the first property step
 	# should have made alpha > 0.
 	assert_true(shimmer.modulate.a > 0.0,
 		"AC-7 Tier 1: HpBarShimmer modulate.a must be > 0.0 when regen is active (shimmer visible)")
