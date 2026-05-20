@@ -14,61 +14,104 @@
  *      mouse to that position AND clicks — so the mouse settles at the click
  *      position, and `_facing` is the vector from the player to that position.
  *
- * **Why canvas-center is the wrong click target.** The Embergrave M1 build has
- * NO `Camera2D` — viewport is a fixed 1280×720 with `stretch=canvas_items` +
- * `aspect=keep`. The player's `global_position == canvas_pixel_position` 1:1.
- * The default spawn point is `DEFAULT_PLAYER_SPAWN = (240, 200)` — which is in
- * the upper-left QUADRANT of the canvas, NOT the center. Canvas-center is at
- * `(640, 360)` — `(+400, +160)` from the player = roughly SOUTHEAST. So a
- * click at canvas-center makes the player swing SOUTHEAST, NOT toward the
- * mobs (which spawn NE/N of the player in Rooms 02–08 per the level_chunk
- * TRES data — see `tests/playwright/specs/ac4-boss-clear.spec.ts:400-411`).
+ * **Coordinate-model migration — POST-T9 (PR #293; ticket `86c9wjyf3`).**
+ *
+ * Pre-T9, the Embergrave M1 build had NO Camera2D — the 1280×720 viewport
+ * used `stretch=canvas_items` + `aspect=keep` to stretch the 480×270 logical
+ * world to fill the screen, and `player.global_position == canvas_pixel
+ * 1:1`. This fixture's helpers all assumed that 1:1 mapping.
+ *
+ * **Post-T9 the assumption breaks.** `CameraDirector` is an autoload that
+ * owns a `Camera2D` snap-following the player at `BASELINE_ZOOM = 2.6667`.
+ * `Camera2D` applies a transform to `Viewport.canvas_transform` such that:
+ *
+ *     world = camera.global_position + (canvas_pixel - viewport_center) / zoom
+ *     canvas_pixel = (world - camera.global_position) * zoom + viewport_center
+ *
+ * where `viewport_center = (640, 360)` and `zoom` is the engine-units Camera2D
+ * zoom (= `BASELINE_ZOOM * normalized_request`; at default 1.0× request the
+ * engine zoom is `2.6667`).
+ *
+ * **The Tess-PR-#293 regression.** Tests 21/23/25 of `mouse-direction-attacks.spec.ts`
+ * regressed because they computed `targetX = playerX + AIM_OFFSET_PX` on the
+ * raw world coord and passed THAT as a canvas-pixel position. With the camera
+ * now centering the player at canvas (640, 360), canvas (440, 200) does NOT
+ * map to "200 px east of the player in world space" — it maps to world
+ * (165, 140), which is SW of the player at (240, 200). The fix is to translate
+ * the desired WORLD target through the camera transform BEFORE clicking.
  *
  * **The fix shape — HARD RULE for ALL future Playwright specs that rely on
- * mouse-direction attacks:** the click position MUST be at a known offset
- * RELATIVE TO THE PLAYER, in the desired attack direction. Aiming via the
- * mouse position is the only mechanism that controls swing direction now —
- * direction keys do not.
+ * mouse-direction attacks:**
  *
- * **Drift-pin convention (sibling of PR #252 § 17):** every spec that fires
- * mouse-direction attacks MUST go through one of the helpers in this file
- * (or document its own explicit aim derivation). A `canvas.click({position:
- * {x: canvasCenter, y: canvasCenter}})` call in a combat-driving spec is a
- * regression — the click hits canvas-center, the swing fires SE, no mobs die.
+ *   - Helpers in this module compute click positions in WORLD coords, then
+ *     apply `worldToCanvas(...)` using the latest `[combat-trace]
+ *     CameraDirector.state | zoom=<v> pos=(<x>,<y>)` line.
+ *   - Specs that want a particular swing direction PASS A `ConsoleCapture`
+ *     to the helper so the live camera state can be read.
+ *   - Direct `canvas.click({position: {x, y}})` calls with raw world coords
+ *     are a regression — the click hits the wrong canvas pixel, swing fires
+ *     in a direction unrelated to the spec's intent.
  *
  * **Helpers in this module:**
  *
- *   - `clickAimedAtSpawn(canvas, direction, options)` — clicks at a fixed
- *     offset from `DEFAULT_PLAYER_SPAWN = (240, 200)` in the named direction.
- *     This is the workhorse for room-clearing helpers (room01-traversal,
- *     AC4 per-room loop) where the player stays near spawn throughout combat.
+ *   - `clickAimedAtSpawn(canvas, capture, direction, options)` — clicks at a
+ *     fixed WORLD offset from `DEFAULT_PLAYER_SPAWN = (240, 200)` in the named
+ *     direction, then translates through the camera transform. Workhorse for
+ *     room-clearing helpers (room01-traversal, AC4 per-room loop) where the
+ *     player stays near spawn throughout combat.
  *
- *   - `clickAtWorldPos(canvas, worldX, worldY)` — clicks at a literal Godot
- *     world coordinate. Use when the target's position is known (e.g. the
- *     PracticeDummy at world (~368, 144)).
+ *   - `clickAtWorldPos(canvas, capture, worldX, worldY)` — clicks at a literal
+ *     Godot world coordinate, translated through the camera transform. Use
+ *     when the target's world position is known (e.g. PracticeDummy).
  *
- *   - `clickAimedFromPlayer(page, canvas, capture, direction, options)` —
- *     reads the latest `[combat-trace] Player.pos | pos=(x,y)` line, then
- *     clicks at a directional offset from THAT live position. Use when the
- *     player has roamed from spawn (multi-chaser pursuit, post-chase
- *     follow-up). Falls back to spawn if no Player.pos trace is available.
+ *   - `clickAimedFromPlayer(canvas, capture, direction, options)` — reads the
+ *     latest `[combat-trace] Player.pos | pos=(x,y)` line, then clicks at a
+ *     directional WORLD offset from THAT live position. Use when the player
+ *     has roamed from spawn (multi-chaser pursuit, post-chase follow-up).
+ *     Falls back to spawn if no Player.pos trace is available.
  *
- *   - `aimAtWorldPos(page, canvas, worldX, worldY)` — moves the mouse without
- *     clicking. Use when you need the mouse hovered (for a subsequent canvas
- *     click) but the click target differs from the aim target (rare).
+ *   - `aimAtWorldPos(page, canvas, capture, worldX, worldY)` — moves the
+ *     mouse without clicking. Use when you need the mouse hovered (for a
+ *     subsequent canvas click) but the click target differs from the aim
+ *     target (rare).
+ *
+ *   - `worldToCanvas(world, cam)` — the low-level transform. Exported for
+ *     custom-aim specs that compute their own world target.
+ *
+ *   - `latestCameraState(capture)` — parses the latest CameraDirector.state
+ *     trace line. Returns null if the trace hasn't fired yet (pre-boot).
+ *     Helpers internally fall back to default-camera-at-spawn if null.
+ *
+ *   - `latestPlayerPos(capture)` — parses the latest Player.pos line.
  *
  * Constants:
- *   - `DEFAULT_PLAYER_SPAWN` — mirrors `scenes/Main.gd:83`.
- *   - `MOUSE_FACING_DEADZONE_PX` — mirrors `scripts/player/Player.gd:136`.
- *     Used by helpers to guarantee `offsetPx ≥ DEADZONE + safety margin` so
- *     facing is reliably updated.
+ *   - `DEFAULT_PLAYER_SPAWN` — world coord; mirrors `scenes/Main.gd:83`.
+ *   - `MOUSE_FACING_DEADZONE_PX` — world-units; mirrors `Player.gd:136`.
+ *   - `VIEWPORT_CENTER` — canvas pixel center used by the camera transform.
+ *   - `DEFAULT_ENGINE_ZOOM` — fallback engine zoom (matches BASELINE_ZOOM)
+ *     used when no camera-state trace has fired yet.
+ *
+ * Checklist for new mouse-input specs (post-T9):
+ *   1. Compute the desired aim target in WORLD coords (relative to spawn,
+ *      to the player, or to a known mob).
+ *   2. Pass a `ConsoleCapture` to the helper. The fixture handles the
+ *      world→canvas transform internally.
+ *   3. If the spec sets up its own canvas click, call `worldToCanvas` and
+ *      pass the result as `{position: {x, y}}`. Never click raw world coords.
+ *   4. Allow ~500 ms post-canvas-focus before reading camera state — the
+ *      state trace emits at 0.25 s cadence (`STATE_TRACE_INTERVAL` in
+ *      `CameraDirector.gd`).
  *
  * References:
- *   - `scripts/player/Player.gd::_update_mouse_facing` — the read site for
+ *   - `scripts/player/Player.gd::_update_mouse_facing` — read site for
  *     `get_global_mouse_position()` that this fixture's clicks target.
+ *   - `scripts/camera/CameraDirector.gd::_emit_state_trace` — origin of the
+ *     `CameraDirector.state` trace line.
+ *   - `.claude/docs/camera-layer.md` § "Playwright-harness implication" —
+ *     the canonical hard rule + world↔canvas math.
  *   - `.claude/docs/combat-architecture.md` § "Mouse-direction facing" —
- *     the canonical hard rule + viewport-coords explanation.
- *   - Ticket `86c9uthf0` — the PR-#255 respin that introduced this fixture.
+ *     the original PR #255 motivation.
+ *   - Tickets `86c9uthf0` (PR #255 respin) + `86c9wjyf3` (T9 camera).
  */
 
 import type { Locator, Page } from "@playwright/test";
@@ -78,27 +121,39 @@ import type { ConsoleCapture } from "./console-capture";
  * The world position the player is teleported to on every `_load_room_at_index`.
  * Mirrors `scenes/Main.gd:83 DEFAULT_PLAYER_SPAWN = Vector2(240, 200)`.
  *
- * With NO Camera2D in the M1 build and `stretch=keep` aspect ratio, this is
- * also the canvas pixel position the player renders at on a fresh room load.
+ * Post-T9 (CameraDirector landed) this is a WORLD coord, NOT a canvas pixel.
+ * The camera snap-follows the player so player-at-spawn renders at the
+ * canvas-pixel `VIEWPORT_CENTER = (640, 360)`.
  */
 export const DEFAULT_PLAYER_SPAWN = { x: 240, y: 200 };
 
 /**
- * Mouse-facing dead-zone threshold (px). Mirrors
+ * Canvas-pixel viewport center. Mirrors `project.godot [display]
+ * window/size = (1280, 720)`. Constant under the M1 viewport size.
+ */
+export const VIEWPORT_CENTER = { x: 640, y: 360 };
+
+/**
+ * Default engine-units Camera2D zoom. Mirrors `CameraDirector.BASELINE_ZOOM
+ * = Vector2(2.6667, 2.6667)`. Used as the fallback when no camera-state
+ * trace has fired yet (extremely rare — emitted every 0.25 s post-boot).
+ */
+export const DEFAULT_ENGINE_ZOOM = 2.6667;
+
+/**
+ * Mouse-facing dead-zone threshold (px, WORLD units). Mirrors
  * `scripts/player/Player.gd:136 MOUSE_FACING_DEADZONE_PX = 8.0`.
  *
- * If `|mouse - player| < 8.0` the player's `_facing` is left unchanged. Every
- * helper in this module enforces a `>= AIM_OFFSET_MIN_PX` distance from the
- * player so facing IS updated (the failure shape from PR #255's first round
- * was exactly this dead-zone trap — canvas-center clicked while player was
- * at canvas-center → 0 px delta → facing frozen at initial Vector2.DOWN).
+ * If `|mouse_world - player_world| < 8.0` the player's `_facing` is left
+ * unchanged. Helpers enforce a world-offset distance `>= AIM_OFFSET_MIN_PX`
+ * so facing IS updated.
  */
 export const MOUSE_FACING_DEADZONE_PX = 8.0;
 
 /**
- * Minimum aim offset (px) from the player. Set well above
- * `MOUSE_FACING_DEADZONE_PX` so a few px of drift / overshoot never collapses
- * the delta into the dead-zone.
+ * Minimum aim offset (world px) from the player. Set well above
+ * `MOUSE_FACING_DEADZONE_PX` so a few px of drift / overshoot never
+ * collapses the delta into the dead-zone.
  */
 export const AIM_OFFSET_MIN_PX = 100;
 
@@ -130,7 +185,7 @@ const DIRECTION_VECTORS: Record<AimDirection, { x: number; y: number }> = {
 
 export interface AimClickOptions {
   /**
-   * Distance (px) from origin to the click position along `direction`.
+   * Distance (world px) from origin to the click position along `direction`.
    * Default 150 — well above `MOUSE_FACING_DEADZONE_PX = 8` so facing
    * updates reliably even if the player has drifted a few px from origin.
    */
@@ -143,63 +198,133 @@ export interface AimClickOptions {
 }
 
 /**
- * Click at a known offset from `DEFAULT_PLAYER_SPAWN = (240, 200)` in the
- * named direction. Use for room-clearing helpers where the player stays near
- * spawn throughout combat (Rooms 02–08 traversal pattern — the gate-traversal
- * walk geometry depends on the player being near spawn anyway).
+ * Live Camera2D state derived from a `[combat-trace] CameraDirector.state`
+ * line. `zoom` is the engine-units zoom (NOT normalized).
+ */
+export interface CameraState {
+  zoom: number;
+  posX: number;
+  posY: number;
+}
+
+/**
+ * Parse the latest `[combat-trace] CameraDirector.state | zoom=<v> pos=(x,y)`
+ * reading from the capture buffer. Returns null if no trace is available
+ * (e.g. helper called pre-boot, or in a build that disables combat_trace).
  *
- * The click position is `spawn + DIRECTION_VECTORS[direction] * offsetPx`,
- * clamped into the canvas bounds. Default `offsetPx = 150` puts the click
- * well outside the dead-zone with margin against player drift.
+ * The emission cadence is `CameraDirector.STATE_TRACE_INTERVAL = 0.25 s`,
+ * so any helper invoked ≥ 500 ms after canvas focus reliably finds a fresh
+ * datapoint. Callers MUST guarantee a settle window — the spec's own
+ * `await page.waitForTimeout(500)` between canvas focus and the first
+ * helper call is the convention.
+ */
+export function latestCameraState(
+  capture: ConsoleCapture
+): CameraState | null {
+  const lines = capture.getLines();
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const t = lines[i].text;
+    if (!/\[combat-trace\] CameraDirector\.state \|/.test(t)) continue;
+    const m = t.match(/zoom=([-\d.]+) pos=\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/);
+    if (!m) continue;
+    return {
+      zoom: parseFloat(m[1]),
+      posX: parseInt(m[2], 10),
+      posY: parseInt(m[3], 10),
+    };
+  }
+  return null;
+}
+
+/**
+ * Translate a world coord to its canvas-pixel position under the live
+ * Camera2D transform:
  *
- * **No camera in M1.** Player at spawn renders at canvas pixel (240, 200) —
- * a click at `(240 + 100, 200 - 100) = (340, 100)` is reliably NE of the
- * player in world coords AND outside the dead-zone (delta length ≈ 141 px).
+ *   canvas_pixel = (world - camera.global_position) * camera.zoom + viewport_center
+ *
+ * If `cam` is null (no state trace yet), assumes the camera is at
+ * `DEFAULT_PLAYER_SPAWN` with `DEFAULT_ENGINE_ZOOM` (boot defaults).
+ *
+ * Result is clamped into canvas bounds [0..1280, 0..720] — out-of-bounds
+ * clicks land at the canvas edge but stay reachable.
+ */
+export function worldToCanvas(
+  worldX: number,
+  worldY: number,
+  cam: CameraState | null
+): { x: number; y: number } {
+  const camX = cam ? cam.posX : DEFAULT_PLAYER_SPAWN.x;
+  const camY = cam ? cam.posY : DEFAULT_PLAYER_SPAWN.y;
+  const z = cam ? cam.zoom : DEFAULT_ENGINE_ZOOM;
+  const cx = (worldX - camX) * z + VIEWPORT_CENTER.x;
+  const cy = (worldY - camY) * z + VIEWPORT_CENTER.y;
+  return {
+    x: Math.max(0, Math.min(1280, cx)),
+    y: Math.max(0, Math.min(720, cy)),
+  };
+}
+
+/**
+ * Click at a known WORLD offset from `DEFAULT_PLAYER_SPAWN = (240, 200)` in
+ * the named direction, then translate through the live camera transform.
+ * Use for room-clearing helpers where the player stays near spawn throughout
+ * combat (Rooms 02–08 traversal pattern).
+ *
+ * The world click position is `spawn + DIRECTION_VECTORS[direction] * offsetPx`.
+ * Default `offsetPx = 150` puts the click well outside the dead-zone with
+ * margin against player drift.
+ *
+ * Post-T9: pass `capture` so the helper reads live camera state. Calling
+ * without `capture` falls back to default-camera-at-spawn (the boot state),
+ * which is correct on a freshly-loaded room where the player hasn't moved.
  */
 export async function clickAimedAtSpawn(
   canvas: Locator,
+  capture: ConsoleCapture | null,
   direction: AimDirection,
   options: AimClickOptions = {}
 ): Promise<void> {
   const offsetPx = options.offsetPx ?? 150;
   const button = options.button ?? "left";
   const v = DIRECTION_VECTORS[direction];
-  const x = DEFAULT_PLAYER_SPAWN.x + v.x * offsetPx;
-  const y = DEFAULT_PLAYER_SPAWN.y + v.y * offsetPx;
-  await canvas.click({ position: { x, y }, button });
+  const worldX = DEFAULT_PLAYER_SPAWN.x + v.x * offsetPx;
+  const worldY = DEFAULT_PLAYER_SPAWN.y + v.y * offsetPx;
+  const cam = capture ? latestCameraState(capture) : null;
+  const c = worldToCanvas(worldX, worldY, cam);
+  await canvas.click({ position: { x: c.x, y: c.y }, button });
 }
 
 /**
- * Click at a literal Godot world coordinate. Use when the target's position
- * is known (e.g. the Room01 PracticeDummy at world ~(368, 144) — clicking
- * there points the swing AT the dummy regardless of where the player
- * currently stands).
- *
- * No camera in M1 — world coord == canvas pixel coord.
+ * Click at a literal Godot world coordinate, translated through the live
+ * camera transform. Use when the target's world position is known (e.g.
+ * Room01 PracticeDummy at world ~(368, 144)).
  */
 export async function clickAtWorldPos(
   canvas: Locator,
+  capture: ConsoleCapture | null,
   worldX: number,
   worldY: number,
   options: { button?: "left" | "right" } = {}
 ): Promise<void> {
   const button = options.button ?? "left";
-  await canvas.click({ position: { x: worldX, y: worldY }, button });
+  const cam = capture ? latestCameraState(capture) : null;
+  const c = worldToCanvas(worldX, worldY, cam);
+  await canvas.click({ position: { x: c.x, y: c.y }, button });
 }
 
 /**
- * Move the mouse to a Godot world coordinate without clicking. Used by
- * `clickAimedFromPlayer` and any spec that needs the mouse hovered prior to
- * a subsequent click. The page-coordinate calculation accounts for the canvas
- * bounding box offset; the click-style helpers above don't need this because
- * `canvas.click({position: ...})` is canvas-relative.
+ * Move the mouse to a Godot world coordinate (no click), translated through
+ * the live camera transform. Used by `clickAimedFromPlayer` and any spec
+ * that needs the mouse hovered prior to a subsequent click.
  *
- * No camera in M1 — world coord == canvas pixel coord, so the mouse-page
- * position is just `canvasBB.x + worldX`, `canvasBB.y + worldY`.
+ * The page-coordinate calculation accounts for the canvas bounding box
+ * offset; the click-style helpers above don't need this because
+ * `canvas.click({position: ...})` is canvas-relative.
  */
 export async function aimAtWorldPos(
   page: Page,
   canvas: Locator,
+  capture: ConsoleCapture | null,
   worldX: number,
   worldY: number
 ): Promise<void> {
@@ -207,7 +332,9 @@ export async function aimAtWorldPos(
   if (!bb) {
     throw new Error("[mouse-facing] canvas.boundingBox() returned null");
   }
-  await page.mouse.move(bb.x + worldX, bb.y + worldY);
+  const cam = capture ? latestCameraState(capture) : null;
+  const c = worldToCanvas(worldX, worldY, cam);
+  await page.mouse.move(bb.x + c.x, bb.y + c.y);
 }
 
 /**
@@ -230,15 +357,15 @@ export function latestPlayerPos(
 }
 
 /**
- * Click at a directional offset from the PLAYER'S CURRENT POSITION (derived
- * from the latest `Player.pos` trace). Use when the player has roamed from
- * spawn (multi-chaser pursuit, post-chase wander) and a spawn-relative aim
- * would no longer point in the intended direction.
+ * Click at a directional WORLD offset from the PLAYER'S CURRENT POSITION
+ * (derived from the latest `Player.pos` trace), then translate through the
+ * live camera transform. Use when the player has roamed from spawn
+ * (multi-chaser pursuit, post-chase wander).
  *
- * Falls back to `clickAimedAtSpawn` if no `Player.pos` trace is available
+ * Falls back to spawn-relative aim if no `Player.pos` trace is available
  * (e.g. helper called before the first physics frame emitted a position
  * line). The fallback path is safer than throwing — every caller has its
- * own downstream hard assertion, and a slightly-off aim still beats no aim.
+ * own downstream hard assertion.
  */
 export async function clickAimedFromPlayer(
   canvas: Locator,
@@ -251,7 +378,9 @@ export async function clickAimedFromPlayer(
   const player = latestPlayerPos(capture);
   const origin = player ?? DEFAULT_PLAYER_SPAWN;
   const v = DIRECTION_VECTORS[direction];
-  const x = origin.x + v.x * offsetPx;
-  const y = origin.y + v.y * offsetPx;
-  await canvas.click({ position: { x, y }, button });
+  const worldX = origin.x + v.x * offsetPx;
+  const worldY = origin.y + v.y * offsetPx;
+  const cam = latestCameraState(capture);
+  const c = worldToCanvas(worldX, worldY, cam);
+  await canvas.click({ position: { x: c.x, y: c.y }, button });
 }

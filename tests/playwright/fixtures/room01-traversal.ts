@@ -194,13 +194,12 @@ export async function clearRoom01Dummy(
   const attackSweep = async (
     directions: { keys: string[]; label: string }[]
   ): Promise<boolean> => {
-    // **Mouse-direction attacks (PR #255, ticket 86c9uthf0).** Direction keys
+    // **Mouse-direction attacks (PR #255 / T9 PR #293).** Direction keys
     // no longer set `Player._facing` — the mouse vector from player to cursor
-    // does. Click AT the dummy's world position (~368, 144) so every swing's
-    // `_facing` points toward the dummy (or near it after the dummy dies).
-    // Caller-supplied `clickX, clickY` are intentionally unused here — they
-    // would land at canvas-center, which is far SE of the dummy on a
-    // no-Camera2D viewport (player at (240,200), canvas-center at (640,360)).
+    // does. Click AT the dummy's WORLD position (~368, 144); post-T9 the
+    // `clickAtWorldPos` helper applies `worldToCanvas` internally against the
+    // live Camera2D transform, so the canvas-pixel click lands where Godot's
+    // `get_global_mouse_position()` inverts back to the dummy's world coord.
     // The legacy direction-key chord below is retained as a no-op input
     // marker (does nothing facing-wise post-PR-#255) so the call shape stays
     // stable for any future spec that wants to layer movement back in; the
@@ -216,7 +215,7 @@ export async function clearRoom01Dummy(
 
       for (let a = 0; a < attacksPerDir; a++) {
         if (Date.now() - t0 >= budgetMs) return false;
-        await clickAtWorldPos(canvas, DUMMY_WORLD_POS.x, DUMMY_WORLD_POS.y);
+        await clickAtWorldPos(canvas, capture, DUMMY_WORLD_POS.x, DUMMY_WORLD_POS.y);
         attacksFired++;
         await page.waitForTimeout(ATTACK_INTERVAL_MS);
         if (checkDummyDead()) return true;

@@ -507,12 +507,10 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
         // Two swings per direction — covers the LIGHT_RECOVERY (0.18s) gap.
         for (let a = 0; a < 2; a++) {
           if (Date.now() - phase25SwingStart >= 30_000) break sweepLoop;
-          // Mouse-direction attacks (PR #255, ticket 86c9uthf0): aim NE-of-
-          // spawn so the swing wedge covers Room02's NE-spawning grunts.
-          // Canvas-center click would aim SE on the no-Camera2D viewport
-          // and the swing would miss every grunt → 0 hits in 30s → false
-          // failure of the LMB-equip dual-surface assertion.
-          await clickAimedAtSpawn(canvas, "NE");
+          // Mouse-direction attacks (PR #255 / T9 PR #293): aim NE-of-spawn
+          // in WORLD coords; the helper applies `worldToCanvas` against the
+          // live camera transform internally.
+          await clickAimedAtSpawn(canvas, capture, "NE");
           await page.waitForTimeout(ATTACK_INTERVAL_MS);
           // Look for hits AFTER the marked buffer position so we don't pick
           // up pre-Tab hits.

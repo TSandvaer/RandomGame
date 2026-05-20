@@ -15,28 +15,30 @@
  *   2. With the mouse positioned NORTH of the player, facing is `(~0,-y)`.
  *   3. RMB heavy with mouse WEST of the player → `(~-x, ~0)`.
  *
- * **Coordinate-model correction (PR #255 respin — Tess CHANGES_REQUESTED
- * finding, 2026-05-17).** The original spec assumed canvas-center is "on the
- * player" because a camera tracks the player. **That assumption was wrong:**
- * the M1 build has NO `Camera2D` — viewport is fixed 1280×720 with
- * `stretch=canvas_items` + `aspect=keep`, so the player's `global_position`
- * == its canvas pixel position 1:1. The player at `DEFAULT_PLAYER_SPAWN =
- * (240, 200)` renders at canvas pixel (240, 200), which is in the upper-LEFT
- * QUADRANT of the canvas — NOT the center. Canvas-center is at (640, 360),
- * which is (+400, +160) from the player — strongly SOUTHEAST.
+ * **Coordinate-model correction history.**
  *
- * Pre-fix: the spec moved the mouse to `canvas-center + offset` and asserted
- * facing matched the offset direction. With canvas-center east-and-south of
- * the player, the dominant component of the player→mouse vector was always
- * east; only the LMB-east test passed (by lucky additive geometry), while
- * LMB-north and RMB-west failed with facing pointing east (`facing.x = 0.9`
- * and `+0.7` respectively — observed in Tess's PR run 25986831195).
+ * **PR #255 respin (2026-05-17).** Pre-T9: spec moved mouse to canvas-center
+ * + offset and asserted facing matched the offset direction. With canvas-center
+ * SE of the player (no Camera2D era — player at world (240, 200) rendered at
+ * canvas (240, 200), upper-left quadrant), the spec was broken — only the
+ * LMB-east case passed by lucky additive geometry. Fix: derive mouse position
+ * from the player's WORLD position via `Player.pos` trace + direction offset.
  *
- * **Post-fix:** mouse position is derived from the PLAYER'S WORLD POSITION
- * (parsed from the latest `[combat-trace] Player.pos | pos=(x,y)` trace —
- * 1:1 with canvas-pixel coords because no camera) + a direction offset large
- * enough to clear the 8px dead-zone. Now every test asserts the facing for
- * the RIGHT reason, not by accidental geometry.
+ * **PR #293 respin (T9 CameraDirector landing, 2026-05-20).** The PR #255
+ * fix baked in a different broken assumption: `world coord == canvas pixel
+ * coord` (line comment "1:1 with canvas-pixel coords because no camera").
+ * T9 introduced a CameraDirector autoload owning a Camera2D snap-following
+ * the player at `BASELINE_ZOOM = 2.6667`. Post-T9, the camera transforms
+ * canvas pixels to world coords as `world = camera.global_position +
+ * (canvas_pixel - viewport_center) / zoom`. A click at canvas (440, 200)
+ * (intended "200 px east of player") now maps to world (165, 140) — SW of
+ * the player — and `facing=(-0.8, -0.6)` instead of the expected (+1.0, 0.0).
+ *
+ * **Post-T9 fix:** compute the desired aim target in WORLD coords, then
+ * translate through the camera transform via `worldToCanvas(worldX, worldY,
+ * cameraState)` from `mouse-facing.ts`. The helper reads the live camera
+ * state from the `[combat-trace] CameraDirector.state | zoom=<v> pos=(x,y)`
+ * trace (emitted every 0.25 s from `CameraDirector._emit_state_trace`).
  *
  * **Why a Playwright spec is needed here:** the GUT side validates the math
  * (pure helper) and the state gate (no mid-swing drift). What it cannot
@@ -60,7 +62,12 @@
 
 import { test, expect } from "../fixtures/test-base";
 import { ConsoleCapture } from "../fixtures/console-capture";
-import { latestPlayerPos, DEFAULT_PLAYER_SPAWN } from "../fixtures/mouse-facing";
+import {
+  latestPlayerPos,
+  latestCameraState,
+  worldToCanvas,
+  DEFAULT_PLAYER_SPAWN,
+} from "../fixtures/mouse-facing";
 
 const BOOT_TIMEOUT_MS = 30_000;
 
@@ -108,12 +115,16 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     const canvasBB = await canvas.boundingBox();
     expect(canvasBB).not.toBeNull();
 
-    // Target mouse position: EAST of the player. No Camera2D, so world
-    // coord == canvas-pixel coord. A click at (playerX + AIM_OFFSET_PX, playerY)
-    // places the mouse 200 px east of the player → delta ~(+200, 0), normalized
-    // → (1.0, 0.0) → facing.x ≈ 1.0.
-    const targetX = playerX + AIM_OFFSET_PX;
-    const targetY = playerY;
+    // Target mouse position: EAST of the player. POST-T9: the Camera2D
+    // transforms canvas pixels to world coords, so we compute the desired
+    // WORLD target then translate through the camera transform via
+    // `worldToCanvas` (see `mouse-facing.ts` for the math). A click at
+    // canvas-pixel(worldToCanvas(playerX + 200, playerY)) puts the mouse
+    // 200 world-px east of the player → delta ~(+200, 0) → facing.x ≈ 1.0.
+    const worldTargetX = playerX + AIM_OFFSET_PX;
+    const worldTargetY = playerY;
+    const cam = latestCameraState(capture);
+    const target = worldToCanvas(worldTargetX, worldTargetY, cam);
 
     const preTryAttackLines = capture
       .getLines()
@@ -124,9 +135,9 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     // separate hover ensures the dead-zone check has fired against the new
     // position even if the engine throttles between the click's move and its
     // press event).
-    await page.mouse.move(canvasBB!.x + targetX, canvasBB!.y + targetY);
+    await page.mouse.move(canvasBB!.x + target.x, canvasBB!.y + target.y);
     await page.waitForTimeout(200);
-    await canvas.click({ position: { x: targetX, y: targetY } });
+    await canvas.click({ position: { x: target.x, y: target.y } });
     await page.waitForTimeout(400);
 
     const fireLines = capture
@@ -136,7 +147,8 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     expect(
       fireLines.length,
       `Expected at least one Player.try_attack FIRED line after mouse-east + LMB click. ` +
-        `Player at (${playerX}, ${playerY}), mouse at (${targetX}, ${targetY}). ` +
+        `Player at world (${playerX}, ${playerY}), world target (${worldTargetX}, ${worldTargetY}), ` +
+        `canvas click (${target.x.toFixed(0)}, ${target.y.toFixed(0)}). ` +
         `Got ${fireLines.length}. Last 15 trace lines:\n` +
         capture.getLines().slice(-15).map((l) => `  ${l.text}`).join("\n")
     ).toBeGreaterThanOrEqual(1);
@@ -152,13 +164,13 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     expect(
       fx,
       `Mouse-east click: expected facing.x > 0.5 (pointing east). ` +
-        `Player at (${playerX}, ${playerY}), mouse aim at (${targetX}, ${targetY}), ` +
+        `Player at world (${playerX}, ${playerY}), world target (${worldTargetX}, ${worldTargetY}), ` +
+        `canvas click (${target.x.toFixed(0)}, ${target.y.toFixed(0)}), ` +
         `got facing=(${fx}, ${fy}). Full line: "${firstFire}"`
     ).toBeGreaterThan(0.5);
     expect(
       Math.abs(fy),
       `Mouse-east click: expected |facing.y| < 0.3 (horizontal-ish). ` +
-        `Player at (${playerX}, ${playerY}), mouse aim at (${targetX}, ${targetY}), ` +
         `got facing=(${fx}, ${fy}). Full line: "${firstFire}"`
     ).toBeLessThan(0.3);
   });
@@ -178,24 +190,26 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     expect(canvasBB).not.toBeNull();
 
     // Target mouse position: NORTH of the player (Godot Y is +DOWN, so
-    // smaller Y = north). At (playerX, playerY - AIM_OFFSET_PX) the delta is
-    // (0, -200) → facing.y ≈ -1.0.
-    //
-    // **Camera-clamp safety.** The player at spawn is at Y=200; mouse target
-    // Y=0 is within canvas bounds (0..720) so the move is safe. If a future
-    // refactor changes the spawn Y high enough that AIM_OFFSET_PX would push
-    // the target negative, we'd clamp here — but with spawn at (240, 200)
-    // and offset 200, target is (240, 0), exactly at the canvas top edge.
-    const targetX = playerX;
-    const targetY = Math.max(0, playerY - AIM_OFFSET_PX);
+    // smaller Y = north). World target at (playerX, playerY - 200), delta
+    // (0, -200) → facing.y ≈ -1.0. Translated through the camera transform
+    // via `worldToCanvas` — at default zoom 2.6667 with camera at player,
+    // the canvas click lands at viewport_center.y - 200*2.6667 ≈ -173, which
+    // the `worldToCanvas` clamp pulls to the canvas-top edge (y=0). The
+    // dead-zone is on the WORLD-delta (200 px); the canvas clamp doesn't
+    // affect facing math because `get_global_mouse_position` always inverts
+    // the clamped canvas pixel back through the same camera transform.
+    const worldTargetX = playerX;
+    const worldTargetY = playerY - AIM_OFFSET_PX;
+    const cam = latestCameraState(capture);
+    const target = worldToCanvas(worldTargetX, worldTargetY, cam);
 
     const preTryAttackLines = capture
       .getLines()
       .filter((l) => /\[combat-trace\] Player\.try_attack \| FIRED/.test(l.text)).length;
 
-    await page.mouse.move(canvasBB!.x + targetX, canvasBB!.y + targetY);
+    await page.mouse.move(canvasBB!.x + target.x, canvasBB!.y + target.y);
     await page.waitForTimeout(200);
-    await canvas.click({ position: { x: targetX, y: targetY } });
+    await canvas.click({ position: { x: target.x, y: target.y } });
     await page.waitForTimeout(400);
 
     const fireLines = capture
@@ -205,8 +219,8 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     expect(
       fireLines.length,
       `Expected at least one Player.try_attack FIRED line after mouse-north + LMB click. ` +
-        `Player at (${playerX}, ${playerY}), mouse at (${targetX}, ${targetY}). ` +
-        `Got ${fireLines.length}.`
+        `Player at world (${playerX}, ${playerY}), world target (${worldTargetX}, ${worldTargetY}), ` +
+        `canvas click (${target.x.toFixed(0)}, ${target.y.toFixed(0)}). Got ${fireLines.length}.`
     ).toBeGreaterThanOrEqual(1);
     const match = fireLines[0].text.match(/facing=\(([-\d.]+),([-\d.]+)\)/);
     expect(match).not.toBeNull();
@@ -214,15 +228,11 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     const fy = parseFloat(match![2]);
     expect(
       Math.abs(fx),
-      `Mouse-north click: expected |facing.x| < 0.3. ` +
-        `Player at (${playerX}, ${playerY}), mouse aim at (${targetX}, ${targetY}), ` +
-        `got facing=(${fx}, ${fy}).`
+      `Mouse-north click: expected |facing.x| < 0.3. got facing=(${fx}, ${fy}).`
     ).toBeLessThan(0.3);
     expect(
       fy,
-      `Mouse-north click: expected facing.y < -0.5 (pointing north). ` +
-        `Player at (${playerX}, ${playerY}), mouse aim at (${targetX}, ${targetY}), ` +
-        `got facing=(${fx}, ${fy}).`
+      `Mouse-north click: expected facing.y < -0.5 (pointing north). got facing=(${fx}, ${fy}).`
     ).toBeLessThan(-0.5);
   });
 
@@ -240,14 +250,15 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     const canvasBB = await canvas.boundingBox();
     expect(canvasBB).not.toBeNull();
 
-    // Target mouse position: WEST of the player. At (playerX - AIM_OFFSET_PX,
-    // playerY) the delta is (-200, 0) → facing.x ≈ -1.0.
-    //
-    // **Room boundary safety.** Player spawn X=240; AIM_OFFSET_PX=200 puts
-    // target at X=40, comfortably within canvas (0..1280). Clamp to 0 for
-    // safety if a future spawn shift would push below.
-    const targetX = Math.max(0, playerX - AIM_OFFSET_PX);
-    const targetY = playerY;
+    // Target mouse position: WEST of the player. World target at (playerX -
+    // 200, playerY), delta (-200, 0) → facing.x ≈ -1.0. Translated through
+    // the camera transform via `worldToCanvas` — at default zoom 2.6667 with
+    // camera at player at world (240, 200), the canvas click lands at
+    // viewport_center.x - 200*2.6667 ≈ 107, well within canvas bounds.
+    const worldTargetX = playerX - AIM_OFFSET_PX;
+    const worldTargetY = playerY;
+    const cam = latestCameraState(capture);
+    const target = worldToCanvas(worldTargetX, worldTargetY, cam);
 
     const preTryAttackLines = capture
       .getLines()
@@ -258,9 +269,9 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     // RMB is fired by page.mouse.click(..., {button: "right"}); canvas.click
     // with button:right also works, but page.mouse.click takes absolute page
     // coords (canvas bbox offset + target) — match the original spec shape.
-    await page.mouse.move(canvasBB!.x + targetX, canvasBB!.y + targetY);
+    await page.mouse.move(canvasBB!.x + target.x, canvasBB!.y + target.y);
     await page.waitForTimeout(200);
-    await page.mouse.click(canvasBB!.x + targetX, canvasBB!.y + targetY, {
+    await page.mouse.click(canvasBB!.x + target.x, canvasBB!.y + target.y, {
       button: "right",
     });
     await page.waitForTimeout(400);
@@ -274,8 +285,8 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     expect(
       fireLines.length,
       `Expected at least one Player.try_attack FIRED kind=heavy line after mouse-west + RMB click. ` +
-        `Player at (${playerX}, ${playerY}), mouse at (${targetX}, ${targetY}). ` +
-        `Got ${fireLines.length}.`
+        `Player at world (${playerX}, ${playerY}), world target (${worldTargetX}, ${worldTargetY}), ` +
+        `canvas click (${target.x.toFixed(0)}, ${target.y.toFixed(0)}). Got ${fireLines.length}.`
     ).toBeGreaterThanOrEqual(1);
     const match = fireLines[0].text.match(/facing=\(([-\d.]+),([-\d.]+)\)/);
     expect(match).not.toBeNull();
@@ -283,15 +294,11 @@ test.describe("Mouse-direction attacks (ticket 86c9uthf0)", () => {
     const fy = parseFloat(match![2]);
     expect(
       fx,
-      `Mouse-west RMB: expected facing.x < -0.5 (pointing west). ` +
-        `Player at (${playerX}, ${playerY}), mouse aim at (${targetX}, ${targetY}), ` +
-        `got facing=(${fx}, ${fy}).`
+      `Mouse-west RMB: expected facing.x < -0.5 (pointing west). got facing=(${fx}, ${fy}).`
     ).toBeLessThan(-0.5);
     expect(
       Math.abs(fy),
-      `Mouse-west RMB: expected |facing.y| < 0.3 (horizontal-ish). ` +
-        `Player at (${playerX}, ${playerY}), mouse aim at (${targetX}, ${targetY}), ` +
-        `got facing=(${fx}, ${fy}).`
+      `Mouse-west RMB: expected |facing.y| < 0.3 (horizontal-ish). got facing=(${fx}, ${fy}).`
     ).toBeLessThan(0.3);
   });
 });

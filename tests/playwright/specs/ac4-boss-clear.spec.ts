@@ -652,12 +652,11 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
           cycle++;
 
           for (let a = 0; a < ATTACKS_PER_FACING; a++) {
-            // Click at a spawn-relative offset in the current facing direction
-            // (N or E) instead of canvas-center. Canvas-center is at world
-            // (640, 360) — far SE of the player at (240, 200) on the
-            // no-Camera2D viewport — so a canvas-center click would aim every
-            // swing SE and miss the NE/N-spawning chasers entirely.
-            await clickAimedAtSpawn(canvas, facing.label as "N" | "E");
+            // Click at a spawn-relative WORLD offset in the current facing
+            // direction (N or E), translated through the live camera transform.
+            // Post-T9 the helper applies `worldToCanvas` internally using the
+            // latest `[combat-trace] CameraDirector.state` line in `capture`.
+            await clickAimedAtSpawn(canvas, capture, facing.label as "N" | "E");
             await page.waitForTimeout(ATTACK_INTERVAL_MS);
 
             const deathsNow = capture
@@ -1042,11 +1041,11 @@ test.describe("AC4 — Stratum-1 boss reach + clear", () => {
       let bossDied = false;
 
       while (Date.now() - bossStart < BOSS_CLEAR_TIMEOUT_MS) {
-        // Boss spawns at (240, 135) per Stratum1BossRoom._spawn_boss; player
-        // at (240, 200). Boss is NORTH of player. Aim N so the swing wedge
-        // covers the boss (PR #255 mouse-direction attacks — canvas-center
-        // click would aim SE on the no-Camera2D viewport, missing the boss).
-        await clickAimedAtSpawn(canvas, "N");
+        // Boss spawns at world (240, 135) per Stratum1BossRoom._spawn_boss;
+        // player at world (240, 200). Boss is NORTH of player. Aim N via
+        // helper — post-T9 the helper translates the world offset through
+        // the live camera transform internally (camera follows player).
+        await clickAimedAtSpawn(canvas, capture, "N");
         await page.waitForTimeout(ATTACK_INTERVAL_MS);
 
         const bossDeathLine = capture

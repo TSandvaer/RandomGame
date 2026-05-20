@@ -195,7 +195,7 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
       // so the swing wedge covers Room02's NE-spawning grunts. Canvas-center
       // (640, 360) is far SE of the player at (240, 200) on the no-Camera2D
       // viewport — clicking there would aim SE and miss every grunt.
-      await clickAimedAtSpawn(canvas, "NE");
+      await clickAimedAtSpawn(canvas, capture, "NE");
       attacks++;
       await page.waitForTimeout(ATTACK_INTERVAL_MS);
 
@@ -308,7 +308,7 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
       // Continue clicking to keep engine ticks flowing. Aim NE-of-spawn
       // (mouse-direction attacks — PR #255) so the swing still targets the
       // already-dying grunt area in Room 02.
-      await clickAimedAtSpawn(canvas, "NE");
+      await clickAimedAtSpawn(canvas, capture, "NE");
       const found = capture
         .getLines()
         .find((l) =>
