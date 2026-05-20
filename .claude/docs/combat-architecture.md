@@ -304,6 +304,25 @@ Resolution is by `Sprite is AnimatedSprite2D` / `Sprite is ColorRect` type-check
 
 Sponsor's HTML5 soak surfaces these lines in DevTools console (F12 → Console). Trace-driven debugging is the load-bearing surface for combat regressions because most physics-flush bugs don't raise GDScript exceptions — Godot's `USER ERROR` macros log + return-early in C++. Tier 2 testing bar consequence (per PR #138 + `team/TESTING_BAR.md`): tests must assert downstream consequences (HP changes, queue_free reached, monitoring state per swing), not just method-was-called.
 
+## Signal-emit-comment drift — multi-path audit rule (PR #281)
+
+In-code comments asserting **"signal X only fires from function Y"** are unreliable when the signal has multiple `emit` paths. The class is load-bearing because listener-wiring decisions (which signal to connect, what semantics the consumer assumes) are made based on these comments — and the comment can lie silently for the lifetime of the signal.
+
+**PR #281 live example.** `iframes_started` was documented at its `try_dodge()` emit site as the dodge-iframes signal — but the actual emit topology was BOTH `try_dodge()` AND `take_damage()`. Two consumers were wired to it, each assuming dodge-only semantics:
+
+1. **Audio listener** — fired the dodge-whoosh cue. Wrong on `take_damage`: damage produced an unwanted whoosh, diverging from `team/uma-ux/audio-direction.md §AD-05` ("intentional dodge ONLY whoosh"). This is the one Tess caught on PR #278.
+2. **`Stratum1Room01` tutorial wiring** — advanced the LMB tutorial beat. **Latent bug**: first damage taken in Room 01 would have spuriously advanced the beat. Currently dormant because `PracticeDummy` has no aggressive hitbox; any future mob addition to Room 01 (or this same wiring copied to another tutorial room) would have activated it.
+
+**The fix (PR #281).** Split `dodge_started` (only from `try_dodge` after dodge-validation passes) from `iframes_started` (still emits from both `try_dodge` AND `take_damage` for backward-compat with HUD-blink listeners). Each signal now has a single, correctly-documented intent.
+
+**3-step audit rule** when refactoring or adding a consumer to any multi-path signal:
+
+1. **Grep ALL emit sites** — `grep -r "<signal_name>.emit" scripts/` — and read every call site's surrounding context, not just the comment.
+2. **Audit ALL `.connect()` consumers** — `grep -r "<signal_name>" scripts/ scenes/` — and verify each consumer's correctness against the **full** emit topology, not just the documented path.
+3. **Split mixed-semantic signals** — if two emit sites have non-overlapping intent (intentional-user-action vs system-event), introduce a second signal rather than patching consumers with guard conditions.
+
+**Highest-risk signal patterns.** Intent-named signals (`iframes_started`, `dodge_started`, `mob_died`, `lmb_strike`) and tutorial-beat signals (`TutorialEventBus.request_beat`) are the highest-risk class for comment drift — they attract new consumers over time, each reading the name as a contract that may not match all emit sites. Audit these at every PR that adds a consumer.
+
 ## Physics-flush rule (load-bearing)
 
 In Godot 4, mutating an Area2D's monitoring state — including `add_child` of an Area2D-derived node, `set_monitoring`, `set_collision_layer/mask`, `disabled = true` on a CollisionShape2D — from inside a `body_entered` / `area_entered` callback (or any signal-handler chain rooted in a physics callback) panics with:
