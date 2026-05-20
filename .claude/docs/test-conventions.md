@@ -120,6 +120,36 @@ If a future refactor renames the constant value (`&"mob"`, `&"hero"`, etc.), the
 
 **Apply this pattern whenever** a Playwright spec regex captures an interpolated `StringName` / `String` value from an engine `const`. Other live surfaces: `Mob._set_state` state names (`STATE_IDLE`, `STATE_CHASING`, `STATE_KITING`, `STATE_AIMING`, `STATE_POST_FIRE_RECOVERY`, `STATE_DEAD`), `Shooter._set_state` band labels, `TutorialEventBus.request_beat` beat ids. Each should have a pinned-constant GUT test if a Playwright regex matches against it.
 
+## Adversarial off-cardinal probe values for decoupling specs (PR #282)
+
+**The trap.** A spec asserting "system follows X, NOT Y" (a decoupling regression) can pass vacuously on a regression if the probe input sits on a degenerate value where both the coupled and decoupled implementations return the same output. The canonical case is cardinal-axis values for angle-based decouples: `atan2(0, 1) = 0` exactly. A regression re-coupling to Y still produces 0 → assertion passes silently.
+
+**The fix — adversarial off-cardinal probes.** Choose probe values where `f(coupled_input) ≠ f(decoupled_input)` and neither is the additive identity for the assertion. For angle-based probes, a 45° diagonal eliminates the 0-symmetry trap because both `sin` and `cos` are non-zero.
+
+**PR #282 example (walk-feel decouple spec):** testing "sprite rotation follows movement-velocity, not cursor `_facing`":
+
+| Cursor probe | `_facing.angle()` | Result |
+|---|---|---|
+| Cardinal-east `Vector2(1, 0)` | `atan2(0, 1) = 0` | Silent pass — cursor-coupled regression still asserts `sprite_rot == 0` |
+| **SE-diagonal `Vector2(1, 1)`** | `atan2(1, 1) ≈ 0.785` | Loud fail — cursor-coupled regression emits non-zero `sprite_rot` |
+
+**Validation method — revert-hack.** Temporarily revert the fix under test on a throwaway branch, run the spec, confirm it fails on each surface independently. If a cardinal-pin alternative would not have failed on the revert, the probe is degenerate. Document the revert-result PR ID + run ID in the PR body — PR #282 cites runs `26099417065` (Fix #2 revert) and `26099635330` (Fix #1 revert).
+
+**Apply when:** any spec whose core assertion is "behavior follows A, not B" — anim-source decoupling, signal-source decoupling, physics-parameter decoupling. The adversarial probe is the structural answer to the silent-symmetry failure class.
+
+## Passive-damage Playwright probe windows (PR #281)
+
+**Minimum window: 15 s** at default game speed for Room 01 mob density. An 8 s window is insufficient — Grunts at distance 27–28 tiles take 10–12 s to close to melee range and land their first hit. The probe closes before any damage events occur and the negative assertion is vacuously true.
+
+**Rule:** any spec asserting "player takes N hits in observation window" or "cue X does NOT fire during N seconds of passive damage" must use `PASSIVE_DAMAGE_WINDOW_MS ≥ 15_000`. Count `Player.take_damage` trace events as a positive confirmation that damage actually occurred during the window — a zero-cue negative is only meaningful if damage events are present.
+
+```typescript
+// Grunts at 27-28 tiles need ~10-12s to close + land first hit; 15s gives safety margin.
+const PASSIVE_DAMAGE_WINDOW_MS = 15_000;
+```
+
+**Room 02 load sentinel.** There is no `[combat-trace] Main._load_room_at_index` line. When a spec needs to wait for Room 02 to finish loading, use the first `Grunt.pos` or `Grunt._set_state` line in the console as the sentinel — that line fires from `_physics_process` once the room's first mob is alive and ticking.
+
 ## Visual primitives — see `team/TESTING_BAR.md` § "Visual primitives"
 
 Tier 1 (mandatory): target color ≠ rest color (`assert_ne`). Tier 2 (mandatory for parented modulate cascades): assertion lands on the visible-draw node, not the parent CharacterBody2D. Tier 3 (aspirational): framebuffer pixel-delta — deferred pending a renderer-painting CI lane. Full detail + rationale in `team/TESTING_BAR.md`.
@@ -133,3 +163,22 @@ Tier 1 (mandatory): target color ≠ rest color (`assert_ne`). Tier 2 (mandatory
 - `.claude/docs/html5-export.md` — HTML5-specific failure modes that the Playwright surface is positioned to catch
 - ClickUp `#86c9uf0mm` — the universal-warning gate ticket (Half A + Half B)
 - PR #217 — Tess's Playwright Phase 1 scaffold (merged)
+
+## Playwright-spec orphan-ref class — GUT test-name drift (PR #280)
+
+**What it is.** A Playwright spec that references a GUT `test_*` function name as a string literal (in `waitForConsole` / `expect_trace` patterns or in coverage-asserting comments) becomes an orphan when the GUT test is renamed or deleted. No CI failure at the drift point — the spec passes silently against a non-existent test name.
+
+**Two root causes observed in PR #280:**
+
+1. **Rename drift** — a GUT test is legitimately deleted during a fix (e.g. `test_sprite_rotation_updates_when_present` removed in PR #274 fix #2 commit `d22a87f`); the Playwright spec referencing it was not updated in the same PR.
+2. **Author-typo orphan** — `test_room_gate_3mob_concurrent_death_unlock` (never existed); the real GUT function is `test_3mob_concurrent_death_with_death_wait_unlocks` in `tests/test_room_gate.gd:244`.
+
+Both cause the same silent-failure class: the Playwright spec asserts coverage that doesn't exist.
+
+**Structural lint opportunity (not yet implemented, tooling backlog):** a CI lint that greps every `test_*` token in `tests/playwright/specs/**/*.ts` and cross-checks against the GUT test catalogue (output of `godot --headless --path . -s addons/gut/gut_cmdln.gd --list-tests`) would catch both causes structurally at PR time.
+
+**Author checklist until lint lands:**
+
+1. When adding a Playwright spec comment or assertion referencing a GUT `test_*` function, copy the name **character-for-character** from the `.gd` file (never from memory).
+2. Grep the repo (`grep -r "<name>" tests/`) to confirm the test exists before merging.
+3. After any GUT test rename or deletion, grep `tests/playwright/specs/` for the old name in the same PR.

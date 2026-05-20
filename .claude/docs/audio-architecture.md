@@ -201,6 +201,45 @@ Verification protocol:
 7. **Audibly verify** the cue plays. The browser console excerpt + the
    audible confirmation are both required in the PR's Self-Test Report.
 
+## `[combat-trace]` audio observability — Playwright QA pattern
+
+Headless GUT cannot hear audio; `AudioStreamPlayer.play()` succeeds silently in the test environment. The `[combat-trace]` shim is the Playwright-observable audio surrogate: `AudioDirector.play_sfx` emits a `[combat-trace] AudioDirector.play_sfx | cue_id=<id>` console line (HTML5 only via `OS.has_feature("web")`) whenever a SFX cue is dispatched.
+
+**Trace shape:**
+```
+[combat-trace] AudioDirector.play_sfx | cue_id=sfx-player-dodge
+```
+The `cue_id` must match the `AD-XX` entry in `team/uma-ux/audio-direction.md` exactly — derive it from the constant, never guess.
+
+**Validated probe pattern (PR #281 — dodge-signal split, AD-05 verification):**
+
+- Scenario A (positive — intentional dodge): Space press → assert exactly 1 `sfx-player-dodge` cue line within the probe window.
+- Scenario B (negative — passive damage 20s window): assert N `Player.take_damage` lines AND **0** `sfx-player-dodge` lines. The high event-count + zero target-cue confirmation is load-bearing: it proves the signal was suppressed, not just absent due to a missed trigger.
+
+```typescript
+const traceLogs: string[] = [];
+page.on("console", msg => {
+  if (msg.text().includes("[combat-trace] AudioDirector.play_sfx")) {
+    traceLogs.push(msg.text());
+  }
+});
+
+// Positive — cue fires on trigger
+await page.keyboard.press("Space");
+const positive = traceLogs.filter(l => l.includes("cue_id=sfx-player-dodge"));
+expect(positive).toHaveLength(1);
+
+// Negative — cue does NOT fire on passive damage (must use ≥15s window; see test-conventions.md)
+const beforeDamage = traceLogs.length;
+await page.waitForTimeout(20_000);
+const negative = traceLogs.slice(beforeDamage).filter(l => l.includes("cue_id=sfx-player-dodge"));
+expect(negative).toHaveLength(0);
+```
+
+**Coupling note.** The trace fires inside `AudioDirector.play_sfx()`, NOT at individual `AudioStreamPlayer.play()` call sites. If a future refactor bypasses `play_sfx` and calls `.play()` directly, the trace goes silent — the Playwright spec passes vacuously. Any SFX-routing refactor must audit whether the call still goes through `play_sfx`.
+
+**HTML5-only limitation.** Same gate as all `[combat-trace]` lines (`OS.has_feature("web") == true`). The trace is a no-op in headless GUT — Playwright HTML5 specs are the **only** automated coverage for SFX-trigger correctness. Audible confirmation in the Self-Test Report (per the HTML5 audio-playback gate above) is still required; the trace probe is the machine-checkable counterpart, not a replacement.
+
 ## Cross-references
 
 - Content side (cue list, mood direction, sourcing plan, tester checklist):
