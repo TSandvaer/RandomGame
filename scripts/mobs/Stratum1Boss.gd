@@ -318,11 +318,56 @@ var _animated_sprite_resolved: bool = false
 # Attack-telegraph tween — ref kept so death-during-telegraph can cancel it.
 var _attack_telegraph_tween: Tween = null
 
+# T5 slam-telegraph indicator runtime — Node2D child created at telegraph start
+# and freed on slam-fire or boss-death. Held by ref so `_fire_slam_hit` and
+# `_die` can drive the fade-out + cleanup. Null when no telegraph is armed.
+var _slam_indicator: Node2D = null
+var _slam_indicator_tween: Tween = null
+
 ## Red tint for melee/slam telegraph (player-journey.md Beat 6). Sub-1.0 all
 ## channels for HTML5 gl_compatibility safety (PR #137 lesson). Brighter than
 ## grunts to make the boss wind-up clearly readable.
 const ATTACK_TELEGRAPH_TINT: Color = Color(1.0, 0.25, 0.25, 1.0)  # vivid red, HTML5 safe
 const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.080
+
+# ---- M3 Tier 2 Wave 2 T5+T6 — slam telegraph indicator + aftershock burst --
+# T5 (ticket 86c9wjyrc): visible slam-telegraph danger-zone circle outline.
+# T6 (ticket 86c9wjyuv): slam aftershock ember-burst on slam-fire impact.
+#
+# Implementation note (T5 deviation from ticket title): the ticket says
+# "Polygon2D circle" but Polygon2D natively renders filled convex polygons —
+# rendering an outline ring would require either (a) a 32-vertex annulus
+# polygon (32 outer + 32 inner verts), or (b) a Node2D._draw() + draw_arc()
+# call. Option (b) is the canonical Godot 4 idiom for a circle outline and
+# does NOT touch the html5-export.md § Polygon2D rendering quirks failure
+# class (which is the PR #137 swing-wedge bug — that was a FILLED polygon).
+# We use Node2D + _draw() + draw_arc(). The 32-segment arc renders identically
+# on `forward_plus` and `gl_compatibility` (verified pattern via Godot 4.3
+# rendering docs — `draw_arc` is part of the canvas-item draw API, not the
+# Polygon2D rasterizer).
+
+## T5 slam telegraph circle indicator — ember-orange outline at SLAM_HITBOX_RADIUS.
+## Color: #FF6A2A at alpha 0.5. Sub-1.0 RGB channels per html5-export.md HDR-clamp
+## rule (PR #137 lesson — gl_compatibility clamps Color channels to [0, 1]).
+const SLAM_INDICATOR_COLOR: Color = Color(1.0, 0.416, 0.165, 0.5)
+const SLAM_INDICATOR_LINE_WIDTH: float = 2.0
+## Fade-in / fade-out duration at telegraph start / slam-fire (Priya AC).
+const SLAM_INDICATOR_FADE: float = 0.080
+## draw_arc segment count — 32 segments produce a smooth circle at 80 px radius.
+const SLAM_INDICATOR_ARC_POINTS: int = 32
+
+## T6 slam aftershock burst — half-volume mirror of `_spawn_death_particles`.
+## 12 particles vs boss-death's 24 (per scope doc T6 AC + uma combat-visual-feedback §3
+## budget — boss-death's 24 is the upper bound).
+const SLAM_AFTERSHOCK_PARTICLE_COUNT: int = 12
+const SLAM_AFTERSHOCK_LIFETIME: float = 0.20  # 200 ms per Priya AC
+## Outward velocity range (px/s) — 40-80 per Priya AC. Slower than death burst's
+## 30-60 because aftershock is impact-radial; death burst is upward-rising.
+const SLAM_AFTERSHOCK_VELOCITY_MIN: float = 40.0
+const SLAM_AFTERSHOCK_VELOCITY_MAX: float = 80.0
+## Spread is half-angle around `direction`. 180° + direction=UP gives uniform
+## omni-radial emission — mirrors death burst.
+const SLAM_AFTERSHOCK_SPREAD: float = 180.0
 
 
 func _ready() -> void:
@@ -684,6 +729,11 @@ func _begin_slam_telegraph() -> void:
 	_set_state(STATE_TELEGRAPHING_SLAM)
 	# Attack-telegraph visual: red-glow for slam wind-up.
 	_play_attack_telegraph(SLAM_TELEGRAPH_DURATION * t_mult)
+	# T5 (ticket 86c9wjyrc): visible danger-zone circle indicator at slam outer
+	# radius. Parent-relative to the boss so it tracks any boss displacement
+	# during the telegraph window. Spawn BEFORE the marker hitbox so headless
+	# tests inspecting children see both in deterministic order.
+	_spawn_slam_indicator(_slam_telegraph_left)
 	# A "telegraph" marker hitbox — zero damage, big radius, short life —
 	# lets the player see the danger zone. We spawn it as a real Hitbox on
 	# enemy_hitbox layer with damage=0 so it doesn't actually hurt — purely
@@ -738,6 +788,13 @@ func _fire_slam_hit() -> void:
 	_slam_recovery_left = SLAM_RECOVERY * rec_mult
 	_slam_cooldown_left = SLAM_COOLDOWN
 	_set_state(STATE_SLAM_RECOVERY)
+	# T5 (ticket 86c9wjyrc): fade out the danger-zone indicator on slam-fire.
+	# The fade-out tween auto-frees the indicator on completion.
+	_fade_out_slam_indicator()
+	# T6 (ticket 86c9wjyuv): 12-particle ember aftershock at slam origin.
+	# Parented to the room (not the boss) so the burst persists past
+	# slam-recovery if the boss subsequently dies and queue_frees itself.
+	_spawn_slam_aftershock()
 	swing_spawned.emit(SWING_KIND_SLAM_HIT, hb)
 
 
@@ -865,6 +922,10 @@ func _die() -> void:
 	_phase_transition_left = 0.0
 	velocity = Vector2.ZERO
 	_cancel_attack_telegraph_tween()
+	# T5 (ticket 86c9wjyrc): if boss dies mid-slam-telegraph, free the danger-
+	# zone indicator immediately — no fade-out, the climax burst should not
+	# share the screen with a stale telegraph circle.
+	_force_free_slam_indicator()
 	_set_state(STATE_DEAD)
 	# CRITICAL CONTRACT (Uma `combat-visual-feedback.md` §3a): boss_died
 	# fires at the START of the death sequence (this frame), NOT after the
@@ -952,6 +1013,140 @@ func _cancel_attack_telegraph_tween() -> void:
 	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
 		_attack_telegraph_tween.kill()
 		_attack_telegraph_tween = null
+
+
+# ---- T5 slam-telegraph indicator (ticket 86c9wjyrc) -------------------
+
+## Spawn the slam-telegraph danger-zone circle indicator as a child of the boss.
+## Parent-relative so the indicator follows the boss if it moves during telegraph.
+## Uses a Node2D + `_draw()` + `draw_arc()` (NOT Polygon2D — see header comment
+## under "Implementation note (T5 deviation from ticket title)" for rationale).
+## `telegraph_duration` is the actual armed duration (varies with phase-3 enrage).
+## Fade-in over SLAM_INDICATOR_FADE, hold for the rest, fade-out triggered
+## externally by `_fade_out_slam_indicator()` on slam-fire.
+func _spawn_slam_indicator(telegraph_duration: float) -> void:
+	if not is_inside_tree():
+		return
+	# Defensive: if a prior indicator still exists (shouldn't under nominal
+	# state-machine flow, but rapid telegraph re-entry would stack them),
+	# free it before spawning the new one.
+	_force_free_slam_indicator()
+	var indicator: Node2D = SlamTelegraphIndicator.new()
+	indicator.position = Vector2.ZERO  # boss-centered (parent-relative)
+	# Start fully transparent — fade-in tween drives the reveal.
+	indicator.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	add_child(indicator)
+	_slam_indicator = indicator
+	if _slam_indicator_tween != null and _slam_indicator_tween.is_valid():
+		_slam_indicator_tween.kill()
+	# Fade-in: alpha 0 → 1 (the underlying draw color is already at α=0.5, so
+	# the multiplied modulate.a ramps the perceived alpha from 0 → 0.5).
+	# Hold = telegraph_duration - 2× fade (one in + one out budget). If the
+	# telegraph is shorter than 2× fade (phase-3 enrage corner), the hold
+	# clamps to 0 and the fade-out is triggered externally by slam-fire.
+	_slam_indicator_tween = create_tween()
+	_slam_indicator_tween.tween_property(
+		indicator, "modulate:a", 1.0, SLAM_INDICATOR_FADE)
+	# Hold for the remainder; the slam-fire fade-out is fired by
+	# `_fade_out_slam_indicator()`, not by the tween reaching the end.
+	var hold_dur: float = max(0.0, telegraph_duration - SLAM_INDICATOR_FADE)
+	if hold_dur > 0.0:
+		_slam_indicator_tween.tween_interval(hold_dur)
+	_combat_trace("Stratum1Boss._spawn_slam_indicator",
+		"radius=%.0f color=(%.2f,%.2f,%.2f,%.2f) telegraph_duration=%.2f fade=%.3f" % [
+			SLAM_HITBOX_RADIUS,
+			SLAM_INDICATOR_COLOR.r, SLAM_INDICATOR_COLOR.g,
+			SLAM_INDICATOR_COLOR.b, SLAM_INDICATOR_COLOR.a,
+			telegraph_duration, SLAM_INDICATOR_FADE])
+
+
+## Trigger fade-out on the slam-telegraph indicator (called from `_fire_slam_hit`).
+## Frees the indicator on tween completion. Idempotent — null-checked.
+func _fade_out_slam_indicator() -> void:
+	if _slam_indicator == null:
+		return
+	if not is_instance_valid(_slam_indicator):
+		_slam_indicator = null
+		return
+	# Kill the fade-in/hold tween so the fade-out animation owns the modulate
+	# channel cleanly without a race against the hold step.
+	if _slam_indicator_tween != null and _slam_indicator_tween.is_valid():
+		_slam_indicator_tween.kill()
+	# Capture local ref so the lambda's free-on-finished closure works even
+	# if `_slam_indicator` is reassigned mid-tween (rapid re-telegraph corner).
+	var indicator: Node2D = _slam_indicator
+	_slam_indicator = null
+	_slam_indicator_tween = create_tween()
+	_slam_indicator_tween.tween_property(
+		indicator, "modulate:a", 0.0, SLAM_INDICATOR_FADE)
+	_slam_indicator_tween.finished.connect(func() -> void:
+		if is_instance_valid(indicator):
+			indicator.queue_free())
+
+
+## Immediate free of the slam-telegraph indicator without fade-out. Used by
+## `_die` (death-mid-telegraph) and as a defensive double-spawn guard in
+## `_spawn_slam_indicator`. Idempotent — null-checked + queued-for-deletion check.
+func _force_free_slam_indicator() -> void:
+	if _slam_indicator_tween != null and _slam_indicator_tween.is_valid():
+		_slam_indicator_tween.kill()
+		_slam_indicator_tween = null
+	if _slam_indicator == null:
+		return
+	if is_instance_valid(_slam_indicator) and not _slam_indicator.is_queued_for_deletion():
+		_slam_indicator.queue_free()
+	_slam_indicator = null
+
+
+# ---- T6 slam aftershock burst (ticket 86c9wjyuv) ---------------------
+
+## Spawn a 12-particle ember aftershock at the slam origin. Half-volume mirror
+## of `_spawn_death_particles` (12 vs 24 particles), parented to the room (not
+## the boss) so the burst persists past slam-recovery + boss death.
+##
+## Physics-flush safety: see `_spawn_death_particles` for the full rationale —
+## `_fire_slam_hit` runs during the physics step's slam-telegraph countdown
+## path, and a direct `add_child` from that callstack risks Godot 4's
+## "Can't change this state while flushing queries" panic if any Area2D state
+## downstream of the new particle node mutates. Deferred add_child sidesteps
+## the class entirely. Mirror of the death-burst pattern.
+func _spawn_slam_aftershock() -> void:
+	var room: Node = get_parent()
+	if room == null:
+		return
+	var burst: CPUParticles2D = CPUParticles2D.new()
+	burst.global_position = global_position
+	burst.amount = SLAM_AFTERSHOCK_PARTICLE_COUNT
+	burst.one_shot = true
+	burst.explosiveness = 1.0
+	burst.lifetime = SLAM_AFTERSHOCK_LIFETIME
+	burst.emitting = true
+	# Omni-radial: direction=UP + spread=180 → uniform 360° emission. Same
+	# shape as the death burst.
+	burst.direction = Vector2.UP
+	burst.spread = SLAM_AFTERSHOCK_SPREAD
+	burst.initial_velocity_min = SLAM_AFTERSHOCK_VELOCITY_MIN
+	burst.initial_velocity_max = SLAM_AFTERSHOCK_VELOCITY_MAX
+	# No gravity — aftershock is impact-radial, not rising. (Death burst uses
+	# Vector2(0, -40) to make embers rise per visual-direction §lighting.)
+	burst.gravity = Vector2.ZERO
+	burst.scale_amount_min = 1.0
+	burst.scale_amount_max = 1.0
+	# Ember ramp — light → deep, mirrors death burst.
+	var ramp: Gradient = Gradient.new()
+	ramp.set_color(0, EMBER_LIGHT)
+	ramp.set_color(1, EMBER_DEEP)
+	burst.color_ramp = ramp
+	# Physics-flush safety: `_fire_slam_hit` runs in the slam-telegraph countdown
+	# path inside `_physics_process`. Deferred add_child avoids the 4.x panic
+	# class — same rationale as `_spawn_death_particles`.
+	room.call_deferred("add_child", burst)
+	burst.finished.connect(burst.queue_free)
+	_combat_trace("Stratum1Boss._spawn_slam_aftershock",
+		"particles=%d lifetime=%.2f vel=[%.0f..%.0f] origin=(%.0f,%.0f)" % [
+			SLAM_AFTERSHOCK_PARTICLE_COUNT, SLAM_AFTERSHOCK_LIFETIME,
+			SLAM_AFTERSHOCK_VELOCITY_MIN, SLAM_AFTERSHOCK_VELOCITY_MAX,
+			global_position.x, global_position.y])
 
 
 ## §2 hit-flash. M3W-4 3-branch resolver per `.claude/docs/combat-architecture.md`
