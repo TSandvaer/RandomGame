@@ -411,7 +411,10 @@ func _cancel_timer_for(reason: String) -> void:
 ## (so NoWarningGuard catches misuse in tests) and falls back to
 ## push_warning when the autoload isn't booted (e.g. some test contexts).
 func _warn(text: String, category: String) -> void:
-	var bus: Node = Engine.get_main_loop().root.get_node_or_null("WarningBus") if Engine.get_main_loop() != null else null
+	var main_loop: MainLoop = Engine.get_main_loop()
+	var bus: Node = null
+	if main_loop is SceneTree:
+		bus = (main_loop as SceneTree).root.get_node_or_null("WarningBus")
 	if bus != null and bus.has_method("warn"):
 		bus.warn(text, category)
 	else:
