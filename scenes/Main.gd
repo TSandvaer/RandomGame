@@ -77,6 +77,7 @@ const PLAYER_SCENE_PATH: String = "res://scenes/player/Player.tscn"
 const INVENTORY_PANEL_SCENE_PATH: String = "res://scenes/ui/InventoryPanel.tscn"
 const STAT_PANEL_SCENE_PATH: String = "res://scenes/ui/StatAllocationPanel.tscn"
 const DESCEND_SCREEN_SCENE_PATH: String = "res://scenes/screens/DescendScreen.tscn"
+const BOSS_DEFEATED_TITLE_CARD_SCENE_PATH: String = "res://scenes/ui/BossDefeatedTitleCard.tscn"
 
 ## Player spawn position — center of a 480x270 internal canvas (rooms are
 ## sized to that grid per Uma's visual-direction lock).
@@ -465,6 +466,12 @@ func _wire_room_signals(room: Node, index: int) -> void:
 				_wire_mob(boss)
 			if not _boss_room.stratum_exit_unlocked.is_connected(_on_stratum_exit_unlocked):
 				_boss_room.stratum_exit_unlocked.connect(_on_stratum_exit_unlocked)
+			# M3-T4 — defeat title card. Lazy-instantiated per kill via
+			# the room's `boss_defeated` signal. Card subscribes once here
+			# (idempotent via `is_connected`); it `queue_free`s itself when
+			# the fade-out completes. See `scripts/ui/BossDefeatedTitleCard.gd`.
+			if not _boss_room.boss_defeated.is_connected(_on_boss_defeated):
+				_boss_room.boss_defeated.connect(_on_boss_defeated)
 	else:
 		# Room01 has no `room_cleared` signal. Wire a fallback: when the last
 		# spawned mob dies, treat that as "cleared." This keeps the AC2 first-
@@ -992,6 +999,30 @@ func _on_room_cleared(_room_id: Variant = null) -> void:
 	if _current_room_index < BOSS_ROOM_INDEX:
 		var next_index: int = _current_room_index + 1
 		_load_room_at_index(next_index)
+
+
+## M3-T4 — defeat title card. Per Uma's brief (`team/uma-ux/m3-t4-defeat-title-card-brief.md`),
+## the card is a transient overlay instantiated per kill. Lazy-load the
+## PackedScene + add as Main's child + call `show_for(boss, pos)`. The
+## card runs its own tween (1.2 s pre-delay + 0.4 s fade-in + 0.8 s hold
+## + 0.4 s fade-out, all on game time) and `queue_free`s itself on
+## completion. Main does NOT track the instance — re-entry on a future
+## New Game + run simply instantiates a fresh node.
+##
+## **Signal payload** matches `Stratum1BossRoom.boss_defeated(boss: Stratum1Boss,
+## death_position: Vector2)`. The card only needs `boss` for the
+## `display_name` templating; `death_position` is forwarded for future
+## use (anchored card variants are out of scope for T4).
+func _on_boss_defeated(boss: Stratum1Boss, death_position: Vector2) -> void:
+	var packed: PackedScene = load(BOSS_DEFEATED_TITLE_CARD_SCENE_PATH) as PackedScene
+	if packed == null:
+		push_warning("[Main] BossDefeatedTitleCard scene missing at '%s'" % BOSS_DEFEATED_TITLE_CARD_SCENE_PATH)
+		return
+	var card: BossDefeatedTitleCard = packed.instantiate() as BossDefeatedTitleCard
+	if card == null:
+		return
+	add_child(card)
+	card.show_for(boss, death_position)
 
 
 func _on_stratum_exit_unlocked() -> void:
