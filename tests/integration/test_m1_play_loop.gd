@@ -72,6 +72,13 @@ func _reset_autoloads() -> void:
 	_player_stats().reset()
 	_inventory().reset()
 	_stratum().reset()
+	# M3 Tier 2 T2/T3 — boss death + phase transitions now mutate Engine.time_scale
+	# via TimeScaleDirector. Reset to baseline so tests that drive boss death
+	# don't leak scale 0.0 into the next test in the suite.
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
 
 
 func _save() -> Node:

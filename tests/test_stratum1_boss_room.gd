@@ -10,6 +10,25 @@ const BossRoomScript: Script = preload("res://scripts/levels/Stratum1BossRoom.gd
 const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 
 
+# ---- Test isolation ---------------------------------------------------
+# M3 Tier 2 Wave 1 T2/T3 — Stratum1Boss fires TimeScaleDirector requests on
+# hit / die / phase-transition. Tests that take the boss to 0 HP leak director
+# state (and Engine.time_scale) into subsequent tests. Reset on both ends.
+
+func before_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+
+
+func after_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+
+
 # ---- Helpers ----------------------------------------------------------
 
 class FakePlayerBody:

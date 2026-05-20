@@ -120,6 +120,29 @@ func test_attack_spawned_signal() -> void:
 	assert_signal_emitted_with_parameters(p, "attack_spawned", [Player.ATTACK_LIGHT, hb])
 
 
+# --- 9b: get_current_attack_kind accessor (M3 T2 hit-pause source-kind) --
+# The boss's T2 hit-pause selects duration via `source.get_current_attack_kind()`.
+# Pin the accessor + that it reflects the most-recent try_attack kind.
+
+func test_get_current_attack_kind_defaults_to_light_before_any_attack() -> void:
+	var p: Player = _make_player_in_tree()
+	assert_eq(p.get_current_attack_kind(), Player.ATTACK_LIGHT,
+		"default attack-kind is light before any try_attack")
+
+
+func test_get_current_attack_kind_reflects_last_swing() -> void:
+	var p: Player = _make_player_in_tree()
+	p.try_attack(Player.ATTACK_HEAVY, Vector2.RIGHT)
+	assert_eq(p.get_current_attack_kind(), Player.ATTACK_HEAVY,
+		"after heavy swing, kind is heavy")
+	# Sit out the recovery so the next light swing isn't blocked.
+	p._tick_timers(Player.HEAVY_RECOVERY + 0.05)
+	p._process_attack(0.0)
+	p.try_attack(Player.ATTACK_LIGHT, Vector2.LEFT)
+	assert_eq(p.get_current_attack_kind(), Player.ATTACK_LIGHT,
+		"after light swing, kind is light")
+
+
 # --- 10: attack uses facing if dir omitted --------------------------------
 
 func test_attack_uses_facing_when_dir_zero() -> void:
