@@ -123,15 +123,22 @@ func test_slam_telegraph_indicator_frees_on_slam_fire() -> void:
 	b._physics_process(Stratum1Boss.SLAM_TELEGRAPH_DURATION + 0.01)
 	assert_eq(b.get_state(), Stratum1Boss.STATE_SLAM_RECOVERY,
 		"slam fired — state transitioned to SLAM_RECOVERY")
-	# Slam-fire kicks the fade-out tween. The indicator is freed on tween-finish.
-	# Advance through the fade-out window. SLAM_INDICATOR_FADE = 0.080.
-	# Drive process delta so the Tween advances. Use a wall-clock wait via the
-	# scene tree — bare `_physics_process` does NOT advance create_tween animations
-	# (those are driven by SceneTree _process), so we await a real frame here.
-	await get_tree().create_timer(
-		Stratum1Boss.SLAM_INDICATOR_FADE + 0.05,
-		true, false, true).timeout
-	# Indicator should be queued_for_deletion (or already gone).
+	# Slam-fire kicks the fade-out tween. Capture the tween ref directly off the
+	# boss so we can `await tween.finished` deterministically — `create_timer +
+	# wall-clock window` is unreliable in headless GUT (tween process_frame
+	# cadence is jittery; pattern matches `test_player_modulate_flash_60ms_total`
+	# in `test_player_visual_feedback.gd` line ~190).
+	var tween: Tween = b._slam_indicator_tween
+	assert_not_null(tween, "slam-fire created the fade-out tween")
+	assert_true(tween.is_valid(), "fade-out tween is valid")
+	# Await the tween's `finished` signal. The `finished.connect` lambda inside
+	# `_fade_out_slam_indicator` calls `queue_free` on the indicator. Connect
+	# order: tween_property first, then `finished.connect` — so the test's
+	# `await tween.finished` is guaranteed to fire AFTER the queue_free lambda
+	# (Godot 4 connects fire in connection order).
+	await tween.finished
+	# One more process_frame to let queue_free flag the node.
+	await get_tree().process_frame
 	var indicator_after: Node = _find_indicator(b)
 	if indicator_after != null:
 		assert_true(indicator_after.is_queued_for_deletion(),
