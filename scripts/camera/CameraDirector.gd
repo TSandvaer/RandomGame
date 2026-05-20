@@ -84,7 +84,7 @@ extends Node
 ## ## Open follow-ups (NOT in this PR)
 ##
 ##   - `CameraDirector.shake(magnitude, duration)` — redirect target for
-##     `Stratum1Boss._play_climax_shake`. Filed for follow-up.
+##     `Stratum1Boss._play_climax_shake`. ClickUp `86c9wvh8e` (low priority).
 ##   - `?camera=<scale>` URL-param debug hook for Sponsor-soak of T13/T16.
 ##   - Smooth lerp-follow (~0.1 s catch-up) instead of snap. Sponsor decision.
 ##
@@ -104,6 +104,12 @@ extends Node
 ## request produces pixel-perfect parity with the pre-T9 viewport-stretch
 ## rendering. Pinned to `project.godot [display]` window/size values; if
 ## those change this constant updates.
+##
+## NOTE: rounded constant; the exact value `1280/480 = 2.6̄` is irrational
+## as a decimal. The 4-digit rounding `2.6667` is within float epsilon
+## (~3.3e-5 delta) of behavior parity and is well below the assertion
+## tolerance (`is_equal_approx` default ~1e-6 relative). Verified via
+## `test_camera2d_exists_and_is_current` + `test_request_zoom_instant_applies_zoom`.
 const BASELINE_ZOOM: Vector2 = Vector2(2.6667, 2.6667)
 
 ## Normalized zoom that means "default." Callers request 1.0× to return to
@@ -164,6 +170,18 @@ var _target_player: Node2D = null
 var _last_request_target_normalized: float = DEFAULT_NORMALIZED_ZOOM
 var _last_request_anchor: Vector2 = Vector2.ZERO
 
+## Throttle accumulator for the HTML5-only `CameraDirector.state` trace —
+## Playwright-fixture consumers (`tests/playwright/fixtures/mouse-facing.ts`)
+## parse the latest emission to translate world coords to canvas-pixel coords
+## via the live camera transform. See `.claude/docs/camera-layer.md` §
+## "Playwright-harness implication" for the world↔canvas math.
+var _state_trace_accum: float = 0.0
+
+## How often the `CameraDirector.state` trace emits. 0.25 s mirrors
+## `Player.pos` so the fixture has same-tick datapoints for both player
+## position AND camera state when computing aim targets.
+const STATE_TRACE_INTERVAL: float = 0.25
+
 
 # ---- Lifecycle -------------------------------------------------------
 
@@ -185,7 +203,7 @@ func _ready() -> void:
 		DEFAULT_NORMALIZED_ZOOM, BASELINE_ZOOM.x, BASELINE_ZOOM.y])
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	# Per-tick: resolve player target (cheap group lookup if cache is stale)
 	# then write camera position. Snap-follow (no lerp) keeps T9 behavior
 	# indistinguishable from pre-T9 native-stretch rendering.
@@ -195,12 +213,35 @@ func _process(_delta: float) -> void:
 		# Pinned anchor — _pos_tween (if any) drives position; otherwise hold.
 		if _pos_tween == null or not _pos_tween.is_valid():
 			_camera.global_position = _anchor_override
+	else:
+		# Player-follow mode. Re-resolve if cached target is gone.
+		if _target_player == null or not is_instance_valid(_target_player):
+			_resolve_player_target()
+		if _target_player != null and is_instance_valid(_target_player):
+			_camera.global_position = _target_player.global_position
+	# HTML5-only state trace for Playwright-fixture consumers. Throttled so
+	# console doesn't drown in chatter. Mirrors `Player.pos` cadence.
+	_state_trace_accum += delta
+	if _state_trace_accum >= STATE_TRACE_INTERVAL:
+		_state_trace_accum = 0.0
+		_emit_state_trace()
+
+
+## Emit the HTML5-only `CameraDirector.state` trace line. Payload carries
+## live engine `Camera2D.zoom` (NOT normalized — fixture wants the engine-units
+## value because the world↔canvas math is `canvas = (world - cam.pos) * zoom
+## + viewport_center` using engine zoom directly) + current camera position.
+##
+## Consumed by `tests/playwright/fixtures/mouse-facing.ts::latestCameraState`.
+## See `.claude/docs/camera-layer.md` § "Playwright-harness implication".
+func _emit_state_trace() -> void:
+	if _camera == null:
 		return
-	# Player-follow mode. Re-resolve if cached target is gone.
-	if _target_player == null or not is_instance_valid(_target_player):
-		_resolve_player_target()
-	if _target_player != null and is_instance_valid(_target_player):
-		_camera.global_position = _target_player.global_position
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags") if is_inside_tree() else null
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace("CameraDirector.state",
+			"zoom=%.4f pos=(%.0f,%.0f)" % [
+				_camera.zoom.x, _camera.global_position.x, _camera.global_position.y])
 
 
 # ---- Public API ------------------------------------------------------

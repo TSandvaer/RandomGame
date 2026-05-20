@@ -288,6 +288,46 @@ func test_negative_duration_clamps_to_zero() -> void:
 
 # ---- AC9: zoom request preserves across room-cycle proxy ---------------
 
+# ---- AC10: Playwright-fixture observability contract -------------------
+
+func test_camera_state_observable_for_playwright_fixture() -> void:
+	# The Playwright fixture (`tests/playwright/fixtures/mouse-facing.ts`)
+	# depends on a `[combat-trace] CameraDirector.state | zoom=<v> pos=(<x>,<y>)`
+	# line to translate world coords to canvas-pixel coords via the live
+	# camera transform. The trace itself is HTML5-only (gated on
+	# DebugFlags.combat_trace_enabled), but the GUT-side contract is that:
+	#
+	#   1. The director exposes camera engine state (zoom + global_position)
+	#      via `get_camera()`.
+	#   2. The values reflect the current snap-follow state immediately
+	#      after a `_process` tick.
+	#   3. The `STATE_TRACE_INTERVAL` cadence constant exists at the value
+	#      the fixture's stale-trace guard expects (0.25 s; longer than
+	#      a single physics frame at 60Hz).
+	#
+	# If any of these contract surfaces drifts, the Playwright fixture
+	# silently breaks — this GUT test fails first.
+	var p: Node2D = Node2D.new()
+	p.global_position = Vector2(240, 200)
+	p.add_to_group("player")
+	add_child_autofree(p)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var cam: Camera2D = _director.get_camera()
+	assert_not_null(cam, "get_camera() returns the Camera2D puppet")
+	assert_almost_eq(cam.global_position.x, 240.0, 0.5,
+		"Camera2D.global_position.x snap-follows player (fixture cam pos)")
+	assert_almost_eq(cam.global_position.y, 200.0, 0.5,
+		"Camera2D.global_position.y snap-follows player (fixture cam pos)")
+	assert_almost_eq(cam.zoom.x, 2.6667, 0.001,
+		"Camera2D.zoom.x at BASELINE_ZOOM (fixture engine-zoom value)")
+	# Cadence constant lookup. The fixture's stale-trace guard expects this
+	# to be ≤ 0.5 s so a single helper call always has a fresh state datapoint.
+	var interval: float = _director.STATE_TRACE_INTERVAL
+	assert_true(interval > 0.0 and interval <= 0.5,
+		"STATE_TRACE_INTERVAL within fixture-expected bounds (got %.3f)" % interval)
+
+
 func test_in_flight_zoom_survives_player_node_freed() -> void:
 	# Simulate: zoom in motion, player gets freed (room-cycle), camera
 	# should not crash on the next tick and should hold its position via

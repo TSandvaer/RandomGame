@@ -258,12 +258,12 @@ test.describe("room traversal smoke — Room 1 dummy poof and auto-advance to Ro
       await page.keyboard.up("d");
       await page.waitForTimeout(400);
 
-      // Mouse-direction attacks (PR #255, ticket 86c9uthf0): aim NE-of-spawn
-      // so swings cover Room02's NE-spawning grunts. Canvas-center clicks
-      // would aim SE on the no-Camera2D viewport and miss the grunts.
-      await clickAimedAtSpawn(canvas, "NE");
+      // Mouse-direction attacks (PR #255 / T9 PR #293): aim NE-of-spawn in
+      // WORLD coords; the helper applies `worldToCanvas` against the live
+      // camera transform internally.
+      await clickAimedAtSpawn(canvas, capture, "NE");
       await page.waitForTimeout(400);
-      await clickAimedAtSpawn(canvas, "NE");
+      await clickAimedAtSpawn(canvas, capture, "NE");
       await page.waitForTimeout(600);
 
       const room2Lines = capture.getLines().slice(preRoom2Count);

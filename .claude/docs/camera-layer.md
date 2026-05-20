@@ -100,15 +100,54 @@ Per [`html5-export.md`](html5-export.md), the WebGL2 renderer diverges from desk
 
 ## `[combat-trace]` observability — Playwright-visible
 
-`request_zoom` emits a `[combat-trace]` line in HTML5 (gated on `DebugFlags.combat_trace_enabled() == OS.has_feature("web")`). Trace shape:
+CameraDirector emits two `[combat-trace]` line shapes in HTML5 (both gated on `DebugFlags.combat_trace_enabled() == OS.has_feature("web")`):
 
 ```
 [combat-trace] CameraDirector.request_zoom | target=1.500 duration=0.900 anchor=(0.0,0.0)
+[combat-trace] CameraDirector.state | zoom=2.6667 pos=(240,200)
 ```
 
-Playwright specs can subscribe to assert request firing without poking at GDScript internals. **Today no production code path calls `request_zoom` on boot or during normal play** — only T13 + T16 (Wave 3) will fire it. T9's smoke spec asserts ABSENCE of the trace at boot.
+The `request_zoom` line fires inside the `request_zoom()` API itself — Playwright specs subscribe to assert request firing without poking at GDScript internals. **Today no production code path calls `request_zoom` on boot or during normal play** — only T13 + T16 (Wave 3) will fire it. T9's smoke spec asserts ABSENCE of the trace at boot.
 
-The trace fires inside `request_zoom()` itself. If a future caller writes `_camera.zoom = X` directly bypassing the director (and bypassing the migration policy below), the trace goes silent + the Playwright spec passes vacuously. PR review must flag any direct `Camera2D.zoom` mutation.
+The `CameraDirector.state` line emits every `STATE_TRACE_INTERVAL = 0.25 s` from `_process` (same cadence as `Player.pos`). Payload carries the live engine-units `Camera2D.zoom` and `global_position`. This trace is the canonical Playwright-fixture observability surface for the world↔canvas transform (see § "Playwright-harness implication" below).
+
+If a future caller writes `_camera.zoom = X` directly bypassing the director (and bypassing the migration policy below), the `request_zoom` trace goes silent + the Playwright spec passes vacuously. PR review must flag any direct `Camera2D.zoom` mutation. The `CameraDirector.state` trace would still emit the new live value (since it reads `_camera.zoom` directly), but the bypass would still break the request-side audit.
+
+## Playwright-harness implication — world↔canvas transform
+
+**The pre-T9 assumption that broke.** Before T9 the M1 build had no Camera2D — `viewport.stretch=canvas_items` + `aspect=keep` mapped world coords to canvas pixels 1:1. `tests/playwright/fixtures/mouse-facing.ts` baked this into every helper: `clickAimedAtSpawn`, `clickAtWorldPos`, and the comment "No camera in M1 — world coord == canvas pixel coord." Spec-side mouse-facing tests passed canvas-pixel coords identical to world coords with no translation.
+
+**The post-T9 reality.** `CameraDirector` owns a `Camera2D` snap-following the player at engine zoom `2.6667`. The Camera2D writes `Viewport.canvas_transform` such that:
+
+```
+world      = camera.global_position + (canvas_pixel - viewport_center) / camera.zoom
+canvas_pixel = (world - camera.global_position) * camera.zoom + viewport_center
+```
+
+with `viewport_center = (640, 360)` and `camera.zoom = BASELINE_ZOOM * normalized_request`.
+
+**PR #293 regression (Tess CHANGES_REQUESTED, 2026-05-20).** Three specs in `mouse-direction-attacks.spec.ts` regressed because they computed `targetX = playerX + 200` (a WORLD delta) and passed that directly to `canvas.click({position: {x: targetX, y: targetY}})`. With camera at player (240, 200), canvas click (440, 200) maps back to world (165, 140) — `facing=(-0.8, -0.6)` instead of the expected (+1.0, 0.0). Tess's empirical trace: spec was ✓ on main pre-T9 (run 26099336967); ✘ on PR #293 (run 26182569457).
+
+**The fixture pattern (post-PR-#293).** Every helper in `mouse-facing.ts` now:
+
+1. Computes the desired click position in WORLD coords.
+2. Reads the live `[combat-trace] CameraDirector.state` line via `latestCameraState(capture)`.
+3. Translates world → canvas via `worldToCanvas(worldX, worldY, cameraState)`.
+4. Issues `canvas.click({position: <canvasPixel>})` with the translated coord.
+
+Helpers (`clickAimedAtSpawn`, `clickAtWorldPos`, `clickAimedFromPlayer`, `aimAtWorldPos`) all take a `ConsoleCapture` argument. Pre-PR-#293 call sites without `capture` no longer compile.
+
+Fallback safety: if no `CameraDirector.state` trace has been observed yet (helper called pre-boot or in a build with `combat_trace` disabled), `worldToCanvas` falls back to assuming the camera is at `DEFAULT_PLAYER_SPAWN` with `DEFAULT_ENGINE_ZOOM = 2.6667` — the boot defaults. This is correct on a fresh room load before the player has moved.
+
+**Checklist for new mouse-input Playwright specs.**
+
+1. **Aim in WORLD coords.** Compute the click position relative to spawn, the player's live position (`latestPlayerPos`), or a known mob's world position. NEVER pass canvas-pixel coords expecting them to be world coords.
+2. **Use a helper from `mouse-facing.ts`.** The helper handles the world→canvas transform internally. Direct `canvas.click({position: ...})` with raw world coords is a regression.
+3. **Pass `ConsoleCapture` to the helper.** The helper reads the live camera state from the capture buffer.
+4. **Allow ~500 ms of settle time post canvas-focus.** The `CameraDirector.state` trace emits at 0.25 s cadence — half a second gives one fresh datapoint with margin.
+5. **For low-level / custom-aim specs** that compute their own world target, import `worldToCanvas` directly from `mouse-facing.ts` and pass its result to `canvas.click({position: ...})`.
+
+**Pinned by:** `test_camera_state_observable_for_playwright_fixture` in `tests/test_camera_director.gd` — asserts `get_camera().zoom` + `get_camera().global_position` reflect snap-follow state, and the `STATE_TRACE_INTERVAL` cadence constant stays within fixture-expected bounds (≤ 0.5 s).
 
 ## Migration policy — what stays, what moves
 
@@ -122,7 +161,7 @@ The trace fires inside `request_zoom()` itself. If a future caller writes `_came
 2. Self-shake still reads as a screen-jolt at the cinematic moment. Not broken-broken, just architecturally misplaced.
 3. T16 (Wave 3) needs `request_zoom`, NOT `shake`. The shake API is unscoped for M3 Tier 2.
 
-**Future ticket** (filed but not raised as ClickUp until T13/T16 land + the shape settles): `feat(camera): CameraDirector.shake(magnitude, duration) — redirect Stratum1Boss._play_climax_shake`. Low priority. The current self-shake stays as a placeholder; the boss-side comment at `Stratum1Boss.gd:1166` references this redirect intention.
+**Follow-up ticket:** `86c9wvh8e` — `feat(camera): CameraDirector.shake(magnitude, duration) — redirect Stratum1Boss._play_climax_shake`. Low priority. The current self-shake stays as a placeholder; the boss-side comment at `Stratum1Boss.gd:1166` references this redirect intention.
 
 **Future writers MUST route through `CameraDirector`.** A direct `Camera2D.zoom = X` or `Camera2D.global_position = Y` write should be flagged in PR review.
 

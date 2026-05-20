@@ -357,14 +357,9 @@ test.describe("negative-assertion sweep — state-change signals don't short-cir
       aimCycle++;
 
       // Mouse-direction attacks (PR #255, ticket 86c9uthf0): aim NE-of-spawn
-      // so swings land on Room01 dummy + Room02 NE-spawning grunts. Canvas-
-      // center is at world (640, 360) — far SE of player at (240, 200) — so
-      // a canvas-center click would aim every swing SE on the no-Camera2D
-      // viewport. This test's STATIC causality assertion doesn't care about
-      // kill outcome, but the 60s combat must still PRODUCE some gate
-      // activity to have anything to assert over; SE-aimed dud swings would
-      // leave the gate buffer empty and the test would pass vacuously.
-      await clickAimedAtSpawn(canvas, "NE");
+      // so swings land on Room01 dummy + Room02 NE-spawning grunts. Helper
+      // applies `worldToCanvas` against the live camera transform (post-T9).
+      await clickAimedAtSpawn(canvas, capture, "NE");
       await page.waitForTimeout(ATTACK_INTERVAL_MS);
     }
 
