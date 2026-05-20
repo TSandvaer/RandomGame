@@ -350,6 +350,41 @@ The fix patterns:
 
 Future bugs in this family: check the `_die` chain (death-path adds), all per-tick spawn sites (spawn-path adds), and any new Area2D class that's instantiated outside `_ready` of the parent scene. Memory rule: `godot-physics-flush-area2d-rule.md`.
 
+### Scope clarification — what this rule does NOT cover
+
+The physics-flush rule is scoped to **Area2D state mutations and `CollisionShape2D`-on-`PhysicsBody2D`
+adds** executed from inside a physics-callback chain (`body_entered`, `area_entered`, or any
+signal handler rooted in one). It has been over-applied as "all `_ready` work must be deferred."
+That is wrong, and unnecessary deferral produces slower, harder-to-read code with no safety benefit.
+
+**Safe in `_ready` without deferral:**
+
+- `signal.connect(callable)` — wiring signals in `_ready` does not touch the physics server;
+  it is always safe. Deferring a `connect()` call introduces a window where the signal can fire
+  before the handler is attached.
+- `Label.text = "..."`, `modulate = Color(...)`, `z_index = N` — visual-property writes go
+  to the rendering server, not the physics server. Safe at any point in `_ready`.
+- `AudioStreamPlayer.play()`, bus assignments, volume tweens — audio server, not physics server.
+  Safe in `_ready` (subject to the HTML5 AudioContext gesture gate in `audio-architecture.md`).
+
+**Still requires deferral:**
+
+- `Area2D` `add_child`, `monitoring = true/false`, `monitorable = true/false`,
+  `collision_layer/mask` writes — when called from a physics-callback chain.
+- `CollisionShape2D.disabled = true/false` on any `PhysicsBody2D` — same flush window risk.
+- Any call-chain rooted in `body_entered` / `area_entered` that reaches physics-state mutation
+  (even indirectly via signals) — use `CONNECT_DEFERRED` on the flush-rooted signal.
+
+**Why `_ready` is safe specifically:** Godot defers `_ready` calls to after the `add_child`
+call returns — i.e., `_ready` runs at end-of-frame, **outside** `flush_queries()`. A
+`signal.connect()` in `_ready` is not a physics-server mutation at all; it writes to the
+signal's connection list in GDScript memory, which has no flush-query guard. There is no
+panic path here.
+
+The encapsulated-`_init` pattern (Area2D enters tree with monitoring off, re-enables in
+`_ready`) is specifically for Area2D nodes spawned from physics-tick paths. It is not a
+general `_ready`-work deferral idiom.
+
 **`Stratum1Room01._build()` death-reload path — audited SAFE (ticket `86c9u2392`).** PR #191's follow-up flagged a suspected latent instance: `Stratum1Room01._build()` runs synchronously from `_ready()` and splices mob `CharacterBody2D`+`CollisionShape2D` subtrees into the live tree via `add_child(_assembly.root)` — the same unsafe shape the `MultiMobRoom` fix addressed. The concern was the **player-death reload path**: `Player.take_damage` (from an enemy Hitbox `body_entered`, inside a physics flush) → `Player._die` → `player_died.emit` → `Main._on_player_died` → `apply_death_rule` → `_load_room_at_index(0)` → `Stratum1Room01._ready` → `_build()`. The trace audit **disproved the threat**: `Main._on_player_died` (`scenes/Main.gd`) does `call_deferred("apply_death_rule")` — the entire reload chain (`apply_death_rule` → `_load_room_at_index(0)` → `Stratum1Room01._ready` → `_build()`) runs at end-of-frame, **outside** `flush_queries()`. The `player_died` signal connection itself is synchronous (`scenes/Main.gd` `_spawn_player`), but the handler immediately defers, so the splice never lands inside the flush. Every other path that reaches `_load_room_at_index(0)` is also flush-safe: `Main._ready` boot (no flush), `load_room_index()` (test-only), and `_on_descend_restart_run` (driven by the `DescendScreen.restart_run` UI-button signal, not a physics callback). `Stratum1Room01` also owns **no Area2D fixtures of its own** (no `RoomGate`, no `HealingFountain`) — `_build()` only adds mob bodies — so even a hypothetical future flush-rooted entry would be the milder `CollisionShape2D`-on-`CharacterBody2D` class, not Area2D-monitoring. **No code change required**; the death-reload deferral in `_on_player_died` is the load-bearing guard and must be preserved — if a future refactor makes `_on_player_died` call `apply_death_rule` synchronously, the Room 01 mob-freeze becomes reachable.
 
 ## Engine.time_scale interactions — harness assumption-vs-game-clock rule (load-bearing for Playwright)
@@ -373,6 +408,8 @@ Future bugs in this family: check the `_die` chain (death-path adds), all per-ti
 **Pattern check for new harness specs:** any spec that drives the player past the L1→L2 XP threshold (100 XP) without explicit panel dismissal will hit this. M3+ specs that drive late-game level-ups will hit the L2→L3 (282 XP), L3→L4 (519 XP), etc. boundaries identically. **The Escape-press idiom from this fix should generalise to every post-clear seam in the harness.** If the AC4 XP economy is rebalanced, the Room boundary where this surfaces will shift but the bug class remains.
 
 **Regression pin (game-side, defensive):** `tests/test_room_gate.gd::test_3mob_concurrent_death_with_death_wait_unlocks` — pins that the gate unlocks correctly when 3 mobs die concurrently AND `test_skip_death_wait = false` (i.e. the production death-wait Timer path runs). This wasn't the actual failure mode of ticket 86c9u6uhg, but the dispatch asked for a 3-mob-concurrent-death regression pin and this is it; future "did Drew break the gate?" investigations have a fast game-side answer ahead of any release-build characterisation.
+
+**M3 T11 — `TimeScaleDirector` is now the canonical owner of `Engine.time_scale`.** As of PR #285 (M3 Wave 1), a stacked-request autoload replaces ad-hoc direct writes for combat-feel effects (hit-pause T2, phase-transition slow-mo T3). **`InventoryPanel` and `StatAllocationPanel` remain as deferred migration targets** — they are still direct writers until a second non-director writer lands (the defined migration trigger). During this migration window, the wall-clock vs game-clock divergence hazard described above still applies in full: Playwright specs must continue using the Escape-press idiom to dismiss slow-mo panels before wall-clock-sensitive assertions. See [`.claude/docs/time-scale-director.md`](.claude/docs/time-scale-director.md) for the full stacked-request contract, priority-overlay model, `freeze()` sugar, and `ignore_time_scale=true` timer requirement.
 
 ## CharacterBody2D motion_mode rule (load-bearing for top-down 2D)
 
@@ -681,6 +718,31 @@ Reviewers should ding PRs that use raw `latestPos` without bounds.
 - **Universal console-warning zero-gate** (PR #217, `tests/playwright/fixtures/test-base.ts`) catches the related class of latent `USER WARNING:` / `USER ERROR:` lines that previously slipped past as console-noise.
 
 A future reader looking at "AC4 green ✓" should NOT conclude that mob behavior, mob-state-machine completeness, or visual fidelity is end-to-end validated. The harness validates the player's prescribed sequence; the rest is soak.
+
+## Boss short-name resolution — `display_name` first-word pattern
+
+**Context:** `BossDefeatedTitleCard` (`scripts/ui/BossDefeatedTitleCard.gd`) renders `"The %s falls."` using a single token derived from the boss's full `MobDef.display_name`. The same pattern applies to any future copy surface that needs a natural-language boss reference (stratum-clear cards, loot-log entries, death summary, etc.).
+
+**Rule:** extract the first word of `MobDef.display_name`; prefix with `"The "`. This produces correct output for every M1–M3 boss as currently named:
+
+| `MobDef.display_name` | Token | Rendered copy |
+|---|---|---|
+| `"Warden of the Outer Cloister"` | `"Warden"` | `"The Warden falls."` |
+| `"Stoker of Vault Forge"` (future) | `"Stoker"` | `"The Stoker falls."` |
+| `"Vorgath"` (single-word) | `"Vorgath"` | `"The Vorgath falls."` |
+
+**Fallback:** if `display_name` is empty or `mob_def` is null, fall back to the constant `FALLBACK_BOSS_NAME = "Warden"`. The fallback name is locked at authoring time per `BossDefeatedTitleCard` — do NOT change it without an Uma sign-off on copy tone.
+
+**Override hook (deferred):** bosses with `display_name` that doesn't follow the first-word pattern can expose a `short_defeat_name: String` field on `MobDef`. `BossDefeatedTitleCard.resolve_short_name()` will prefer it over the first-word extraction when non-empty. This override is NOT in T4 scope; it lands when an M3+ boss name breaks the pattern.
+
+**Tolerant lookup pattern in `resolve_short_name(boss)`:**
+1. Check `boss.mob_def.display_name` (typed `Stratum1Boss` path).
+2. Fall back to `boss.display_name` directly (test-stub path — avoids requiring full mob plumbing in unit tests).
+3. On any empty/null result, return `FALLBACK_BOSS_NAME`.
+
+This two-path duck-type lookup is the canonical pattern for test-friendly boss-property access in this codebase.
+
+**Non-ASCII caution:** if `display_name` ever contains non-ASCII characters, the title-card `Label` will hit the Godot 4.3 `gl_compatibility` default-font tofu trap. Import a custom `.ttf` covering the codepoint before shipping non-ASCII boss names.
 
 ## Cross-references
 

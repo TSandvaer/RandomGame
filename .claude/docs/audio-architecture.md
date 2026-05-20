@@ -143,6 +143,37 @@ if ad != null and ad.has_method("crossfade_to_boss_stratum2"):
 The crossfade duration (600 ms) matches `audio-direction.md §3 Ducking
 rule 4` for boss-intro Beat 5.
 
+### S1 boss-room — no-current-BGM case (pure fade-in, not a swap)
+
+`Stratum1BossRoom` enters **silent** — no stratum BGM is playing on the BGM bus
+before the entry sequence fires. This is a structural asymmetry from the S2
+boss-room case, where ambient/stratum BGM is active and the crossfade is a
+true swap (fade out current → fade in boss BGM simultaneously).
+
+For S1 the crossfade implementation must treat the "no current BGM" case as a
+**pure fade-in**: bring the boss BGM up from silence without attempting to fade
+out a non-playing stream. Failing to handle this correctly produces one of two
+silent bugs:
+
+- If the code tries to fade FROM the idle `BgmPlayer` (volume = -inf), boss BGM
+  plays at zero volume and is inaudible.
+- If the code short-circuits entirely when no stream is playing, the fade is
+  skipped and boss BGM starts abruptly at full volume.
+
+**Implementation guard:** before starting any crossfade, check whether the
+current `BgmPlayer` is actually playing (`_bgm_player.playing`). If not,
+skip the fade-out half and start only the fade-in on `BgmCrossfadePlayer`.
+
+| Scenario | `BgmPlayer.playing` on entry | Correct behaviour |
+|---|---|---|
+| S2 boss room (nominal) | `true` — stratum BGM active | Crossfade: fade OUT running stream, fade IN boss BGM |
+| S1 boss room (silent entry) | `false` — no BGM active | Pure fade-in: skip the fade-out step; start `BgmCrossfadePlayer` at volume 0 and tween to nominal |
+
+**Implementation note (PR #288 — in QA at time of writing):** `AudioDirector.crossfade_to_boss_bgm()`
+gates the fade-out branch on `_bgm_player.playing` before starting the tween. If `_bgm_player`
+is not playing, it skips straight to the fade-in branch on `_bgm_crossfade_player`. This
+is the pattern to follow for any future `crossfade_to_boss_stratumN()` variant.
+
 ### Player death (Beat A)
 
 `Main._on_player_died()` calls `stop_all_music(200)` synchronously so
@@ -200,6 +231,23 @@ Verification protocol:
    → S2 BGM should kick in).
 7. **Audibly verify** the cue plays. The browser console excerpt + the
    audible confirmation are both required in the PR's Self-Test Report.
+
+## Tonal pattern — silence as punctuation
+
+**Rule:** when a UI moment must land hard (defeat title card, stratum-clear card, narrative beat), **the absence of audio IS the cue** — do not add a sting, chime, or bell under the card. Adding audio under a silence-anchored moment diffuses the tonal weight; the preceding gameplay audio (e.g. the F2 boss horn) is the audio event, and the silence that follows is the punctuation.
+
+> Uma's formulation (M3-T4 brief, §3): "The F2 horn IS the audio. The silence after IS the punctuation."
+
+**As-built example:** `BossDefeatedTitleCard` (`scripts/ui/BossDefeatedTitleCard.gd`) fires no audio. The boss horn (sibling ticket T16) completes at approximately T+2.1 of the boss-died timeline; the card fades in at T+1.2 and the horn tails out into silence during the hold phase. The 0.8 s hold is audibly empty by design.
+
+**Negative spec for any future "moment-lands-here" surface:**
+- No bell / chime / sting under the card.
+- No UI cue reuse (`sfx-ui-tab-open` is a panel cue, not a defeat cue).
+- No `sfx-ember-rise` reuse — ember-rise is the player's-flame-forward cue (descend, level-up); the boss-death card is about the boss being *gone*, not the player ascending. Wrong tonal register.
+
+**Future application:** any stratum-clear card, intro sting, or narrative-beat UI surface should default to *no audio under the card* and require an explicit Uma decision to add audio. The emotional beat lives in the contrast with the preceding fight audio, not in a new cue.
+
+**Exception:** a cue is acceptable under the card only if Uma explicitly identifies it as additive (e.g. a very low ambient swell that reinforces silence rather than filling it). This is a creative call, not a technical one; default is silence.
 
 ## `[combat-trace]` audio observability — Playwright QA pattern
 

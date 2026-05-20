@@ -157,6 +157,21 @@ Per memory rule `html5-visual-verification-gate.md`: any PR touching Tween / mod
 
 Platform-agnostic fixes (e.g. PR #140's mob hit-flash Sprite color tween, where the tween targets `Sprite.color` which is an engine-level draw property identical across all renderers) are exempt from this gate when the change is mechanically deterministic — but the burden is on the author to demonstrate why the visual gate doesn't apply, not to assert exemption by primitive-class.
 
+### Visual-verification escape clause — honest-disclose + Sponsor-soak routing
+
+When **both the PR author and the reviewing agent** cannot launch a browser interactively in their environments (VM / container / headless agent context), the gate has an established escape-clause workflow rather than a blanket block:
+
+1. **Author honest-discloses** in the Self-Test Report that HTML5 visual verification was not performed in the author environment, and lists specific visual probe targets (e.g. "confirm modulate fade-in over darkened room", "confirm HDR-clamp compliance — no channel > 1.0", "confirm tween pauses during hit-pause freeze").
+2. **Reviewer concurs** in the QA review comment and echoes the probe targets.
+3. **Sponsor-soak is designated the visual verification of record** — the PR is not blocked, but the Sponsor handoff message must call out the specific probe targets explicitly.
+4. The Self-Test Report and QA comment together constitute the paper trail; neither party self-claims exemption — they document the deferral and route it.
+
+**Precedent PRs:** this escape clause has been applied on PRs #285 (Engine.time_scale smoke), #288 (audio HTML5 audible probes), and #289 (title card HDR-clamp / tween / modulate). It is now a project convention, not a one-off.
+
+**What this does NOT permit:** silent omission of the gate, self-claiming "renderer-safe primitives" exemption without documentation, or routing to Sponsor without the explicit probe target list. The probes are load-bearing — without them, Sponsor's soak is unguided and the visual bugs that drove the original gate (PR #115/#122) can slip through again.
+
+**When this escape clause does NOT apply:** if the change touches Polygon2D, CPUParticles2D, or Area2D-state mutations — the failure modes for these are empirically demonstrated (PR #115/#122) and subtle enough that renderer-safety analysis is insufficient even as pre-work. Those require a screenshot from someone who can run Godot locally (Sponsor or a local build) before merge, not after.
+
 ## Release-build trigger and artifact handoff
 
 ```bash
