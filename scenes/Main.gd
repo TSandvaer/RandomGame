@@ -456,6 +456,21 @@ func _load_room_at_index(index: int) -> void:
 	# Push pickups into the room (loot spawner re-targets so dropped pickups
 	# get freed when the room frees).
 	_loot_spawner.set_parent_for_pickups(room)
+	# M3-T2-W2-T10 — Stratum-1 ambient bed. For every non-boss S1 room
+	# (indices 0..7) start (or idempotently keep playing) the S1 ambient.
+	# The boss room (index 8) explicitly does NOT start ambient — the
+	# `Stratum1BossRoom.entry_sequence_started` handler stops S1 ambient as
+	# part of BI-03 (boss-room entry sequence Beat 2). Routing the start
+	# from this single `_load_room_at_index` site means room-cycle
+	# (R1→R2→R1) hits the idempotence guard cleanly — no audible re-seed.
+	# Wiring rationale: Uma's brief §"Trigger wiring" calls for the cue to
+	# fire from any S1 room's _ready, but routing through Main lets the
+	# idempotence guard see the whole room-cycle without each room script
+	# having to know about audio.
+	if index != BOSS_ROOM_INDEX:
+		var ad: Node = _audio_director()
+		if ad != null and ad.has_method("play_stratum1_ambient"):
+			ad.play_stratum1_ambient()
 	# Update HUD room counter.
 	_refresh_room_label()
 	room_changed.emit(room, index)
@@ -1063,6 +1078,20 @@ func _on_boss_defeated(boss: Stratum1Boss, death_position: Vector2) -> void:
 	if card == null:
 		return
 	add_child(card)
+	# M3-T2-W2-T10 — wire F4 ambient resume to the card-dismissed signal so
+	# the bed comes back at 60% AFTER the silence-as-punctuation hold (per
+	# `.claude/docs/audio-architecture.md` § "Tonal pattern — silence as
+	# punctuation" + Uma's s1-ambient.md §"F4"). Subscribed BEFORE
+	# `show_for` so the tween chain inside the card can fire `dismissed`
+	# without the resume missing it. If the AudioDirector autoload is
+	# absent (test surface), the connect is skipped silently.
+	var ad: Node = _audio_director()
+	if ad != null and ad.has_method("resume_stratum1_ambient_at_60_percent"):
+		# Wrap in lambda so the default-arg form is called (Callable.connect
+		# strict-arg-counts means the raw Callable would expect zero args; a
+		# zero-arg lambda forwards into the default-fade method cleanly).
+		card.title_card_dismissed.connect(func() -> void:
+			ad.resume_stratum1_ambient_at_60_percent())
 	card.show_for(boss, death_position)
 
 
@@ -1132,9 +1161,18 @@ func _on_descend_restart_run() -> void:
 	# the HTML5 AudioContext (see AudioDirector.gd § HTML5 audio-playback
 	# gate), so this is the safe first-cue spot regardless of browser.
 	var audio_director: Node = _audio_director()
+	# M3-T2-W2-T10 ordering note: `_load_room_at_index(0)` now triggers
+	# `play_stratum1_ambient()` because room 0 is a non-boss S1 room.
+	# Since the descend semantically reaches Stratum 2 (the M1 placeholder
+	# reload is the wiring shortcut, not the design), the S2 entry trigger
+	# must fire AFTER the room-load so the S2 ambient overwrites the S1
+	# ambient state that _load_room_at_index set. Once a real S2 scene
+	# transition lands (post-M2 W3) this re-ordering becomes unnecessary —
+	# the post-descend scene is a stratum-2 room which `_load_room_at_index`
+	# would correctly NOT trigger S1 ambient for.
+	_load_room_at_index(0)
 	if audio_director != null and audio_director.has_method("play_stratum2_entry"):
 		audio_director.play_stratum2_entry()
-	_load_room_at_index(0)
 	_persist_to_save()
 
 

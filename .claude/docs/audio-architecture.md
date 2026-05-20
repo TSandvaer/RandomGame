@@ -84,6 +84,21 @@ AudioDirector.play_stratum2_entry()
 # Honors Uma's UNIQUE not-cross-stratum-reuse decision (DECISIONS.md 2026-05-15).
 AudioDirector.crossfade_to_boss_stratum2(fade_ms := 600)
 
+# Boss room (S1) — crossfade BGM to mus-boss-stratum1.ogg over 600 ms.
+# Same role-swap pattern as the S2 variant.
+AudioDirector.crossfade_to_boss_stratum1(fade_ms := 600)
+
+# S1 ambient — start/keep playing the room bed. Idempotent across room-cycle.
+# Default fade 800 ms ease-in-out quadratic. target_gain_db = 0.0 nominal.
+AudioDirector.play_stratum1_ambient(fade_in_ms := 800, target_gain_db := 0.0)
+
+# S1 ambient — fade out on boss-room entry (BI-03). 600 ms ease-out cubic.
+AudioDirector.stop_stratum1_ambient(fade_out_ms := 600)
+
+# S1 ambient — F4 post-defeat resume sugar. Wraps play_stratum1_ambient with
+# the -4.4 dB (60% nominal) target. Caller doesn't compute dB math.
+AudioDirector.resume_stratum1_ambient_at_60_percent(fade_in_ms := 800)
+
 # Global stop — used by player-death (Beat A) and "leave to title" paths.
 AudioDirector.stop_all_music(fade_out_ms := 600)
 ```
@@ -248,6 +263,42 @@ Verification protocol:
 **Future application:** any stratum-clear card, intro sting, or narrative-beat UI surface should default to *no audio under the card* and require an explicit Uma decision to add audio. The emotional beat lives in the contrast with the preceding fight audio, not in a new cue.
 
 **Exception:** a cue is acceptable under the card only if Uma explicitly identifies it as additive (e.g. a very low ambient swell that reinforces silence rather than filling it). This is a creative call, not a technical one; default is silence.
+
+## Tonal pattern — cross-stratum distinct ambient (project-level policy)
+
+**Rule:** every stratum's BGM and ambient bed is **distinct content** from every other stratum's, NOT a tone-match cousin. Same dark-folk-chamber palette discipline (per `audio-direction.md §1`), DIFFERENT composition / texture / pacing. The contrast between strata is load-bearing for the descent narrative — if S1 ambient mimics S2's pressure texture, the S1→S2 descent loses its tonal beat.
+
+**Decision shape:** the same project-level rule as boss music. The boss-music UNIQUE decision (DECISIONS.md 2026-05-15) established that S1 boss music is NOT a remix of S2 boss music — different composition, separate `compose_*` script, distinct identity. The ambient parallel (S1 ambient = "stone cloister settled into silence" / S2 ambient = "Cinder Vaults active pressure") follows the same shape. **Stratum identity > cross-stratum economy** is the underlying principle: the descent narrative is the asset, and the inter-stratum contrast IS the gameplay.
+
+**Empirical anchors:**
+- **S2 ambient** (`amb-stratum2-room.ogg`, PR #210): steam-hiss + sub-bass vein-pulse + scree-rustle — active pressure, mechanically alive room.
+- **S1 ambient** (`amb-stratum1-room.ogg`, PR T10 / `86c9wjyke`): soft stone reverb tail + irregular distant drips + faint sub-300 Hz wind — post-active sparsity, a cloister settled into silence.
+- **S2 boss music** (`mus-boss-stratum2.ogg`, PR #210): minor-third cello tension (D2 + F2) + driving 80 BPM frame drum.
+- **S1 boss music** (`mus-boss-stratum1.ogg`, PR #288 T1): perfect-fifth cello (D2 + A2) + steadier 72 BPM ritual drum.
+
+**Implementation tell:** every stratum's audio gets its own `compose_*.py` placeholder script. If a future PR proposes reusing one stratum's OGG for another (e.g. "amb-stratum1-room.ogg = amb-stratum2-room.ogg with a low-pass filter"), reject under this policy — same shape as the boss-music UNIQUE precedent.
+
+**Future application:** any new stratum (S3+) ships its own distinct BGM + ambient bed. The cost (one more `compose_*.py` + asset) is small; the value (preserving the descent narrative) is large.
+
+## Stratum-1 ambient — wiring + curves
+
+The S1 ambient bed is wired in three places, all gated on the **same Uma-locked curves** for tonal consistency:
+
+| Trigger | API call | Duration | Curve | Target dB |
+|---|---|---|---|---|
+| Room load (non-boss) | `play_stratum1_ambient()` | 800 ms | ease-in-out quadratic | 0 dB (full) |
+| Boss-room entry (BI-03) | `stop_stratum1_ambient()` | 600 ms | **ease-out cubic** | -80 (silence) |
+| Boss defeated (F4) | `resume_stratum1_ambient_at_60_percent()` | 800 ms | ease-in-out quadratic | -4.4 dB (60%) |
+
+**Curve discipline (Uma's brief §"Cross-fade shapes"):** the entry fade-out is **ease-out cubic** (front-loaded "dive") while the resume fade-in is **ease-in-out quadratic** (gentle, unhurried). The asymmetry IS the tonal beat — entry is "the room closing around the player"; resume is "the room settling back around them". A linear fade on either rejects under Uma's direction.
+
+**Wiring rationale (T10):**
+
+- **Room-load callback** (`Main._load_room_at_index`, index 0..7): Single fan-out site, hits idempotence on every room-cycle (R1→R2→R1 no-op). Index 8 (boss room) is explicitly skipped — the entry-sequence handler is the only ambient-control path inside the boss room.
+- **`Stratum1BossRoom.entry_sequence_started` handler** (`_on_entry_sequence_started_audio`): Fires at Beat 2 (T+0 of the 1.8 s entry sequence). The ambient duck PRECEDES the BGM kick by ~1.2 s — BI-03 (ambient-off) is Beat 2, BI-05 (boss-BGM-on) is Beat 5. Two different beats; same `Stratum1BossRoom` signal pair (`started` / `completed`) carries both.
+- **`BossDefeatedTitleCard.title_card_dismissed` handler** (wired in `Main._on_boss_defeated`): Fires AFTER the silence-as-punctuation hold completes, so the F4 resume doesn't land under the card. Uma's brief §"F4 / Coordination with title card" locks the post-card timing.
+
+**Cold-boot first-room HTML5 caveat:** on a fresh-load run the player loads directly into Room01 with no prior gesture. `play_stratum1_ambient` runs from `_load_room_at_index` (during boot `_ready`), which is pre-gesture — the HTML5 AudioContext is still locked, so `.play()` succeeds silently with no audible output. The bed becomes audible on the player's first input (WASD / mouse), which unlocks the context retroactively. This is the same gate every other audio cue inherits per § HTML5 audio-playback gate; no engine-side `AudioContext.resume()` hook is needed because the playing-but-silent state self-heals on first input.
 
 ## `[combat-trace]` audio observability — Playwright QA pattern
 

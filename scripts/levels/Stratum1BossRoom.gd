@@ -476,7 +476,7 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 		df.combat_trace(tag, msg)
 
 
-# ---- M3-T2-W1-T1 audio wiring -----------------------------------------
+# ---- M3-T2-W1-T1 + M3-T2-W2-T10 audio wiring -------------------------
 
 ## Wire `entry_sequence_completed` to the BGM crossfade so the boss-room
 ## music kicks in at T+1.8 s post-trigger (Uma `boss-intro.md` Beat 5).
@@ -484,9 +484,20 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 ## pattern used in `Stratum1Boss._wire_audio_cues`. Production wires once
 ## from `_ready`; tests can call `_wire_audio_cues()` repeatedly without
 ## stacking handlers.
+##
+## **M3-T2-W2-T10 (`86c9wjyke`):** also wire `entry_sequence_started` →
+## `AudioDirector.stop_stratum1_ambient(600)` so the S1 ambient bed fades
+## to silence with the 600 ms ease-out cubic curve Uma's brief
+## (`team/uma-ux/s1-ambient.md §"BI-03 — fade-out on boss-room entry"`)
+## locks. Subscribing on `entry_sequence_started` (not `_completed`) is
+## intentional — BI-03 is Beat 2 (T+0.6 hard-mute), BI-05 (boss BGM
+## crossfade) is Beat 5 (T+1.8). Two different beats; the ambient duck
+## must precede the BGM kick, not coincide.
 func _wire_audio_cues() -> void:
 	if not entry_sequence_completed.is_connected(_on_entry_sequence_completed_audio):
 		entry_sequence_completed.connect(_on_entry_sequence_completed_audio)
+	if not entry_sequence_started.is_connected(_on_entry_sequence_started_audio):
+		entry_sequence_started.connect(_on_entry_sequence_started_audio)
 
 
 ## Handler — fires when the 1.8 s entry sequence elapses. Crossfades the
@@ -509,6 +520,19 @@ func _on_entry_sequence_completed_audio() -> void:
 	if ad == null or not ad.has_method("crossfade_to_boss_stratum1"):
 		return
 	ad.crossfade_to_boss_stratum1()
+
+
+## M3-T2-W2-T10 — BI-03 handler. Fires on `entry_sequence_started`
+## (Beat 2 of Uma's boss-intro spec). Hard-mutes the S1 ambient bed
+## over 600 ms with the ease-out cubic curve.
+##
+## Soft no-op when AudioDirector is absent (bare-test surface) — mirrors
+## the `_on_entry_sequence_completed_audio` resolver pattern.
+func _on_entry_sequence_started_audio() -> void:
+	var ad: Node = _resolve_audio_director()
+	if ad == null or not ad.has_method("stop_stratum1_ambient"):
+		return
+	ad.stop_stratum1_ambient()
 
 
 func _resolve_audio_director() -> Node:
