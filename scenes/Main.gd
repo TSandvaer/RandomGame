@@ -433,6 +433,21 @@ func _load_room_at_index(index: int) -> void:
 	# Push pickups into the room (loot spawner re-targets so dropped pickups
 	# get freed when the room frees).
 	_loot_spawner.set_parent_for_pickups(room)
+	# M3-T2-W2-T10 — Stratum-1 ambient bed. For every non-boss S1 room
+	# (indices 0..7) start (or idempotently keep playing) the S1 ambient.
+	# The boss room (index 8) explicitly does NOT start ambient — the
+	# `Stratum1BossRoom.entry_sequence_started` handler stops S1 ambient as
+	# part of BI-03 (boss-room entry sequence Beat 2). Routing the start
+	# from this single `_load_room_at_index` site means room-cycle
+	# (R1→R2→R1) hits the idempotence guard cleanly — no audible re-seed.
+	# Wiring rationale: Uma's brief §"Trigger wiring" calls for the cue to
+	# fire from any S1 room's _ready, but routing through Main lets the
+	# idempotence guard see the whole room-cycle without each room script
+	# having to know about audio.
+	if index != BOSS_ROOM_INDEX:
+		var ad: Node = _audio_director()
+		if ad != null and ad.has_method("play_stratum1_ambient"):
+			ad.play_stratum1_ambient()
 	# Update HUD room counter.
 	_refresh_room_label()
 	room_changed.emit(room, index)
@@ -1022,6 +1037,20 @@ func _on_boss_defeated(boss: Stratum1Boss, death_position: Vector2) -> void:
 	if card == null:
 		return
 	add_child(card)
+	# M3-T2-W2-T10 — wire F4 ambient resume to the card-dismissed signal so
+	# the bed comes back at 60% AFTER the silence-as-punctuation hold (per
+	# `.claude/docs/audio-architecture.md` § "Tonal pattern — silence as
+	# punctuation" + Uma's s1-ambient.md §"F4"). Subscribed BEFORE
+	# `show_for` so the tween chain inside the card can fire `dismissed`
+	# without the resume missing it. If the AudioDirector autoload is
+	# absent (test surface), the connect is skipped silently.
+	var ad: Node = _audio_director()
+	if ad != null and ad.has_method("resume_stratum1_ambient_at_60_percent"):
+		# Wrap in lambda so the default-arg form is called (Callable.connect
+		# strict-arg-counts means the raw Callable would expect zero args; a
+		# zero-arg lambda forwards into the default-fade method cleanly).
+		card.title_card_dismissed.connect(func() -> void:
+			ad.resume_stratum1_ambient_at_60_percent())
 	card.show_for(boss, death_position)
 
 

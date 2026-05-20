@@ -40,6 +40,10 @@ extends Node
 ##   - `tests/test_audio_bus_layout.gd` — bus existence + dB values
 ##   - `tests/integration/test_s2_audio_triggers.gd` — S2 entry cues fire on
 ##     the right buses with the right streams
+##   - `tests/integration/test_s1_boss_audio_triggers.gd` — S1 boss BGM
+##     crossfade on entry_sequence_completed + UNIQUE decision pin
+##   - `tests/integration/test_s1_ambient.gd` — S1 ambient bed play / stop /
+##     resume-at-60% + BI-03 wiring + Main room-load wiring (M3-T2-W2-T10)
 ##
 ## **Decision honored:** Uma's UNIQUE (not cross-stratum-reuse) boss-music
 ## decision is preserved here — `crossfade_to_boss_stratum2()` loads
@@ -62,6 +66,33 @@ const STREAM_PATH_S2_AMBIENT: String = "res://audio/ambient/stratum2/amb-stratum
 ## STREAM_PATH_S2_BOSS — same dark-folk-chamber palette but distinct
 ## composition. See `audio/_src/composer/compose_stratum1.py`.
 const STREAM_PATH_S1_BOSS: String = "res://audio/music/stratum1/mus-boss-stratum1.ogg"
+## M3-T2-W2-T10 — S1 ambient bed. Uma's binding direction in
+## `team/uma-ux/s1-ambient.md`: distinct-from-S2 stratum identity ("stone
+## cloister settled into silence"), NOT a tone-match of S2's active-pressure
+## texture. The cross-stratum-distinct policy mirrors the boss-music UNIQUE
+## decision (DECISIONS.md 2026-05-15).
+const STREAM_PATH_S1_AMBIENT: String = "res://audio/ambient/stratum1/amb-stratum1-room.ogg"
+
+## M3-T2-W2-T10 — F4 post-defeat resume target gain. Uma's brief §"Volume /
+## loudness targets" locks 60% of nominal = -4.4 dB on the AmbientPlayer
+## (additional attenuation on top of the Ambient bus -18 dB). The room
+## feels emptier after the boss falls; the audio mix follows the diegesis.
+const S1_AMBIENT_RESUME_DB: float = -4.4
+
+## M3-T2-W2-T10 — fade-out duration when the boss-room entry sequence
+## starts (BI-03). Uma's brief locks 600 ms ease-out cubic.
+const S1_AMBIENT_ENTRY_FADE_OUT_MS: int = 600
+
+## M3-T2-W2-T10 — fade-in duration when the boss-defeated card dismisses
+## (F4). Uma's brief locks 800 ms ease-in-out quadratic.
+const S1_AMBIENT_RESUME_FADE_IN_MS: int = 800
+
+## M3-T2-W2-T10 — fallback delay between `boss_defeated` and resume kick
+## when no title-card-dismissed signal is wired. Uma's brief §"F4 — fade-in
+## to 60% on `boss_defeated`": "T+2.4 s onward in the boss-defeated
+## cinematic". The fallback uses `ignore_time_scale=true` so a still-active
+## boss-defeat freeze (T2/T11) does not delay the timer fire.
+const S1_AMBIENT_RESUME_FALLBACK_DELAY_S: float = 2.4
 
 ## M3W-7 — SFX cue id → resource path map. Cue ids are stable StringName
 ## constants; consumers (Player, Grunt, Charger, Shooter, Stratum1Boss) call
@@ -135,12 +166,20 @@ var _bgm_fade_tween: Tween = null
 var _bgm_crossfade_tween: Tween = null
 var _ambient_fade_tween: Tween = null
 
+# M3-T2-W2-T10 — most-recent ambient fade target dB. Captured every time
+# `_play_ambient_with_curve` / `stop_stratum1_ambient` kicks a tween so
+# `complete_pending_fades_for_test` can snap the player to the intended
+# end-state without guessing FULL_DB. -INF means "no tween in flight";
+# tests / production read via `get_ambient_target_db_for_test()`.
+var _ambient_target_db: float = SILENCE_DB
+
 # Cached streams. Loaded once on first use; the stream object is shared
 # between cues since `AudioStreamPlayer` doesn't mutate it.
 var _stream_s2_bgm: AudioStream = null
 var _stream_s2_boss: AudioStream = null
 var _stream_s2_ambient: AudioStream = null
 var _stream_s1_boss: AudioStream = null  # M3-T2-W1-T1
+var _stream_s1_ambient: AudioStream = null  # M3-T2-W2-T10
 
 # M3W-7 SFX pool — N AudioStreamPlayers rotating round-robin so concurrent
 # cues don't truncate each other. Per-cue streams are cached in `_sfx_streams`
@@ -257,6 +296,123 @@ func crossfade_to_boss_stratum1(fade_ms: int = DEFAULT_CROSSFADE_MS) -> void:
 		"stream=%s fade_ms=%d" % [STREAM_PATH_S1_BOSS, fade_ms])
 
 
+## M3-T2-W2-T10 — start S1 ambient bed with a fade-in on the Ambient bus.
+## Idempotent: if `amb-stratum1-room.ogg` is already playing at the requested
+## gain (within 0.05 dB), this is a no-op — won't re-seed loop position or
+## glitch the bed. Production callers (room-load handler in Main.gd) hit the
+## idempotence guard on every non-boss S1 room load, by design.
+##
+## **fade_in_ms** defaults to 800 ms (matches Uma's brief §"Cross-fade shapes"
+## F4 resume — also a reasonable on-boot fade-in for cold-boot first-room).
+## **target_gain_db** defaults to 0.0 (nominal). The F4 resume helper passes
+## `S1_AMBIENT_RESUME_DB` (-4.4 dB = 60% nominal). Callers that want full
+## nominal pass 0.0; the API surface lets a future tuning pass change the
+## "full" target without touching every call site.
+##
+## Curve: ease-in-out quadratic (Uma's brief §"F4" — gentle, reflective).
+## Used for both the cold-boot first-room fade-in AND the F4 post-defeat
+## resume. The entry fade-OUT (BI-03) uses ease-out cubic and is in
+## `stop_stratum1_ambient`, not here.
+##
+## **HTML5 audio-playback gate** (see `audio-architecture.md`): the cold-boot
+## first-room load happens BEFORE the player's first input — so on HTML5 the
+## AudioContext is still locked and `.play()` will silently fail. This is
+## not a bug at the AudioDirector layer; the caller (Main.gd) is responsible
+## for routing the first-cue trigger to a post-gesture event. See the
+## "Trigger wiring" subsection in Uma's brief: production wires this to the
+## room-load handler, which is reached AFTER the DescendScreen click (a
+## gesture) on a fresh run, OR after first WASD/mouse input on a cold-boot
+## new game. Per audio-direction.md, the deferred-until-gesture pattern is
+## the wider M1+ contract — no engine-side AudioContext.resume hook yet.
+func play_stratum1_ambient(fade_in_ms: int = S1_AMBIENT_RESUME_FADE_IN_MS,
+		target_gain_db: float = FULL_DB) -> void:
+	# Idempotence guard: same-stream, playing, AND the most-recent tween was
+	# aimed at the same target gain. Compares against `_ambient_target_db`
+	# (intended target) NOT `volume_db` (current mid-tween value) — that's
+	# the difference between "the bed is going to end up at target X" and
+	# "the bed happens to be at X RIGHT NOW mid-fade". Using the target lets
+	# a rapid play+play sequence with the same args no-op cleanly even mid-
+	# fade-in.
+	if _last_ambient_path == STREAM_PATH_S1_AMBIENT and _ambient_player != null \
+			and _ambient_player.playing \
+			and abs(_ambient_target_db - target_gain_db) < 0.05:
+		return
+	var stream: AudioStream = _get_stream_s1_ambient()
+	if stream == null:
+		return
+	_play_ambient_with_curve(_ambient_player, stream, fade_in_ms, target_gain_db,
+		Tween.TRANS_QUAD, Tween.EASE_IN_OUT)
+	_last_ambient_path = STREAM_PATH_S1_AMBIENT
+	_combat_trace("AudioDirector.play_stratum1_ambient",
+		"stream=%s fade_in_ms=%d target_db=%.2f" % [
+			STREAM_PATH_S1_AMBIENT, fade_in_ms, target_gain_db])
+
+
+## M3-T2-W2-T10 — fade out S1 ambient and stop. Used by BI-03 (boss-room
+## entry sequence start — `Stratum1BossRoom.entry_sequence_started` signal).
+## Curve: **ease-out cubic** per Uma's brief §"BI-03 — fade-out on boss-room
+## entry" — front-loaded attenuation so the bed *dives* in the first 200 ms
+## and tails into silence over the remaining 400 ms. Reads as "the room is
+## closing around the player".
+##
+## Default duration 600 ms matches Uma `boss-intro.md` Beat 2 ("Hard mute by
+## T+0.6") + `audio-direction.md §3 ducking rule 4`.
+##
+## After the fade, the player is stopped + `_last_ambient_path` cleared so a
+## future `play_stratum1_ambient()` is NOT idempotent-blocked (the next time
+## the player enters a non-boss S1 room post-defeat, the resume must take
+## effect).
+func stop_stratum1_ambient(fade_out_ms: int = S1_AMBIENT_ENTRY_FADE_OUT_MS) -> void:
+	if _ambient_player == null:
+		return
+	if not _ambient_player.playing:
+		_last_ambient_path = ""
+		return
+	if _ambient_fade_tween != null and _ambient_fade_tween.is_valid():
+		_ambient_fade_tween.kill()
+	var duration_sec: float = max(fade_out_ms, 1) / 1000.0
+	# Capture the player reference so the finished callback isn't sensitive
+	# to a future role-swap (ambient has no swap today, but matches the
+	# BGM stop pattern's discipline).
+	var p: AudioStreamPlayer = _ambient_player
+	_ambient_fade_tween = create_tween()
+	_ambient_fade_tween.tween_property(p, "volume_db", SILENCE_DB, duration_sec) \
+		.set_trans(Tween.TRANS_CUBIC) \
+		.set_ease(Tween.EASE_OUT)
+	_ambient_fade_tween.finished.connect(func() -> void:
+		if p != null and p.playing:
+			p.stop()
+	)
+	_ambient_target_db = SILENCE_DB
+	# Clear last-path NOW (not at finished) so an immediate
+	# `play_stratum1_ambient()` call (e.g. test race) doesn't get idempotent-
+	# no-op'd by stale state.
+	_last_ambient_path = ""
+	_combat_trace("AudioDirector.stop_stratum1_ambient",
+		"fade_out_ms=%d curve=ease_out_cubic" % fade_out_ms)
+
+
+## M3-T2-W2-T10 — F4 post-defeat resume sugar. Wraps `play_stratum1_ambient`
+## with the 60% target gain (Uma's brief §"Volume / loudness targets" —
+## -4.4 dB = 60% nominal). Caller doesn't have to compute the dB math; the
+## semantic intent ("resume at 60%") is in the method name.
+##
+## Curve: ease-in-out quadratic (Uma's brief §"F4 — fade-in to 60% on
+## boss_defeated" — gentle, unhurried "the room settles back around the
+## player"). 800 ms default duration.
+##
+## Trigger wiring: hook to `BossDefeatedTitleCard.title_card_dismissed` (or
+## equivalent end-of-card signal) so the resume starts AFTER the title-card
+## silence-hold completes (per `audio-architecture.md` § "Tonal pattern —
+## silence as punctuation"). Main.gd's `_on_boss_defeated` is the canonical
+## wiring point. If a tighter signal isn't available, the caller can fall
+## back to a `SceneTreeTimer(2.4, ignore_time_scale=true)` from
+## `boss_defeated` — Uma's brief locks this fallback shape.
+func resume_stratum1_ambient_at_60_percent(
+		fade_in_ms: int = S1_AMBIENT_RESUME_FADE_IN_MS) -> void:
+	play_stratum1_ambient(fade_in_ms, S1_AMBIENT_RESUME_DB)
+
+
 ## M3W-7 — fire a one-shot SFX cue by id. Routes to the SFX bus via a
 ## round-robin pool so concurrent cues don't truncate each other.
 ##
@@ -307,6 +463,7 @@ func stop_all_music(fade_out_ms: int = DEFAULT_FADE_OUT_MS) -> void:
 		_fade_out_and_stop(_ambient_player, fade_out_ms)
 	_last_bgm_path = ""
 	_last_ambient_path = ""
+	_ambient_target_db = SILENCE_DB
 
 
 # ---- Test surface ----------------------------------------------------
@@ -336,6 +493,15 @@ func get_last_bgm_path() -> String:
 
 func get_last_ambient_path() -> String:
 	return _last_ambient_path
+
+
+## M3-T2-W2-T10 — test surface. Returns the dB value the most-recent
+## ambient tween was targeting. Paired tests use this to assert the F4
+## resume aimed at -4.4 dB without needing to wait for tween completion.
+## SILENCE_DB sentinel when no tween has fired in this lifetime (or after
+## a fade-out completes).
+func get_ambient_target_db_for_test() -> float:
+	return _ambient_target_db
 
 
 ## M3W-7 test surface — returns the cue id of the last SFX played, or &""
@@ -393,7 +559,11 @@ func complete_pending_fades_for_test() -> void:
 	if _bgm_player != null and _bgm_player.playing:
 		_bgm_player.volume_db = FULL_DB
 	if _ambient_player != null and _ambient_player.playing:
-		_ambient_player.volume_db = FULL_DB
+		# M3-T2-W2-T10 — snap to the most-recent ambient tween target rather
+		# than hardcoding FULL_DB. The F4 resume target is -4.4 dB (60%),
+		# not 0 dB; before this change the snap would drift the F4 assertion
+		# upward by 4.4 dB and the paired test would assert on the wrong value.
+		_ambient_player.volume_db = _ambient_target_db
 	if had_crossfade_in_flight and _bgm_crossfade_player != null \
 			and _bgm_crossfade_player.playing:
 		_bgm_crossfade_player.volume_db = FULL_DB
@@ -517,6 +687,19 @@ func _get_stream_s2_ambient() -> AudioStream:
 	return _stream_s2_ambient
 
 
+func _get_stream_s1_ambient() -> AudioStream:
+	# M3-T2-W2-T10 — S1 ambient loader, mirror of `_get_stream_s2_ambient`.
+	# Same lazy-load + loop-flag pattern. Missing-asset surfaces via the
+	# regression-guard test that round-trips load() on the path constant.
+	if _stream_s1_ambient == null:
+		_stream_s1_ambient = load(STREAM_PATH_S1_AMBIENT) as AudioStream
+		if _stream_s1_ambient == null:
+			push_warning("[AudioDirector] failed to load %s" % STREAM_PATH_S1_AMBIENT)
+			return null
+		_set_stream_loop(_stream_s1_ambient, true)
+	return _stream_s1_ambient
+
+
 ## Mark an OGG / WAV stream as looped. Both `AudioStreamOggVorbis` and
 ## `AudioStreamWAV` expose `loop` (different sub-properties), so we set
 ## whichever one exists rather than hard-coding the class.
@@ -598,6 +781,46 @@ func _play_with_fade_in_ambient(player: AudioStreamPlayer, stream: AudioStream, 
 	var duration_sec: float = max(fade_ms, 1) / 1000.0
 	_ambient_fade_tween = create_tween()
 	_ambient_fade_tween.tween_property(player, "volume_db", FULL_DB, duration_sec)
+	_ambient_target_db = FULL_DB
+
+
+## M3-T2-W2-T10 — curve-aware ambient fade-in. Used by
+## `play_stratum1_ambient` / `resume_stratum1_ambient_at_60_percent` so the
+## caller can pin the curve shape (Uma's brief locks ease-in-out quadratic
+## for resume; the entry fade-out uses ease-out cubic but that's in
+## `stop_stratum1_ambient`, not this helper).
+##
+## Two behaviors collapsed into one path:
+##   1. Fresh start: stream NOT playing → assign stream + play() from SILENCE_DB
+##      to target_gain_db with the requested curve.
+##   2. Re-target while playing (e.g. play_stratum1_ambient called twice with
+##      different targets): keep stream + position, just tween volume_db from
+##      current to target. Avoids re-seeding loop position to 0.
+##
+## The second case is what makes the F4 resume work cleanly even if the bed
+## got STOP'd by BI-03 and then re-PLAY'd by the next room load — the
+## ambient bed seamlessly retargets to the new gain without re-seeding.
+func _play_ambient_with_curve(player: AudioStreamPlayer, stream: AudioStream,
+		fade_ms: int, target_gain_db: float,
+		trans_type: int, ease_type: int) -> void:
+	if player == null or stream == null:
+		return
+	if _ambient_fade_tween != null and _ambient_fade_tween.is_valid():
+		_ambient_fade_tween.kill()
+	# Fresh start vs re-target: if not playing OR stream changed, do a fresh
+	# play() from silence. If already playing the same stream, tween from
+	# current volume_db without restarting playback (preserves loop position).
+	var fresh_start: bool = not player.playing or player.stream != stream
+	if fresh_start:
+		player.stream = stream
+		player.volume_db = SILENCE_DB
+		player.play()
+	var duration_sec: float = max(fade_ms, 1) / 1000.0
+	_ambient_fade_tween = create_tween()
+	_ambient_fade_tween.tween_property(player, "volume_db", target_gain_db, duration_sec) \
+		.set_trans(trans_type) \
+		.set_ease(ease_type)
+	_ambient_target_db = target_gain_db
 
 
 func _fade_out_and_stop(player: AudioStreamPlayer, fade_ms: int) -> void:
