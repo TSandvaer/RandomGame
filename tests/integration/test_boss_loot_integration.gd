@@ -59,6 +59,19 @@ func _reset_autoloads() -> void:
 	Engine.time_scale = 1.0
 
 
+# M3 T2/T3 — drive boss kill in every test of this file fires final-freeze
+# (Engine.time_scale = 0.0) via TimeScaleDirector. `_reset_autoloads` already
+# runs at test START via `_instantiate_main`, but the LAST test's leaked state
+# would carry into the NEXT test file (test_hp_regen_in_room_traversal.gd → ...
+# → test_hp_regen.gd shimmer tween → tween game-time stuck at scale 0.0).
+# `after_each` resets explicitly so cross-file leak is impossible.
+func after_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+
+
 func _save() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("Save")
 
