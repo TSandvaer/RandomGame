@@ -108,6 +108,17 @@ func _ready() -> void:
 	set_opacity(DEFAULT_OPACITY_S1)
 
 
+func _exit_tree() -> void:
+	# Defensive cleanup — kill any in-flight tween before the node is
+	# autofreed. If a tween's bound callback fires after the node leaves
+	# the tree, GUT's autofree raises "Object is locked and can't be freed"
+	# from `addons/gut/autofree.gd:51`. Production never hits this (Main's
+	# vignette lives the lifetime of the play loop), but tests instantiate +
+	# free vignettes per `after_each`, and a partial tween becomes the
+	# locked object. Killing here releases the callback binding cleanly.
+	_kill_active_tween()
+
+
 # ---- Public API (Uma vignette-spec § "API surface") --------------------
 
 ## Set vignette opacity directly (no tween). `value` is clamped to `[0.0, 1.0]`.

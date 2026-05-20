@@ -256,14 +256,16 @@ func test_opacity_tween_completed_signal_fires() -> void:
 	# Signal-driven endpoint assertion — tests subscribing to this signal can
 	# chain callback logic without polling. Convenience for T13/T16 if they
 	# ever need post-ramp completion hooks.
+	#
+	# Uses `await` on the signal directly — Godot's `await signal_name`
+	# returns the emitted payload as the await expression's value. This is
+	# more robust than a lambda + captured local (which has GDScript 4.x
+	# capture-by-value semantics that drop the assignment).
 	var v: Vignette = _make_vignette()
 	await get_tree().process_frame
-	var seen_target: float = -1.0
-	v.opacity_tween_completed.connect(
-		func(target: float) -> void: seen_target = target)
 	v.set_opacity_tween(0.55, 0.05, Vignette.CURVE_EASE_IN_OUT_CUBIC)
-	await v.opacity_tween_completed
-	assert_almost_eq(seen_target, 0.55, 0.001,
+	var emitted_target: float = await v.opacity_tween_completed
+	assert_almost_eq(emitted_target, 0.55, 0.001,
 		"opacity_tween_completed emits with the target value")
 
 
