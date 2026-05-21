@@ -100,6 +100,35 @@ Opt-out semantics mirror the GUT side: `test.use({ expectedUserWarnings: [/regex
 
 **A bug class is "covered" only when BOTH surfaces have a test for it** when the bug class can manifest in either lane. The Sponsor M2 RC meta-finding was that headless GUT and the Playwright suite both shipped green for 24 hours while the Sponsor's manual soak found three production warnings — every test path was scoped, none was universal. The two-surface warning gate is the structural answer.
 
+### Playwright e2e CI does NOT auto-trigger on `feat/*` branches — manual kick required (PR #293)
+
+The two-surface gate (GUT + Playwright) is structurally **one-surface** on feature branches until someone manually kicks Playwright. Only Headless GUT auto-runs on `feat/*` push; `playwright-e2e.yml` is `workflow_dispatch`-only. A PR can show "CI green" while hiding a Playwright regression. **GUT-green is not a substitute for Playwright-green.**
+
+**Author convention** — any PR touching Playwright-covered surfaces (HTML5 export, boss-room flow, audio gates, inventory UI, combat integration, mob behavior, room traversal, AC4 / equip-flow / mouse-direction-attacks / kiting-mob-chase / soak-narrative-regression / universal-console-warning-gate) MUST manually kick Playwright against the PR's release-build SHA and paste the run link in the Self-Test Report. Silence in the Self-Test Report on Playwright is now read as "missed kick," not "didn't need to."
+
+**SHA-pin sequence** — Playwright must run against the exact artifact the soak uses, not a drifted HEAD:
+
+```bash
+# 1. Trigger release-build for the PR head SHA
+gh workflow run release-github.yml --ref <branch>
+
+# 2. Wait for artifact (query by --commit <sha>, NOT --branch --limit 1 — race)
+gh run list --workflow=release-github.yml --commit <sha>
+
+# 3. Kick Playwright against same SHA
+gh workflow run playwright-e2e.yml --ref <branch>
+
+# 4. Confirm both runs reference the same SHA before pasting links
+```
+
+See memory `gh-run-list-race-on-just-pushed` for why `--commit <sha>` is mandatory over `--branch --limit 1` when polling the just-pushed run. See `.claude/docs/html5-export.md` § "Release-build trigger and artifact handoff" for the matching artifact-link pattern.
+
+**Self-Test Report line to include:**
+
+> **Playwright e2e:** kicked manually at SHA `<sha>` — run `<url>` — verdict: green / red / N/A (surface not Playwright-covered)
+
+**Open follow-up (Sponsor-class decision, queued separately):** wire `playwright-e2e.yml` to auto-trigger on `feat/*` push, matching Headless GUT. Until then the manual-kick convention is the gap-closer. PR #293 (Tess re-QA flag) is the precedent.
+
 ## Spec-string-vs-engine-emit drift (ticket `86c9upffv`)
 
 **The trap.** Playwright specs assert against `[combat-trace]` line shapes via regex. The trace strings are interpolated from engine-side `StringName` constants (e.g. `Hitbox.TEAM_PLAYER = &"player"` / `Hitbox.TEAM_ENEMY = &"enemy"`). A spec author who guesses the string from intuition rather than reading the constant ships a regex that **never matches a real production trace** — but Playwright reports "assertion failed" the same way as a real engine bug, so the misdiagnosis class is open.
