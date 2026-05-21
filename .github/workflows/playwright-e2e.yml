@@ -28,6 +28,16 @@ on:
     branches:
       - main
 
+  # Option C (Sponsor 2026-05-21) — auto-fire on every PR open/sync targeting main.
+  # release-github.yml also triggers on the same pull_request event; this job's
+  # resolve step polls for release-github.yml's run against the PR head SHA to
+  # finish, then downloads the artifact and runs the suite. Closes the manual-kick
+  # gap from PR #293 (.claude/docs/test-conventions.md § "Playwright e2e CI does
+  # NOT auto-trigger on feat/* branches"). Cost estimate: ~600-1000 min/month.
+  pull_request:
+    branches:
+      - main
+
   # Manual trigger: run against a specific artifact or any branch.
   #
   # SHA-pin contract (W3-T11, ticket 86c9ue1xu):
@@ -56,9 +66,12 @@ jobs:
     name: Playwright E2E — HTML5 artifact smoke
     runs-on: ubuntu-22.04
 
-    # Only run if the upstream release build succeeded (for workflow_run trigger)
+    # Only run if the upstream release build succeeded (for workflow_run trigger).
+    # pull_request and workflow_dispatch always proceed — the resolve step is
+    # the gate that enforces "must have a successful release-github.yml run".
     if: >
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     steps:
@@ -90,6 +103,14 @@ jobs:
       #      bit Tess's W2 soak (pulled W2 RC artifact for a PR-branch Playwright
       #      run) and is intentionally removed. Pass artifact_run_id or
       #      artifact_sha explicitly.
+      #
+      #   5. pull_request (Option C, Sponsor 2026-05-21):
+      #      Read github.event.pull_request.head.sha. release-github.yml fires
+      #      on the same pull_request event in parallel; this step polls
+      #      release-github.yml runs against that SHA until one concludes
+      #      success (or fails). Same SHA-pin discipline as path 3 — the
+      #      resolved run_id + head_sha get the same artifact-name verification
+      #      downstream.
       - name: Resolve artifact run ID + expected SHA
         id: resolve_run
         run: |
@@ -161,6 +182,64 @@ jobs:
             echo "Resolved explicit run_id=${run_id} (workflow='${wf_name}', head_sha=${head_sha})"
           }
 
+          # Path 5 — pull_request: poll release-github.yml for a run on the PR head SHA.
+          #
+          # release-github.yml fires on the same pull_request event in parallel
+          # with this workflow. Its export job takes ~3-6 min; this step polls
+          # until a matching run exists AND reaches a terminal conclusion.
+          #
+          # Polling budget: 20 min total (40 attempts × 30 s sleep) — covers
+          # cold-cache release builds + queue wait under load. Beyond that we
+          # fail with a clear message rather than block the runner indefinitely.
+          # An in-progress run that hasn't concluded after 20 min is itself
+          # signal worth investigating.
+          resolve_via_pr_sha() {
+            local needle="$1"
+            local wf_name="Release to GitHub (M1 RC build)"
+            local wf_id
+            wf_id=$(gh api "repos/${repo}/actions/workflows" \
+              --jq ".workflows[] | select(.name == \"${wf_name}\") | .id" | head -1)
+            if [ -z "${wf_id}" ]; then
+              fail "Could not locate workflow '${wf_name}' in repo ${repo}"
+            fi
+
+            local max_attempts=40
+            local sleep_s=30
+            local attempt=0
+            local match_run="" match_sha="" match_status="" match_conclusion=""
+
+            while [ "${attempt}" -lt "${max_attempts}" ]; do
+              attempt=$((attempt + 1))
+              # Query both pull_request-triggered runs and any other event runs
+              # for this SHA. event=pull_request is the expected path; broaden
+              # to all events so a manual workflow_dispatch matching the SHA
+              # also counts.
+              local runs_json
+              runs_json=$(gh api "repos/${repo}/actions/workflows/${wf_id}/runs?head_sha=${needle}&per_page=20" 2>/dev/null || echo '{}')
+              # Prefer a successful run; otherwise track the most recent in-progress.
+              match_run=$(echo "${runs_json}" | jq -r "[.workflow_runs[]? | select(.conclusion == \"success\")] | .[0].id // empty")
+              match_sha=$(echo "${runs_json}" | jq -r "[.workflow_runs[]? | select(.conclusion == \"success\")] | .[0].head_sha // empty")
+              if [ -n "${match_run}" ] && [ -n "${match_sha}" ]; then
+                echo "run_id=${match_run}" >> "$GITHUB_OUTPUT"
+                echo "expected_sha=${match_sha}" >> "$GITHUB_OUTPUT"
+                echo "Resolved pull_request SHA '${needle}' -> run ${match_run} (head_sha=${match_sha}) after ${attempt} attempts"
+                return 0
+              fi
+              # Has any run completed with a non-success conclusion? Fail fast.
+              local failed_run failed_conclusion
+              failed_run=$(echo "${runs_json}" | jq -r "[.workflow_runs[]? | select(.status == \"completed\" and .conclusion != \"success\")] | .[0].id // empty")
+              failed_conclusion=$(echo "${runs_json}" | jq -r "[.workflow_runs[]? | select(.status == \"completed\" and .conclusion != \"success\")] | .[0].conclusion // empty")
+              if [ -n "${failed_run}" ]; then
+                fail "release-github.yml run ${failed_run} concluded '${failed_conclusion}' for SHA '${needle}'. Cannot run Playwright against a failed release build."
+              fi
+              # In-progress or not-yet-queued; report status and sleep.
+              match_status=$(echo "${runs_json}" | jq -r "[.workflow_runs[]?] | .[0].status // \"not-yet-queued\"")
+              echo "[attempt ${attempt}/${max_attempts}] release-github.yml status='${match_status}' for SHA '${needle}'; sleeping ${sleep_s}s..."
+              sleep "${sleep_s}"
+            done
+            fail "Timed out after ${max_attempts} attempts (~$((max_attempts * sleep_s / 60)) min) waiting for release-github.yml to complete for SHA '${needle}'. Last status='${match_status}'."
+          }
+
           if [ "${event}" = "workflow_run" ]; then
             run_id="${{ github.event.workflow_run.id }}"
             head_sha="${{ github.event.workflow_run.head_sha }}"
@@ -180,8 +259,17 @@ jobs:
             else
               fail "workflow_dispatch requires either artifact_run_id or artifact_sha. Pass one explicitly."
             fi
+          elif [ "${event}" = "pull_request" ]; then
+            # Option C — Sponsor 2026-05-21. Poll release-github.yml for a
+            # successful run against the PR head SHA. release-github.yml fires
+            # on the same pull_request event in parallel.
+            pr_sha="${{ github.event.pull_request.head.sha }}"
+            if [ -z "${pr_sha}" ]; then
+              fail "pull_request event missing head.sha — should be impossible; investigate event payload."
+            fi
+            resolve_via_pr_sha "${pr_sha}"
           else
-            fail "Unsupported event '${event}' — this workflow only handles workflow_run + workflow_dispatch."
+            fail "Unsupported event '${event}' — this workflow only handles workflow_run + workflow_dispatch + pull_request."
           fi
         env:
           GH_TOKEN: ${{ github.token }}
@@ -402,6 +490,9 @@ jobs:
           echo "**Artifact:** \`embergrave-html5\` from run \`${{ steps.resolve_run.outputs.run_id }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "**Resolved SHA:** \`${{ steps.resolve_run.outputs.expected_sha }}\` (W3-T11 SHA-pin verified)" >> "$GITHUB_STEP_SUMMARY"
           echo "**Trigger:** \`${{ github.event_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "**PR:** #${{ github.event.pull_request.number }}" >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**Specs run:**" >> "$GITHUB_STEP_SUMMARY"
           echo "- \`ac1-boot-and-sha\` — build boots + SHA correct + no errors + no 404s" >> "$GITHUB_STEP_SUMMARY"

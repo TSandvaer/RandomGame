@@ -30,6 +30,16 @@ on:
       - "v*-rc*"
       - "v*-m1-*"
       - "m1-rc*"
+  # Option C (Sponsor 2026-05-21) — fire on every PR open/sync targeting main so
+  # the HTML5 artifact is built automatically at review-time. Pairs with
+  # playwright-e2e.yml's pull_request trigger: release-github.yml produces the
+  # artifact, playwright-e2e.yml polls for it via SHA and runs the browser suite.
+  # See .claude/docs/test-conventions.md § "Playwright e2e CI does NOT auto-trigger
+  # on feat/* branches — manual kick required (PR #293)" — Option C closes that
+  # gap. Cost estimate: ~600-1000 min/month, near GitHub free-tier limits.
+  pull_request:
+    branches:
+      - main
 
 env:
   GODOT_VERSION: "4.3"
@@ -91,11 +101,36 @@ jobs:
 
       - name: Stamp build SHA into project
         id: stamp
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          short_sha="${GITHUB_SHA:0:7}"
+          # On pull_request events, GITHUB_SHA points at the synthetic
+          # merge commit (PR head merged into base) created by GitHub for
+          # the run. That SHA is NOT visible in the PR branch's git log
+          # and does NOT match what playwright-e2e.yml's resolve_via_pr_sha
+          # path resolves to (`github.event.pull_request.head.sha`, the
+          # branch tip). Stamping the merge SHA produces an artifact named
+          # with a SHA the downstream resolver cannot match → SHA-pin
+          # verifier fails the Playwright run.
+          #
+          # Fix (Option 1, PR #299 Devon review): on pull_request, stamp
+          # the PR branch-tip SHA instead. Pairs with the Sponsor-soak
+          # ritual that greps the HUD `[BuildInfo]` SHA against the PR
+          # branch (`git rev-parse origin/<branch>`) — HUD SHA matches
+          # human-visible branch SHA.
+          #
+          # Non-pull_request paths (workflow_dispatch, tag push) keep
+          # GITHUB_SHA — those events have GITHUB_SHA pointing at the
+          # ref's tip directly, no merge-commit synthesis.
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            sha="${PR_HEAD_SHA}"
+          else
+            sha="${GITHUB_SHA}"
+          fi
+          short_sha="${sha:0:7}"
           echo -n "${short_sha}" > build_info.txt
-          echo "Stamped build_info.txt = ${short_sha}"
+          echo "Stamped build_info.txt = ${short_sha} (event=${GITHUB_EVENT_NAME})"
           echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
 
       - name: Headless import (asset import sanity)
