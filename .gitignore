@@ -29,6 +29,10 @@ diag-build/
 .ac4-artifact/
 .artifact-extract/
 html5-build-extract/
+# Per-agent scratch dir for soak extracts, screenshot drafts, self-test artifacts.
+# Created by agents during self-soak / probe work — must never commit.
+# Match at any depth (top-level worktree OR tests/playwright/.claude/tmp/).
+**/.claude/tmp/
 
 # IDE / editors
 .vscode/
