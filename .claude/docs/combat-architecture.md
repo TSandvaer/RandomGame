@@ -115,6 +115,29 @@ When a mob's HP reaches 0, the synchronous chain is:
 
 `MobLootSpawner.on_mob_died` calls `parent_for_pickups.call_deferred("add_child", pickup)` (PR #142 fix) — Pickup root is an Area2D, and adding it during physics flush triggers the same `USER ERROR: Can't change this state while flushing queries` panic. The `_spawn_death_particles` adds in each of 4 mob types also use `room.call_deferred("add_child", burst)` defensively.
 
+### Room-parented CPUParticles2D burst — reusable idiom
+
+When emitting a one-shot `CPUParticles2D` burst from any path that may execute inside `flush_queries()` — mob `_die` chain rooted in `Hitbox.body_entered`, boss-attack telegraph / impact / aftershock callbacks, projectile-impact plumes, environment triggers driven by `area_entered` — use the room-parented + caller-side-deferred shape:
+
+```gdscript
+var burst := CPUParticles2D.new()
+burst.position = world_pos
+# ...configure emission (color, amount, lifetime, spread, scale, gravity)...
+room.call_deferred("add_child", burst)
+burst.emitting = true   # or burst.call_deferred("set_emitting", true) if emission must start post-add
+```
+
+**Why room-parented, not actor-parented.** The emitting actor is typically about to `queue_free` (mob death-tween end) or its `global_transform` is mid-tween (boss-anim case) — parenting the burst to the actor tears the particles down mid-emission. The room outlives any single emitter while still cleaning up on room transition. For full-screen / cross-room bursts use `Main.get_world_2d_root()` (no precedent yet).
+
+**Why `call_deferred` even though CPUParticles2D is not an Area2D.** The Physics-flush rule (§ below) covers Area2D-state mutations + `CollisionShape2D` adds, not particle nodes. The defer is **defensive in depth**: burst sites sit next to Area2D adds (Pickup, Hitbox) that DO need the defer, and routing every spawn through `call_deferred` keeps the spawn block uniform — no foot-gun where someone copies the synchronous CPUParticles2D add as a template, later adds an Area2D sibling, and forgets to defer. Self-cleanup is a `SceneTreeTimer` `queue_free` after `lifetime + safety_margin`.
+
+**Production usages (audit these when changing the pattern):**
+
+- `Grunt / Charger / Shooter / PracticeDummy / Stratum1Boss._spawn_death_particles` — mob-death dust plume (PR #136 family).
+- `Stratum1Boss._spawn_slam_aftershock` — T6 boss slam-impact ember burst (PR #291).
+
+Future boss-feel work (level-up bursts, mob-impact plumes, environment decoration bursts driven by `body_entered` / `area_entered`) should follow the same shape rather than re-derive it. The "is this site a physics-flush spawn?" question is hard to answer locally — uniform `room.call_deferred("add_child", burst)` makes it a non-question.
+
 ### Single MobLootSpawner per mob death — load-bearing rule (ticket `86c9uemdg`)
 
 **Exactly ONE `MobLootSpawner` instance must process each mob_died/boss_died event.** Multiple spawners running in parallel each roll the loot table independently AND each produce their own set of `Pickup` Area2Ds — the resulting Pickup sets are spatially identical (same `death_pos + ring_offset(i)` arithmetic, with independent RNG only inside the roll) but **scenically distinct** Area2Ds. Critically, **only the spawner whose Array[Node] return value is fed into `Inventory.auto_collect_pickups` produces collectable pickups** — every other spawner's set has zero `picked_up` listeners and the player walking over them does nothing.
