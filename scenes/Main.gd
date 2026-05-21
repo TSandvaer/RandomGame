@@ -208,6 +208,19 @@ func _ready() -> void:
 	_load_room_at_index(0)
 	_refresh_hud_full()
 	print("[Main] M1 play-loop ready — Room 01 loaded, autoloads wired")
+	# DebugFlags.start_room URL-param soak utility (2026-05-21, PR #291 v4 self-soak
+	# gap). When set on the HTML5 URL (e.g. `?start_room=8`), bypass the Room 01 →
+	# Room N traversal by jumping directly to Room N AFTER the normal Room 01
+	# bootstrap. The Room 01 load above still happens (so autoloads / signals are
+	# wired identically to production) — we just immediately replace the active
+	# room with Room N. Same shape as the `boss_hp_mult` query-param soak utility.
+	# `-1` (default) = no override. Clamped to `[0, BOSS_ROOM_INDEX]` in DebugFlags.
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.get("start_room") != null:
+		var target: int = int(df.start_room)
+		if target >= 0 and target != 0:
+			print("[Main] DebugFlags.start_room=%d — bypassing Room 01 traversal" % target)
+			_load_room_at_index(target)
 
 
 func _notification(what: int) -> void:

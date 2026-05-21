@@ -433,6 +433,41 @@ func test_boss_hp_mult_clamps_extreme_inputs() -> void:
 	df.reset_boss_hp_mult_for_test()
 
 
+# ---- start_room URL-param soak utility (PR #291 v4 self-soak gap) ----
+
+## `DebugFlags.start_room` defaults to -1 (no override). After
+## `set_start_room_for_test(8)` it lands at 8 and is consumable by `Main._ready`.
+## Headless GUT can't exercise the JS-bridge read path; this test exercises the
+## clamping + state-setting via the test-only injection mirror of `boss_hp_mult`.
+func test_start_room_default_is_no_override() -> void:
+	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
+	assert_not_null(df, "DebugFlags autoload is wired")
+	df.reset_start_room_for_test()
+	assert_eq(int(df.start_room), -1, "default = -1 (no override)")
+
+
+func test_start_room_accepts_valid_indices() -> void:
+	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
+	for i in [0, 1, 4, 8]:
+		df.set_start_room_for_test(i)
+		assert_eq(int(df.start_room), i,
+			"valid index %d is accepted as-is" % i)
+	df.reset_start_room_for_test()
+
+
+func test_start_room_clamps_out_of_range() -> void:
+	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
+	# Above MAX (8): clamps DOWN to 8.
+	df.set_start_room_for_test(99)
+	assert_eq(int(df.start_room), 8,
+		"super-MAX input clamps to START_ROOM_MAX=8")
+	# Below 0 via the setter's special-case: explicit reset to -1.
+	df.set_start_room_for_test(-5)
+	assert_eq(int(df.start_room), -1,
+		"negative input resets to START_ROOM_DEFAULT=-1 (no override)")
+	df.reset_start_room_for_test()
+
+
 # ---- T6-3: aftershock self-frees on finished --------------------------
 
 func test_slam_aftershock_burst_self_frees_on_finished() -> void:

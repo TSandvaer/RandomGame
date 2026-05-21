@@ -59,10 +59,35 @@ const BOSS_HP_MULT_DEFAULT: float = 1.0
 const BOSS_HP_MULT_MIN: float = 0.05
 const BOSS_HP_MULT_MAX: float = 5.0
 
+## Start-room URL query param — Sponsor/Drew soak-iteration utility (2026-05-21,
+## PR #291 v4 self-soak gap). When set on the HTML5 URL, `Main._ready` calls
+## `load_room_index(N)` AFTER the normal Room 01 boot path so the player drops
+## directly into Room N instead of having to traverse 1..N. Defaults to -1 (no
+## override) when missing / malformed / desktop. Clamped to `[0, BOSS_ROOM_INDEX]`
+## (0..8) so out-of-range values can't load a non-existent room. Same shape as
+## `boss_hp_mult` — HTML5-only via JavaScriptBridge; desktop / headless GUT
+## always reads the default. Trace line emitted on boot lists the resolved value.
+##
+## Usage:
+##   http://localhost:8080/?start_room=8                 → drops into boss room
+##   http://localhost:8080/?start_room=8&boss_hp_mult=0.1 → boss room + 60 HP boss
+##                                                           (phase 2 in ~1 hit)
+##   http://localhost:8080/                              → Room 01 (production)
+##
+## Use case: self-soak of boss-room visuals (slam telegraph, aftershock burst,
+## phase-transition slow-mo) without needing to clear Rooms 01-07 first. The
+## AC4 Playwright spec stops at Room 05 on a game-side death-physics-flush
+## blocker (out of scope for boss-visual PRs); start_room bypasses that.
+const START_ROOM_QUERY_PARAM: String = "start_room"
+const START_ROOM_DEFAULT: int = -1
+const START_ROOM_MIN: int = 0
+const START_ROOM_MAX: int = 8  # BOSS_ROOM_INDEX in Main.gd
+
 # Public state — read by gameplay code, written only via toggle/parse functions.
 var fast_xp_enabled: bool = false
 var test_mode_enabled: bool = false
 var boss_hp_mult: float = BOSS_HP_MULT_DEFAULT
+var start_room: int = START_ROOM_DEFAULT
 
 # Emitted when fast_xp_enabled flips, so HUD/debug overlays can reflect it.
 signal fast_xp_toggled(enabled: bool)
@@ -74,13 +99,15 @@ func _ready() -> void:
 	# so mob spawn seed stays free. See `_resolve_test_mode()` for gating.
 	_resolve_test_mode()
 	_resolve_boss_hp_mult()
+	_resolve_start_room()
 	# Single boot-time line for Tess's grep.
-	print("[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s web=%s boss_hp_mult=%.3f" % [
+	print("[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s web=%s boss_hp_mult=%.3f start_room=%d" % [
 		OS.is_debug_build(),
 		test_mode_enabled,
 		fast_xp_enabled,
 		OS.has_feature("web"),
 		boss_hp_mult,
+		start_room,
 	])
 
 
@@ -263,3 +290,56 @@ func set_boss_hp_mult_for_test(mult: float) -> void:
 ## in `after_each` so leaked state can't cascade across the test file.
 func reset_boss_hp_mult_for_test() -> void:
 	boss_hp_mult = BOSS_HP_MULT_DEFAULT
+
+
+## Read the `start_room` URL query param via JavaScriptBridge on HTML5; no-op on
+## desktop / headless GUT. Defaults to -1 (no override) when absent / malformed.
+## Clamps parsed values to [START_ROOM_MIN, START_ROOM_MAX] (0..8) so an
+## out-of-range value can never reach `Main.load_room_index` with a bad index.
+##
+## Same rationale as `_resolve_boss_hp_mult` for the no-debug-gate posture:
+## Sponsor / Drew run this against the production-shape HTML5 release artifact.
+## Mitigations: (a) default = -1 means "no override" — zero behavior change
+## without an explicit URL param, (b) clamped range, (c) HTML5-only via bridge.
+func _resolve_start_room() -> void:
+	start_room = START_ROOM_DEFAULT
+	if not OS.has_feature("web"):
+		return
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return
+	var bridge: Object = Engine.get_singleton("JavaScriptBridge")
+	var raw_value: Variant = bridge.eval(
+		"new URLSearchParams(window.location.search).get('%s')" % START_ROOM_QUERY_PARAM,
+		true)
+	if raw_value == null:
+		return
+	var raw_str: String = str(raw_value).strip_edges()
+	if raw_str.is_empty() or raw_str == "null":
+		return
+	if not raw_str.is_valid_int():
+		push_warning("[DebugFlags] start_room URL param invalid int: %s" % raw_str)
+		return
+	var parsed: int = raw_str.to_int()
+	var clamped: int = clamp(parsed, START_ROOM_MIN, START_ROOM_MAX)
+	start_room = clamped
+	if parsed != clamped:
+		push_warning(("[DebugFlags] start_room clamped from %d to %d " +
+			"(range [%d..%d])") % [
+				parsed, clamped, START_ROOM_MIN, START_ROOM_MAX])
+
+
+## Test-only: inject a start-room override without the JS bridge. Tests can
+## set this in `before_each` to drive Main._ready into a non-Room01 boot path
+## (or use the default -1 to disable). Clamps inputs the same way the URL parser
+## does so test inputs match production semantics.
+func set_start_room_for_test(index: int) -> void:
+	if index < 0:
+		start_room = START_ROOM_DEFAULT
+		return
+	start_room = clamp(index, START_ROOM_MIN, START_ROOM_MAX)
+
+
+## Test-only: reset to production default. Pair with `set_start_room_for_test`
+## in `after_each` so leaked state can't cascade across the test file.
+func reset_start_room_for_test() -> void:
+	start_room = START_ROOM_DEFAULT
