@@ -294,65 +294,92 @@ func test_slam_aftershock_burst_config_matches_scope_ac() -> void:
 			burst = child
 			break
 	assert_not_null(burst, "burst spawned")
-	# Particle count: BUMPED from 12 (scope-AC) → 24 after PR #291 v5 self-soak
-	# (2026-05-21 SHA 83831c4). Screenshot capture confirmed v3's 12 particles
-	# rendered correctly but blended with the boss's red armor; 24 (matching
-	# death-burst density) + impact-flash ramp gives the burst readable contrast.
+	# Particle count: v7 BUMPED from 24 → 56 after Sponsor 2026-05-21 v6 soak
+	# "cannot see the sparkles" report. The v5 24-particle burst was captured
+	# by Playwright headless but invisible to human vision in real-browser
+	# motion (Playwright-vs-interactive divergence class). v7 stacks intensity
+	# changes to push the burst over the perceptibility threshold. Assert with
+	# a `>= 24` lower bound rather than `==` so future tuning doesn't churn the
+	# test — the actual value lives in the boss script constant.
 	assert_eq(burst.amount, Stratum1Boss.SLAM_AFTERSHOCK_PARTICLE_COUNT,
 		"T6-2: aftershock particle count tracks SLAM_AFTERSHOCK_PARTICLE_COUNT constant")
-	assert_eq(burst.amount, 24,
-		"T6-2: aftershock = 24 particles (v5 visibility fix vs scope-AC 12)")
-	# Lifetime: BUMPED from 200 ms → 350 ms after Sponsor 2026-05-21 soak
-	# "see no aftershock" report. The boss script constant is the source of
-	# truth — assert via the constant so this stays in sync if it tunes again.
+	assert_gte(burst.amount, 24,
+		"T6-2 v7: aftershock particle count >= 24 (v7 unmissable-intensity floor)")
+	# Lifetime: 350 ms — v5 screenshot capture confirmed duration is sufficient.
+	# The boss script constant is the source of truth.
 	assert_almost_eq(burst.lifetime, Stratum1Boss.SLAM_AFTERSHOCK_LIFETIME, 0.001,
 		"T6-2: aftershock lifetime tracks SLAM_AFTERSHOCK_LIFETIME constant")
 	assert_almost_eq(burst.lifetime, 0.35, 0.001,
-		"T6-2: aftershock lifetime = 350 ms (post-Sponsor-soak visibility fix)")
-	# Velocity range: 40-80 px/s.
-	assert_almost_eq(burst.initial_velocity_min, 40.0, 0.001,
-		"T6-2: aftershock min velocity 40 px/s per scope-doc AC")
-	assert_almost_eq(burst.initial_velocity_max, 80.0, 0.001,
-		"T6-2: aftershock max velocity 80 px/s per scope-doc AC")
+		"T6-2: aftershock lifetime = 350 ms (unchanged across v5/v6/v7)")
+	# Velocity range: v7 BUMPED from 40-80 → 80-140 px/s. Faster outward
+	# velocity escapes boss sprite occlusion faster. Assert via the constants
+	# so future tuning is single-source-of-truth.
+	assert_almost_eq(burst.initial_velocity_min, Stratum1Boss.SLAM_AFTERSHOCK_VELOCITY_MIN, 0.001,
+		"T6-2: aftershock min velocity tracks SLAM_AFTERSHOCK_VELOCITY_MIN")
+	assert_almost_eq(burst.initial_velocity_max, Stratum1Boss.SLAM_AFTERSHOCK_VELOCITY_MAX, 0.001,
+		"T6-2: aftershock max velocity tracks SLAM_AFTERSHOCK_VELOCITY_MAX")
+	assert_gte(burst.initial_velocity_min, 80.0,
+		"T6-2 v7: min velocity >= 80 px/s (v7 unmissable-intensity floor)")
 	# One-shot, explosive, emitting at spawn.
 	assert_true(burst.one_shot,
 		"T6-2: aftershock is one-shot (does not loop)")
 	assert_true(burst.emitting,
 		"T6-2: aftershock starts emitting on spawn")
 	# T6-2 visibility-fix invariants (Sponsor 2026-05-21 soak respin):
-	#   - rising gravity (0, -50) so embers clear the boss sprite
+	#   - rising gravity (v7: 0, -100) so embers clear the boss sprite faster
 	#   - z_index +1 so the burst draws over the boss AnimatedSprite2D (z=0)
-	#   - scale 1.5 so each ember reads at the smaller-count 12 vs death's 24.
+	#   - scale (v7: 2.5) so each ember has more screen-area of signal.
 	assert_almost_eq(burst.gravity.x, 0.0, 0.001,
 		"T6-2: aftershock gravity x = 0 (rising-only, no horizontal drift)")
 	assert_true(burst.gravity.y < 0.0,
 		"T6-2: aftershock gravity y < 0 — rising (Sponsor soak visibility fix)")
+	assert_lte(burst.gravity.y, -50.0,
+		"T6-2 v7: gravity y <= -50 (v7 unmissable: steeper rise to clear sprite)")
 	assert_eq(burst.z_index, 1,
 		"T6-2: aftershock z_index=+1 draws above boss sprite (z=0) per " +
 		"html5-export.md §Z-index sensitivity")
-	assert_true(burst.scale_amount_min > 1.0,
-		"T6-2: aftershock scale > 1.0 — larger ember footprint vs death-burst's 1.0")
-	# Impact-flash ramp (PR #291 v5): white-hot → ember-light → ember-deep.
-	# Was ember-only (EMBER_LIGHT → EMBER_DEEP) in v3; the start-color was too
-	# close to the boss's red armor and the burst read as sprite noise rather
-	# than an impact tell. The 3-stop ramp puts a high-contrast flash at the
-	# first ~85 ms of the 350 ms lifetime, then falls back to ember.
+	assert_gte(burst.scale_amount_min, 2.0,
+		"T6-2 v7: aftershock scale >= 2.0 — larger ember footprint per v7 intensity stack")
+	# v7 impact-flash ramp: pure-white FLAT HOLD then decay to ember.
+	# Ramp shape (4 stops):
+	#   0.00 = AFTERSHOCK_FLASH_WHITE (pure white, #FFFFFF)
+	#   AFTERSHOCK_FLASH_HOLD_OFFSET   = AFTERSHOCK_FLASH_WHITE (FLAT HOLD)
+	#   AFTERSHOCK_FLASH_DECAY_OFFSET  = EMBER_LIGHT
+	#   1.00 = EMBER_DEEP
+	# The flat hold is the load-bearing perceptual fix — gives human vision
+	# ≥~100 ms of sustained bright signal vs v5/v6's instant-decay-at-t=0.
 	var ramp: Gradient = burst.color_ramp
 	assert_not_null(ramp, "T6-2: aftershock has a color ramp")
-	# Start color = AFTERSHOCK_FLASH_WHITE (#FFF2BF), midpoint near EMBER_LIGHT,
-	# end = EMBER_DEEP (#A02E08). Match against the boss-exposed constants so
-	# this stays in sync if the v5 tuning needs another pass.
 	var start: Color = ramp.sample(0.0)
-	var mid: Color = ramp.sample(0.25)
+	var hold: Color = ramp.sample(Stratum1Boss.AFTERSHOCK_FLASH_HOLD_OFFSET - 0.01)
+	var decay: Color = ramp.sample(Stratum1Boss.AFTERSHOCK_FLASH_DECAY_OFFSET)
 	var end: Color = ramp.sample(1.0)
+	# Start = AFTERSHOCK_FLASH_WHITE (v7: pure #FFFFFF, R=G=B=1.0).
 	assert_almost_eq(start.r, Stratum1Boss.AFTERSHOCK_FLASH_WHITE.r, 0.005,
-		"T6-2 v5: ramp start matches AFTERSHOCK_FLASH_WHITE R (impact flash)")
+		"T6-2 v7: ramp start matches AFTERSHOCK_FLASH_WHITE R (pure white)")
 	assert_almost_eq(start.g, Stratum1Boss.AFTERSHOCK_FLASH_WHITE.g, 0.005,
-		"T6-2 v5: ramp start matches AFTERSHOCK_FLASH_WHITE G")
-	assert_almost_eq(mid.r, Stratum1Boss.EMBER_LIGHT.r, 0.01,
-		"T6-2 v5: ramp midpoint @0.25 matches EMBER_LIGHT R (warm fade-through)")
+		"T6-2 v7: ramp start matches AFTERSHOCK_FLASH_WHITE G")
+	assert_almost_eq(start.b, Stratum1Boss.AFTERSHOCK_FLASH_WHITE.b, 0.005,
+		"T6-2 v7: ramp start matches AFTERSHOCK_FLASH_WHITE B (pure white, not warm-cream)")
+	# Flat hold — sample just before the hold offset, still at flash color.
+	assert_almost_eq(hold.r, Stratum1Boss.AFTERSHOCK_FLASH_WHITE.r, 0.01,
+		"T6-2 v7: ramp@HOLD_OFFSET still at impact-flash (flat hold load-bearing fix)")
+	assert_almost_eq(hold.g, Stratum1Boss.AFTERSHOCK_FLASH_WHITE.g, 0.01,
+		"T6-2 v7: ramp@HOLD_OFFSET still at impact-flash G")
+	# Decay to ember-light at the decay offset.
+	assert_almost_eq(decay.r, Stratum1Boss.EMBER_LIGHT.r, 0.01,
+		"T6-2 v7: ramp@DECAY_OFFSET matches EMBER_LIGHT (warm decay through)")
+	# End = EMBER_DEEP.
 	assert_almost_eq(end.r, Stratum1Boss.EMBER_DEEP.r, 0.005,
-		"T6-2 v5: ramp end matches EMBER_DEEP R")
+		"T6-2 v7: ramp end matches EMBER_DEEP R")
+	# v7 invariant: HOLD < DECAY < 1.0 — ramp progresses correctly through
+	# the flat-hold → decay → ember tail sequence.
+	assert_true(
+		Stratum1Boss.AFTERSHOCK_FLASH_HOLD_OFFSET < Stratum1Boss.AFTERSHOCK_FLASH_DECAY_OFFSET,
+		"T6-2 v7: HOLD_OFFSET < DECAY_OFFSET (ramp progresses forward)")
+	assert_true(
+		Stratum1Boss.AFTERSHOCK_FLASH_DECAY_OFFSET < 1.0,
+		"T6-2 v7: DECAY_OFFSET < 1.0 (ember tail occupies final segment)")
 	# Origin = slam impact position (boss global_position at slam-fire).
 	assert_almost_eq(burst.global_position.x, 100.0, 0.5,
 		"T6-2: aftershock origin x matches boss position")
@@ -518,3 +545,64 @@ func test_slam_aftershock_burst_self_frees_on_finished() -> void:
 	assert_true(burst.finished.is_connected(queue_free_callable),
 		"T6-3: aftershock's queue_free is connected to the finished signal — " +
 		"self-frees when particles complete")
+
+
+# ---- T6-v7: slam-impact sprite flash (PR #291 v7) ---------------------
+
+## v7 adds a paired sprite-modulate flash on the boss itself at slam-fire,
+## complementing the particle burst with a "shake-and-flash" peripheral
+## tell. Verify the tween is created + runs the IN+HOLD+OUT property chain
+## on the bare-instance branch (no Sprite child → falls through to
+## self.modulate, branch 3 of `_play_slam_impact_flash`'s resolver).
+func test_slam_impact_flash_runs_on_slam_fire_bare_instance() -> void:
+	var room: Node2D = Node2D.new()
+	add_child_autofree(room)
+	var b: Stratum1Boss = BossScript.new()
+	b.skip_intro_for_tests = true
+	room.add_child(b)
+	var p: FakePlayer = FakePlayer.new()
+	room.add_child(p)
+	b.set_player(p)
+	# Force phase 2 (slam latches at <60% HP) so the slam-telegraph fires.
+	b.take_damage(204, Vector2.ZERO, null)
+	b._physics_process(Stratum1Boss.PHASE_TRANSITION_DURATION + 0.01)
+	b.global_position = Vector2(100.0, 200.0)
+	p.global_position = Vector2(150.0, 200.0)
+	b._physics_process(0.016)
+	# Pre-slam-fire: no impact-flash tween yet.
+	assert_null(b._slam_impact_flash_tween,
+		"T6-v7: no slam-impact flash tween before slam-fire")
+	b._physics_process(Stratum1Boss.SLAM_TELEGRAPH_DURATION + 0.01)
+	# Post-slam-fire: flash tween armed + valid.
+	assert_not_null(b._slam_impact_flash_tween,
+		"T6-v7: slam-impact flash tween created on slam-fire")
+	assert_true(b._slam_impact_flash_tween.is_valid(),
+		"T6-v7: slam-impact flash tween is valid post-slam-fire")
+	# Independence from `_hit_flash_tween` — distinct refs so a slam-self-hit
+	# doesn't have one tween cancel the other.
+	assert_ne(b._slam_impact_flash_tween, b._hit_flash_tween,
+		"T6-v7: slam-impact flash tween is independent from hit-flash tween")
+
+
+## v7 invariants on the impact-flash constants — HDR-clamp safety + budget
+## must fit inside SLAM_RECOVERY so the flash always completes before the
+## next state transition. Failure modes if violated: post-clamp R/G/B
+## suppresses the flash entirely (PR #137 bug class); over-budget = flash
+## lingers past slam-recovery into the next swing.
+func test_slam_impact_flash_constants_are_html5_safe() -> void:
+	# All channels in [0, 1] — HDR clamp safety per html5-export.md.
+	assert_lte(Stratum1Boss.SLAM_IMPACT_FLASH_TINT.r, 1.0,
+		"T6-v7: SLAM_IMPACT_FLASH_TINT.r <= 1.0 (HTML5 HDR clamp)")
+	assert_lte(Stratum1Boss.SLAM_IMPACT_FLASH_TINT.g, 1.0,
+		"T6-v7: SLAM_IMPACT_FLASH_TINT.g <= 1.0 (HTML5 HDR clamp)")
+	assert_lte(Stratum1Boss.SLAM_IMPACT_FLASH_TINT.b, 1.0,
+		"T6-v7: SLAM_IMPACT_FLASH_TINT.b <= 1.0 (HTML5 HDR clamp)")
+	# Total flash budget fits inside SLAM_RECOVERY (200 ms baseline).
+	var budget: float = (
+		Stratum1Boss.SLAM_IMPACT_FLASH_IN
+		+ Stratum1Boss.SLAM_IMPACT_FLASH_HOLD
+		+ Stratum1Boss.SLAM_IMPACT_FLASH_OUT
+	)
+	assert_lte(budget, Stratum1Boss.SLAM_RECOVERY,
+		"T6-v7: flash budget IN+HOLD+OUT <= SLAM_RECOVERY (200 ms) — must " +
+		"complete before next state transition")

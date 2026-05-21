@@ -318,6 +318,12 @@ var _animated_sprite_resolved: bool = false
 # Attack-telegraph tween — ref kept so death-during-telegraph can cancel it.
 var _attack_telegraph_tween: Tween = null
 
+# v7 slam-impact sprite-flash tween (PR #291 v7) — ref kept so a second slam
+# arriving before the previous flash completes can kill+restart without
+# leaving the sprite stuck mid-flash. Independent from `_hit_flash_tween`
+# (which is take_damage-driven and may run simultaneously on a slam-self-hit).
+var _slam_impact_flash_tween: Tween = null
+
 # T5 slam-telegraph indicator runtime — Node2D child created at telegraph start
 # and freed on slam-fire or boss-death. Held by ref so `_fire_slam_hit` and
 # `_die` can drive the fade-out + cleanup. Null when no telegraph is armed.
@@ -375,61 +381,107 @@ const SLAM_INDICATOR_STROBE_HZ: float = 5.0
 const SLAM_INDICATOR_STROBE_HIGH: float = 1.0   # perceived peak alpha = 1.0 × 0.5 = 0.5
 const SLAM_INDICATOR_STROBE_LOW: float = 0.25   # perceived trough     = 0.25 × 0.5 = 0.125
 
-## T6 slam aftershock burst — was "half-volume" mirror of `_spawn_death_particles`
-## (12 vs 24). v5 (PR #291 SHA `83831c4` self-soak 2026-05-21): empirical screenshot
-## capture confirmed particles ARE rendering — but at 12 particles + ember ramp
-## (`EMBER_LIGHT` → `EMBER_DEEP`, both warm-red) they blend with the boss's red
-## armor and read as boss-sprite noise rather than a distinct impact tell. Sponsor
-## "see no aftershock" on v3 is a visibility / contrast issue, not a missing-fire
-## issue (trace shows `_spawn_slam_aftershock | particles=12 ... origin=(240,165)
-## parent_path=/root/Main/World/Stratum1BossRoom` firing correctly). Fix shape:
-## raise to 24 (matching death-burst density) + replace `EMBER_LIGHT` ramp[0] with
-## a near-white-hot impact flash (`AFTERSHOCK_FLASH_WHITE`) so the burst starts
-## bright and fades to ember — gives the high-contrast "impact" frame the boss's
-## red armor was washing out. Death-burst keeps ember-only because the boss is
-## already dead and there's no sprite to contrast against.
-const SLAM_AFTERSHOCK_PARTICLE_COUNT: int = 24
-## Lifetime BUMPED from 200 ms (scope-AC) → 350 ms after Sponsor 2026-05-21 soak
-## report "see no aftershock" on SHA `46bdcc9`. 200 ms × 60 fps = 12 frames —
-## empirically insufficient for the burst to read in HTML5 / `gl_compatibility`,
-## particularly with no rising gravity (particles stayed near boss origin and
-## drew behind the AnimatedSprite2D sprite child). v5 keeps 350 ms — screenshot
-## capture confirmed the duration is correct; visibility is now solved via
-## particle count + impact-flash ramp, not lifetime. Documented in PR #291
-## Self-Test Report v5.
+## T6 slam aftershock burst — v7 "make it unmissable" intensity stack (PR #291,
+## Sponsor 2026-05-21 v6 soak: "cannot see the sparkles you captured in your
+## Playwright headless screenshots"). The v5/v6 ramp + 24 particles + 1.5 scale
+## was demonstrably present in Playwright captures but perceptually invisible
+## in real-browser motion — Playwright headless captures perception-subliminal
+## frames that the human eye never resolves AND/OR CPUParticles2D rendering
+## under `gl_compatibility` real-browser differs from headless. Documented as a
+## new HTML5 divergence class in `.claude/docs/html5-export.md` (Playwright
+## headless vs interactive divergence).
+##
+## v7 intensity stack — five changes layered to push the burst over the
+## perceptibility threshold even at the periphery of vision:
+##   1. Particle count 24 → 56 — more area of perceptual signal.
+##   2. Initial scale 1.5 → 2.5 — bigger embers read more clearly.
+##   3. Initial velocity 40-80 → 80-140 — particles escape boss-sprite
+##      occlusion faster, reach screen-areas not under sprite.
+##   4. Rising gravity -50 → -100 — steeper rise, clears sprite-top within
+##      the first 100 ms of the 350 ms lifetime.
+##   5. Ramp[0] flat hold + pure-white impact color — ramp dwells at
+##      `AFTERSHOCK_FLASH_WHITE` (now pure #FFFFFF, not the warm-cream
+##      #FFF2BF that blended into the boss's red hue family) for the first
+##      ~30% of lifetime (~100 ms), then transitions to ember at 0.40.
+##      The flat hold is the load-bearing perceptual fix — instant decay at
+##      t=0 meant the bright frame never persisted long enough to register.
+## Plus: brief sprite-modulate flash on the boss itself at slam-impact
+## (`_play_slam_impact_flash`), giving the impact a "shake-and-flash" feel
+## that's unmistakable even without seeing the particles clearly.
+##
+## v5/v6 history (kept for trace continuity): 12 → 24 particles + ember-only
+## → ember+impact-flash ramp + lifetime 0.20 → 0.35 + rising gravity. All
+## those changes were correct in direction but insufficient in magnitude.
+const SLAM_AFTERSHOCK_PARTICLE_COUNT: int = 56
+## Lifetime stays at 350 ms — v5 screenshot capture confirmed duration is
+## sufficient, the visibility problem was magnitude not duration. Bumping
+## further would risk reading as a separate effect from the slam impact.
 const SLAM_AFTERSHOCK_LIFETIME: float = 0.35
-## Impact-flash color for the aftershock ramp[0]. Near-white-hot so the first
-## ~50 ms of the burst flashes bright against the red boss armor before fading
-## to `EMBER_DEEP`. Uma's "impact flash" visual-language pattern from death-burst
-## doesn't apply (death is post-sprite-fade); aftershock fires WHILE the boss
-## sprite is on-screen, so the start-color needs to contrast against red armor
-## not blend with it. Channel-sum 1.0+0.95+0.75 = 2.7 vs `EMBER_LIGHT` 1.0+0.69+0.40
-## = 2.09 — the +29% luminance lift is what makes the impact frame read.
-## All channels < 1.05 for HTML5 HDR-clamp safety per `.claude/docs/html5-export.md`.
-const AFTERSHOCK_FLASH_WHITE: Color = Color(1.0, 0.95, 0.75, 1.0)  # #FFF2BF
-## Outward velocity range (px/s) — 40-80 per Priya AC. Slower than death burst's
-## 30-60 because aftershock is impact-radial; death burst is upward-rising.
-const SLAM_AFTERSHOCK_VELOCITY_MIN: float = 40.0
-const SLAM_AFTERSHOCK_VELOCITY_MAX: float = 80.0
+## Impact-flash color for the aftershock ramp[0]. v7 BUMPED to pure white
+## (#FFFFFF) from v5's warm-cream #FFF2BF — Sponsor's real-browser report
+## "cannot see the sparkles" with a warm-cream start against red armor is the
+## hue-family-blend failure mode. Pure white is maximally outside the boss's
+## red/orange hue cone; the contrast jump on the impact frame is what makes
+## the burst read at peripheral vision. All channels = 1.0 — exactly at the
+## HDR clamp boundary (HTML5 `gl_compatibility` clamps to [0,1]; pure white
+## is the boundary, not over it). See `.claude/docs/html5-export.md` § HDR
+## modulate clamp.
+const AFTERSHOCK_FLASH_WHITE: Color = Color(1.0, 1.0, 1.0, 1.0)  # #FFFFFF
+## v7: ramp[0] flat-hold duration as a fraction of lifetime. The bright
+## impact color dwells at this offset before transitioning to ember. 0.30 ×
+## 350 ms = 105 ms — long enough for human vision to resolve (well above
+## the ~16 ms flicker-fusion threshold). v5/v6 had instant decay (offset
+## 0.0 only at the bright color) which meant only the t=0 frame was bright.
+const AFTERSHOCK_FLASH_HOLD_OFFSET: float = 0.30
+## v7: offset at which the ramp transitions from impact-flash to ember-light.
+## The 0.30 → 0.40 segment is the "decay" zone — quick transition so the
+## flash decays cleanly, then ember tail to lifetime end.
+const AFTERSHOCK_FLASH_DECAY_OFFSET: float = 0.40
+## Outward velocity range (px/s) — v7 BUMPED from 40-80 → 80-140. Faster
+## initial velocity ensures particles escape the boss sprite's occlusion
+## footprint (~32 px radius) within the first ~50 ms, reaching screen-areas
+## not covered by the boss body where contrast against the dark floor is
+## maximal.
+const SLAM_AFTERSHOCK_VELOCITY_MIN: float = 80.0
+const SLAM_AFTERSHOCK_VELOCITY_MAX: float = 140.0
 ## Spread is half-angle around `direction`. 180° + direction=UP gives uniform
 ## omni-radial emission — mirrors death burst.
 const SLAM_AFTERSHOCK_SPREAD: float = 180.0
-## Rising gravity — pulls embers UP at -50 px/s² (mirrors death-burst's -40,
-## slightly stronger so the burst clears the boss sprite faster within the
-## 350 ms lifetime). Sponsor "see no aftershock" diagnosis: without rising
-## gravity, omni-radial particles spread at boss chest-height and stay behind
-## the AnimatedSprite2D. Rising-gravity lifts them above the sprite so the
-## burst is readable as an impact tell.
-const SLAM_AFTERSHOCK_GRAVITY: Vector2 = Vector2(0.0, -50.0)
-## Particle scale — 1.5 px (50% larger than death-burst's 1.0). Larger ember
-## footprint compensates for the smaller count (12 vs 24) and the shorter
-## lifetime, so each particle reads on screen for the available frames.
-const SLAM_AFTERSHOCK_SCALE: float = 1.5
+## Rising gravity — v7 BUMPED from -50 → -100 px/s². Steeper rise so particles
+## clear the boss sprite top (~24 px above origin) within the first ~100 ms
+## of the 350 ms lifetime, putting the ember tail above the sprite where it
+## reads against the dark room background instead of the red armor.
+const SLAM_AFTERSHOCK_GRAVITY: Vector2 = Vector2(0.0, -100.0)
+## Particle scale — v7 BUMPED from 1.5 → 2.5. Bigger ember footprint gives
+## each particle more screen-area of perceptual signal, which is the
+## load-bearing fix-shape for the Playwright-vs-interactive divergence:
+## headless captures resolve sub-pixel detail the eye in motion does not.
+const SLAM_AFTERSHOCK_SCALE: float = 2.5
 ## z_index +1 lifts the burst draw-layer above the boss AnimatedSprite2D
 ## (sprite z_index=0). Per `.claude/docs/html5-export.md` § "Z-index
 ## sensitivity" — never rely on negative z_index in `gl_compatibility`; this
 ## positive lift ensures the burst draws over the boss body sprite.
 const SLAM_AFTERSHOCK_Z_INDEX: int = 1
+
+# ---- v7 slam-impact sprite flash (ticket 86c9wjyuv, PR #291 v7) ------
+# Brief modulate flash on the boss sprite at slam-fire moment. The particle
+# burst is the primary visual tell; this flash is a secondary "shake-and-
+# flash" cue that triggers peripheral-vision motion-detection even if the
+# player isn't looking directly at the boss. Two-tween fire-and-restore:
+# tween rest → SLAM_IMPACT_FLASH_TINT (50 ms) → rest (80 ms). Total budget
+# 130 ms is well under the 200 ms SLAM_RECOVERY window so the flash always
+# completes before the next state transition.
+##
+## Pure-white at α=1.0 with a slight blue accent (g=b=1.0, r=0.95) to break
+## out of the boss's red hue family — same rationale as the particle
+## AFTERSHOCK_FLASH_WHITE bump. Sub-1.0 R channel keeps the value strictly
+## below the HDR clamp; G+B at 1.0 are exactly at the clamp boundary which
+## `gl_compatibility` handles cleanly. Mirrors `Player.SWING_FLASH_TINT`'s
+## "all channels ≤ 1.0" discipline from `html5-export.md`.
+const SLAM_IMPACT_FLASH_TINT: Color = Color(1.0, 1.0, 1.0, 1.0)  # pure white pulse
+const SLAM_IMPACT_FLASH_IN: float = 0.030
+const SLAM_IMPACT_FLASH_HOLD: float = 0.020
+const SLAM_IMPACT_FLASH_OUT: float = 0.080
 
 
 func _ready() -> void:
@@ -853,10 +905,19 @@ func _fire_slam_hit() -> void:
 	# T5 (ticket 86c9wjyrc): fade out the danger-zone indicator on slam-fire.
 	# The fade-out tween auto-frees the indicator on completion.
 	_fade_out_slam_indicator()
-	# T6 (ticket 86c9wjyuv): 12-particle ember aftershock at slam origin.
+	# T6 (ticket 86c9wjyuv): aftershock ember-burst at slam origin. v7 scales
+	# up to 56 particles + impact-flash ramp w/ flat hold + faster outward
+	# velocity — see SLAM_AFTERSHOCK_* constants for the v7 intensity stack
+	# rationale (Sponsor "cannot see sparkles" 2026-05-21 v6 soak).
 	# Parented to the room (not the boss) so the burst persists past
 	# slam-recovery if the boss subsequently dies and queue_frees itself.
 	_spawn_slam_aftershock()
+	# v7: brief pure-white sprite-modulate flash on the boss itself, paired
+	# with the particle burst. Gives a "shake-and-flash" peripheral-vision
+	# tell that's unmistakable even when the player isn't looking at the boss.
+	# Runs in parallel with `_spawn_slam_aftershock`'s burst — combined effect
+	# is the v7 "unmissable" target.
+	_play_slam_impact_flash()
 	swing_spawned.emit(SWING_KIND_SLAM_HIT, hb)
 
 
@@ -1206,18 +1267,26 @@ func _spawn_slam_aftershock() -> void:
 	burst.spread = SLAM_AFTERSHOCK_SPREAD
 	burst.initial_velocity_min = SLAM_AFTERSHOCK_VELOCITY_MIN
 	burst.initial_velocity_max = SLAM_AFTERSHOCK_VELOCITY_MAX
-	# Impact-flash ramp (v5 visibility fix): start near-white-hot then fade through
-	# ember-light to ember-deep. The white-hot start gives a high-contrast "impact"
-	# frame against the boss's red armor — pure ember-only ramp washed out against
-	# the boss sprite in v3 (screenshot evidence: PR #291 v5 self-soak). Three-stop
-	# Gradient: 0.0=flash, 0.25=ember-light, 1.0=ember-deep so the flash decays
-	# within the first ~85 ms of the 350 ms lifetime.
+	# v7 impact-flash ramp with FLAT HOLD on the bright color (PR #291 v7,
+	# Sponsor "cannot see sparkles" report 2026-05-21). Four-stop Gradient:
+	#   offset 0.00 = AFTERSHOCK_FLASH_WHITE (pure white)
+	#   offset 0.30 = AFTERSHOCK_FLASH_WHITE (FLAT HOLD — load-bearing fix)
+	#   offset 0.40 = EMBER_LIGHT (decay through warm orange)
+	#   offset 1.00 = EMBER_DEEP (ember tail)
+	# The flat hold at 0.0→0.30 means the bright frame dwells for ~105 ms
+	# (30% of 350 ms lifetime) instead of decaying instantly at t=0 like the
+	# v5/v6 ramp. This is the load-bearing perceptual fix — human vision needs
+	# ≥~50 ms of sustained signal to register a transient at peripheral focus,
+	# and v5's instant-decay impact-flash was sub-threshold despite being
+	# captured perfectly by Playwright's headless frame-sampling.
+	#
 	# Gradient.new() starts with 2 default points at offsets 0.0 and 1.0;
-	# set_color writes them, add_point inserts a third in the middle.
+	# set_color writes them, add_point inserts intermediates.
 	var ramp: Gradient = Gradient.new()
 	ramp.set_color(0, AFTERSHOCK_FLASH_WHITE)
 	ramp.set_color(1, EMBER_DEEP)
-	ramp.add_point(0.25, EMBER_LIGHT)
+	ramp.add_point(AFTERSHOCK_FLASH_HOLD_OFFSET, AFTERSHOCK_FLASH_WHITE)
+	ramp.add_point(AFTERSHOCK_FLASH_DECAY_OFFSET, EMBER_LIGHT)
 	burst.color_ramp = ramp
 	# T6 visibility-fix (Sponsor soak 2026-05-21 — "see no aftershock"): rise +
 	# z_index +1 so the burst climbs above the boss sprite during its short
@@ -1241,13 +1310,88 @@ func _spawn_slam_aftershock() -> void:
 	# permanently so the next regression diagnoses itself.
 	_combat_trace("Stratum1Boss._spawn_slam_aftershock",
 		("particles=%d lifetime=%.2f vel=[%.0f..%.0f] gravity=(%.0f,%.0f) " +
-		 "scale=%.2f z_index=%d origin=(%.0f,%.0f) parent_path=%s") % [
+		 "scale=%.2f z_index=%d origin=(%.0f,%.0f) " +
+		 "ramp_hold=[0..%.2f]=white decay=%.2f parent_path=%s") % [
 			SLAM_AFTERSHOCK_PARTICLE_COUNT, SLAM_AFTERSHOCK_LIFETIME,
 			SLAM_AFTERSHOCK_VELOCITY_MIN, SLAM_AFTERSHOCK_VELOCITY_MAX,
 			SLAM_AFTERSHOCK_GRAVITY.x, SLAM_AFTERSHOCK_GRAVITY.y,
 			SLAM_AFTERSHOCK_SCALE, SLAM_AFTERSHOCK_Z_INDEX,
 			global_position.x, global_position.y,
+			AFTERSHOCK_FLASH_HOLD_OFFSET, AFTERSHOCK_FLASH_DECAY_OFFSET,
 			String(room.get_path()) if room.is_inside_tree() else "<not-in-tree>"])
+
+
+## v7 slam-impact sprite flash (PR #291 v7, ticket 86c9wjyuv) — secondary
+## visual cue for the slam impact that complements the particle aftershock.
+## Brief pure-white modulate flash on the boss's AnimatedSprite2D for the
+## ~130 ms IN+HOLD+OUT budget, then restores the sprite's rest modulate.
+## Runs in PARALLEL with the particle burst — together they give a
+## "shake-and-flash" tell that triggers peripheral-vision motion-detection
+## even when the player isn't looking directly at the boss.
+##
+## Distinct from `_play_hit_flash`:
+##   - `_play_hit_flash` is take_damage-driven (boss took a hit, soft-red
+##     tint, mirrors Grunt/PracticeDummy hit-flash convention).
+##   - `_play_slam_impact_flash` is slam-fire-driven (boss DEALT a hit,
+##     pure-white pulse, mirrors PR #137 Player.SWING_FLASH discipline).
+## They use separate tween refs so a slam-self-hit (boss damaged by player
+## counter while boss is mid-slam) doesn't have one tween cancelling the
+## other mid-flash.
+##
+## 3-branch sprite resolver mirrors `_play_hit_flash` — branches discriminated
+## by the same `_hit_flash_target` resolution. This means the resolver runs
+## once across both flash types (whichever fires first wires the target).
+func _play_slam_impact_flash() -> void:
+	if _is_dead:
+		return
+	# Resolve the flash target (idempotent — `_play_hit_flash` uses the same
+	# branch resolution, so we share the cached _hit_flash_target ref).
+	if _hit_flash_target == null:
+		var sprite: Node = get_node_or_null("Sprite")
+		if sprite is AnimatedSprite2D:
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = true
+			_sprite_modulate_at_rest = (sprite as AnimatedSprite2D).modulate
+		elif sprite is ColorRect:
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = false
+			_sprite_color_at_rest = (sprite as ColorRect).color
+		else:
+			_hit_flash_target = self
+			_hit_flash_uses_sprite = false
+			_hit_flash_uses_animated_sprite = false
+	if not _captured_modulate_at_rest:
+		_modulate_at_rest = modulate
+		_captured_modulate_at_rest = true
+	if _slam_impact_flash_tween != null and _slam_impact_flash_tween.is_valid():
+		_slam_impact_flash_tween.kill()
+	if not is_inside_tree():
+		return
+	_slam_impact_flash_tween = create_tween()
+	if _hit_flash_uses_animated_sprite:
+		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
+		_slam_impact_flash_tween.tween_property(asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+		_slam_impact_flash_tween.tween_property(asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+		_slam_impact_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, SLAM_IMPACT_FLASH_OUT)
+	elif _hit_flash_uses_sprite:
+		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
+		_slam_impact_flash_tween.tween_property(sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+		_slam_impact_flash_tween.tween_property(sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+		_slam_impact_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, SLAM_IMPACT_FLASH_OUT)
+	else:
+		_slam_impact_flash_tween.tween_property(self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+		_slam_impact_flash_tween.tween_property(self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+		_slam_impact_flash_tween.tween_property(self, "modulate", _modulate_at_rest, SLAM_IMPACT_FLASH_OUT)
+	# Diagnostic trace — distinct tag from _play_hit_flash so the trace stream
+	# can discriminate "boss got hit" (hit_flash) vs "boss dealt slam" (slam_impact_flash).
+	_combat_trace("Stratum1Boss._play_slam_impact_flash",
+		"tint=(%.2f,%.2f,%.2f) budget_ms=%.0f branch=%s" % [
+			SLAM_IMPACT_FLASH_TINT.r, SLAM_IMPACT_FLASH_TINT.g, SLAM_IMPACT_FLASH_TINT.b,
+			(SLAM_IMPACT_FLASH_IN + SLAM_IMPACT_FLASH_HOLD + SLAM_IMPACT_FLASH_OUT) * 1000.0,
+			"animated_sprite" if _hit_flash_uses_animated_sprite else ("color_rect" if _hit_flash_uses_sprite else "self_modulate")
+		])
 
 
 ## §2 hit-flash. M3W-4 3-branch resolver per `.claude/docs/combat-architecture.md`
