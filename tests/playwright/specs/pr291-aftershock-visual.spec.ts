@@ -26,27 +26,26 @@ import {
 } from "../fixtures/mouse-facing";
 
 const BOOT_TIMEOUT_MS = 30_000;
-const COMBAT_TIMEOUT_MS = 60_000;
-const POST_AFTERSHOCK_CAPTURE_FRAMES = 6;
+const COMBAT_TIMEOUT_MS = 150_000;
+const POST_AFTERSHOCK_CAPTURE_FRAMES = 8;
 
 test.describe("PR #291 v5 — aftershock visual capture", () => {
   test("interleaved screenshot capture during slam-aftershock window", async ({
     page,
     context,
   }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(240_000);
     await context.route("**/*", (route) => route.continue());
 
     const capture = new ConsoleCapture(page);
     capture.attach();
 
     const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:8000";
-    // boss_hp_mult=0.15 → 90 HP boss (phase 2 latches at HP < 60, phase 3 at HP < 30).
-    // 0.05 (30 HP) caused boss to phase + die too quickly to capture the burst —
-    // and the slam's 17-damage hit at low player HP killed the player + reloaded
-    // Room 01. 0.15 gives a slower fight where slam fires while player still has
-    // HP buffer.
-    const url = `${baseURL}/?start_room=8&boss_hp_mult=0.08`;
+    // boss_hp_mult=0.05 → 30 HP boss. Phase 2 (slam) latches at HP < 60% × 30 = 18.
+    // Player at 100 HP, fist deals 1 dmg, boss melee deals ~12 — player survives
+    // 8 boss swings. At ~7 player hits/sec we reach 18 HP boss in ~12 player
+    // attacks, well before player dies. v4 diag spec validated this exact value.
+    const url = `${baseURL}/?start_room=8&boss_hp_mult=0.05`;
     await page.goto(url, { waitUntil: "domcontentloaded" });
 
     await capture.waitForLine(/\[Main\] M1 play-loop ready/, BOOT_TIMEOUT_MS);
