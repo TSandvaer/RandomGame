@@ -355,12 +355,38 @@ const SLAM_INDICATOR_LINE_WIDTH: float = 2.0
 const SLAM_INDICATOR_FADE: float = 0.080
 ## draw_arc segment count — 32 segments produce a smooth circle at 80 px radius.
 const SLAM_INDICATOR_ARC_POINTS: int = 32
+## T5 strobe parameters (Sponsor 2026-05-21 soak — "circle disappears too fast,
+## should also be blinking"). After fade-in, the modulate.a strobes between a
+## high and low value at ~5 Hz (one full cycle = 200 ms) across the hold window
+## (~420 ms = SLAM_TELEGRAPH_DURATION - fade_in - fade_out budget). That budget
+## fits ~2 full pulses, which is sufficient to read as "danger imminent."
+##
+## 5 Hz is well within feel-targets for boss-AoE telegraphs in shipped ARPGs
+## and below the seizure-risk threshold for our class of stimulus (small,
+## peripheral, low-contrast, color-only — not the high-contrast full-screen
+## red-flashing pattern epilepsy guidance restricts). The base color α=0.5
+## multiplies through; perceived peak = HIGH × 0.5 = 0.5, perceived trough =
+## LOW × 0.5 = 0.125 — strong on/off contrast.
+##
+## Sponsor's "disappears too fast" complaint maps to the absence of motion
+## during the 420 ms hold (a static circle reads as decoration); strobing
+## restores the "imminent" read without lengthening combat-timing windows.
+const SLAM_INDICATOR_STROBE_HZ: float = 5.0
+const SLAM_INDICATOR_STROBE_HIGH: float = 1.0   # perceived peak alpha = 1.0 × 0.5 = 0.5
+const SLAM_INDICATOR_STROBE_LOW: float = 0.25   # perceived trough     = 0.25 × 0.5 = 0.125
 
 ## T6 slam aftershock burst — half-volume mirror of `_spawn_death_particles`.
 ## 12 particles vs boss-death's 24 (per scope doc T6 AC + uma combat-visual-feedback §3
 ## budget — boss-death's 24 is the upper bound).
 const SLAM_AFTERSHOCK_PARTICLE_COUNT: int = 12
-const SLAM_AFTERSHOCK_LIFETIME: float = 0.20  # 200 ms per Priya AC
+## Lifetime BUMPED from 200 ms (scope-AC) → 350 ms after Sponsor 2026-05-21 soak
+## report "see no aftershock" on SHA `46bdcc9`. 200 ms × 60 fps = 12 frames —
+## empirically insufficient for the burst to read in HTML5 / `gl_compatibility`,
+## particularly with no rising gravity (particles stayed near boss origin and
+## drew behind the AnimatedSprite2D sprite child). Death-burst at 300 ms reads
+## fine; we lift to 350 ms with rising gravity + z_index +1 to surface above
+## the boss body. Documented in PR #291 Self-Test Report v2.
+const SLAM_AFTERSHOCK_LIFETIME: float = 0.35
 ## Outward velocity range (px/s) — 40-80 per Priya AC. Slower than death burst's
 ## 30-60 because aftershock is impact-radial; death burst is upward-rising.
 const SLAM_AFTERSHOCK_VELOCITY_MIN: float = 40.0
@@ -368,6 +394,22 @@ const SLAM_AFTERSHOCK_VELOCITY_MAX: float = 80.0
 ## Spread is half-angle around `direction`. 180° + direction=UP gives uniform
 ## omni-radial emission — mirrors death burst.
 const SLAM_AFTERSHOCK_SPREAD: float = 180.0
+## Rising gravity — pulls embers UP at -50 px/s² (mirrors death-burst's -40,
+## slightly stronger so the burst clears the boss sprite faster within the
+## 350 ms lifetime). Sponsor "see no aftershock" diagnosis: without rising
+## gravity, omni-radial particles spread at boss chest-height and stay behind
+## the AnimatedSprite2D. Rising-gravity lifts them above the sprite so the
+## burst is readable as an impact tell.
+const SLAM_AFTERSHOCK_GRAVITY: Vector2 = Vector2(0.0, -50.0)
+## Particle scale — 1.5 px (50% larger than death-burst's 1.0). Larger ember
+## footprint compensates for the smaller count (12 vs 24) and the shorter
+## lifetime, so each particle reads on screen for the available frames.
+const SLAM_AFTERSHOCK_SCALE: float = 1.5
+## z_index +1 lifts the burst draw-layer above the boss AnimatedSprite2D
+## (sprite z_index=0). Per `.claude/docs/html5-export.md` § "Z-index
+## sensitivity" — never rely on negative z_index in `gl_compatibility`; this
+## positive lift ensures the burst draws over the boss body sprite.
+const SLAM_AFTERSHOCK_Z_INDEX: int = 1
 
 
 func _ready() -> void:
@@ -1039,25 +1081,42 @@ func _spawn_slam_indicator(telegraph_duration: float) -> void:
 	_slam_indicator = indicator
 	if _slam_indicator_tween != null and _slam_indicator_tween.is_valid():
 		_slam_indicator_tween.kill()
-	# Fade-in: alpha 0 → 1 (the underlying draw color is already at α=0.5, so
-	# the multiplied modulate.a ramps the perceived alpha from 0 → 0.5).
-	# Hold = telegraph_duration - 2× fade (one in + one out budget). If the
-	# telegraph is shorter than 2× fade (phase-3 enrage corner), the hold
-	# clamps to 0 and the fade-out is triggered externally by slam-fire.
+	# Fade-in then strobe (Sponsor 2026-05-21 — "should also be blinking").
+	# Replaces the prior flat-hold with a `tween_method`-driven sine-wave pulse
+	# at SLAM_INDICATOR_STROBE_HZ between LOW and HIGH alpha for the hold
+	# duration. The underlying draw color stays at α=0.5; the multiplied
+	# modulate.a strobes the perceived alpha between 0.125 (trough) and 0.5
+	# (peak). Slam-fire fade-out is still triggered externally by
+	# `_fade_out_slam_indicator()` — it kills this tween and owns the channel.
 	_slam_indicator_tween = create_tween()
 	_slam_indicator_tween.tween_property(
-		indicator, "modulate:a", 1.0, SLAM_INDICATOR_FADE)
-	# Hold for the remainder; the slam-fire fade-out is fired by
-	# `_fade_out_slam_indicator()`, not by the tween reaching the end.
+		indicator, "modulate:a", SLAM_INDICATOR_STROBE_HIGH, SLAM_INDICATOR_FADE)
+	# Strobe across the remaining window. tween_method drives a custom callback
+	# every frame across `hold_dur` seconds; the callback writes modulate.a
+	# from a sine wave. tween_interval would only delay; we want continuous
+	# motion during the hold.
 	var hold_dur: float = max(0.0, telegraph_duration - SLAM_INDICATOR_FADE)
 	if hold_dur > 0.0:
-		_slam_indicator_tween.tween_interval(hold_dur)
+		var strobe_cb: Callable = func(t: float) -> void:
+			if not is_instance_valid(indicator):
+				return
+			# Sine wave 0 → 1 → 0 → 1 across `t` seconds. `t` is elapsed tween
+			# time (0 → hold_dur). Map to phase via STROBE_HZ.
+			# sin() output is [-1, 1]; remap to [LOW, HIGH].
+			var phase: float = t * SLAM_INDICATOR_STROBE_HZ * TAU
+			var s: float = (sin(phase) + 1.0) * 0.5  # [0, 1]
+			indicator.modulate.a = lerp(
+				SLAM_INDICATOR_STROBE_LOW, SLAM_INDICATOR_STROBE_HIGH, s)
+		_slam_indicator_tween.tween_method(strobe_cb, 0.0, hold_dur, hold_dur)
 	_combat_trace("Stratum1Boss._spawn_slam_indicator",
-		"radius=%.0f color=(%.2f,%.2f,%.2f,%.2f) telegraph_duration=%.2f fade=%.3f" % [
+		("radius=%.0f color=(%.2f,%.2f,%.2f,%.2f) telegraph_duration=%.2f " +
+		 "fade=%.3f strobe_hz=%.1f strobe=[%.2f..%.2f]") % [
 			SLAM_HITBOX_RADIUS,
 			SLAM_INDICATOR_COLOR.r, SLAM_INDICATOR_COLOR.g,
 			SLAM_INDICATOR_COLOR.b, SLAM_INDICATOR_COLOR.a,
-			telegraph_duration, SLAM_INDICATOR_FADE])
+			telegraph_duration, SLAM_INDICATOR_FADE,
+			SLAM_INDICATOR_STROBE_HZ,
+			SLAM_INDICATOR_STROBE_LOW, SLAM_INDICATOR_STROBE_HIGH])
 
 
 ## Trigger fade-out on the slam-telegraph indicator (called from `_fire_slam_hit`).
@@ -1127,26 +1186,40 @@ func _spawn_slam_aftershock() -> void:
 	burst.spread = SLAM_AFTERSHOCK_SPREAD
 	burst.initial_velocity_min = SLAM_AFTERSHOCK_VELOCITY_MIN
 	burst.initial_velocity_max = SLAM_AFTERSHOCK_VELOCITY_MAX
-	# No gravity — aftershock is impact-radial, not rising. (Death burst uses
-	# Vector2(0, -40) to make embers rise per visual-direction §lighting.)
-	burst.gravity = Vector2.ZERO
-	burst.scale_amount_min = 1.0
-	burst.scale_amount_max = 1.0
 	# Ember ramp — light → deep, mirrors death burst.
 	var ramp: Gradient = Gradient.new()
 	ramp.set_color(0, EMBER_LIGHT)
 	ramp.set_color(1, EMBER_DEEP)
 	burst.color_ramp = ramp
+	# T6 visibility-fix (Sponsor soak 2026-05-21 — "see no aftershock"): rise +
+	# z_index +1 so the burst climbs above the boss sprite during its short
+	# lifetime instead of staying behind it. Mirrors `SlamTelegraphIndicator`
+	# z_index=1 (see html5-export.md § Z-index sensitivity) and the death-burst
+	# rising-gravity pattern below.
+	burst.gravity = SLAM_AFTERSHOCK_GRAVITY
+	burst.z_index = SLAM_AFTERSHOCK_Z_INDEX
+	burst.scale_amount_min = SLAM_AFTERSHOCK_SCALE
+	burst.scale_amount_max = SLAM_AFTERSHOCK_SCALE
 	# Physics-flush safety: `_fire_slam_hit` runs in the slam-telegraph countdown
 	# path inside `_physics_process`. Deferred add_child avoids the 4.x panic
 	# class — same rationale as `_spawn_death_particles`.
 	room.call_deferred("add_child", burst)
 	burst.finished.connect(burst.queue_free)
+	# Diagnostic trace (T6 visibility hunt — Sponsor soak 2026-05-21). Captures
+	# parent-path + z-index + scale alongside the existing particle/lifetime/
+	# velocity/origin fields so a future "still invisible" report can rule out
+	# scene-tree-parent / z-order / scale regressions without re-instrumenting.
+	# Per `diagnostic-traces-before-hypothesized-fixes` — these stay in the code
+	# permanently so the next regression diagnoses itself.
 	_combat_trace("Stratum1Boss._spawn_slam_aftershock",
-		"particles=%d lifetime=%.2f vel=[%.0f..%.0f] origin=(%.0f,%.0f)" % [
+		("particles=%d lifetime=%.2f vel=[%.0f..%.0f] gravity=(%.0f,%.0f) " +
+		 "scale=%.2f z_index=%d origin=(%.0f,%.0f) parent_path=%s") % [
 			SLAM_AFTERSHOCK_PARTICLE_COUNT, SLAM_AFTERSHOCK_LIFETIME,
 			SLAM_AFTERSHOCK_VELOCITY_MIN, SLAM_AFTERSHOCK_VELOCITY_MAX,
-			global_position.x, global_position.y])
+			SLAM_AFTERSHOCK_GRAVITY.x, SLAM_AFTERSHOCK_GRAVITY.y,
+			SLAM_AFTERSHOCK_SCALE, SLAM_AFTERSHOCK_Z_INDEX,
+			global_position.x, global_position.y,
+			String(room.get_path()) if room.is_inside_tree() else "<not-in-tree>"])
 
 
 ## §2 hit-flash. M3W-4 3-branch resolver per `.claude/docs/combat-architecture.md`
@@ -1531,21 +1604,51 @@ static func _vec_to_dir_suffix(v: Vector2) -> String:
 
 
 func _apply_mob_def() -> void:
+	# Boss HP multiplier (Sponsor 2026-05-21 soak-iteration utility). Resolves
+	# to 1.0 (no-op) outside HTML5 and when the `boss_hp_mult` URL param is
+	# absent. Multiplied IN even on the bare-instance fallback path so headless
+	# GUT tests using `DebugFlags.set_boss_hp_mult_for_test(0.5)` can exercise
+	# the nerf without supplying a MobDef.
+	var hp_mult: float = _resolve_boss_hp_mult()
 	if mob_def == null:
 		# Bare-instantiated boss (tests). Use spec defaults — 600 HP, 12 dmg
 		# (rebalanced M1 RC soak-4, was 15), 80 px/s.
 		# Phase-2 and phase-3 thresholds resolve to 396 and 198.
-		hp_max = 600
-		hp_current = 600
+		var bare_hp: int = max(1, int(round(600.0 * hp_mult)))
+		hp_max = bare_hp
+		hp_current = bare_hp
 		damage_base = 12
 		move_speed_base = 80.0
 		move_speed = move_speed_base
 		return
-	hp_max = mob_def.hp_base
-	hp_current = mob_def.hp_base
+	var scaled_hp: int = max(1, int(round(float(mob_def.hp_base) * hp_mult)))
+	hp_max = scaled_hp
+	hp_current = scaled_hp
 	damage_base = mob_def.damage_base
 	move_speed_base = mob_def.move_speed
 	move_speed = move_speed_base
+
+
+## Resolve the boss HP multiplier from the DebugFlags autoload (defaults to 1.0
+## when the autoload is missing — bare-instance unit-test edge). Centralised so
+## both branches of `_apply_mob_def` share the same gate + the multiplier value
+## is testable without re-instantiating the boss.
+func _resolve_boss_hp_mult() -> float:
+	if not is_inside_tree():
+		# Bare unit-test edge: instantiate-then-set-fields without scene tree.
+		# Use the autoload via `Engine.get_main_loop()` so we still get the test
+		# injection value if the test wrote one before adding the boss.
+		var ml: SceneTree = Engine.get_main_loop() as SceneTree
+		if ml == null:
+			return 1.0
+		var df: Node = ml.root.get_node_or_null("DebugFlags")
+		if df == null:
+			return 1.0
+		return df.boss_hp_mult
+	var df_in: Node = get_node_or_null("/root/DebugFlags")
+	if df_in == null:
+		return 1.0
+	return df_in.boss_hp_mult
 
 
 func _apply_layers() -> void:

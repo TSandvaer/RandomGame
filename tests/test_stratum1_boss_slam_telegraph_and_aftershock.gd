@@ -21,12 +21,19 @@ extends GutTest
 ##         sub-1.0 RGB channels per HTML5 HDR-clamp safety).
 ##   T5-6. Indicator radius matches `SLAM_HITBOX_RADIUS` (80 px) via the
 ##         `SlamTelegraphIndicator.SLAM_HITBOX_RADIUS_CONST` mirror.
+##   T5-7. Strobe constants (LOW/HIGH/HZ) within safe bounds (Sponsor 2026-05-21).
+##   T5-8. Strobe tween is still running during the hold window — pulse, not
+##         static hold (Sponsor 2026-05-21).
 ##   T6-1. Slam-fire spawns a CPUParticles2D burst parented to the boss's
 ##         parent (room), NOT the boss itself, so the burst persists past
 ##         boss queue_free.
-##   T6-2. Burst configuration matches scope-doc AC: 12 particles, 200 ms
-##         lifetime, 40–80 px/s velocity, ember light → deep ramp.
+##   T6-2. Burst configuration: 12 particles, lifetime tracks the script
+##         constant (350 ms post-Sponsor-soak visibility fix), 40–80 px/s
+##         velocity, ember light → deep ramp, rising gravity, z_index +1.
 ##   T6-3. Burst self-frees on `finished` signal — `queue_free` connected.
+##   HP-1. Bare-instance boss respects DebugFlags.boss_hp_mult (Sponsor 2026-05-21).
+##   HP-2. Default (no multiplier set) → production 600 HP.
+##   HP-3. Multiplier clamped to [MIN, MAX] range.
 
 const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 const IndicatorScript: Script = preload("res://scripts/mobs/SlamTelegraphIndicator.gd")
@@ -286,9 +293,13 @@ func test_slam_aftershock_burst_config_matches_scope_ac() -> void:
 	# Particle count: 12 (half of boss-death's 24, per Priya AC).
 	assert_eq(burst.amount, 12,
 		"T6-2: aftershock = 12 particles per scope-doc AC")
-	# Lifetime: 200 ms.
-	assert_almost_eq(burst.lifetime, 0.20, 0.001,
-		"T6-2: aftershock lifetime 200 ms per scope-doc AC")
+	# Lifetime: BUMPED from 200 ms → 350 ms after Sponsor 2026-05-21 soak
+	# "see no aftershock" report. The boss script constant is the source of
+	# truth — assert via the constant so this stays in sync if it tunes again.
+	assert_almost_eq(burst.lifetime, Stratum1Boss.SLAM_AFTERSHOCK_LIFETIME, 0.001,
+		"T6-2: aftershock lifetime tracks SLAM_AFTERSHOCK_LIFETIME constant")
+	assert_almost_eq(burst.lifetime, 0.35, 0.001,
+		"T6-2: aftershock lifetime = 350 ms (post-Sponsor-soak visibility fix)")
 	# Velocity range: 40-80 px/s.
 	assert_almost_eq(burst.initial_velocity_min, 40.0, 0.001,
 		"T6-2: aftershock min velocity 40 px/s per scope-doc AC")
@@ -299,6 +310,19 @@ func test_slam_aftershock_burst_config_matches_scope_ac() -> void:
 		"T6-2: aftershock is one-shot (does not loop)")
 	assert_true(burst.emitting,
 		"T6-2: aftershock starts emitting on spawn")
+	# T6-2 visibility-fix invariants (Sponsor 2026-05-21 soak respin):
+	#   - rising gravity (0, -50) so embers clear the boss sprite
+	#   - z_index +1 so the burst draws over the boss AnimatedSprite2D (z=0)
+	#   - scale 1.5 so each ember reads at the smaller-count 12 vs death's 24.
+	assert_almost_eq(burst.gravity.x, 0.0, 0.001,
+		"T6-2: aftershock gravity x = 0 (rising-only, no horizontal drift)")
+	assert_true(burst.gravity.y < 0.0,
+		"T6-2: aftershock gravity y < 0 — rising (Sponsor soak visibility fix)")
+	assert_eq(burst.z_index, 1,
+		"T6-2: aftershock z_index=+1 draws above boss sprite (z=0) per " +
+		"html5-export.md §Z-index sensitivity")
+	assert_true(burst.scale_amount_min > 1.0,
+		"T6-2: aftershock scale > 1.0 — larger ember footprint vs death-burst's 1.0")
 	# Ember ramp: light → deep (mirrors death burst).
 	var ramp: Gradient = burst.color_ramp
 	assert_not_null(ramp, "T6-2: aftershock has a color ramp")
@@ -315,6 +339,98 @@ func test_slam_aftershock_burst_config_matches_scope_ac() -> void:
 		"T6-2: aftershock origin x matches boss position")
 	assert_almost_eq(burst.global_position.y, 200.0, 0.5,
 		"T6-2: aftershock origin y matches boss position")
+
+
+# ---- T5 strobe (Sponsor 2026-05-21 soak respin) ----------------------
+
+## After fade-in, the indicator modulate.a strobes between LOW and HIGH at
+## STROBE_HZ for the hold window. Pin: the strobe constants must satisfy
+## (a) LOW < HIGH, (b) HIGH ≤ 1.0 (Color modulate clamp), (c) LOW ≥ 0.0,
+## (d) STROBE_HZ ∈ [3, 10] Hz (below seizure-risk threshold for our stimulus
+## class; high enough to read as "imminent").
+func test_slam_indicator_strobe_constants_are_sane() -> void:
+	assert_true(Stratum1Boss.SLAM_INDICATOR_STROBE_LOW < Stratum1Boss.SLAM_INDICATOR_STROBE_HIGH,
+		"strobe LOW < HIGH so the pulse oscillates")
+	assert_true(Stratum1Boss.SLAM_INDICATOR_STROBE_HIGH <= 1.0,
+		"strobe HIGH ≤ 1.0 — Color.a clamp")
+	assert_true(Stratum1Boss.SLAM_INDICATOR_STROBE_LOW >= 0.0,
+		"strobe LOW ≥ 0.0 — Color.a clamp")
+	assert_true(Stratum1Boss.SLAM_INDICATOR_STROBE_HZ >= 3.0,
+		"strobe Hz ≥ 3 — above static-decoration read")
+	assert_true(Stratum1Boss.SLAM_INDICATOR_STROBE_HZ <= 10.0,
+		"strobe Hz ≤ 10 — below seizure-risk threshold for our stimulus class")
+
+
+## The fade-in + strobe tween is created when the indicator spawns and runs
+## (`is_valid` + `is_running`) during the hold window. Verifies the strobe is
+## not a no-op static hold by inspecting the tween's lifecycle, not by
+## sampling modulate.a directly (headless tween cadence is too jittery for
+## reliable per-frame sampling — same constraint as test_slam_telegraph_indicator_frees_on_slam_fire).
+func test_slam_indicator_strobe_tween_runs_during_hold() -> void:
+	var arr: Array = _arm_slam_telegraph()
+	var b: Stratum1Boss = arr[0]
+	# After fade-in completes, the tween enters the strobe step. Advance one
+	# physics tick + flush a process frame so the tween reaches the strobe.
+	await get_tree().process_frame
+	var tween: Tween = b._slam_indicator_tween
+	assert_not_null(tween, "indicator tween created on telegraph spawn")
+	assert_true(tween.is_valid(), "indicator tween is valid post-fade-in")
+	assert_true(tween.is_running(),
+		"strobe tween is still running during the hold window — confirms " +
+		"the post-fade-in step is a strobe, not a static hold")
+
+
+# ---- Boss HP nerf (Sponsor 2026-05-21 dev utility) -------------------
+
+## DebugFlags.boss_hp_mult defaults to 1.0; Stratum1Boss._apply_mob_def
+## multiplies through. Test the bare-instance branch (no MobDef) so the
+## 600-HP fallback path is exercised — that's the path that drives bare GUT
+## tests, and the multiplier needs to apply there too so tests can opt-in.
+func test_boss_hp_nerf_applies_to_bare_instance_hp() -> void:
+	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
+	assert_not_null(df, "DebugFlags autoload is wired")
+	df.set_boss_hp_mult_for_test(0.5)
+	var b: Stratum1Boss = BossScript.new()
+	b.skip_intro_for_tests = true
+	add_child_autofree(b)
+	# Bare-instance fallback: 600 HP × 0.5 = 300.
+	assert_eq(b.hp_max, 300, "bare-instance HP 600 × 0.5 mult = 300")
+	assert_eq(b.hp_current, 300, "bare-instance current HP matches max post-nerf")
+	df.reset_boss_hp_mult_for_test()
+
+
+## Default behavior: when no multiplier is set, the bare-instance boss falls
+## back to its production 600-HP default — i.e. the nerf is opt-in only.
+func test_boss_hp_default_when_no_mult() -> void:
+	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
+	df.reset_boss_hp_mult_for_test()
+	var b: Stratum1Boss = BossScript.new()
+	b.skip_intro_for_tests = true
+	add_child_autofree(b)
+	assert_eq(b.hp_max, 600, "no-mult default HP = 600 (production)")
+
+
+## DebugFlags clamps multiplier inputs to [MIN, MAX]. Below MIN should clamp
+## up; above MAX should clamp down. The clamped value is what gets multiplied
+## into HP, so we can read clamping behavior through the boss.
+func test_boss_hp_mult_clamps_extreme_inputs() -> void:
+	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
+	# Below MIN (0.05): should clamp UP to 0.05.
+	df.set_boss_hp_mult_for_test(0.001)
+	var b1: Stratum1Boss = BossScript.new()
+	b1.skip_intro_for_tests = true
+	add_child_autofree(b1)
+	# 600 × 0.05 = 30 (clamped); below 0.05 would give a much smaller value.
+	assert_eq(b1.hp_max, 30,
+		"sub-MIN input clamps to BOSS_HP_MULT_MIN=0.05 → 600 × 0.05 = 30")
+	# Above MAX (5.0): should clamp DOWN to 5.0.
+	df.set_boss_hp_mult_for_test(99.0)
+	var b2: Stratum1Boss = BossScript.new()
+	b2.skip_intro_for_tests = true
+	add_child_autofree(b2)
+	assert_eq(b2.hp_max, 3000,
+		"super-MAX input clamps to BOSS_HP_MULT_MAX=5.0 → 600 × 5.0 = 3000")
+	df.reset_boss_hp_mult_for_test()
 
 
 # ---- T6-3: aftershock self-frees on finished --------------------------

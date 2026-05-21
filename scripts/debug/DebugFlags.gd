@@ -39,9 +39,30 @@ const TEST_MODE_MOB_SEED: int = 0x7E57C0DE
 const TEST_MODE_CLI_FLAG: String = "--test-mode"
 const TEST_MODE_ENV_VAR: String = "EMBERGRAVE_TEST_MODE"
 
+## Boss HP multiplier — Sponsor soak-iteration dev utility (2026-05-21). Reads
+## from the HTML5 URL query param `boss_hp_mult` on boot; defaults to 1.0 (no
+## nerf) when missing / malformed / desktop. Clamped to [0.05, 5.0] to keep
+## extreme values from breaking phase-boundary math. Applied at boss spawn-time
+## by `Stratum1Boss._apply_mob_def` (see that function for the multiplication
+## point).
+##
+## Usage:
+##   http://localhost:8080/?boss_hp_mult=0.5   → 300 HP boss (50% nerf)
+##   http://localhost:8080/?boss_hp_mult=0.1   → 60  HP boss (10% — fast soak)
+##   http://localhost:8080/                    → 600 HP boss (production default)
+##
+## Desktop / headless GUT always reads 1.0 (no JavaScriptBridge available); the
+## multiplier never affects production / non-web builds. Trace line emitted on
+## boot lists the resolved value so Sponsor can confirm the URL param landed.
+const BOSS_HP_MULT_QUERY_PARAM: String = "boss_hp_mult"
+const BOSS_HP_MULT_DEFAULT: float = 1.0
+const BOSS_HP_MULT_MIN: float = 0.05
+const BOSS_HP_MULT_MAX: float = 5.0
+
 # Public state — read by gameplay code, written only via toggle/parse functions.
 var fast_xp_enabled: bool = false
 var test_mode_enabled: bool = false
+var boss_hp_mult: float = BOSS_HP_MULT_DEFAULT
 
 # Emitted when fast_xp_enabled flips, so HUD/debug overlays can reflect it.
 signal fast_xp_toggled(enabled: bool)
@@ -52,12 +73,14 @@ func _ready() -> void:
 	# Even in release, ignoring the flag here keeps test_mode_enabled=false,
 	# so mob spawn seed stays free. See `_resolve_test_mode()` for gating.
 	_resolve_test_mode()
+	_resolve_boss_hp_mult()
 	# Single boot-time line for Tess's grep.
-	print("[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s web=%s" % [
+	print("[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s web=%s boss_hp_mult=%.3f" % [
 		OS.is_debug_build(),
 		test_mode_enabled,
 		fast_xp_enabled,
 		OS.has_feature("web"),
+		boss_hp_mult,
 	])
 
 
@@ -178,3 +201,65 @@ func _resolve_test_mode() -> void:
 	var raw: String = OS.get_environment(TEST_MODE_ENV_VAR).strip_edges().to_lower()
 	if raw != "" and raw != "0" and raw != "false":
 		test_mode_enabled = true
+
+
+## Sponsor 2026-05-21 soak-iteration utility. Reads the `boss_hp_mult` URL
+## query param via JavaScriptBridge on HTML5; no-op on desktop / headless GUT.
+## Defaults to 1.0 (production HP); clamps parsed values to [MIN, MAX] so
+## extreme inputs don't break phase-boundary math (a 0.01 mult on 600 HP would
+## leave 6 HP, below the 198 phase-3 threshold and below the 396 phase-2
+## threshold — phase boundaries would never latch). Applied at boss spawn-time
+## in `Stratum1Boss._apply_mob_def`.
+##
+## Why no debug-build gate (unlike fast_xp / test_mode): Sponsor's iteration
+## workflow runs against the same HTML5 release-build artifact as production
+## soak. Debug-gating here would make the utility unusable for its actual
+## consumer. Mitigations: (a) default is always 1.0 — no behavior change
+## without an explicit URL param, (b) clamped range, (c) HTML5-only via
+## JavaScriptBridge — desktop / headless tests never touch it. If Tess wants
+## to exercise the mult path in GUT, `set_boss_hp_mult_for_test()` below
+## provides a clean injection surface that bypasses the bridge.
+func _resolve_boss_hp_mult() -> void:
+	# Default unless we successfully read a valid float from the URL.
+	boss_hp_mult = BOSS_HP_MULT_DEFAULT
+	if not OS.has_feature("web"):
+		return
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return
+	var bridge: Object = Engine.get_singleton("JavaScriptBridge")
+	# Read the query param. `URLSearchParams.get(key)` returns null when absent,
+	# string otherwise. We coerce via String() and bail if empty/null.
+	var raw_value: Variant = bridge.eval(
+		"new URLSearchParams(window.location.search).get('%s')" % BOSS_HP_MULT_QUERY_PARAM,
+		true)
+	if raw_value == null:
+		return
+	var raw_str: String = str(raw_value).strip_edges()
+	if raw_str.is_empty() or raw_str == "null":
+		return
+	if not raw_str.is_valid_float():
+		push_warning("[DebugFlags] boss_hp_mult URL param invalid float: %s" % raw_str)
+		return
+	var parsed: float = raw_str.to_float()
+	# Clamp to safe range so extreme inputs don't break phase-boundary math.
+	var clamped: float = clamp(parsed, BOSS_HP_MULT_MIN, BOSS_HP_MULT_MAX)
+	boss_hp_mult = clamped
+	if not is_equal_approx(parsed, clamped):
+		push_warning(("[DebugFlags] boss_hp_mult clamped from %.3f to %.3f " +
+			"(range [%.2f..%.2f])") % [
+				parsed, clamped, BOSS_HP_MULT_MIN, BOSS_HP_MULT_MAX])
+
+
+## Test-only: inject a boss HP multiplier without going through the JS bridge.
+## Tests can call this in `before_each` to exercise the nerf path in headless
+## GUT (the production bridge path is unreachable from GUT — `OS.has_feature("web")`
+## is always false). Clamps to the production range to keep test inputs
+## self-consistent with what the URL parser would accept.
+func set_boss_hp_mult_for_test(mult: float) -> void:
+	boss_hp_mult = clamp(mult, BOSS_HP_MULT_MIN, BOSS_HP_MULT_MAX)
+
+
+## Test-only: reset to production default. Pair with `set_boss_hp_mult_for_test`
+## in `after_each` so leaked state can't cascade across the test file.
+func reset_boss_hp_mult_for_test() -> void:
+	boss_hp_mult = BOSS_HP_MULT_DEFAULT
