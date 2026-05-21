@@ -116,5 +116,5 @@ func test_slam_anim_total_duration_fits_inside_slam_recovery_window() -> void:
 		% [anim_duration, Stratum1Boss.SLAM_RECOVERY * 2.0])
 	# Lower bound: anim shouldn't be a 1-frame still — the slam needs at
 	# least 3 visible frames to read as a strike motion.
-	assert_ge(EXPECTED_FRAME_COUNT, 3,
-		"slam anim has ≥3 frames (visible strike motion)")
+	assert_gte(EXPECTED_FRAME_COUNT, 3,
+		"slam anim has >=3 frames (visible strike motion)")
