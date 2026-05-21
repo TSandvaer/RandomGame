@@ -5,8 +5,11 @@ extends GutTest
 ## (actually Node2D + draw_arc — see implementation note in Stratum1Boss.gd
 ## header) circle indicator at SLAM_HITBOX_RADIUS.
 ##
-## **T6** (ticket `86c9wjyuv`) — slam aftershock 12-particle ember burst on
-## slam-fire, parented to the room so it persists past slam-recovery.
+## **T6** (ticket `86c9wjyuv`) — slam aftershock 24-particle ember burst on
+## slam-fire (bumped from 12 in PR #291 v5 after screenshot-capture proved 12
+## blended with the boss's red armor), parented to the room so it persists past
+## slam-recovery. Ramp upgraded to 3-stop white-flash → ember-light → ember-deep
+## so the first ~85 ms reads as a high-contrast impact frame.
 ##
 ## ## Coverage
 ##
@@ -27,9 +30,10 @@ extends GutTest
 ##   T6-1. Slam-fire spawns a CPUParticles2D burst parented to the boss's
 ##         parent (room), NOT the boss itself, so the burst persists past
 ##         boss queue_free.
-##   T6-2. Burst configuration: 12 particles, lifetime tracks the script
-##         constant (350 ms post-Sponsor-soak visibility fix), 40–80 px/s
-##         velocity, ember light → deep ramp, rising gravity, z_index +1.
+##   T6-2. Burst configuration: 24 particles (v5 visibility fix), lifetime
+##         tracks SLAM_AFTERSHOCK_LIFETIME (350 ms), 40–80 px/s velocity,
+##         3-stop white-flash → ember-light → ember-deep ramp, rising gravity,
+##         z_index +1.
 ##   T6-3. Burst self-frees on `finished` signal — `queue_free` connected.
 ##   HP-1. Bare-instance boss respects DebugFlags.boss_hp_mult (Sponsor 2026-05-21).
 ##   HP-2. Default (no multiplier set) → production 600 HP.
@@ -290,9 +294,14 @@ func test_slam_aftershock_burst_config_matches_scope_ac() -> void:
 			burst = child
 			break
 	assert_not_null(burst, "burst spawned")
-	# Particle count: 12 (half of boss-death's 24, per Priya AC).
-	assert_eq(burst.amount, 12,
-		"T6-2: aftershock = 12 particles per scope-doc AC")
+	# Particle count: BUMPED from 12 (scope-AC) → 24 after PR #291 v5 self-soak
+	# (2026-05-21 SHA 83831c4). Screenshot capture confirmed v3's 12 particles
+	# rendered correctly but blended with the boss's red armor; 24 (matching
+	# death-burst density) + impact-flash ramp gives the burst readable contrast.
+	assert_eq(burst.amount, Stratum1Boss.SLAM_AFTERSHOCK_PARTICLE_COUNT,
+		"T6-2: aftershock particle count tracks SLAM_AFTERSHOCK_PARTICLE_COUNT constant")
+	assert_eq(burst.amount, 24,
+		"T6-2: aftershock = 24 particles (v5 visibility fix vs scope-AC 12)")
 	# Lifetime: BUMPED from 200 ms → 350 ms after Sponsor 2026-05-21 soak
 	# "see no aftershock" report. The boss script constant is the source of
 	# truth — assert via the constant so this stays in sync if it tunes again.
@@ -323,17 +332,27 @@ func test_slam_aftershock_burst_config_matches_scope_ac() -> void:
 		"html5-export.md §Z-index sensitivity")
 	assert_true(burst.scale_amount_min > 1.0,
 		"T6-2: aftershock scale > 1.0 — larger ember footprint vs death-burst's 1.0")
-	# Ember ramp: light → deep (mirrors death burst).
+	# Impact-flash ramp (PR #291 v5): white-hot → ember-light → ember-deep.
+	# Was ember-only (EMBER_LIGHT → EMBER_DEEP) in v3; the start-color was too
+	# close to the boss's red armor and the burst read as sprite noise rather
+	# than an impact tell. The 3-stop ramp puts a high-contrast flash at the
+	# first ~85 ms of the 350 ms lifetime, then falls back to ember.
 	var ramp: Gradient = burst.color_ramp
 	assert_not_null(ramp, "T6-2: aftershock has a color ramp")
-	# Start color = EMBER_LIGHT (#FFB066), end = EMBER_DEEP (#A02E08).
-	# Match against the same constants the boss exposes.
+	# Start color = AFTERSHOCK_FLASH_WHITE (#FFF2BF), midpoint near EMBER_LIGHT,
+	# end = EMBER_DEEP (#A02E08). Match against the boss-exposed constants so
+	# this stays in sync if the v5 tuning needs another pass.
 	var start: Color = ramp.sample(0.0)
+	var mid: Color = ramp.sample(0.25)
 	var end: Color = ramp.sample(1.0)
-	assert_almost_eq(start.r, Stratum1Boss.EMBER_LIGHT.r, 0.005,
-		"T6-2: ramp start matches EMBER_LIGHT R")
+	assert_almost_eq(start.r, Stratum1Boss.AFTERSHOCK_FLASH_WHITE.r, 0.005,
+		"T6-2 v5: ramp start matches AFTERSHOCK_FLASH_WHITE R (impact flash)")
+	assert_almost_eq(start.g, Stratum1Boss.AFTERSHOCK_FLASH_WHITE.g, 0.005,
+		"T6-2 v5: ramp start matches AFTERSHOCK_FLASH_WHITE G")
+	assert_almost_eq(mid.r, Stratum1Boss.EMBER_LIGHT.r, 0.01,
+		"T6-2 v5: ramp midpoint @0.25 matches EMBER_LIGHT R (warm fade-through)")
 	assert_almost_eq(end.r, Stratum1Boss.EMBER_DEEP.r, 0.005,
-		"T6-2: ramp end matches EMBER_DEEP R")
+		"T6-2 v5: ramp end matches EMBER_DEEP R")
 	# Origin = slam impact position (boss global_position at slam-fire).
 	assert_almost_eq(burst.global_position.x, 100.0, 0.5,
 		"T6-2: aftershock origin x matches boss position")

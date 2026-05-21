@@ -375,18 +375,38 @@ const SLAM_INDICATOR_STROBE_HZ: float = 5.0
 const SLAM_INDICATOR_STROBE_HIGH: float = 1.0   # perceived peak alpha = 1.0 × 0.5 = 0.5
 const SLAM_INDICATOR_STROBE_LOW: float = 0.25   # perceived trough     = 0.25 × 0.5 = 0.125
 
-## T6 slam aftershock burst — half-volume mirror of `_spawn_death_particles`.
-## 12 particles vs boss-death's 24 (per scope doc T6 AC + uma combat-visual-feedback §3
-## budget — boss-death's 24 is the upper bound).
-const SLAM_AFTERSHOCK_PARTICLE_COUNT: int = 12
+## T6 slam aftershock burst — was "half-volume" mirror of `_spawn_death_particles`
+## (12 vs 24). v5 (PR #291 SHA `83831c4` self-soak 2026-05-21): empirical screenshot
+## capture confirmed particles ARE rendering — but at 12 particles + ember ramp
+## (`EMBER_LIGHT` → `EMBER_DEEP`, both warm-red) they blend with the boss's red
+## armor and read as boss-sprite noise rather than a distinct impact tell. Sponsor
+## "see no aftershock" on v3 is a visibility / contrast issue, not a missing-fire
+## issue (trace shows `_spawn_slam_aftershock | particles=12 ... origin=(240,165)
+## parent_path=/root/Main/World/Stratum1BossRoom` firing correctly). Fix shape:
+## raise to 24 (matching death-burst density) + replace `EMBER_LIGHT` ramp[0] with
+## a near-white-hot impact flash (`AFTERSHOCK_FLASH_WHITE`) so the burst starts
+## bright and fades to ember — gives the high-contrast "impact" frame the boss's
+## red armor was washing out. Death-burst keeps ember-only because the boss is
+## already dead and there's no sprite to contrast against.
+const SLAM_AFTERSHOCK_PARTICLE_COUNT: int = 24
 ## Lifetime BUMPED from 200 ms (scope-AC) → 350 ms after Sponsor 2026-05-21 soak
 ## report "see no aftershock" on SHA `46bdcc9`. 200 ms × 60 fps = 12 frames —
 ## empirically insufficient for the burst to read in HTML5 / `gl_compatibility`,
 ## particularly with no rising gravity (particles stayed near boss origin and
-## drew behind the AnimatedSprite2D sprite child). Death-burst at 300 ms reads
-## fine; we lift to 350 ms with rising gravity + z_index +1 to surface above
-## the boss body. Documented in PR #291 Self-Test Report v2.
+## drew behind the AnimatedSprite2D sprite child). v5 keeps 350 ms — screenshot
+## capture confirmed the duration is correct; visibility is now solved via
+## particle count + impact-flash ramp, not lifetime. Documented in PR #291
+## Self-Test Report v5.
 const SLAM_AFTERSHOCK_LIFETIME: float = 0.35
+## Impact-flash color for the aftershock ramp[0]. Near-white-hot so the first
+## ~50 ms of the burst flashes bright against the red boss armor before fading
+## to `EMBER_DEEP`. Uma's "impact flash" visual-language pattern from death-burst
+## doesn't apply (death is post-sprite-fade); aftershock fires WHILE the boss
+## sprite is on-screen, so the start-color needs to contrast against red armor
+## not blend with it. Channel-sum 1.0+0.95+0.75 = 2.7 vs `EMBER_LIGHT` 1.0+0.69+0.40
+## = 2.09 — the +29% luminance lift is what makes the impact frame read.
+## All channels < 1.05 for HTML5 HDR-clamp safety per `.claude/docs/html5-export.md`.
+const AFTERSHOCK_FLASH_WHITE: Color = Color(1.0, 0.95, 0.75, 1.0)  # #FFF2BF
 ## Outward velocity range (px/s) — 40-80 per Priya AC. Slower than death burst's
 ## 30-60 because aftershock is impact-radial; death burst is upward-rising.
 const SLAM_AFTERSHOCK_VELOCITY_MIN: float = 40.0
@@ -1186,10 +1206,18 @@ func _spawn_slam_aftershock() -> void:
 	burst.spread = SLAM_AFTERSHOCK_SPREAD
 	burst.initial_velocity_min = SLAM_AFTERSHOCK_VELOCITY_MIN
 	burst.initial_velocity_max = SLAM_AFTERSHOCK_VELOCITY_MAX
-	# Ember ramp — light → deep, mirrors death burst.
+	# Impact-flash ramp (v5 visibility fix): start near-white-hot then fade through
+	# ember-light to ember-deep. The white-hot start gives a high-contrast "impact"
+	# frame against the boss's red armor — pure ember-only ramp washed out against
+	# the boss sprite in v3 (screenshot evidence: PR #291 v5 self-soak). Three-stop
+	# Gradient: 0.0=flash, 0.25=ember-light, 1.0=ember-deep so the flash decays
+	# within the first ~85 ms of the 350 ms lifetime.
+	# Gradient.new() starts with 2 default points at offsets 0.0 and 1.0;
+	# set_color writes them, add_point inserts a third in the middle.
 	var ramp: Gradient = Gradient.new()
-	ramp.set_color(0, EMBER_LIGHT)
+	ramp.set_color(0, AFTERSHOCK_FLASH_WHITE)
 	ramp.set_color(1, EMBER_DEEP)
+	ramp.add_point(0.25, EMBER_LIGHT)
 	burst.color_ramp = ramp
 	# T6 visibility-fix (Sponsor soak 2026-05-21 — "see no aftershock"): rise +
 	# z_index +1 so the burst climbs above the boss sprite during its short
