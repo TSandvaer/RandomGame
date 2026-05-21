@@ -34,13 +34,45 @@ Generated: 2026-05-17 (PR #263 batch)
 | `walk/` | `animating-08e307cd/` | `animating` (custom — wide-stance idle / movement) | 6 |
 | `atk/` | `animating-7691a7fc/` | `animating` (custom — heavy melee swing) | 8 |
 | `atk_telegraph/` | `animating-227a1442/` | `animating` (custom — windup pose) | 8 |
-| `slam/` | `roundhouse_kick-4d533f1e/` | `roundhouse_kick` (mannequin template — spinning AoE) | 7 |
+| `slam/` | (multi-UUID, see below) | `surprise-uppercut` (mannequin template — upward strike) | 7 |
 | `slam_telegraph/` | `uppercut-1a9f12cd/` | `uppercut` (mannequin template — upward windup) | 7 |
 | `hit/` | `taking_a_punch-749388de/` | `taking_a_punch` (mannequin template — hit reaction) | 6 |
 | `die/` | `falling_backward-c0134300/` | `falling_backward` (mannequin template — death fall) | 7 |
 
 Frame counts per anim (across all 8 directions): 6+8+8+7+7+6+7 = 49 frames/dir
 × 8 dirs = **392 frames total** in `Stratum1Boss.tres`.
+
+### `slam/` source — `surprise-uppercut` per-direction UUIDs (2026-05-21 B3 swap)
+
+The original `slam/` shipped at PR #263 was sourced from PixelLab template
+`roundhouse_kick` (folder `roundhouse_kick-4d533f1e/`). Sponsor's 2026-05-21
+soak iteration on PR #291 surfaced the visual as a kick rather than the
+intended weapon-uppercut slam (B3 finding). Replaced 2026-05-21 with
+`surprise-uppercut` template frames pre-existing from the 2026-05-17
+generation batch — zero new gens consumed.
+
+Per-direction PixelLab animation UUIDs (sourced from `get_character` output
+saved to orchestrator tool-result file 2026-05-21):
+
+| Direction | `surprise-uppercut` UUID |
+|---|---|
+| `north-east` | `89b6c052-3be4-4082-86ac-eaf817674de7` |
+| `north` | `c08a4f34-90dd-4d8c-a5a6-0a8a14123de5` |
+| `south-west` | `9ca8f456-f078-4820-b62d-345ee510de59` |
+| `south-east` | `e74c6755-2989-4798-a0b6-a16ec02d2cbe` |
+| `south` | `e524e0f9-633c-4360-adaf-84e26e9a243b` |
+| `north-west` | `10d5df34-26a8-4a3f-8de6-18c8a154253f` |
+| `east` | `fc3041d4-9ee5-463b-a5d9-0205434bde52` |
+| `west` | `b35b22dd-71ee-40be-9100-d6dba5a46aa8` |
+
+Each UUID maps to 7 frames (`0.png`–`6.png` from PixelLab CDN, renamed to
+`frame_000.png`–`frame_006.png` on import to match the existing M3W-4
+SpriteFrames path contract). Frame canvas: 80×80 RGBA, same as all other
+boss animations. Palette: at parity with the existing un-doctrine-locked
+boss frames — same iron/grey/red family, no doctrine remap required (see
+2026-05-21 palette spot-check via Pillow inspection — old slam frame_003
+and new slam frame_003 share the iron ramp `#EBEEF7`/`#D7D6E6`/`#C5C4D4`
+/.../`#585767`).
 
 ## State-machine mapping (per `scripts/mobs/Stratum1Boss.gd`)
 
