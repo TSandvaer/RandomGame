@@ -275,8 +275,16 @@ func trigger_entry_sequence() -> void:
 
 ## Test-only: skip the wall-clock wait and complete the sequence now.
 ## Production code never calls this — production waits the real 1.8 s.
+## Also fast-forwards past the boss's ~417 ms WAKE_DURATION window
+## (M3-T2-W1-T8, ticket 86c9wjyp9) so existing integration tests that
+## expect STATE_IDLE immediately after this call continue to pass without
+## per-test wake-tick simulation. Tests that specifically need to observe
+## the WAKING window should call `room._complete_entry_sequence()` directly
+## and inspect `boss.is_waking()` before this helper's wake fast-forward.
 func complete_entry_sequence_for_test() -> void:
 	_complete_entry_sequence()
+	if _boss != null and is_instance_valid(_boss) and _boss.has_method("complete_wake_for_test"):
+		_boss.complete_wake_for_test()
 
 
 # ---- Internal --------------------------------------------------------

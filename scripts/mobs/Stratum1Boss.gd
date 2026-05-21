@@ -78,6 +78,7 @@ signal boss_died(mob: Stratum1Boss, death_position: Vector2, mob_def: MobDef)
 # ---- States ------------------------------------------------------------
 
 const STATE_DORMANT: StringName = &"dormant"            # pre-wake (intro)
+const STATE_WAKING: StringName = &"waking"              # mid-wake-anim (damage-immune)
 const STATE_IDLE: StringName = &"idle"                  # awake, no target
 const STATE_CHASING: StringName = &"chasing"
 const STATE_TELEGRAPHING_MELEE: StringName = &"telegraphing_melee"
@@ -145,6 +146,15 @@ const SLAM_COOLDOWN: float = 4.0
 ## damage immune (per Uma's design: no double-triggering by hit-spam).
 ## Wraps the world-time-slow that Devon's cinematic layer applies.
 const PHASE_TRANSITION_DURATION: float = 0.60
+
+## M3-T2-W1-T8 wake-anim duration (ticket 86c9wjyp9). Five PixelLab frames at
+## SpriteFrames speed=12 fps = ~417 ms total. Uma BI-06 targeted ~500 ms for the
+## boss-wake animation timing — 417 ms lands inside that band. During this
+## window the boss is damage-immune (extends the DORMANT intro-fairness rule
+## through the wake animation tail so the player can't kill the boss before it
+## has stood up). `boss_woke.emit()` still fires at the START of WAKING (Beat 3
+## audio stinger lands immediately on wake entry — matches BI-06).
+const WAKE_DURATION: float = 0.417
 
 # ---- M3 Tier 2 Wave 1 T2 + T3 cinematic-feel constants ----------------
 # T2 hit-pause + final-freeze (ticket 86c9wjy1t):
@@ -266,6 +276,7 @@ var _slam_telegraph_left: float = 0.0
 var _slam_recovery_left: float = 0.0
 var _slam_cooldown_left: float = 0.0
 var _phase_transition_left: float = 0.0
+var _wake_left: float = 0.0  # M3-T2-W1-T8: wake-anim countdown
 
 # Idempotent phase-change latches — prevent rapid-hit-spam from re-firing
 # `phase_changed` for the same boundary. Set true the moment the boundary
@@ -361,6 +372,14 @@ func is_dormant() -> bool:
 	return _state == STATE_DORMANT
 
 
+## M3-T2-W1-T8: True during the ~417 ms wake-anim window (damage immune; the
+## boss is standing up but cannot yet act or be hit). Exposed for tests +
+## external observers (e.g. cinematic camera that should hold focus through
+## the wake animation, not just the dormant pre-wake window).
+func is_waking() -> bool:
+	return _state == STATE_WAKING
+
+
 ## True during the 0.6 s phase-transition window (stagger + damage immune).
 func is_in_phase_transition() -> bool:
 	return _state == STATE_PHASE_TRANSITION
@@ -382,20 +401,44 @@ func apply_mob_def(def: MobDef) -> void:
 	_apply_mob_def()
 
 
+## Test-only: fast-forward through the ~417 ms WAKE_DURATION window without
+## requiring physics-tick simulation. After this call the boss is in
+## STATE_IDLE (combat-ready, damage-eligible). Production never calls this —
+## production drains `_wake_left` via `_process_waking` on real physics ticks.
+##
+## Use this in GUT tests that need to skip past the wake animation to test
+## downstream combat behavior (damage-eligibility, chase-loop, AI dispatch).
+## The test-only `Stratum1BossRoom.complete_entry_sequence_for_test()` chains
+## into this so existing room-based integration tests continue to land in
+## STATE_IDLE without per-test changes.
+func complete_wake_for_test() -> void:
+	if _state != STATE_WAKING:
+		return
+	_wake_left = 0.0
+	_set_state(STATE_IDLE)
+
+
 ## Wake the boss — called by `BossRoomTrigger` after the 1.8 s entry
-## sequence completes. From here on the boss can act, take damage, and die.
-## Idempotent — calling twice has no extra effect.
+## sequence completes. Transitions DORMANT → WAKING (plays the standup
+## animation + remains damage-immune) and then auto-advances to IDLE after
+## `WAKE_DURATION` (~417 ms) via `_process_waking`. Idempotent — calling
+## twice has no extra effect.
+##
+## `boss_woke.emit()` fires at the START of WAKING so the BI-06 audio stinger
+## (Uma boss-intro brief, Beat 3) lands on wake entry, NOT at the end of the
+## wake animation. This matches the audio-direction.md cue contract.
 func wake() -> void:
 	if _state != STATE_DORMANT:
 		return
-	# [combat-trace] diagnostic (ticket 86c9ujq8d — finding 1): confirms the
-	# boss successfully exited DORMANT and can now engage the player. If this
-	# line never appears in the soak stream, the entry sequence timer did not
-	# fire — look for `trigger_entry_sequence` call (auto-fire in
+	# [combat-trace] diagnostic (ticket 86c9ujq8d — finding 1, extended T8):
+	# confirms the boss successfully exited DORMANT into the wake-anim window.
+	# If this line never appears in the soak stream, the entry sequence timer
+	# did not fire — look for `trigger_entry_sequence` call (auto-fire in
 	# `_assemble_room_fixtures`) and the SceneTreeTimer creation path.
 	_combat_trace("Stratum1Boss.wake",
-		"exiting STATE_DORMANT — boss now IDLE, combat enabled")
-	_set_state(STATE_IDLE)
+		"exiting STATE_DORMANT -> STATE_WAKING (damage-immune wake-anim window, %.3fs)" % WAKE_DURATION)
+	_wake_left = WAKE_DURATION
+	_set_state(STATE_WAKING)
 	boss_woke.emit()
 
 
@@ -403,6 +446,8 @@ func wake() -> void:
 ##
 ##   - Damage during STATE_DEAD is ignored.
 ##   - Damage during STATE_DORMANT is ignored (intro fairness protection).
+##   - Damage during STATE_WAKING is ignored (M3-T2-W1-T8: wake-anim window
+##     extends intro fairness through the boss's standup animation).
 ##   - Damage during STATE_PHASE_TRANSITION is ignored (Uma's stagger-
 ##     immune-during-transition rule + idempotent phase-change guard).
 ##   - Negative amounts clamped to 0.
@@ -419,6 +464,16 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 		# dormant — the M2 W1 P0 root cause). Wired against `86c9q96fv`.
 		_combat_trace("Stratum1Boss.take_damage",
 			"IGNORED dormant amount=%d hp=%d (boss still in entry sequence)" % [amount, hp_current])
+		return
+	if _state == STATE_WAKING:
+		# M3-T2-W1-T8 (ticket 86c9wjyp9): extends the intro-fairness rule through
+		# the wake animation. The boss has exited DORMANT but is still standing
+		# up — combat shouldn't start landing damage until the wake-anim window
+		# closes (~417 ms after `wake()`). Mirrors the DORMANT trace shape so a
+		# soak diagnostician can discriminate "wake-window rejection" from
+		# "dormant rejection" by a single trace-line read.
+		_combat_trace("Stratum1Boss.take_damage",
+			"IGNORED waking amount=%d hp=%d wake_left=%.3f (wake-anim window)" % [amount, hp_current, _wake_left])
 		return
 	if _state == STATE_PHASE_TRANSITION:
 		_combat_trace("Stratum1Boss.take_damage",
@@ -519,6 +574,18 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 	_tick_timers(delta)
+
+	# Wake-anim window (M3-T2-W1-T8). Rooted, damage-immune, plays `wake_<dir>`
+	# once. When `_wake_left` drains we hand off to STATE_IDLE — `_process_chase`
+	# picks up on the next tick if a player is present.
+	if _state == STATE_WAKING:
+		velocity = Vector2.ZERO
+		if _wake_left <= 0.0:
+			_combat_trace("Stratum1Boss._process_waking",
+				"wake-anim complete -> STATE_IDLE (damage-immunity ends)")
+			_set_state(STATE_IDLE)
+		move_and_slide()
+		return
 
 	# Phase-transition window — when it expires, commit the pending phase.
 	if _state == STATE_PHASE_TRANSITION:
@@ -1140,7 +1207,9 @@ func _on_swing_spawned_audio(kind: StringName, _hitbox: Node) -> void:
 
 
 ## M3-T2-W1-T7 — Uma `boss-intro.md` BI-06 (boss-wake stinger).
-## Fires once on boss wake (STATE_DORMANT → STATE_IDLE transition).
+## Fires once on boss wake (STATE_DORMANT → STATE_WAKING transition — at the
+## START of the wake-anim window, so the audio stinger lands on Beat 3
+## immediately rather than at the tail of the ~417 ms standup animation).
 func _on_boss_woke_audio() -> void:
 	var ad: Node = _resolve_audio_director()
 	if ad == null or not ad.has_method("play_sfx"):
@@ -1233,6 +1302,8 @@ func _tick_timers(delta: float) -> void:
 		_slam_cooldown_left = max(0.0, _slam_cooldown_left - delta)
 	if _phase_transition_left > 0.0:
 		_phase_transition_left = max(0.0, _phase_transition_left - delta)
+	if _wake_left > 0.0:
+		_wake_left = max(0.0, _wake_left - delta)
 
 
 func _set_state(new_state: StringName) -> void:
@@ -1243,12 +1314,16 @@ func _set_state(new_state: StringName) -> void:
 	# M3W-4 animation playback — map state → SpriteFrames anim key. `hit_<dir>`
 	# and `die_<dir>` are driven directly from `take_damage` / `_die` (one-shot
 	# beats that interrupt the state-anim); the state-driven mapping covers
-	# walk/atk/atk_telegraph/slam/slam_telegraph. STATE_DEAD has no entry — `_die`
-	# plays `die_<dir>` explicitly. STATE_DORMANT and STATE_PHASE_TRANSITION are
-	# also no-op here — boss anim is frozen in those states (dormant uses the
+	# wake/walk/atk/atk_telegraph/slam/slam_telegraph. STATE_DEAD has no entry —
+	# `_die` plays `die_<dir>` explicitly. STATE_DORMANT and STATE_PHASE_TRANSITION
+	# are also no-op here — boss anim is frozen in those states (dormant uses the
 	# .tscn-assigned default `walk_s` frame-0; phase transition holds whatever
 	# anim was last playing as the 0.6 s damage-immune window expires).
+	# STATE_WAKING (M3-T2-W1-T8, ticket 86c9wjyp9) plays `wake_<dir>` once — the
+	# one-shot stand-up animation that bridges DORMANT and IDLE, ~417 ms long.
 	match new_state:
+		STATE_WAKING:
+			_play_anim(&"wake")
 		STATE_IDLE, STATE_CHASING:
 			_play_anim(&"walk")
 		STATE_TELEGRAPHING_MELEE:
@@ -1267,9 +1342,9 @@ func _set_state(new_state: StringName) -> void:
 ## Play an animation on the AnimatedSprite2D child. Resolves the child lazily
 ## on first call so bare-instanced test bosses (no Sprite child or ColorRect
 ## fallback) no-op safely. `state` is the state-key prefix (`walk`, `atk`,
-## `atk_telegraph`, `slam`, `slam_telegraph`, `hit`, `die`); the full SpriteFrames
-## key is `<state>_<dir>` where `<dir>` is derived from the boss's intent —
-## direction toward the player when known, "s" otherwise.
+## `atk_telegraph`, `slam`, `slam_telegraph`, `hit`, `die`, `wake`); the full
+## SpriteFrames key is `<state>_<dir>` where `<dir>` is derived from the boss's
+## intent — direction toward the player when known, "s" otherwise.
 ##
 ## M3W-4 convention — mirrors `Grunt._play_anim` / `Shooter._play_anim` /
 ## `Charger._play_anim` from M3W-3 with a non-trivial `<dir>` resolver. Boss
