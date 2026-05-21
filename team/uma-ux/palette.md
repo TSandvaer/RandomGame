@@ -27,7 +27,7 @@ The ember-orange ramp is constant across **all 8 strata**. It is the player's fl
 | Section header            | `#FF6A2A` | Small caps; ember.                     |
 | Cell empty border         | `#3A3540` | At 40% opacity for empty inventory cells. |
 | Cell hover border         | `#FF6A2A` | Ember at 100%.                         |
-| Vignette                  | `#000000` | Dark overlay, 30% (S1) → 60% (S8).     |
+| Vignette                  | `#0A0606` | Warm-black overlay, 30% (S1) → 60% (S8). Sub-1.0 RGB per channel for HTML5 HDR-clamp safety; slight R-bias honors S1 "warm cloister" anti-list. See [`vignette-spec.md`](vignette-spec.md) (T12 direction, landed via PR #292) for full opacity-curve + rendering-primitive contract. |
 
 ## Status / state colors
 
