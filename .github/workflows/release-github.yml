@@ -30,6 +30,16 @@ on:
       - "v*-rc*"
       - "v*-m1-*"
       - "m1-rc*"
+  # Option C (Sponsor 2026-05-21) — fire on every PR open/sync targeting main so
+  # the HTML5 artifact is built automatically at review-time. Pairs with
+  # playwright-e2e.yml's pull_request trigger: release-github.yml produces the
+  # artifact, playwright-e2e.yml polls for it via SHA and runs the browser suite.
+  # See .claude/docs/test-conventions.md § "Playwright e2e CI does NOT auto-trigger
+  # on feat/* branches — manual kick required (PR #293)" — Option C closes that
+  # gap. Cost estimate: ~600-1000 min/month, near GitHub free-tier limits.
+  pull_request:
+    branches:
+      - main
 
 env:
   GODOT_VERSION: "4.3"
