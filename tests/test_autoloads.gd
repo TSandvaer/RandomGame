@@ -54,6 +54,29 @@ func test_save_schema_version_constant_is_positive_int() -> void:
 	assert_gt(v, 0, "SCHEMA_VERSION must be >= 1 (current: %d)" % v)
 
 
+# --- DialogueController autoload (ticket 86c9xuab3 — M3 Tier 3 W1 spike) -----
+
+func test_dialogue_controller_autoload_registered() -> void:
+	# DialogueController is the central owner of the active dialogue session.
+	# `Player._dialogue_is_active()` and `DialoguePanel` both look it up via
+	# `get_node_or_null("DialogueController")` — a missing autoload would make
+	# the input gate fail-safe to OFF (Player attacks during dialogue) and the
+	# panel a no-op. Pin the registration explicitly.
+	var dc: Node = Engine.get_main_loop().root.get_node_or_null("DialogueController")
+	assert_not_null(dc,
+		"DialogueController must be registered as autoload (project.godot [autoload])")
+	for method: String in ["open", "advance_line", "select_response", "close",
+			"is_active", "current_branch_key", "current_line_index",
+			"current_line_text", "current_responses", "current_npc_id",
+			"current_display_name"]:
+		assert_true(dc.has_method(method),
+			"DialogueController must expose %s() (dialogue-system.md contract)" % method)
+	for sig: String in ["branch_opened", "line_displayed", "responses_presented",
+			"response_selected", "quest_action_invoked", "dialogue_closed"]:
+		assert_true(dc.has_signal(sig),
+			"DialogueController must expose %s signal (dialogue-system.md contract)" % sig)
+
+
 # --- tu-autoload-01: GameState autoload (deferred until task lands) -----
 
 func test_gamestate_autoload_when_present() -> void:

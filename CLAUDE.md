@@ -64,6 +64,7 @@ For deep-dive reference, see the topic files in `.claude/docs/`:
 - [Pixel-mcp Pipeline](.claude/docs/pixel-mcp-pipeline.md) — pixel-mcp tool bugs (`draw_pixels` silently broken, `fill_area` global-replace trap), canonical RGB-first pipeline ordering, aspect-ratio two-step downsample, Windows path escape, doctrine palette lock worked example (S1 Grunt)
 - [PixelLab Pipeline](.claude/docs/pixellab-pipeline.md) — PixelLab tool sequence (create_character → get_character → curl), canvas-size trap (`size` is character height not canvas), quantize dupe-slot mitigation, doctrine-compliance strategies (per-slot nearest-neighbor validated as BEST), cost model, `import_image` param trap
 - [TimeScaleDirector](.claude/docs/time-scale-director.md) — stacked-request ownership of `Engine.time_scale`, priority-overlay resolution, `freeze()` sugar with `ignore_time_scale` timer, InventoryPanel migration policy
+- [Dialogue System](.claude/docs/dialogue-system.md) — DialogueTreeDef / DialogueBranch / DialogueResponse Resource schema, DialogueController autoload (single-session + branch resolution + quest_action side-effect channel), DialoguePanel modal UI, Player attack-input gating convention seed
 
 ## Key references outside `.claude/docs/`
 

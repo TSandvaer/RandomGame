@@ -32,6 +32,7 @@ MobRegistry="*res://scripts/content/MobRegistry.gd"
 AudioDirector="*res://scripts/audio/AudioDirector.gd"
 TimeScaleDirector="*res://scripts/combat/TimeScaleDirector.gd"
 CameraDirector="*res://scripts/camera/CameraDirector.gd"
+DialogueController="*res://scripts/dialogue/DialogueController.gd"
 
 [audio]
 

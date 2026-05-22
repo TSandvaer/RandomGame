@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="DialogueTreeDef" load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueTreeDef.gd" id="1_tree"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueBranch.gd" id="2_branch"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueResponse.gd" id="3_response"]
+
+[sub_resource type="Resource" id="Resource_response_yes"]
+script = ExtResource("3_response")
+text = "Yes — reforge it."
+next_branch_key = &"reforge_confirm"
+quest_action = &"reforge:weapon"
+
+[sub_resource type="Resource" id="Resource_response_no"]
+script = ExtResource("3_response")
+text = "Not yet."
+next_branch_key = &""
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_response_done"]
+script = ExtResource("3_response")
+text = "Thank you, Brother."
+next_branch_key = &""
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_branch_flavor"]
+script = ExtResource("2_branch")
+lines = ["The anvil takes the ember the way a lung takes breath.", "Steady, then loud. Always loud at the end."]
+responses = []
+
+[sub_resource type="Resource" id="Resource_branch_pre_quest"]
+script = ExtResource("2_branch")
+lines = ["I can reforge what you carry. Iron remembers the heat better than the man who wore it.", "Shall I work the blade now?"]
+responses = [SubResource("Resource_response_yes"), SubResource("Resource_response_no")]
+
+[sub_resource type="Resource" id="Resource_branch_reforge_confirm"]
+script = ExtResource("2_branch")
+lines = ["The hammer falls. The ember answers.", "It is done."]
+responses = [SubResource("Resource_response_done")]
+
+[resource]
+script = ExtResource("1_tree")
+npc_id = &"hub_anvil_keeper"
+display_name = "Brother Voll, the Anvil-Keeper"
+branches = {
+&"flavor": SubResource("Resource_branch_flavor"),
+&"pre_quest": SubResource("Resource_branch_pre_quest"),
+&"reforge_confirm": SubResource("Resource_branch_reforge_confirm")
+}
+default_branch_key = &"flavor"

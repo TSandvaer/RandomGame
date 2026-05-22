@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="DialogueTreeDef" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueTreeDef.gd" id="1_tree"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueBranch.gd" id="2_branch"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueResponse.gd" id="3_response"]
+
+[sub_resource type="Resource" id="Resource_response_browse"]
+script = ExtResource("3_response")
+text = "Show me what you have."
+next_branch_key = &""
+quest_action = &"open_vendor:hub_vendor"
+
+[sub_resource type="Resource" id="Resource_response_leave"]
+script = ExtResource("3_response")
+text = "Maybe later."
+next_branch_key = &""
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_branch_flavor"]
+script = ExtResource("2_branch")
+lines = ["The forge is still cold. The road is colder.", "What can I do for you?"]
+responses = [SubResource("Resource_response_browse"), SubResource("Resource_response_leave")]
+
+[sub_resource type="Resource" id="Resource_branch_pre_quest"]
+script = ExtResource("2_branch")
+lines = ["Nothing on offer until the road thaws.", "What can I do for you?"]
+responses = [SubResource("Resource_response_browse"), SubResource("Resource_response_leave")]
+
+[sub_resource type="Resource" id="Resource_branch_quest_active"]
+script = ExtResource("2_branch")
+lines = ["Heard you took the Warden's job. Brave. Stupid. Brave-stupid."]
+responses = [SubResource("Resource_response_browse"), SubResource("Resource_response_leave")]
+
+[resource]
+script = ExtResource("1_tree")
+npc_id = &"hub_vendor"
+display_name = "Hadda the Vendor"
+branches = {
+&"flavor": SubResource("Resource_branch_flavor"),
+&"pre_quest": SubResource("Resource_branch_pre_quest"),
+&"quest_active": SubResource("Resource_branch_quest_active")
+}
+default_branch_key = &"flavor"
