@@ -141,15 +141,22 @@ Replace `<list of artifacts>`, `<NNN>`, and `<list of facts>` with task-specific
 
 The **Regression guard** line is non-negotiable. It forces every dispatch to produce a named, durable regression surface — not just "paired tests for this PR's logic." All four M2 RC Sponsor-soak findings (2026-05-15) were regressions in surfaces that had previously been tested by component-scoped tests; none had system-scoped regression guards. The named test is the artifact a future unrelated PR's CI run flips RED against, so the regression surfaces at PR-time rather than at Sponsor-soak-time.
 
-## Final-report shape — TIGHT (mandatory in every dispatch)
+## Final-report shape — TIGHT + cite-able evidence (mandatory in every dispatch)
 
 ```markdown
-**Final report to orchestrator — TIGHT (≤200 words):**
+**Final report to orchestrator — TIGHT (≤200 words) + CITE-ABLE EVIDENCE:**
 
-Your task-completion message back to the orchestrator MUST be tight to preserve the orchestrator's main-window context. Required content:
+Your task-completion message back to the orchestrator MUST be tight to preserve the orchestrator's main-window context AND any claim about state (CI / GUT / Playwright / soak / artifacts) MUST cite verifiable evidence — not bare assertions. Required content:
 
 - **PR URL** (1 line)
 - **Verdict** (1 line — `APPROVE` / `blocked-on-X` / `partial — see follow-up #...`)
+- **Cite-able evidence** (the state claims you make in this report — each MUST follow the shape below):
+  - **CI state:** `CI: <run-id URL>` or `CI: pass on <commit SHA>`. NOT `"CI passes"` / `"CI green"` / `"CI should be green"`.
+  - **GUT results:** `GUT: <N>/<M> on <commit SHA>`. NOT `"GUT clean"` / `"GUT passes"`.
+  - **Playwright results:** `Playwright: <run-id URL>` or `Playwright: <N>/<M> on <commit SHA>`. NOT `"Playwright green"`.
+  - **Soak verification:** `Soak: <screenshot/video URL>` or `Soak: deferred to Sponsor with probes: <enumerated list>`. NOT `"soak fine"` / `"Sponsor will check"`.
+  - **Paired tests added:** `Tests added: <file path>:<line range>`. NOT `"paired tests added"`.
+  - **In-flight state (genuinely still running):** cite the run-id URL + last observed status (e.g., `CI: in flight, run https://...26288244641 — last status 'queued' at 12:38 UTC`). NOT `"CI in flight"` with no link.
 - **Blockers or follow-ups** (1-3 lines max — only what the orchestrator needs to act on this turn)
 - **Doc updates** (1 line — `Doc updates: <file> — <one-line>` or `Doc updates: none`)
 - **Decision draft** (omit if none — `Decision draft: <1-3 line bullet describing the architectural or process decision>` — Priya batches into `team/DECISIONS.md` weekly; NEVER edit that file directly)
@@ -162,9 +169,32 @@ Detailed content goes in artifacts the orchestrator can read on-demand, NOT in t
 - **Cross-lane integration check** → Self-Test Report on the PR (template above)
 - **Sponsor-input items** → PR body section if applicable
 - **8-run sweep evidence** → PR body / Self-Test Report
+
+**Return timing — exit after report, do NOT wait for merge.** Submit your final report at `ready for qa test` (PR open + Self-Test Report posted + ClickUp flipped) and EXIT. Do NOT wait for Tess QA or orchestrator merge before reporting. The merge + ClickUp `→ complete` flip is the orchestrator's lane (per `clickup-flip-paired-with-merge`). Waiting around for merge wastes agent cycles AND delays the orchestrator's visibility into your readiness. If Tess REQUEST CHANGES, the orchestrator re-dispatches you fresh with the rework brief — that's the contract. **Concrete tell:** if your final report describes events that happened AFTER your work was done (merge, Tess approval, ClickUp `→ complete` flip), you waited too long. Submit at PR-open + ClickUp `ready for qa test` and exit.
+
+**Orchestrator-side enforcement of claim-fidelity.** If your final report makes a state claim ("CI passes", "GUT clean", "Soak fine") without the cite-able evidence shape above, the orchestrator will SendMessage-bounce-back asking for the cite BEFORE processing the report or dispatching the next agent. Don't re-do the work — just paste the evidence. Catching the optimism at report time is cheaper than catching it downstream.
 ```
 
-**Backstory:** the M2 W3 mid-retro investigation (2026-05-15) found that verbose sub-agent final reports flooding the orchestrator's main conversation window was the dominant context-bloat surface — separate from static file loads (which are actually larger in MARIAN-TUTOR than Embergrave). Tight orchestrator-bound reports + detailed PR-body / ClickUp-comment artifacts is the discipline that closes that gap. See orchestrator memory `tightened-final-report-contract.md`. Pair with the persona-file references in `.claude/agents/{role}.md`.
+**Backstory:** the M2 W3 mid-retro investigation (2026-05-15) found that verbose sub-agent final reports flooding the orchestrator's main conversation window was the dominant context-bloat surface. The M3 retrospective (2026-05-22, PR #315) added the claim-fidelity + return-timing amendments after empirical findings — PR #314's "CI in flight" claim when CI had failed 2 min earlier (P2 pattern), Drew's PR #312 agent waiting 42 min for merge before reporting. Tight orchestrator-bound reports + cite-able evidence + return-at-ready-for-qa is the discipline that closes that gap. See orchestrator memory `tightened-final-report-contract.md` (with 2026-05-22 amendments) + `agent-lifecycle-vs-sendmessage.md`. Pair with the persona-file references in `.claude/agents/{role}.md`.
+
+## HTML5-visual-gated merge-gate verification (orchestrator-side, paste when dispatching gated PRs)
+
+Per `team/GIT_PROTOCOL.md` § "Orchestrator merge-gate verification (HTML5-visual-gated PRs)". Sub-agents authoring a PR in the visual-gated class should be aware the orchestrator runs this check at merge time and the author's Self-Test Report needs to carry the section content for the merge to succeed.
+
+```markdown
+**HTML5-visual-gated merge-gate (orchestrator runs at merge time; author satisfies in Self-Test Report):**
+
+When your PR touches `Tween / CanvasItem.modulate / Polygon2D / CPUParticles2D / Area2D state mutations / ColorRect with HDR colors / TileMap-scroll / z-index changes that affect rendering`, the orchestrator will verify the following BEFORE `gh pr merge --admin`. Satisfying these in your Self-Test Report up-front avoids a Tess-bounce + re-dispatch round trip:
+
+1. **CI run-id of the latest green build for THIS commit** — your final-report cite (`CI: <run-id URL>`) covers this. The orchestrator confirms by `gh pr view <N> --json statusCheckRollup` against your HEAD SHA.
+2. **Build SHA in the release-build artifact name matches PR HEAD** — when a release-build is part of the verification, the artifact-name SHA must match. The orchestrator confirms by `gh api repos/.../actions/runs/<run-id>/artifacts`.
+3. **Self-Test Report comment includes either (a) real-browser screenshot/video of the probe target OR (b) explicit Sponsor-soak deferral with concrete probe targets enumerated.** Headless Playwright captures alone are NOT sufficient for visibility-of-effect claims on this class (per `team/TESTING_BAR.md` § "Auto-memory: `html5-visual-gated-author-self-soak`"). Acceptable: real-browser incognito screenshot OR Sponsor-soak deferral that NAMES the concrete probe targets (not "Sponsor will check").
+4. **For ineligible-surface PRs (escape-clause does NOT apply):** if your surface is HTML5-visual-gated AND your Self-Test Report does NOT carry a real-browser self-soak section, **pre-merge Sponsor-soak is required — NOT post-merge.** The orchestrator routes the artifact to Sponsor for soak BEFORE the merge tool-round, not after.
+
+If any check fails, Tess bounces with a one-line note naming which check failed. Don't take it personally — the rule exists because PR #291 (M3 Tier 2 W3, 2026-05-21) consumed ~12-15 agent-cycles across 7 author iterations because the gate wasn't enforced at merge time.
+```
+
+Skip this block for `chore(...)` / `docs(...)` / `test(...)` PRs or PRs that touch no visual primitives. Paste it in dispatches that match the gated class above.
 
 ## Doc-update reporting (mandatory in every dispatch)
 

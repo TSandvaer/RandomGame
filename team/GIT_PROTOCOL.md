@@ -75,6 +75,40 @@ Every ticket lifecycle event has a paired ClickUp status move that fires in the 
 
 **Mantra:** the ClickUp board is the truth. Don't lie to it.
 
+## Orchestrator merge-gate verification (HTML5-visual-gated PRs)
+
+**Rule:** Before `gh pr merge --admin` on any PR matching the HTML5-visual-gated class, the orchestrator MUST verify the merge prerequisites against actual evidence — not against agent assertions, not against a stale earlier snapshot. This is a hard gate, not a "should-check."
+
+**HTML5-visual-gated class** (per `team/TESTING_BAR.md` § "Auto-memory: `html5-visual-verification-gate`"):
+- `Tween` / `CanvasItem.modulate` / `Polygon2D` / `CPUParticles2D`
+- `Area2D` state mutations (monitoring / monitorable flips, collision-layer/mask changes)
+- `ColorRect` with HDR colors (any channel value > 1.0)
+- New `gl_compatibility`-rendered visual primitives
+- TileMap / tilemap-scroll changes
+- Z-index ordering changes that affect rendered output
+
+**Pre-merge verification (mandatory; same tool round as `gh pr merge`):**
+
+1. **CI run-id of the latest green build for THIS commit** — fetch via `gh pr view <N> --json statusCheckRollup`. "Should be green" / "agent said it's green" is NOT acceptable. The run-id + green status must be verifiable at merge time. Per memory `gh-run-list-race-on-just-pushed`: query CI runs by HEAD SHA (`--commit`), not `--branch --limit 1` — the limit-1 query races against GitHub workflow registration.
+2. **Build SHA in the release-build artifact name matches PR HEAD** — when the PR is HTML5-visual-gated and a release-build was triggered (manually or via workflow_run chain), confirm the artifact name contains the PR HEAD SHA. Pulling a stale artifact at merge time is the failure mode this catches.
+3. **Self-Test Report comment present and includes either (a) screenshot/video of the probe target OR (b) explicit Sponsor-soak deferral with concrete probe targets enumerated.** "Headless Playwright captures" alone are NOT acceptable for visibility-of-effect claims on this class — Playwright headless ≠ real-browser perception (per `team/TESTING_BAR.md` § "Auto-memory: `html5-visual-gated-author-self-soak`"). Acceptable shapes:
+   - Real-browser incognito screenshot / video / DevTools console paste showing the visual behavior.
+   - Sponsor-soak deferral that names the concrete probe targets (e.g., "Sponsor must verify: aftershock particle visibility at boss-room t=0..500ms, slam wind-up frames 0-12, deadzone-follow during E-step traverse"). Vague "Sponsor will check" is not a deferral.
+4. **For ineligible-surface PRs (escape-clause does NOT apply):** if the surface is HTML5-visual-gated AND the Self-Test Report does NOT carry a real-browser self-soak section, pre-merge Sponsor-soak is required — NOT post-merge. The orchestrator routes the artifact to Sponsor for soak BEFORE the merge tool-round, not after. "Merge now, Sponsor will catch it later" is the anti-pattern this rule retires.
+
+**If any of (1)-(4) fails:** the orchestrator does NOT merge. Bounce back to Tess (not the author) with a one-line note naming which check failed; Tess either requests the missing evidence from the author or routes to Sponsor per the escape clause. The orchestrator does NOT make the author/Sponsor decision itself; that's Tess's lane.
+
+**Why:** PR #291 (M3 Tier 2 W3, 2026-05-21) consumed ~12-15 agent-cycles across 7 author iterations. Tess APPROVED twice on GUT-green + CI-green; Sponsor overturned both. The merge happened on weak evidence because no orchestrator-side check verified "the Self-Test Report's HTML5-self-soak section is concretely present and includes a real-browser screenshot, not just a headless Playwright capture." The gate existed in dispatch-brief discipline but not in merge-time discipline. This rule closes that gap. Authoritative source: `team/priya-pl/m3-retrospective.md` § P1 + §5 Priority 1 + PR #315 (`0ca8381`).
+
+**Composition with sibling rules:**
+- The merge identity rule (`team/GIT_PROTOCOL.md` § "Tess sign-off via PR") is unchanged: Tess approves feat/fix, orchestrator merges. This rule adds an orchestrator-side verification step BEFORE the merge tool call, after Tess approval.
+- This rule does NOT apply to non-visual-gated PRs (pure data refactors, audio-only changes, code-only refactors without visual surface, `chore/docs/test` PRs). Those merge under existing rules.
+- This rule operates orthogonally to the Self-Test Report gate. The Self-Test Report gate is author-side (no report → Tess bounces). The merge-gate verification is orchestrator-side (report present but missing required HTML5-section content → orchestrator bounces back to Tess).
+
+**Cross-reference:** the per-dispatch shape of this rule lives in `team/orchestrator/dispatch-template.md` § "HTML5-visual-gated merge-gate verification" so dispatch briefs reference it. Authoring agents should read both that section and the auto-memory mirror in `team/TESTING_BAR.md` § "Auto-memory: `html5-visual-gated-author-self-soak`" at brief-time.
+
+---
+
 ## Self-Test Report (UX-visible PRs)
 
 Any PR that touches a **player-visible surface** (scene tree, UI, visual feedback, audio cue, input affordance, save format, level content) MUST include a **Self-Test Report comment from the author** before Tess reviews. Tess's review starts from the report, not from a cold-read of the diff.
