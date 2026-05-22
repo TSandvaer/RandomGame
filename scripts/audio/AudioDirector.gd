@@ -118,6 +118,15 @@ const SFX_ATTACK_IMPACT: StringName = &"sfx-attack-impact"
 ## Maps to Uma `boss-intro.md` BI-18 (phase break) and BI-06 (boss wake).
 const SFX_PHASE_BREAK: StringName = &"sfx-phase-break"
 const SFX_BOSS_WAKE: StringName = &"sfx-boss-wake"
+## M3-T2-W3-T16b — boss-defeated Beat F2 cinematic horn. Fires from
+## `Stratum1BossRoom._play_t16_cinematic_climax(death_position)` (Drew's
+## T16a wiring). Sustained warm horn note, 0.9 s, rising D3 → E3 —
+## tonally rhymes with SFX_BOSS_WAKE so the entry/exit harmonic palette
+## is shared (wake at A2 fundamental, kill-horn at D3 fundamental — the
+## minor-third lift is the entry-darker / exit-brighter design beat).
+## Maps to Uma `boss-intro.md` Beat F2 + `audio-direction.md` row
+## sfx-boss-kill-horn (AD-23 tester check).
+const SFX_BOSS_KILL_HORN: StringName = &"sfx-boss-kill-horn"
 
 const SFX_PATHS: Dictionary = {
 	SFX_PLAYER_ATTACK_LIGHT: "res://audio/sfx/player/sfx-player-attack-light.ogg",
@@ -131,6 +140,7 @@ const SFX_PATHS: Dictionary = {
 	SFX_ATTACK_IMPACT: "res://audio/sfx/mobs/sfx-attack-impact.ogg",
 	SFX_PHASE_BREAK: "res://audio/sfx/mobs/sfx-phase-break.ogg",
 	SFX_BOSS_WAKE: "res://audio/sfx/mobs/sfx-boss-wake.ogg",
+	SFX_BOSS_KILL_HORN: "res://audio/sfx/mobs/sfx-boss-kill-horn.ogg",
 }
 
 ## SFX pool size. Each pool entry is one `AudioStreamPlayer` on the SFX bus;

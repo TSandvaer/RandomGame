@@ -622,10 +622,9 @@ func _on_boss_died(boss: Stratum1Boss, death_position: Vector2, _mob_def: MobDef
 	#     (CameraDirector autoload — first non-1.0 production zoom).
 	#   - F2 vignette deepen to 80% over 0.9 s (Vignette.boss_defeat_climax —
 	#     locked named-method per Uma vignette-spec §"Duration locks").
-	#   - F2 horn SFX placeholder (Devon's T16b sibling will land the
-	#     `sfx-boss-kill-horn` cue + asset; the placeholder call emits an
-	#     UNKNOWN cue_id trace line in the interim — the play_sfx contract
-	#     no-ops safely on unknown ids per AudioDirector.play_sfx contract).
+	#   - F2 horn SFX `sfx-boss-kill-horn` (M3-T2-W3-T16b — Devon's sibling
+	#     PR landed the OGG asset + SFX_PATHS entry; cue routes through
+	#     AudioDirector.play_sfx and emits a [combat-trace] line on fire).
 	#
 	# F3 ramp-out (camera reset + vignette return) is wired in
 	# `Main._on_boss_defeated` where the BossDefeatedTitleCard lifecycle
@@ -1050,10 +1049,11 @@ func _play_t16_cinematic_climax(death_position: Vector2) -> void:
 		vig.boss_defeat_climax()
 		_combat_trace("Stratum1BossRoom._play_t16_cinematic_climax",
 			"vignette boss_defeat_climax fired")
-	# Horn SFX placeholder — Devon's T16b sibling lands the
-	# `sfx-boss-kill-horn` cue + asset. Until then, `play_sfx` hits the
-	# UNKNOWN cue_id safe-no-op branch and emits an UNKNOWN trace line
-	# (per `scripts/audio/AudioDirector.gd::play_sfx` contract).
+	# Horn SFX — fires alongside the camera zoom + vignette deepen so the
+	# 0.9 s sustained warm horn rises across the same window as the embers.
+	# Cue + asset landed in M3-T2-W3-T16b; AudioDirector emits a
+	# [combat-trace] AudioDirector.play_sfx | cue_id=sfx-boss-kill-horn line
+	# in HTML5 builds — Playwright + Sponsor-soak observable.
 	var ad: Node = _resolve_audio_director()
 	if ad != null and ad.has_method("play_sfx"):
 		ad.play_sfx(T16_HORN_SFX_CUE_ID)
