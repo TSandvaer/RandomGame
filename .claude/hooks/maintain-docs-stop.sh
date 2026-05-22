@@ -17,5 +17,5 @@ if printf '%s' "$input" | grep -Eq '"stop_hook_active"[[:space:]]*:[[:space:]]*t
 fi
 
 cat <<'JSON'
-{"decision":"block","reason":"Invoke the maintain-docs skill now. Display a short status message (e.g. 'Reviewing turn for doc-worthy findings...') so the user knows the hook fired. Review this turn for findings / new or altered code worth capturing in .claude/docs/, then apply the consolidated doc edits if any. Always report the outcome — if nothing is worth documenting, say so briefly (e.g. 'No documentation updates warranted this turn.')."}
+{"decision":"block","reason":"Invoke the maintain-docs skill now and run it silently. Review this turn for findings / new or altered code worth capturing in .claude/docs/, then apply the consolidated doc edits if any. Emit output to the main thread ONLY if documentation was actually updated (use the Step 6 report format). If nothing is worth documenting, end silently — do NOT emit a start message and do NOT emit a no-change message."}
 JSON
