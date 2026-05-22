@@ -100,22 +100,73 @@ Opt-out semantics mirror the GUT side: `test.use({ expectedUserWarnings: [/regex
 
 **A bug class is "covered" only when BOTH surfaces have a test for it** when the bug class can manifest in either lane. The Sponsor M2 RC meta-finding was that headless GUT and the Playwright suite both shipped green for 24 hours while the Sponsor's manual soak found three production warnings — every test path was scoped, none was universal. The two-surface warning gate is the structural answer.
 
-### Playwright e2e CI does NOT auto-trigger on `feat/*` branches — manual kick required (PR #293)
+### Playwright e2e CI auto-triggers on every PR — but author + orchestrator must still verify (PR #299, corrects PR #293)
 
-The two-surface gate (GUT + Playwright) is structurally **one-surface** on feature branches until someone manually kicks Playwright. Only Headless GUT auto-runs on `feat/*` push; `playwright-e2e.yml` is `workflow_dispatch`-only. A PR can show "CI green" while hiding a Playwright regression. **GUT-green is not a substitute for Playwright-green.**
+**Updated 2026-05-22** during P0 ticket `86c9xw8xd` (Playwright-red on main 7 days) investigation chain. Earlier convention (PR #293 era) said Playwright was `workflow_dispatch`-only and required manual kicks on `feat/*` branches. **That is now stale.** As of PR #299 (commit `9773250`, 2026-05-21), `playwright-e2e.yml` has a `pull_request` trigger that **auto-fires on every PR push** — all branch prefixes (`feat/*`, `fix/*`, `docs/*`, `spike/*`). The two-surface gate (GUT + Playwright) is now structurally two-surface from the moment a PR opens.
 
-**Author convention** — any PR touching Playwright-covered surfaces (HTML5 export, boss-room flow, audio gates, inventory UI, combat integration, mob behavior, room traversal, AC4 / equip-flow / mouse-direction-attacks / kiting-mob-chase / soak-narrative-regression / universal-console-warning-gate) MUST manually kick Playwright against the PR's release-build SHA and paste the run link in the Self-Test Report. Silence in the Self-Test Report on Playwright is now read as "missed kick," not "didn't need to."
+**This DOES NOT mean authors can ignore Playwright on their PRs.** Main was Playwright-red for 7 days (2026-05-15 → 2026-05-22, parent ticket `86c9xw8xd`) precisely because authors merged on `gh pr merge --admin` while Playwright was red on the merge SHA. Admin-merge bypasses GitHub's Required-Checks gate. **Verification is now the author's + orchestrator's responsibility, not GitHub's.**
 
-**SHA-pin sequence** — Playwright must run against the exact artifact the soak uses, not a drifted HEAD:
+**Author convention** — any PR (regardless of branch prefix) MUST verify Playwright check status before claiming ready-for-QA in the Self-Test Report. Silence on Playwright is now read as "didn't check," not "didn't need to."
+
+**Self-Test Report line to include (UPDATED):**
+
+> **Playwright e2e:** auto-fired at SHA `<sha>` — run `<url>` — verdict: green / red-but-pre-existing-on-main (cite parent run) / red-new (BLOCKER) / N/A (no Playwright-covered surface)
+
+If Playwright is red on the PR's HEAD, the author MUST classify:
+
+- **red-but-pre-existing-on-main**: cite the matching main red run (`gh run list --workflow=playwright-e2e.yml --branch=main --limit 5`) showing the same failure set. Apples-to-apples comparison required.
+- **red-new**: BLOCKER. PR introduces the regression; do not claim ready-for-QA.
+
+### Control-comparison technique — disambiguate "mine vs pre-existing" via a same-base docs-only PR (PR #317 finding)
+
+**The trap.** When classifying Playwright failures as pre-existing vs new, the obvious approach is `gh run list --workflow=playwright-e2e.yml --branch=main --limit 5` to pull the latest main red run and compare its failure set to the PR's failure set. **This breaks when the PR base predates the latest main red run** — failure-list specs may have been added or renamed between the PR's base and the main run, producing false-positive "new" classifications.
+
+**Empirical case (Tess PR #317 QA, 2026-05-22):** Tess was QA'ing Devon's equip-flow fix on `eb6714e`. Latest main Playwright (`26187844079` on `2435669c`, 2026-05-20) predated four of the now-failing specs (`pr291` × 2, `pr300` × 2, `t16`). A naive apples-to-apples vs that baseline would have flagged all four as "new" — they weren't; they'd just been added after that baseline.
+
+**Disambiguator — same-base docs-only PR as control.** Pick a CONCURRENT docs-only PR with the same merge-base as the PR under review. Pull its Playwright run. Compare failure sets: anything in both = pre-existing; anything only in the PR under review = new. Tess used PR #316 (Priya's 3-mitigation orch-docs PR, docs-only, same merge-base era) as the control for #317.
+
+**Why docs-only specifically:** A docs-only PR is GUARANTEED not to introduce gameplay regressions — its Playwright failures are 100% pre-existing-on-main. That makes it the cleanest control for "what failures are baseline right now?"
+
+**Workflow shape:**
 
 ```bash
-# 1. Trigger release-build for the PR head SHA
+# 1. Pull failure list from PR under review
+gh run view <pr_run_id> --log | grep "✘ \[" | sort -u > /tmp/pr-fails.txt
+
+# 2. Pull failure list from concurrent docs-only PR (same merge-base era)
+gh run view <docs_pr_run_id> --log | grep "✘ \[" | sort -u > /tmp/docs-fails.txt
+
+# 3. Diff — anything only in PR under review = NEW regression
+diff /tmp/pr-fails.txt /tmp/docs-fails.txt
+```
+
+If diff is empty → all PR failures are pre-existing → classify red-but-pre-existing-on-main → merge eligible per Mitigation 1.
+If diff shows additions → PR introduced new regressions → classify red-new → REQUEST CHANGES.
+
+**Special handling for `test.fail()` glyphs.** Playwright renders `test.fail()` blocks that throw a placeholder error as `✘ [<spec>]` in the text output, but the run summary's `N failed` line counts them as PASS (fail-as-expected). When triaging failures, **bisect by spec-name from the `N failed` summary line, NOT by counting `✘` glyphs in the text output**. The morning Tess investigation of P0 `86c9xw8xd` initially conflated these two surfaces and produced a fabricated "9-failure cluster" framing; Devon's later investigation revealed the true `1 failed` count was a different spec entirely.
+
+### CI race — initial PR push may show empty checks until rebase re-triggers (PR #318 finding)
+
+**The trap.** Occasionally a brand-new PR will show NO check-runs at all in `gh pr checks <num>` and `gh api repos/<org>/<repo>/commits/<sha>/check-runs` returns `{"total_count": 0}` — even though `playwright-e2e.yml` and `ci.yml` both have `pull_request` triggers configured. The workflows simply did not register against that initial push.
+
+**Suspected cause:** race between GitHub's webhook-event registration and the workflow-trigger evaluation when the PR base is stale relative to current main (PR branch created off local main that was N commits behind origin/main).
+
+**Workaround that works reliably:** rebase the PR branch onto current origin/main + force-push. The fresh push event re-triggers the workflows. Empirically validated on PR #318 (Drew peer-review caught the empty-checks anomaly; orchestrator rebased + force-pushed; CI immediately fired on the rebased commit).
+
+**Adjacent benefit:** rebasing also resolves any stale-base diff noise (per `rebase-before-merging-stale-base-pr` memory). Two birds, one rebase.
+
+### Manual SHA-pin sequence (still relevant for out-of-band runs)
+
+Useful when running Playwright against an out-of-band release-build, e.g. diag-build soak or manually-triggered main verification:
+
+```bash
+# 1. Trigger release-build for the PR head SHA (if not auto-built via release-github.yml chain)
 gh workflow run release-github.yml --ref <branch>
 
 # 2. Wait for artifact (query by --commit <sha>, NOT --branch --limit 1 — race)
 gh run list --workflow=release-github.yml --commit <sha>
 
-# 3. Kick Playwright against same SHA
+# 3. Kick Playwright against same SHA (only needed if auto-fire didn't catch this SHA)
 gh workflow run playwright-e2e.yml --ref <branch>
 
 # 4. Confirm both runs reference the same SHA before pasting links
@@ -123,9 +174,15 @@ gh workflow run playwright-e2e.yml --ref <branch>
 
 See memory `gh-run-list-race-on-just-pushed` for why `--commit <sha>` is mandatory over `--branch --limit 1` when polling the just-pushed run. See `.claude/docs/html5-export.md` § "Release-build trigger and artifact handoff" for the matching artifact-link pattern.
 
-**Self-Test Report line to include:**
+**Note — `release-github.yml` does NOT auto-fire on main pushes** (only `workflow_dispatch` + release tag pushes + PR open/sync). To verify a post-merge main green-flip (e.g. closing a Playwright-red parent ticket after the fix PR merges), the orchestrator MUST manually run `gh workflow run release-github.yml --ref main` to fire the release-build → `workflow_run` chain → Playwright. Empirical case: P0 `86c9xw8xd` closure on 2026-05-22 required manual trigger of run `26294618225`.
 
-> **Playwright e2e:** kicked manually at SHA `<sha>` — run `<url>` — verdict: green / red / N/A (surface not Playwright-covered)
+### Orchestrator merge-gate cross-reference
+
+**Per `team/GIT_PROTOCOL.md` § "Orchestrator merge-gate verification" (landed PR #316 Mitigation 1, merged `55679077`):** orchestrator MUST verify Playwright check status on the PR's HEAD SHA before `gh pr merge --admin`. If red, classify per the three-way bucket above using the control-comparison technique. Cite the run-id URL + classification in the merge comment. This is the structural fix for the 7-day silent main-red break (`86c9xw8xd`).
+
+### Historical context
+
+Pre-PR #299, `playwright-e2e.yml` was `workflow_dispatch`-only and authors manually kicked it per a separate convention (the "Playwright e2e CI does NOT auto-trigger" rule, original heading on this section). PR #293 was that era's precedent. PR #299 added the `pull_request` trigger but `test-conventions.md` was not updated until the 7-day silent break (`86c9xw8xd`) surfaced the stale-doc gap.
 
 ### Author HTML5 self-soak — mandatory before claiming fix-complete on visual-gated surfaces (PR #291 v3 two-iteration failure)
 
