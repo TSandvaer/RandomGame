@@ -1,5 +1,148 @@
 # Post-Wave-3 Sequencing — From Now to Ship
 
+**Owner:** Priya · **Authored:** 2026-05-22 · **Amended:** 2026-05-22 (v1.1) · **Status:** v1.1 — Sponsor signed §6 SI-1 through SI-5 same-day + added a fifth Diablo-shape directive (randomized maps per character). M3 Tier 3 scope locked; procgen spike added to W1.
+
+## v1.1 amendment — 2026-05-22 — randomized-maps directive + §6 SI-1..5 Sponsor sign-off
+
+This amendment folds Sponsor's two same-day signals into the v1.0 sequencing plan:
+- **§6 SI-1 through SI-5 signed by Sponsor** (locks the Diablo-shape vertical-slice scope: continuous-scroll camera, full state-branching dialogue, Diablo-II per-act map, 2 new S2 mob archetypes, 3 M3 Tier 3 stratum NPCs)
+- **New §1 Commitment 5** — randomized maps per character via per-character `world_seed` + procedural chunk-fill between fixed anchors (zone entries/exits, NPCs, boss rooms, quest-target rooms, hub-town)
+
+**Substantive sections that change:** §1 (add Commitment 5), §2 (procgen spike scope inside vertical slice), §3 (calendar — Tier 3 widens 6-8 → 7-10 weeks honest middle), §4 (procgen-spike + assemble_floor-impl + per-character-seed-binding tickets added to W1/W2), §6 (close SI-1 through SI-5 as signed; mark SI-6 + SI-7 still deferrable; add new SI-8 on procgen scope), §7 (add R-PROCGEN; demote R-SCOPE), §8 (add `level-chunks.md` ports § + `save-schema-v5-plan.md`).
+
+**SI-8 — new Sponsor-input item, surfaced by Commitment 5.** Procgen scope: (a) fully procedural chunk-fill between anchors / (b) partially procedural with hand-pinned set-pieces inside zones / (c) hybrid by stratum (S1-S2 hand-pinned, S3-S8 procedural). **Recommended:** (b) partially procedural with hand-pinned set-pieces inside zones. Reasoning: S1+S2 vertical slice already requires hand-authored zones for the quest-target rooms and NPC placements per Commitment 3 + SI-5; pure procedural inside zones risks the quest objective being placed in a structurally-weird position that the player can't read. Set-piece pinning preserves authorial control over critical rooms while letting the rest of the zone fill procedurally. (a) is cheapest but risks legibility; (c) is the slip-floor if the procgen spike surfaces HTML5-seam regressions that gate S2 fill. **Lockable by:** end of M3 Tier 3 W1 (post-spike).
+
+Pre-existing v1.0 content below is preserved as the historical record; this amendment supersedes by section. The §3 calendar shift is the most-load-bearing v1.1 delta — Tier 3 widens from 6-8 weeks to 7-10 weeks honest middle to absorb the procgen spike + `assemble_floor` runtime impl + the procedural-seam HTML5 visual-verification.
+
+### v1.1 — §1 — NEW Commitment 5 — Randomized maps per character (procedural-arrangement + per-character seed)
+
+> *"i also want randomized maps per level, meaning tile sprites are put together randomly for each new player"* — Sponsor verbatim, 2026-05-22, post-PR-#303-merge.
+
+**The lock:** Diablo-II "procedurally arranged per character" pattern. Each character has a `world_seed: int` (rolled on character creation, persisted in v5 save schema per `save-schema-v5-plan.md`). The map layout the player sees is **deterministic for that character** — re-rolling the same character always yields the same maps; rolling a new character yields a different layout. Different characters in the same save slot may share strata + zones + NPC placement, but the **chunk arrangement WITHIN zones differs per character**.
+
+**Hand-authored vs procedural split:**
+
+- **Hand-authored (deterministic per stratum + per zone, identical for all characters):**
+  - Zone entries + exits (the ports connecting zones — per `level-chunks.md` § "Why ports, not free-form transitions" — the schema is already pre-shaped for this)
+  - NPC placement rooms (per stratum NPC roster per SI-5: 1 NPC in S1, 2 NPCs in S2)
+  - Boss rooms (`Stratum1BossRoom`, `Stratum2BossRoom`)
+  - Quest-target rooms (the rooms where exploration-quest objectives resolve — per Commitment 3)
+  - Story-beat rooms (any zone room flagged as narrative-critical by Drew + Uma)
+  - Hub-town (single-screen 480×270 by design; not procedural per Commitment 4)
+- **Procedural (per-character, seeded by `world_seed`):**
+  - Tile-chunk arrangement WITHIN zone bounds, between the hand-authored anchors
+  - Mob spawn point selection within procedural chunks (which spawn-points of the chunk's authored set fire for this character)
+  - Loot pickup placement within procedural chunks (the existing pickup-drop pool, just spawned in different chunks per character)
+
+**Determinism:** seeded by per-character `world_seed`; same character on the same stratum always sees the same maps. Per-stratum derived seeds: `stratum_seed = hash(world_seed, stratum_id)` — keeps re-rolling at S1 from leaking S2's layout into S1. Per-zone seeds derived the same way (`zone_seed = hash(stratum_seed, zone_id)`) so re-entering a zone within a run produces the same layout.
+
+**Save-schema implication:** additive on top of v5's per-character keys. `data.characters[N].world_seed: int` (rolled at character creation; immutable thereafter). See `save-schema-v5-plan.md` for the v5 structure; this addition is purely additive on a per-character key, doesn't touch v5's non-additive multi-character lift.
+
+**Reference architecture:** the schema is **already pre-shaped** for this in `level-chunks.md` § "Why ports, not free-form transitions" + § "Out of scope for M1" (which explicitly lists `assemble_floor` as M2/M3 work). The chunk schema's `ports + assemble_floor` was designed exactly for multi-chunk procedural assembly. M3 Tier 3 W1 spike implements `assemble_floor(chunks: Array[LevelChunkDef], zone_def: ZoneDef, seed: int)`.
+
+**Cost:** M-L. The procgen system is non-trivial (per-character seed binding, zone-bound chunk selection, port-mating discipline, save-write on character creation), but `level-chunks.md` § "Why chunks" + § "Why ports" pre-shape it heavily. **Honest middle:** ~2 calendar weeks of Devon+Drew parallel work for the spike + impl + S1 retrofit; another ~1 week for HTML5 procedural-seam visual-verification. See R-PROCGEN below.
+
+**Landing point:** M3 Tier 3 W1 spike (`procgen_spike`) → W2 `assemble_floor` impl + S1 retrofit → W3 S2 procedural fill at zone authoring time. **The procgen spike must prove three things before W2 dispatches:**
+1. Per-character seed binding round-trip (create character → save → load → same map renders)
+2. Hand-authored anchors compose with procedural fill correctly (zone entry/exit ports mate; quest-target room is reachable; NPC room is reachable)
+3. Chunk-port mating at procedural seams renders cleanly under continuous-scroll camera (HTML5 z-index sharp edge per `html5-export.md` § "Z-index sensitivity" + the burst-contrast finding)
+
+### v1.1 — §2 — Vertical-slice scope clarification — procgen spike added
+
+The M3 Tier 3 vertical slice (S1+S2 polished) now includes a procgen spike as Track 1.5 (between Camera-scroll Track 1 and Dialogue-system Track 2 in dispatch order — procgen spike is the foundation Track 1's camera-scroll consumes once chunks compose into wider-than-screen tilemaps).
+
+**The spike must prove:**
+
+1. **Per-character seed binding.** Character creation rolls `world_seed`; save round-trips it; load reads it; assembler consumes it; same character → same map across loads. Paired GUT test pins the round-trip.
+2. **Hand-authored anchors compose with procedural fill correctly.** Zone schema (per Commitment 3 ZoneDef) defines anchor rooms by id (`entry`, `npc_room`, `boss_room`, `quest_target`, `exit`) + procedural slots between them. The assembler places anchors first (deterministic position), then fills slots with seed-selected chunks. Port-mating discipline (per `level-chunks.md` § "Why ports") ensures no broken seams.
+3. **Chunk-port mating at procedural seams renders cleanly under continuous-scroll camera under HTML5 `gl_compatibility`.** This is the HTML5 sharp edge — the procedural seam between two chunks may produce tilemap z-index ordering issues or visible mating gaps that don't reproduce on desktop. Visual-verification gate per `html5-export.md` § "HTML5 visual-verification gate" is mandatory; Sponsor-soak with concrete probe targets per the per-surface escape clause.
+
+**If the spike surfaces an unworkable HTML5 procedural-seam regression**, the fallback shape is SI-8 option (c) — hybrid: S1+S2 ship with hand-pinned chunks inside zones (no procedural fill, but per-character seed still drives anchor selection from a hand-authored pool); M5 strata revisit procedural fill once the seam regression is debugged. This preserves the per-character map experience (different characters see different maps via the seeded anchor selection) without the procedural-seam HTML5 risk.
+
+### v1.1 — §3 — Milestone calendar updated — Tier 3 widens 6-8 → 7-10 weeks
+
+The procgen spike + `assemble_floor` impl + per-character-seed save lift + HTML5 procedural-seam visual-verification adds **~1-2 calendar weeks** to M3 Tier 3. Honest middle: **7-10 weeks parallel-dispatched** (was 6-8).
+
+**Updated W1-W5 calendar (replaces v1.0 §3 M3 Tier 3 calendar):**
+
+- **Week 1** — Sponsor signs SI-8 (procgen scope). Track 1 spike (camera-scroll). Track 1.5 spike (procgen `assemble_floor` + per-character seed). Track 2 spike (dialogue schema). Sub-track 5a Sponsor PixelLab batch wave 1 (Player + Grunt + Charger + Shooter).
+- **Weeks 2-3** — Track 1 implementation + S1 light retrofit. Track 1.5 `assemble_floor` impl + per-character seed save-write + S1 procedural retrofit (replace static chunk arrangement with assembler-driven). Track 2 implementation + first 3 dialogue trees. Track 3 zone-schema extension + 2-3 exploration quests authored. Sub-track 5a continues.
+- **Weeks 4-5** — Track 4 world-map UI minimal. Sub-track 5b hub-town impl. Sub-track 5d S1 + S2 NPC sprites + dialogue trees. Sub-track 5c S2 content authoring (zones + new mobs) **with procedural chunk-fill inside zones via the W2 assembler**.
+- **Weeks 6-7** — S2 boss room polish; Sub-track 5d completes; HTML5 procedural-seam visual-verification round (Tess + Sponsor-soak with probe targets per `html5-export.md`); Tess M3 Tier 3 acceptance plan + per-track QA omnibus.
+- **Weeks 8-9** — Sponsor M3 Tier 3 soak; fix-forward absorbed. Procgen HTML5-seam fix-forward if Sponsor surfaces regression.
+- **Week 10** — slip buffer (was implicit in v1.0; made explicit in v1.1 for the procgen-HTML5-seam risk class).
+
+**Total calendar from now to ship:** ~11-15 months honest middle (was 10-14). Sponsor should plan against the 15-month shape; team ships as fast as quality holds. The hex-block fallback per v1.0 §1 stays as the slip safety net AND SI-8 option (c) is the procgen slip safety net.
+
+### v1.1 — §4 — Ticket pre-shape updated — procgen tickets added to W1/W2
+
+Three new tickets added to M3 Tier 3 ticket pre-shape (insert into v1.0 §4 M3 Tier 3 table at indicated waves):
+
+| Wave | Tickets | Ownership | Count | Notes |
+|---|---|---|---|---|
+| **W1** | **Procgen spike: `assemble_floor` + per-character `world_seed` binding (NEW)** | **Devon + Drew** | **2 (spike + paired test)** | **Gated on §6 SI-8. Proves per-character seed round-trip + anchor-procgen composition before W2 impl.** |
+| **W2** | **`assemble_floor(chunks, zone_def, seed)` impl + S1 procedural retrofit (NEW)** | **Drew + Devon** | **2-3** | **Depends on W1 procgen spike + W1 zone schema spike. S1's existing 8 rooms transition to anchor-driven assembly.** |
+| **W2** | **Per-character `world_seed` save-write + v5 schema additive field (NEW)** | **Devon** | **1** | **Additive on top of v5 per-character keys; not a v5-non-additive lift. Save round-trip GUT test pinned.** |
+| **W6-W7** | **HTML5 procedural-seam visual-verification + Sponsor-soak probe round (NEW)** | **Tess + Sponsor** | **1 QA + 1 soak** | **Visual-verification per `html5-export.md` per-surface escape clause; concrete probe targets on chunk seams + scroll transitions.** |
+
+**Updated M3 Tier 3 ticket total:** ~50 across 5 waves (was ~45 across 4 waves). Procgen spike + impl + seed save-write + HTML5 seam QA = +5 tickets net.
+
+### v1.1 — §6 — Sponsor-input items, post-2026-05-22 sign-off
+
+**Closed this session (Sponsor signed 2026-05-22):**
+
+- ✅ **SI-1 — Camera-scroll shape:** Sponsor confirmed (a) continuous-scroll. (b) Zelda-edge-pan and (c) Tunic-fixed-camera dropped.
+- ✅ **SI-2 — Dialogue system scope:** Sponsor confirmed full state-branching (pre-quest / active / completed / failed branches).
+- ✅ **SI-3 — World-map UI shape:** Sponsor picked (a) Diablo-II per-act map (the genuine fork from (b) Diablo-IV persistent overworld and (c) Crystal-Project room-tree).
+- ✅ **SI-4 — S2 mob archetypes:** Sponsor confirmed 2 new archetypes — Sunken-Scholar (ranged) + Bone-Catalyst (melee). Mechanical details + final names confirmed at S2 content authoring time per v1.0 §3 Sub-track 5c.
+- ✅ **SI-5 — Per-stratum NPC count in M3 Tier 3:** Sponsor confirmed 3 stratum NPCs (1 in S1, 2 in S2) on top of 3 hub-town NPCs = 6 total dialogue trees in M3 Tier 3.
+
+Decision drafts for the next weekly DECISIONS.md batch (Priya weekly cadence):
+
+> Decision draft: Sponsor signed Diablo-shape vertical-slice scope locks 2026-05-22 — continuous-scroll camera (SI-1), full state-branching dialogue (SI-2), Diablo-II per-act map (SI-3), 2 new S2 mob archetypes Sunken-Scholar + Bone-Catalyst (SI-4), 3 M3 Tier 3 stratum NPCs (SI-5). M3 Tier 3 W1 dispatch unblocked.
+
+> Decision draft: Sponsor added fifth Diablo-shape directive 2026-05-22 — randomized maps per character via per-character `world_seed` + procedural chunk-fill between hand-authored anchors. Adds M3 Tier 3 procgen spike + `assemble_floor` impl + per-character-seed-save tickets to W1/W2; widens Tier 3 calendar 6-8 → 7-10 weeks honest middle.
+
+**Open — Sponsor input needed:**
+
+- **NEW SI-8 — Procgen scope:** (a) fully procedural chunk-fill between anchors / (b) partially procedural with hand-pinned set-pieces inside zones / (c) hybrid by stratum (S1-S2 hand-pinned, S3-S8 procedural). **Recommended:** (b) partially procedural with hand-pinned set-pieces inside zones — per the reasoning at the top of this v1.1 amendment block. **Lockable by:** end of M3 Tier 3 W1 (post-spike).
+
+**Deferrable — remain held:**
+
+- **SI-6 — Multi-character slot count.** Recommended: 3. Lockable by: M4 W1.
+- **SI-7 — M5 stratum order.** Recommended: sequential. Lockable by: end of M4 close.
+- **SI-Δ-1 — NG+ Paragon track shape.** Recommended: ship Paragon. Lockable by: M4 W2.
+- **SI-Δ-2 — Ship target.** Recommended: itch.io first + Steam playtest concurrent. Lockable by: M5.9.
+- **SI-Δ-3 — Per-stratum NPC density in M5.** Recommended: 1-3 per stratum tuned to tone. Lockable by: M5.1.
+
+### v1.1 — §7 — Risk register update — R-PROCGEN added, R-SCOPE demoted
+
+**NEW R-PROCGEN — Procgen + HTML5 procedural-seam regression.** **Probability:** med. **Impact:** high. **Why:** the procgen system is the project's first net-new content-architecture system (Tier 1 was schema-design; Tier 2 was polishing existing surfaces; Tier 3 W1 builds new content architecture). Three sub-risks:
+- **R-PROCGEN.a — Per-character seed-binding bugs.** Same character → different maps across loads = save corruption-class bug. Mitigated by W1 spike's paired-GUT round-trip pin + Tess M3 Tier 3 acceptance plan including seed-round-trip in QA matrix.
+- **R-PROCGEN.b — Chunk-port mating gaps at procedural seams.** Ports mis-mate produces a visible tile gap or overlap; player walks into invisible wall or sees draw-order seam. Mitigated by `level-chunks.md` § "Why ports" already-validated port-discipline + W1 spike's anchor-procgen composition gate (proof 2).
+- **R-PROCGEN.c — HTML5 `gl_compatibility` procedural-seam rendering divergence.** Tilemap z-index ordering or seam draw-order differs from desktop. Mitigated by `html5-export.md` HTML5 visual-verification gate + W6-W7 Sponsor-soak probe round (NEW ticket above) + fallback to SI-8 option (c) hybrid if regression is unworkable.
+
+**Trigger:** W1 spike surfaces any of the three sub-risks; Tess M3 Tier 3 acceptance plan flags seed-round-trip drift; Sponsor M3 Tier 3 soak surfaces visible procedural seams. **Owner:** Devon (seed-binding + save), Drew (procgen + assembler), Tess (HTML5 visual-verification gate).
+
+**R-SCOPE (this doc's adoption) — DEMOTED.** v1.0 §7 listed R-SCOPE as the "Sponsor disagrees with milestone shape" risk. With SI-1 through SI-5 now signed and SI-8 added as a discrete pinpoint, the v1.0 R-SCOPE has effectively retired (Sponsor signed the milestone shape). **Demote to:** retired pending SI-8 sign-off. Re-arm only if Sponsor diverges on SI-8 or surfaces a new directive.
+
+**All other v1.0 §7 risks (R-SCROLL, R-DIALOGUE, R-MAP, R-ART, R6, R-AC4, R1, R8, R-M3) unchanged.** Risk register update lands in next Priya weekly batch.
+
+### v1.1 — §8 — Cross-references added
+
+In addition to all v1.0 §8 references, this amendment cites:
+
+- **`team/drew-dev/level-chunks.md`** § "Why ports, not free-form transitions" — the port-mating discipline that pre-shapes the procgen system. Already cited in v1.0 §8 § "Why chunks"; v1.1 specifically pins the "Why ports" subsection as load-bearing for Commitment 5.
+- **`team/devon-dev/save-schema-v5-plan.md`** — verified to exist (M3 Tier 1 spike landed by Devon). Commitment 5's `world_seed` additive field rides on top of v5's per-character key structure (`data.characters[N].world_seed: int`) without touching the non-additive multi-character lift. The v5 spike's pointer-shadow strategy (per `save-schema-v5-plan.md §4.4`) is unaffected.
+
+---
+
+## v1.0 content — historical record below
+
+The v1.0 content below is preserved unchanged from the initial 2026-05-22 authoring. This v1.1 amendment supersedes the v1.0 content by section (per the section list at the top of this amendment block). Read the v1.1 amendment block above first for the current shape; read v1.0 below for the reasoning chains and dependency graphs that didn't change.
+
+---
+
 **Owner:** Priya · **Authored:** 2026-05-22 · **Status:** v1.0 — Sponsor signed two major direction locks same-day (level-scale + Diablo-shape); milestones below shaped around them. Sponsor-input pending on seven items in §6.
 
 This doc is the **canonical sequencing artifact** for the work the team does after M3 Tier 2 Wave 3 lands. Sponsor's ask: *"do the tasks in the order that any professional game developer team would progress."* Below is the order, with the reasoning, the milestones, the pre-shaped tickets (counts + ownership, not dispatched), the Sponsor-input items that gate each milestone, and the risk-register shifts that follow from adopting it.
