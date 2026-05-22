@@ -235,6 +235,12 @@ func test_t16_f3_title_card_dismissed_resets_camera_and_vignette() -> void:
 	assert_not_null(camera_director)
 	assert_not_null(vignette)
 
+	# Pre-condition: drive camera AWAY from the F3 target (1.0× + follow mode)
+	# so the dismissal's `reset_to_player()` lands as a real state change, not
+	# the idempotent no-op CameraDirector.request_zoom returns when the live
+	# state already matches. Simulates the F2 having fired.
+	camera_director.request_zoom(1.5, 0.0, boss.global_position)  # snap to F2-like state
+
 	# Fire boss_defeated (via the room emitting its own signal — same path
 	# Main subscribes to in `_wire_room_signals`). This instantiates the
 	# title card AND wires the F3 reset callbacks.
