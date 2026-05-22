@@ -455,6 +455,40 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
     // The dual-surface invariant: Player._equipped_weapon got refreshed by
     // the LMB-click path. Confirm by firing a swing and watching for
     // Hitbox.hit damage matching the pre-reload value.
+    //
+    // **Anchor the search to the lmb_click equip line (ticket 86c9xwu50).**
+    // The Tab open + unequip click + grid click sequence above can produce
+    // SPURIOUS `[combat-trace] Hitbox.hit | team=player` lines:
+    //   - The InventoryPanel button consumes the LMB click for UI purposes,
+    //     but Godot's `Input.is_action_just_pressed("attack_light")` polls
+    //     global state (not the consumed Control event), so `Player.
+    //     _process_grounded` ALSO fires `try_attack` for the same LMB press.
+    //   - At canvas (428, 80) / (428, 208), with CameraDirector centered on
+    //     the player at world (240, 200), the mouse-derived `_facing` points
+    //     into Room02 where grunts are spawned — and the unequip click fires
+    //     a swing AFTER `_apply_unequip_to_player` cleared `_equipped_weapon
+    //     = null` (within the same Inventory.unequip call), so that swing
+    //     deals FIST_DAMAGE = 1 instead of weapon-scaled 6.
+    // If we slice from `phase25LineCount` (captured BEFORE Tab open) the
+    // first-matching `Hitbox.hit | team=player` may be the fistless leak
+    // from the unequip click, not the post-re-equip sweep swing. Anchor
+    // to the `lmb_click` equip line so only POST-EQUIP hits are considered.
+    // This is a pure spec-correctness fix — the engine-side "InventoryPanel
+    // does not gate player attack input" is a separate question (production
+    // gameplay: should the player be able to swing while the panel is open?).
+    const lmbEquipLineIdx = capture
+      .getLines()
+      .findIndex((l) =>
+        /\[combat-trace\] Inventory\.equip \| .*source=lmb_click/.test(l.text)
+      );
+    if (lmbEquipLineIdx < 0) {
+      throw new Error(
+        "[equip-flow] internal: lost the lmb_click equip line index between " +
+          "the assertion above and the search anchor. Trace ordering changed?"
+      );
+    }
+    const postEquipBaselineIdx = lmbEquipLineIdx + 1;
+
     await canvas.click(); // re-focus the canvas for swing input
     await page.waitForTimeout(300);
 
@@ -512,9 +546,17 @@ test.describe("equip flow — equipped weapon survives F5 reload", () => {
           // live camera transform internally.
           await clickAimedAtSpawn(canvas, capture, "NE");
           await page.waitForTimeout(ATTACK_INTERVAL_MS);
-          // Look for hits AFTER the marked buffer position so we don't pick
-          // up pre-Tab hits.
-          const recentLines = capture.getLines().slice(phase25LineCount);
+          // Look for hits AFTER the lmb_click equip line — NOT just after
+          // phase25LineCount (ticket 86c9xwu50). The Tab → unequip → grid
+          // click sequence above can leak a fistless `Hitbox.hit | team=
+          // player damage=1` line into the buffer via the InventoryPanel-
+          // does-not-gate-Player-input race (see the long comment block
+          // above the canvas.click). Anchoring to lmbEquipLineIdx+1
+          // guarantees only post-re-equip hits are considered, so the
+          // assertion correctly tests "after the LMB-equip refreshed
+          // Player._equipped_weapon, do subsequent swings deal the weapon
+          // damage" rather than accidentally consuming the unequip-leak.
+          const recentLines = capture.getLines().slice(postEquipBaselineIdx);
           const hitLine = recentLines.find((l) =>
             /\[combat-trace\] Hitbox\.hit \| team=player.*damage=(\d+)/.test(
               l.text
