@@ -4,8 +4,8 @@ This doc codifies a routing rule that emerged from the M3 Tier 3 W1 retro (PR #3
 
 This rule is **complementary** to two existing rules and does not replace either:
 
-- [`html5-visual-verification-gate.md`](.. /memory mirror) — the *author* obligation: any tween/modulate/Polygon2D/CPUParticles2D/Area2D-state PR must self-soak HTML5 before flipping to ready-for-QA.
-- [`html5-visual-gated-author-self-soak.md`](.. /memory mirror) — author MUST self-soak before claiming fix-complete on the gated PR classes.
+- **`html5-visual-verification-gate`** (orchestrator memory entry) — the *author* obligation: any tween/modulate/Polygon2D/CPUParticles2D/Area2D-state PR must self-soak HTML5 before flipping to ready-for-QA.
+- **`html5-visual-gated-author-self-soak`** (orchestrator memory entry) — author MUST self-soak before claiming fix-complete on the gated PR classes.
 
 Sponsor-soak-routing is the *Sponsor* obligation side: given that those gates are met, when does Sponsor's manual soak add signal vs. duplicate work the harness already covered?
 
