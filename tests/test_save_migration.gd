@@ -162,11 +162,11 @@ func test_save_migrated_v0_then_reload_round_trips() -> void:
 	var raw: String = f.get_as_text()
 	f.close()
 	var parsed: Dictionary = JSON.parse_string(raw)
-	# Schema bumped to 3 on 2026-05-02 (added stats / unspent / first_level_up_seen).
+	# Schema bumped to 4 on 2026-05-22 (added first_boss_kill_seen per M3-T2-W3-T17).
 	# When SCHEMA_VERSION bumps, update this number AND add the new
 	# migration test in test_save.gd.
-	assert_eq(int(parsed["schema_version"]), 3,
-		"on-disk envelope upgraded to current schema (v3) after migration + save")
+	assert_eq(int(parsed["schema_version"]), 4,
+		"on-disk envelope upgraded to current schema (v4) after migration + save")
 	# And reload one more time — fields are stable.
 	var reloaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_eq(reloaded["character"]["level"], 4, "level stable across v0 → migrate → save → reload")
@@ -292,3 +292,135 @@ func test_v0_save_survives_simulated_quit_and_relaunch() -> void:
 	assert_eq(continued["character"]["xp"], 1850)
 	assert_true(continued.has("meta"), "v1 meta block present after migration cycle")
 	assert_true(continued.has("equipped"))
+
+
+# =====================================================================
+# v3 -> v4: first_boss_kill_seen backfill (M3-T2-W3-T17, ticket 86c9wjzjf)
+# =====================================================================
+
+func test_v3_migration_chains_through_to_v4() -> void:
+	# A hand-authored v3 save must migrate cleanly to v4 — the only new
+	# v4 field is `character.first_boss_kill_seen`, backfilled to `false`.
+	# Mirrors `test_migrate_v0_save_chains_through_v2` in test_save.gd
+	# for shape; lives here next to the migration-fixture tests so the
+	# full chain (v0 → v1 → v2 → v3 → v4) is documented in one file.
+	var v3_envelope: Dictionary = {
+		"schema_version": 3,
+		"saved_at": "2026-05-22T10:00:00",
+		"data": {
+			"character": {
+				"name": "Mid-game-Knight",
+				"level": 3,
+				"xp": 600,
+				"xp_to_next": 519,
+				"vigor": 1,
+				"focus": 1,
+				"edge": 0,
+				"stats": {"vigor": 1, "focus": 1, "edge": 0},
+				"unspent_stat_points": 2,
+				"first_level_up_seen": true,
+				"hp_current": 80,
+				"hp_max": 100,
+			},
+			"stash": [],
+			"equipped": {},
+			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 100.0},
+		},
+	}
+	var f: FileAccess = FileAccess.open(_save().save_path(TEST_SLOT), FileAccess.WRITE)
+	f.store_string(JSON.stringify(v3_envelope))
+	f.close()
+
+	var loaded: Dictionary = _save().load_game(TEST_SLOT)
+	assert_true(loaded.has("character"))
+	# v3 -> v4 migration backfills first_boss_kill_seen to false.
+	assert_true(loaded["character"].has("first_boss_kill_seen"),
+		"v3 → v4 migration adds first_boss_kill_seen to character")
+	assert_false(bool(loaded["character"]["first_boss_kill_seen"]),
+		"first_boss_kill_seen defaults to false on migration (first kill still unskippable)")
+	# Untouched v3 fields preserved bit-identical.
+	assert_eq(loaded["character"]["level"], 3, "v3 level preserved through v4 migration")
+	assert_eq(loaded["character"]["xp"], 600)
+	assert_eq(loaded["character"]["unspent_stat_points"], 2)
+	assert_true(bool(loaded["character"]["first_level_up_seen"]),
+		"v3 first_level_up_seen preserved (not overwritten by v4 migration)")
+	# Re-save and verify on-disk schema bumped to 4.
+	_save().save_game(TEST_SLOT, loaded)
+	var path: String = _save().save_path(TEST_SLOT)
+	var f2: FileAccess = FileAccess.open(path, FileAccess.READ)
+	var raw2: String = f2.get_as_text()
+	f2.close()
+	var parsed: Dictionary = JSON.parse_string(raw2)
+	assert_eq(int(parsed["schema_version"]), 4,
+		"on-disk envelope upgraded to v4 after v3 → v4 migration + save")
+
+
+func test_v0_migration_chains_through_to_v4() -> void:
+	# Full-chain stress test: v0 fixture migrates v0 → v1 → v2 → v3 → v4
+	# and lands with every intermediate-version field present, plus the
+	# new v4 field. Catches drift in the migration chain — if any step
+	# silently drops a field, this test fails before T18+ does.
+	_install_fixture_at_slot(FIXTURE_V0, TEST_SLOT)
+	var loaded: Dictionary = _save().load_game(TEST_SLOT)
+	# v0 -> v1: meta + equipped added.
+	assert_true(loaded.has("meta"), "v0 → v1 added meta")
+	assert_true(loaded.has("equipped"), "v0 → v1 added equipped")
+	# v1 -> v2: xp_to_next added.
+	assert_true(loaded["character"].has("xp_to_next"), "v1 → v2 added xp_to_next")
+	# v2 -> v3: stats block + unspent_stat_points + first_level_up_seen added.
+	assert_true(loaded["character"].has("stats"), "v2 → v3 added stats block")
+	assert_true(loaded["character"].has("unspent_stat_points"), "v2 → v3 added unspent_stat_points")
+	assert_true(loaded["character"].has("first_level_up_seen"), "v2 → v3 added first_level_up_seen")
+	# v3 -> v4: first_boss_kill_seen added.
+	assert_true(loaded["character"].has("first_boss_kill_seen"),
+		"v3 → v4 added first_boss_kill_seen")
+	assert_false(bool(loaded["character"]["first_boss_kill_seen"]),
+		"v3 → v4 default-false (first kill of migrated character still unskippable)")
+	# Original v0 fields survive the full chain.
+	assert_eq(loaded["character"]["level"], 4, "v0 level survives full v0→v4 chain")
+	assert_eq(loaded["character"]["xp"], 1850)
+	assert_eq(loaded["stash"].size(), 2)
+
+
+func test_v4_migration_is_idempotent() -> void:
+	# Running the v3→v4 migration on an already-v4 save (or any data that
+	# already has first_boss_kill_seen) must be a no-op — never reset a
+	# true value to false. Tests Save._migrate_v3_to_v4 idempotence per
+	# the existing `if not character.has(...)` guard idiom.
+	var v4_envelope: Dictionary = {
+		"schema_version": 4,
+		"saved_at": "2026-05-22T11:00:00",
+		"data": {
+			"character": {
+				"name": "Veteran-Knight",
+				"level": 5,
+				"xp": 2500,
+				"xp_to_next": 0,
+				"vigor": 3,
+				"focus": 2,
+				"edge": 1,
+				"stats": {"vigor": 3, "focus": 2, "edge": 1},
+				"unspent_stat_points": 0,
+				"first_level_up_seen": true,
+				"first_boss_kill_seen": true,  # Veteran — should survive the migration cycle.
+				"hp_current": 130,
+				"hp_max": 130,
+			},
+			"stash": [],
+			"equipped": {},
+			"meta": {"runs_completed": 5, "deepest_stratum": 1, "total_playtime_sec": 3600.0},
+		},
+	}
+	var f: FileAccess = FileAccess.open(_save().save_path(TEST_SLOT), FileAccess.WRITE)
+	f.store_string(JSON.stringify(v4_envelope))
+	f.close()
+	var loaded: Dictionary = _save().load_game(TEST_SLOT)
+	# Critically — first_boss_kill_seen=true is PRESERVED through the migration
+	# cycle. The defensive `has()` check in _migrate_v3_to_v4 must not overwrite
+	# an existing true value. If it does, every veteran character would lose
+	# their skip privilege on schema-version rollback / partial load.
+	assert_true(bool(loaded["character"]["first_boss_kill_seen"]),
+		"already-v4 first_boss_kill_seen=true survives the no-op migration")
+	assert_true(bool(loaded["character"]["first_level_up_seen"]),
+		"already-v4 first_level_up_seen=true survives the no-op migration")
+	assert_eq(loaded["character"]["level"], 5)

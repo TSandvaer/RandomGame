@@ -29,7 +29,7 @@ const TMP_SUFFIX: String = ".tmp"
 const README_FILENAME: String = "README.txt"
 const README_PATH: String = SAVE_DIR + README_FILENAME
 
-const SCHEMA_VERSION: int = 3
+const SCHEMA_VERSION: int = 4
 
 # ---- Signals ----------------------------------------------------------
 
@@ -66,6 +66,13 @@ const _V2_MAX_LEVEL: int = 5
 # compatibility shadow during v2 -> v3 migration so old saves load cleanly.
 # Also added `character.first_level_up_seen` (one-shot panel auto-open
 # gate per Uma `level-up-panel.md` LU-05 / LU-06).
+#
+# v4 (2026-05-22): added `character.first_boss_kill_seen` (M3-T2-W3-T17,
+# ticket 86c9wjzjf). One-shot gate for the boss-intro skip rule per Uma
+# `boss-intro.md § "Skip rule"` — after the first boss kill of the
+# character's lifetime, subsequent boss intros can be collapsed by
+# pressing any movement key during Beats 2–4. Default false (first-ever
+# fight is NOT skippable). Mirrors `first_level_up_seen` lifecycle exactly.
 const DEFAULT_PAYLOAD: Dictionary = {
 	"character": {
 		"name": "Ember-Knight",
@@ -82,6 +89,7 @@ const DEFAULT_PAYLOAD: Dictionary = {
 		},
 		"unspent_stat_points": 0,
 		"first_level_up_seen": false,
+		"first_boss_kill_seen": false,
 		"hp_current": 100,
 		"hp_max": 100,
 	},
@@ -231,6 +239,8 @@ func migrate(data: Dictionary, from_version: int) -> Dictionary:
 		out = _migrate_v1_to_v2(out)
 	if from_version < 3:
 		out = _migrate_v2_to_v3(out)
+	if from_version < 4:
+		out = _migrate_v3_to_v4(out)
 	return out
 
 
@@ -315,6 +325,35 @@ func _migrate_v2_to_v3(data: Dictionary) -> Dictionary:
 	# level-up, which is acceptable — it's still a celebratory beat.
 	if not character.has("first_level_up_seen"):
 		character["first_level_up_seen"] = false
+	return data
+
+
+## v3 -> v4: add `character.first_boss_kill_seen` (M3-T2-W3-T17, ticket
+## `86c9wjzjf`). One-shot gate for the boss-intro skip rule per Uma
+## `boss-intro.md § "Skip rule"`. Default false — first-ever boss fight
+## is NOT skippable; the player sees the full 1.8 s entry sequence the
+## first time, gains the skip privilege on the FIRST `boss_defeated`
+## emit per character, then can collapse subsequent intros by pressing
+## any movement key during Beats 2–4.
+##
+## A v3 character who has already killed the boss (no way to know from
+## the save shape alone — v3 didn't track it) defaults to `false`, which
+## means they get the unskippable theatre one more time on their next
+## boss room visit. This is the same tradeoff as `first_level_up_seen`
+## in v2->v3 — one extra "first time" beat is acceptable for migrated
+## characters. Erring on the side of "show the cinematic" preserves the
+## narrative for migrated saves; the alternative ("hide the cinematic")
+## would silently rob a player who hadn't yet seen it.
+##
+## Mirrors the `_migrate_v2_to_v3` defensive-guard idiom — character
+## block backfilled if missing; per-field `has()` check before backfill
+## (idempotent on already-v4 data).
+func _migrate_v3_to_v4(data: Dictionary) -> Dictionary:
+	if not data.has("character") or not (data["character"] is Dictionary):
+		data["character"] = DEFAULT_PAYLOAD["character"].duplicate(true)
+	var character: Dictionary = data["character"]
+	if not character.has("first_boss_kill_seen"):
+		character["first_boss_kill_seen"] = false
 	return data
 
 
