@@ -86,16 +86,61 @@ extends Node
 ##   - `CameraDirector.shake(magnitude, duration)` — redirect target for
 ##     `Stratum1Boss._play_climax_shake`. ClickUp `86c9wvh8e` (low priority).
 ##   - `?camera=<scale>` URL-param debug hook for Sponsor-soak of T13/T16.
-##   - Smooth lerp-follow (~0.1 s catch-up) instead of snap. Sponsor decision.
+##
+## ## M3 Tier 3 W1 — continuous-scroll follow-target + world-bounds clamp
+##   (ticket `86c9xu9yt`, additive on top of T9)
+##
+## **What's new** — Sponsor signed SI-1 (continuous-scroll camera) 2026-05-22.
+## Rooms become wider-than-screen volumes; camera follows the player smoothly
+## within a deadzone and clamps at world edges so the player never sees beyond
+## authored content. Per-tick snap-follow (the T9 default) is preserved for
+## backward compatibility; the new path is opt-in via `follow_target()`.
+##
+##   follow_target(target: Node2D, deadzone_px: Vector2) -> void
+##       Engage continuous-scroll follow mode. Camera tracks `target` but only
+##       moves on an axis if the target has crossed outside the deadzone
+##       relative to the camera center. The deadzone is HALF-extents in world
+##       pixels — `Vector2(40, 24)` means an 80-px-wide × 48-px-tall rectangle
+##       around the camera within which the target can roam freely.
+##       When the target crosses the deadzone edge, the camera shifts to
+##       maintain the target AT the deadzone edge — a Diablo-style "camera
+##       catches up to the player at the deadzone edge" behavior. Re-engaging
+##       follow_target with a fresh target/deadzone resets state.
+##
+##   set_world_bounds(bounds: Rect2) -> void
+##       Set the world-edge clamp rect (world-space pixels). The camera's
+##       position is clamped so the visible viewport (computed from current
+##       engine zoom) never shows beyond `bounds`. If `bounds` is smaller
+##       than the viewport on an axis, the camera centers on the rect's
+##       center on that axis (the player still moves; the camera holds).
+##
+##   clear_world_bounds() -> void
+##       Disable bounds-clamp.
+##
+##   clear_follow_target() -> void
+##       Revert to T9 snap-follow behavior (player-group lookup, no deadzone,
+##       no smoothing). The default after boot.
+##
+## **HUD-immunity preserved.** The new follow path writes only
+## `_camera.global_position`. CanvasLayer parents (all M1 UI) remain immune
+## per the same Godot architectural guarantee that backs T9 — verified by
+## the existing `test_hud_canvaslayer_unaffected_by_camera_zoom` plus the
+## new W1 `test_hud_canvaslayer_unaffected_by_continuous_scroll`.
+##
+## **Zoom preserved.** Zoom requests are orthogonal to follow mode — a zoom
+## tween fired during follow_target keeps tracking; the world-bounds clamp
+## recomputes against the current engine zoom each tick.
 ##
 ## ## References
 ##
-##   - ClickUp `86c9wjyf3` — this ticket (T9)
-##   - `team/devon-dev/camera2d-spike.md` — spike doc + design rationale
-##   - `team/priya-pl/m3-tier2-boss-room-polish-scope.md` §3 T9 — AC
+##   - ClickUp `86c9wjyf3` — original T9 ticket (snap-follow + zoom)
+##   - ClickUp `86c9xu9yt` — M3 Tier 3 W1 spike (continuous-scroll follow + bounds)
+##   - `team/devon-dev/camera2d-spike.md` — original T9 spike doc + design rationale
+##   - `team/priya-pl/m3-tier2-boss-room-polish-scope.md` §3 T9 — original AC
+##   - `team/priya-pl/post-wave3-sequencing.md` §1 Commitment 1 + §4 W1 — W1 brief
 ##   - `team/uma-ux/boss-intro.md` BI-05 + F2 — Wave 3 consumers
 ##   - `.claude/docs/html5-export.md` — gl_compatibility + visual-verification gate
-##   - `.claude/docs/camera-layer.md` (to be created by maintain-docs when this lands)
+##   - `.claude/docs/camera-layer.md` — full reference (updated with continuous-scroll § by W2 impl PR)
 
 
 # ---- Constants -------------------------------------------------------
@@ -138,6 +183,15 @@ signal zoom_changed(new_normalized_zoom: float)
 ## Subscribers: T13 (nameplate slide-in coordination), T16 (ember-rise
 ## sequencer), debug overlay.
 signal zoom_requested(target_normalized: float, duration: float, anchor: Vector2)
+
+## Emitted when continuous-scroll follow mode engages or disengages.
+## Payload: `engaged` true on engage; false on `clear_follow_target()`.
+## W1 spike (`86c9xu9yt`) consumer surface; W2 impl + Sponsor-soak utility.
+signal follow_target_changed(engaged: bool)
+
+## Emitted when the world-bounds clamp engages, changes, or clears.
+## Payload is the new clamp rect; `Rect2()` (zero size) means cleared.
+signal world_bounds_changed(bounds: Rect2)
 
 
 # ---- State -----------------------------------------------------------
@@ -182,6 +236,31 @@ var _state_trace_accum: float = 0.0
 ## position AND camera state when computing aim targets.
 const STATE_TRACE_INTERVAL: float = 0.25
 
+## ---- M3 Tier 3 W1 — continuous-scroll follow + bounds-clamp state ----
+
+## Continuous-scroll follow target. When non-null, takes precedence over
+## both `_anchor_override` and the T9 snap-follow path. Re-resolves via
+## `is_instance_valid` per tick; clears on target free without panic.
+var _follow_target: Node2D = null
+
+## Half-extents of the deadzone in WORLD pixels. `Vector2(40, 24)` means
+## an 80×48 rectangle around the camera within which the target can move
+## freely without shifting the camera. Set by `follow_target()`.
+var _follow_deadzone: Vector2 = Vector2.ZERO
+
+## World-edge clamp rect in WORLD pixels. `Rect2()` (zero size) means
+## "no clamp." When set, `_process` post-processes the candidate camera
+## position to keep the visible viewport (computed from current engine
+## zoom) inside the rect.
+var _world_bounds: Rect2 = Rect2()
+
+## Viewport size in WORLD pixels at engine zoom 1.0. The viewport is
+## 1280×720 in display pixels (`project.godot [display]`). At default
+## engine zoom `BASELINE_ZOOM = 2.6667`, the visible WORLD region is
+## `1280/2.6667 × 720/2.6667 = 480×270` — the same logical-room size
+## that pre-T9 rendering assumed.
+const LOGICAL_VIEWPORT_BASE: Vector2 = Vector2(1280.0, 720.0)
+
 
 # ---- Lifecycle -------------------------------------------------------
 
@@ -204,21 +283,35 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# Per-tick: resolve player target (cheap group lookup if cache is stale)
-	# then write camera position. Snap-follow (no lerp) keeps T9 behavior
-	# indistinguishable from pre-T9 native-stretch rendering.
+	# Per-tick precedence (highest → lowest):
+	#   1. Pinned anchor (T9 `request_zoom(anchor)`) — holds at world coord.
+	#   2. Continuous-scroll follow_target (W1 spike) — deadzone follow,
+	#      optionally bounds-clamped.
+	#   3. T9 snap-follow on the "player" group — backward-compat default.
+	# Order matters: a caller that does request_zoom with non-zero anchor
+	# during follow_target gets the anchor pin (cinematic supersedes scroll).
 	if _camera == null:
 		return
 	if _anchor_override != Vector2.ZERO:
 		# Pinned anchor — _pos_tween (if any) drives position; otherwise hold.
 		if _pos_tween == null or not _pos_tween.is_valid():
 			_camera.global_position = _anchor_override
+	elif _follow_target != null and is_instance_valid(_follow_target):
+		# Continuous-scroll mode — deadzone follow.
+		var candidate: Vector2 = _compute_deadzone_follow_position(
+			_camera.global_position, _follow_target.global_position, _follow_deadzone)
+		if _world_bounds.size != Vector2.ZERO:
+			candidate = _clamp_to_world_bounds(candidate, _world_bounds)
+		_camera.global_position = candidate
 	else:
-		# Player-follow mode. Re-resolve if cached target is gone.
+		# T9 snap-follow on the "player" group.
 		if _target_player == null or not is_instance_valid(_target_player):
 			_resolve_player_target()
 		if _target_player != null and is_instance_valid(_target_player):
-			_camera.global_position = _target_player.global_position
+			var snap_pos: Vector2 = _target_player.global_position
+			if _world_bounds.size != Vector2.ZERO:
+				snap_pos = _clamp_to_world_bounds(snap_pos, _world_bounds)
+			_camera.global_position = snap_pos
 	# HTML5-only state trace for Playwright-fixture consumers. Throttled so
 	# console doesn't drown in chatter. Mirrors `Player.pos` cadence.
 	_state_trace_accum += delta
@@ -370,6 +463,122 @@ func get_camera() -> Camera2D:
 	return _camera
 
 
+# ---- M3 Tier 3 W1 — continuous-scroll API -----------------------------
+
+## Engage continuous-scroll follow mode against `target`. The camera moves
+## smoothly within a deadzone so small target motions don't shake the view;
+## crossings of the deadzone edge cause the camera to catch up to maintain
+## the target AT the deadzone edge (Diablo-style behavior).
+##
+## `deadzone_px`: half-extents in WORLD pixels. `Vector2(40, 24)` is an
+## 80×48 freely-moveable rectangle. `Vector2.ZERO` (the default) makes
+## every target movement immediately translate to camera movement — same
+## visual effect as snap-follow, but routed through the continuous-scroll
+## codepath (useful for tests that want to exercise the path without
+## introducing a deadzone variable).
+##
+## Negative deadzone components are clamped to 0.0 with a WarningBus
+## warning. `null` target is treated as `clear_follow_target()`.
+##
+## Idempotent: re-engaging with the same target + same deadzone does not
+## emit `follow_target_changed` (avoids signal-spam on per-frame callers).
+func follow_target(target: Node2D, deadzone_px: Vector2 = Vector2.ZERO) -> void:
+	if target == null:
+		clear_follow_target()
+		return
+	# Validate + clamp deadzone.
+	if is_nan(deadzone_px.x) or is_nan(deadzone_px.y) or is_inf(deadzone_px.x) or is_inf(deadzone_px.y):
+		_warn(("CameraDirector.follow_target: non-finite deadzone (%s) — refusing"
+			% str(deadzone_px)), "camera_director")
+		return
+	var clamped_dz: Vector2 = Vector2(maxf(deadzone_px.x, 0.0), maxf(deadzone_px.y, 0.0))
+	if clamped_dz != deadzone_px:
+		_warn(("CameraDirector.follow_target: deadzone %s clamped to %s "
+			+ "(negative components → 0)") % [str(deadzone_px), str(clamped_dz)],
+			"camera_director")
+
+	# HTML5-only Playwright-observable trace.
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags") if is_inside_tree() else null
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace("CameraDirector.follow_target",
+			"target=%s deadzone=(%.1f,%.1f)" % [
+				target.name, clamped_dz.x, clamped_dz.y])
+
+	var was_engaged: bool = _follow_target != null and is_instance_valid(_follow_target)
+	var changed: bool = (_follow_target != target) or (clamped_dz != _follow_deadzone) or not was_engaged
+	_follow_target = target
+	_follow_deadzone = clamped_dz
+	if changed:
+		follow_target_changed.emit(true)
+
+
+## Disengage continuous-scroll follow mode. Reverts to T9 snap-follow on
+## the "player" group. Idempotent — no-op if not currently engaged.
+func clear_follow_target() -> void:
+	if _follow_target == null:
+		return
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags") if is_inside_tree() else null
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace("CameraDirector.follow_target", "cleared")
+	_follow_target = null
+	_follow_deadzone = Vector2.ZERO
+	follow_target_changed.emit(false)
+
+
+## Set the world-edge clamp rect. The camera position is constrained so
+## the visible viewport (computed from current engine zoom) does not show
+## beyond `bounds`. Pass `Rect2()` (zero size) or use `clear_world_bounds()`
+## to disable. Idempotent on same value.
+##
+## `bounds` is in WORLD pixels. Example: a 3-chunk scene 1440×270 wide:
+## `set_world_bounds(Rect2(0, 0, 1440, 270))`.
+func set_world_bounds(bounds: Rect2) -> void:
+	if bounds.size.x < 0.0 or bounds.size.y < 0.0:
+		_warn(("CameraDirector.set_world_bounds: negative size %s — refusing"
+			% str(bounds)), "camera_director")
+		return
+	if _world_bounds == bounds:
+		return
+	_world_bounds = bounds
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags") if is_inside_tree() else null
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace("CameraDirector.set_world_bounds",
+			"pos=(%.0f,%.0f) size=(%.0f,%.0f)" % [
+				bounds.position.x, bounds.position.y, bounds.size.x, bounds.size.y])
+	world_bounds_changed.emit(bounds)
+
+
+## Disable the world-edge clamp.
+func clear_world_bounds() -> void:
+	if _world_bounds.size == Vector2.ZERO:
+		return
+	set_world_bounds(Rect2())
+
+
+## Live world-edge clamp rect. `Rect2()` (zero size) means "no clamp."
+## For tests + debug only.
+func get_world_bounds() -> Rect2:
+	return _world_bounds
+
+
+## True iff continuous-scroll follow mode is engaged + the target is alive.
+## For tests + debug only.
+func is_following_target() -> bool:
+	return _follow_target != null and is_instance_valid(_follow_target)
+
+
+## Live follow-target reference. Nullable. For tests + debug only.
+func get_follow_target() -> Node2D:
+	if _follow_target != null and is_instance_valid(_follow_target):
+		return _follow_target
+	return null
+
+
+## Live deadzone half-extents in WORLD pixels. For tests + debug only.
+func get_follow_deadzone() -> Vector2:
+	return _follow_deadzone
+
+
 # ---- Internals -------------------------------------------------------
 
 func _resolve_player_target() -> void:
@@ -392,6 +601,84 @@ func _on_zoom_tween_done(final_normalized: float) -> void:
 	_current_normalized_zoom = final_normalized
 	zoom_changed.emit(final_normalized)
 	_zoom_tween = null
+
+
+## Compute the deadzone-follow camera position for one tick. Pure function:
+## given the current camera position, the target's position, and the
+## deadzone half-extents, returns the new camera position such that the
+## target sits AT the deadzone edge in any axis it has crossed past.
+##
+## Behavior per axis:
+##   - If `abs(target.axis - camera.axis) <= deadzone.axis`: camera holds
+##     (target is inside the deadzone — no movement).
+##   - Else: camera shifts so the target lands EXACTLY on the deadzone
+##     edge in the direction of motion (`target - sign * deadzone`).
+##
+## A zero-deadzone axis collapses to snap-follow on that axis (camera ==
+## target). Negative deadzone components were rejected at `follow_target`
+## entry; this helper assumes ≥ 0.
+##
+## Static-like: no member access except via params. Test-callable.
+func _compute_deadzone_follow_position(camera_pos: Vector2, target_pos: Vector2, deadzone: Vector2) -> Vector2:
+	var result: Vector2 = camera_pos
+	# X axis.
+	var dx: float = target_pos.x - camera_pos.x
+	if absf(dx) > deadzone.x:
+		# Target outside deadzone → shift camera so target lands on edge.
+		# If dx > 0, target is to the right; camera moves to target.x - deadzone.x.
+		# If dx < 0, target is to the left; camera moves to target.x + deadzone.x.
+		result.x = target_pos.x - signf(dx) * deadzone.x
+	# Y axis (independent of X).
+	var dy: float = target_pos.y - camera_pos.y
+	if absf(dy) > deadzone.y:
+		result.y = target_pos.y - signf(dy) * deadzone.y
+	return result
+
+
+## Clamp a candidate camera position so the visible viewport stays inside
+## `bounds`. Visible viewport is `LOGICAL_VIEWPORT_BASE / engine_zoom`
+## (e.g. at zoom 2.6667 the visible world region is 480×270). Camera
+## position is the CENTER of the viewport (Godot Camera2D semantics).
+##
+## Per axis:
+##   - If `bounds.size.axis < viewport.axis`: viewport is wider than the
+##     bounds on this axis → center the camera on the bounds center
+##     (player still moves; camera holds — no "scrolling past content").
+##   - Else: clamp camera to `[bounds.position + viewport/2,
+##     bounds.end - viewport/2]` so the viewport edges align with the
+##     bounds edges at the extremes.
+##
+## Static-like helper; test-callable.
+func _clamp_to_world_bounds(camera_pos: Vector2, bounds: Rect2) -> Vector2:
+	var zoom: Vector2 = BASELINE_ZOOM
+	if _camera != null:
+		zoom = _camera.zoom
+	# Guard against zoom = 0 (would be infinite viewport — shouldn't happen
+	# given MIN_NORMALIZED_ZOOM 0.5, but defensive).
+	var safe_zoom_x: float = zoom.x if zoom.x > 0.001 else BASELINE_ZOOM.x
+	var safe_zoom_y: float = zoom.y if zoom.y > 0.001 else BASELINE_ZOOM.y
+	var viewport_world: Vector2 = Vector2(
+		LOGICAL_VIEWPORT_BASE.x / safe_zoom_x,
+		LOGICAL_VIEWPORT_BASE.y / safe_zoom_y)
+	var half_vp: Vector2 = viewport_world * 0.5
+
+	var result: Vector2 = camera_pos
+	# X axis.
+	if bounds.size.x <= viewport_world.x:
+		# Bounds narrower than viewport → center on bounds.
+		result.x = bounds.position.x + bounds.size.x * 0.5
+	else:
+		result.x = clampf(camera_pos.x,
+			bounds.position.x + half_vp.x,
+			bounds.position.x + bounds.size.x - half_vp.x)
+	# Y axis.
+	if bounds.size.y <= viewport_world.y:
+		result.y = bounds.position.y + bounds.size.y * 0.5
+	else:
+		result.y = clampf(camera_pos.y,
+			bounds.position.y + half_vp.y,
+			bounds.position.y + bounds.size.y - half_vp.y)
+	return result
 
 
 ## Internal warning helper. Routes through WarningBus when available; falls

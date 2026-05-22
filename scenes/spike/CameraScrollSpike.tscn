@@ -1,0 +1,169 @@
+[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_camera_scroll_spike"]
+
+[ext_resource type="Script" path="res://scripts/spike/CameraScrollSpike.gd" id="1_spike"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_marker"]
+size = Vector2(12, 16)
+
+[node name="CameraScrollSpike" type="Node2D"]
+script = ExtResource("1_spike")
+
+; ---- World floor — three chunks side by side ----
+; Distinct floor tones in the warm-sandstone family so the seams are
+; visible during soak without breaking the stratum-1 palette discipline.
+; Chunk 1 = lightest sandstone; Chunk 2 = mid; Chunk 3 = deepest.
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="Chunk1Floor" type="ColorRect" parent="World"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 270.0
+color = Color(0.45, 0.36, 0.27, 1)
+mouse_filter = 2
+
+[node name="Chunk2Floor" type="ColorRect" parent="World"]
+offset_left = 480.0
+offset_top = 0.0
+offset_right = 960.0
+offset_bottom = 270.0
+color = Color(0.36, 0.29, 0.22, 1)
+mouse_filter = 2
+
+[node name="Chunk3Floor" type="ColorRect" parent="World"]
+offset_left = 960.0
+offset_top = 0.0
+offset_right = 1440.0
+offset_bottom = 270.0
+color = Color(0.29, 0.23, 0.18, 1)
+mouse_filter = 2
+
+; ---- Seam markers ----
+; 2-px-wide ember-orange vertical lines at each chunk boundary so the
+; chunk-seam is unmistakable in HTML5 soak screenshots. If z-index ordering
+; misbehaves under gl_compatibility, the seam markers will visibly drop
+; below the chunk floor at the boundary.
+
+[node name="Seam1Marker" type="ColorRect" parent="World"]
+offset_left = 479.0
+offset_top = 0.0
+offset_right = 481.0
+offset_bottom = 270.0
+color = Color(1, 0.42, 0.16, 1)
+mouse_filter = 2
+
+[node name="Seam2Marker" type="ColorRect" parent="World"]
+offset_left = 959.0
+offset_top = 0.0
+offset_right = 961.0
+offset_bottom = 270.0
+color = Color(1, 0.42, 0.16, 1)
+mouse_filter = 2
+
+; ---- Per-chunk landmarks ----
+; A labeled rectangle in the center of each chunk so the soaker can tell
+; which chunk they're looking at without counting seams.
+
+[node name="Chunk1Landmark" type="ColorRect" parent="World"]
+offset_left = 224.0
+offset_top = 119.0
+offset_right = 256.0
+offset_bottom = 151.0
+color = Color(0.85, 0.7, 0.5, 1)
+mouse_filter = 2
+
+[node name="Chunk1LandmarkLabel" type="Label" parent="World"]
+offset_left = 220.0
+offset_top = 152.0
+offset_right = 260.0
+offset_bottom = 168.0
+text = "1"
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="Chunk2Landmark" type="ColorRect" parent="World"]
+offset_left = 704.0
+offset_top = 119.0
+offset_right = 736.0
+offset_bottom = 151.0
+color = Color(0.65, 0.5, 0.3, 1)
+mouse_filter = 2
+
+[node name="Chunk2LandmarkLabel" type="Label" parent="World"]
+offset_left = 700.0
+offset_top = 152.0
+offset_right = 740.0
+offset_bottom = 168.0
+text = "2"
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="Chunk3Landmark" type="ColorRect" parent="World"]
+offset_left = 1184.0
+offset_top = 119.0
+offset_right = 1216.0
+offset_bottom = 151.0
+color = Color(0.45, 0.32, 0.18, 1)
+mouse_filter = 2
+
+[node name="Chunk3LandmarkLabel" type="Label" parent="World"]
+offset_left = 1180.0
+offset_top = 152.0
+offset_right = 1220.0
+offset_bottom = 168.0
+text = "3"
+horizontal_alignment = 1
+mouse_filter = 2
+
+; ---- Marker (the camera's follow target) ----
+; CharacterBody2D so WASD via the production move_* InputMap maps cleanly
+; through move_and_slide. 12×16 ember-orange rectangle — distinct against
+; all three floor tones.
+
+[node name="PlayerMarker" type="CharacterBody2D" parent="."]
+position = Vector2(240, 135)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PlayerMarker"]
+shape = SubResource("RectangleShape2D_marker")
+
+[node name="Sprite" type="ColorRect" parent="PlayerMarker"]
+offset_left = -6.0
+offset_top = -8.0
+offset_right = 6.0
+offset_bottom = 8.0
+color = Color(1, 0.42, 0.16, 1)
+mouse_filter = 2
+
+; ---- HUD (CanvasLayer — immune to camera per HUD-immunity invariant) ----
+
+[node name="HUD" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="BuildLabel" type="Label" parent="HUD"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 600.0
+offset_bottom = 24.0
+text = "[CameraScrollSpike] build=…"
+
+[node name="MarkerPosLabel" type="Label" parent="HUD"]
+offset_left = 8.0
+offset_top = 28.0
+offset_right = 400.0
+offset_bottom = 44.0
+text = "marker=(…,…)"
+
+[node name="CameraPosLabel" type="Label" parent="HUD"]
+offset_left = 8.0
+offset_top = 48.0
+offset_right = 400.0
+offset_bottom = 64.0
+text = "camera=(…,…)"
+
+[node name="ModeLabel" type="Label" parent="HUD"]
+offset_left = 8.0
+offset_top = 696.0
+offset_right = 1272.0
+offset_bottom = 712.0
+text = "follow_target ON | deadzone=… | bounds=…"
