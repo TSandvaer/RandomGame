@@ -229,3 +229,154 @@ None for M1. M2 will add:
 - Save schema for per-room state — Devon's call (save/load owner) when M2 stash UI lands.
 - Whether `_spawn_mob` in `MultiMobRoom` becomes a `MobRegistry`-driven lookup (preferred) or stays a hand-rolled match block. Decided when S2 mob count > 5 makes the match block unwieldy.
 - Whether to extract `BossRoomBase.gd` from `Stratum1BossRoom.gd` — decided when S2 boss content authoring exposes the seam.
+
+## Zone schema (M3 Tier 3 W1 spike, ticket `86c9xuap4`)
+
+Landed as a spike in M3 Tier 3 W1 (`drew/86c9xuap4-zone-schema`). Pure paper-design + data layer — `assemble_floor(chunks, zone_def, seed)` runtime is the sibling procgen spike (ticket `86c9xub9p`). This section is the contract that ticket's runtime consumes; the W2 retrofit ticket converts S1's 8 hand-arranged chunks to anchor-driven assembly against this shape.
+
+**Cross-references:**
+
+- `team/priya-pl/post-wave3-sequencing.md` v1.1 §1 Commitment 3 (quests reference geography by `zone_id`) + Commitment 5 (per-character `world_seed` + procedural chunk-fill between anchors). Sponsor signed SI-2 + added Commitment 5 on 2026-05-22.
+- `team/tess-qa/m3-acceptance-plan-tier-3.md` rows `ZQ-1` through `ZQ-8` (acceptance criteria fold up to this spike).
+- Sibling procgen spike: ticket `86c9xub9p` (consumes `ZoneDef`; implements `assemble_floor`).
+
+### Why zones (and not "one chunk = one room = one zone")
+
+A **chunk** is a tile-arrangement unit — the smallest navigable space, sized to fit the 480×270 internal canvas (~15×8 tiles at 32 px). A **zone** is the named geography layer ABOVE chunks: a fixed sequence of hand-authored anchor chunks (entry, NPC room, boss room, quest target, exit) with procedural chunk-fill between them, drawn from a per-zone pool seeded by per-character `world_seed`.
+
+**Diablo II precedent.** Each act in D2 has named sub-areas the quest log + map UI reference by name — "Den of Evil," "Tools of the Trade," "Search for Cain." Each is a fixed, hand-authored shape (entry from town portal, a quest-target room, an exit/boss area), with tile layout INSIDE the area varying per character. The Embergrave shape is structurally the same:
+
+| D2 (single act) | Embergrave (single stratum) |
+|---|---|
+| "Den of Evil" sub-area | `s1_z1_outer_cloister` ZoneDef |
+| Fixed entry + objective room + exit | `entry` + `quest_target` + `exit` anchors |
+| Different tile maze per character | Procedural slots between anchors, seeded by `world_seed` |
+| Quest log says "go to Den of Evil" | Quest `.tres` references `zone_id: &"s1_z1_outer_cloister"` |
+| Map UI shows "Den of Evil (cleared)" | World-map UI per-stratum pane lists zones by `display_name` |
+
+**Why the layer is necessary** (the alternative — quests referencing chunks or pixel coordinates — fails):
+
+1. **Quests can't bind to chunks** — chunks are tile-arrangement units that procgen reshuffles per character. A quest pointing at "`s1_room04`" would target a chunk that doesn't exist in some characters' floors. Quests bind to zones (`s1_z1_outer_cloister`) and the quest-target anchor inside them, which is deterministic per zone.
+2. **Map UI can't display chunk graphs** — 8 strata × N zones × M chunks-per-zone is too dense to render legibly. The Diablo-II per-act map shows ~5-10 named zones per act; that maps cleanly to "8 strata × 2-4 zones per stratum × tile-maze inside" which is the Embergrave shape.
+3. **Procgen has nowhere to anchor** — without zones, "where does the boss room go?" has no answer. Zones fix the anchor positions (boss_room is always the second-to-last anchor) and let procgen randomize what's BETWEEN them.
+
+The chunk schema already pre-shaped this in § "Why ports, not free-form transitions" (v1, M1) — the `ports + assemble_floor` design was sized for multi-chunk procedural assembly from day one. Zones are the layer that gives the assembler something to compose against; chunks are still the unit it places.
+
+### ZoneDef shape
+
+```
+ZoneDef (Resource — resources/level/ZoneDef.gd)
+  ├─ zone_id: StringName            # &"s1_z1_outer_cloister" (stable id)
+  ├─ display_name: String           # "Outer Cloister" (map UI + dialogue)
+  ├─ stratum_id: int                # 1..8 (per Stratum.gd enum)
+  ├─ anchors: Array[ZoneAnchor]     # hand-authored, deterministic per zone
+  ├─ procedural_slot_pool: Array[StringName]  # chunk ids for procgen fill
+  ├─ min_slots_between_anchors: int # inclusive lower bound (default 1)
+  ├─ max_slots_between_anchors: int # inclusive upper bound (default 3)
+  └─ port_mating_rules: Dictionary  # per-zone overrides (default empty)
+
+ZoneAnchor (Resource — resources/level/ZoneAnchor.gd)
+  ├─ room_id: StringName            # &"s1_z1_threshold" (unique inside zone)
+  ├─ chunk_id: StringName           # &"s1_room01" (resolves to LevelChunkDef)
+  ├─ anchor_kind: StringName        # one of ZoneAnchor.KINDS
+  └─ target_zone_id: StringName     # only meaningful for exit anchors
+```
+
+**Design rationale (one bullet per non-obvious field):**
+
+- **`zone_id` is StringName, not int.** Same rationale as chunk `mob_id`s: save schema + quest content + map UI all reference zones by string id, so the chunk-resource graph doesn't cascade-load on every quest/UI access. Convention: `s{stratum}_z{ordinal}_{slug}`.
+- **`display_name` mandatory** (validate fails if empty). Map UI's per-stratum pane reads it; an empty display name renders blank cells which is a content bug, not a soft-fail.
+- **`stratum_id: int` matches `Stratum.gd`'s enum** — `1..8`. The procgen assembler uses `stratum_seed = hash(world_seed, stratum_id)` to scope per-stratum determinism (re-rolling at S1 must not leak S2's layout into S1; see post-wave3-sequencing.md v1.1 §1 Commitment 5).
+- **`anchors: Array[ZoneAnchor]` order matters.** The assembler places anchors in array order along the zone graph; procedural slots fill the gaps between consecutive anchors. Authoring convention: `entry` first, `exit` last, with `npc_room` / `quest_target` / `boss_room` / `story_beat` in narrative order between them.
+- **`procedural_slot_pool: Array[StringName]` references chunk ids, not chunk resources.** Same `mob_id`-style decoupling — the zone `.tres` doesn't import the chunk-resource graph. Pool size ≥3 recommended so two characters with different `world_seed`s see meaningfully different layouts; the worked example uses 4.
+- **`min_/max_slots_between_anchors` are inclusive bounds.** Total procedural chunks per zone is `(len(anchors) - 1) × [min, max]`. With 5 anchors + `[1, 3]`, a zone has 4 to 12 procedural chunks plus 5 anchors = 9 to 17 total chunks per character. Bounds prevent two failure modes: too few = zone reads as a hallway, too many = traversal becomes tedious.
+- **`port_mating_rules: Dictionary` defaults empty.** Zones inherit chunk-level port-mating from § "Why ports" unchanged. Only populate when a specific zone has an anchor-specific constraint (e.g. boss arena's exit port mates only with a stratum-descent entry tag).
+
+### ZoneAnchor kinds enum
+
+Exhaustive list — `ZoneAnchor.KINDS` is the canonical source of truth, `ZoneDef.validate()` rejects unknown kinds. Extend deliberately, not casually: quest content + map UI + procgen all branch on these.
+
+| Kind | Semantic | Worked-example reference | Notes |
+|---|---|---|---|
+| `&"entry"` | Player enters the zone here. The assembler resolves this to the player's spawn point on first zone-load. | `s1_z1_outer_cloister` → `s1_room01` (Threshold) | Exactly one per zone (`validate()` asserts). |
+| `&"exit"` | Player leaves the zone here. May declare `target_zone_id` for cross-zone mating (see § "Cross-zone transitions" below). | `s1_z1_outer_cloister` → `s1_room08` chunk geometry, anchor `room_id = &"s1_z1_descent"`, `target_zone_id = &"s2_z1_sunken_entrance"` | ≥1 per zone. Empty `target_zone_id` = terminal exit (boss-defeat → hub-town flow). |
+| `&"npc_room"` | Hand-placed NPC sits here. Dialogue trees bind by `room_id`. | `s1_z1_outer_cloister` → `s1_room02` (Antechamber) | Per-stratum NPC roster per SI-5: 1 in S1, 2 in S2. |
+| `&"boss_room"` | Stratum boss arena. | `s1_z1_outer_cloister` → `s1_room08` (Bossward Threshold). The boss arena scene itself is `Stratum1BossRoom.tscn`; the anchor's chunk is the antechamber leading into it. | One per stratum (per the stratum-1 / stratum-2 boss model). |
+| `&"quest_target"` | Exploration-quest objective resolves here (Commitment 3). | `s1_z1_outer_cloister` → `s1_room04` (Marksman's Perch — Shooter-only chunk; good "find the marksman" objective). | Quest `.tres` resources reference `zone_id` + the anchor `room_id`. |
+| `&"story_beat"` | Narrative-critical room flagged by Drew + Uma. | (no example in S1 z1 — rare; e.g. a forced cutscene trigger or a fixed-position lore prop). | Use sparingly — story_beats are heavy; over-use erodes the player's sense of agency. |
+
+**Two anchors MAY share chunk geometry** (i.e. point at the same `chunk_id`) **but MUST have distinct `room_id` values**. The worked example demonstrates this: `boss_room` (`room_id = &"s1_z1_bossward"`) and `exit` (`room_id = &"s1_z1_descent"`) both reference `chunk_id = &"s1_room08"`. The assembler places the chunk twice (with separate parent nodes); save schema + quest binding + map UI all key on `room_id` so the two slots are distinct entities to gameplay.
+
+### Hand-authored vs procedural split
+
+Restated from post-wave3-sequencing.md v1.1 §1 Commitment 5 for the level-content authoring surface:
+
+**Hand-authored (deterministic per stratum + per zone, identical for all characters):**
+- Zone entries + exits (the `entry` / `exit` anchors above; ports stitched per § "Why ports").
+- NPC placement rooms (`npc_room` anchors).
+- Boss rooms (`boss_room` anchors).
+- Quest-target rooms (`quest_target` anchors per Commitment 3).
+- Story-beat rooms (`story_beat` anchors flagged by Drew + Uma).
+- Hub-town (single-screen by design per Commitment 4; not procedural).
+
+**Procedural (per-character, seeded by `world_seed`):**
+- Tile-chunk arrangement WITHIN zone bounds, between the hand-authored anchors (drawn from `procedural_slot_pool` with per-zone derived seed).
+- Mob spawn point selection within procedural chunks (per chunk's authored set, which spawn-points fire for this character).
+- Loot pickup placement within procedural chunks.
+
+**Determinism:** per-character `world_seed` rolled at character creation (save schema additive on top of v5's per-character keys). Per-stratum derived seed: `stratum_seed = hash(world_seed, stratum_id)`. Per-zone derived seed: `zone_seed = hash(stratum_seed, zone_id)`. Same character on the same zone always sees the same layout; re-entering a zone within a run produces the same layout.
+
+**Assembler signature (lives in sibling procgen spike `86c9xub9p`):**
+
+```gdscript
+# In LevelAssembler.gd, alongside the existing assemble_single():
+func assemble_floor(
+    chunks_by_id: Dictionary,    # &"s1_room01" -> LevelChunkDef
+    zone_def: ZoneDef,
+    seed: int                    # zone_seed = hash(stratum_seed, zone_id)
+) -> AssemblyResult
+```
+
+The assembler places `zone_def.anchors` in order at deterministic positions in the floor graph, then for each gap between consecutive anchors draws `randi_range(zone_def.min_slots_between_anchors, zone_def.max_slots_between_anchors)` chunks from `zone_def.procedural_slot_pool` using a seeded RNG, mating ports per the existing chunk-level discipline. The implementation lives in the sibling spike — this spike just pins the data shape.
+
+### Worked example: `s1_z1_outer_cloister.tres`
+
+Lives at `resources/level/zones/s1_z1_outer_cloister.tres` — the first zone authored against the new schema, demonstrating all five anchor kinds (minus `story_beat`) + a 4-chunk procedural pool drawn from existing S1 chunk variants.
+
+```
+ZoneDef
+  zone_id          = &"s1_z1_outer_cloister"
+  display_name     = "Outer Cloister"
+  stratum_id       = 1
+  anchors          = [
+    ZoneAnchor(room_id=&"s1_z1_threshold",       chunk_id=&"s1_room01", kind=&"entry"),
+    ZoneAnchor(room_id=&"s1_z1_antechamber",     chunk_id=&"s1_room02", kind=&"npc_room"),
+    ZoneAnchor(room_id=&"s1_z1_marksmans_perch", chunk_id=&"s1_room04", kind=&"quest_target"),
+    ZoneAnchor(room_id=&"s1_z1_bossward",        chunk_id=&"s1_room08", kind=&"boss_room"),
+    ZoneAnchor(room_id=&"s1_z1_descent",         chunk_id=&"s1_room08", kind=&"exit",
+               target_zone_id=&"s2_z1_sunken_entrance"),
+  ]
+  procedural_slot_pool = [&"s1_room03", &"s1_room05", &"s1_room06", &"s1_room07"]
+  min_slots_between_anchors = 1
+  max_slots_between_anchors = 3
+  port_mating_rules         = {}
+```
+
+**Per-character layout shape:** with 5 anchors + 4 gaps × `[1, 3]` procedural fill, each character sees 9 to 17 chunks total in this zone. With pool size 4 and 4-to-12 procedural slots, the per-character variance is substantial (different fill order, different fill density). The `entry → npc_room → quest_target → boss_room → exit` narrative ordering is identical across characters — the zone reads the same; only the tile-maze in between differs.
+
+**Cross-validation with existing chunks:** all 5 anchor `chunk_id`s and all 4 `procedural_slot_pool` entries resolve to existing `resources/level_chunks/s1_room0N.tres` files. The spike's GUT test `test_authored_s1_z1_outer_cloister_anchor_chunks_resolve` + `..._pool_chunks_resolve` pin this — typos in the worked example fail CI loudly.
+
+**W2 retrofit hook:** this zone is the W2 retrofit target. The existing S1 chunk arrangement (Stratum1Room01 through Stratum1Room08 in `Main.tscn` flow) becomes anchor-driven assembly via `assemble_floor(chunks_by_id, this_zone_def, seed)`. The 8 chunks split: 5 stay as anchors (with hand-authored deterministic order), 3 spill into the procedural pool. The W2 ticket coordinates the Main.tscn re-wire with Devon's camera-scroll bounds-clamp.
+
+### Cross-zone transitions (ports between zones)
+
+Zone-to-zone exit/entry mating uses the existing chunk-level port-mating discipline (per § "Why ports, not free-form transitions") with a thin zone-schema overlay:
+
+1. **Source zone declares an `exit` anchor with `target_zone_id`.** Example: `s1_z1_outer_cloister`'s exit anchor sets `target_zone_id = &"s2_z1_sunken_entrance"`.
+2. **Target zone's `entry` anchor accepts the source.** The assembler looks up `target_zone_id`, finds the target zone's `entry` anchor, and mates the source exit's port (direction + tag) to the target entry's port (opposite direction + matching tag) per existing chunk-level mating rules.
+3. **Boss-defeat → terminal exit.** When `target_zone_id == &""` (empty), the exit is terminal — the assembler treats it as the flow that hands the player back to hub-town (per Stratum1BossRoom's existing `stratum_exit_unlocked` signal). The `boss_room` anchor's chunk handles the door-trigger; the `exit` anchor with empty `target_zone_id` is the descent ritual itself.
+4. **Unresolved `target_zone_id` is a terminal exit (W2 transitional).** Until S2 zones land in W3, `s1_z1_outer_cloister`'s exit references a not-yet-authored zone (`s2_z1_sunken_entrance`). The assembler treats unresolved targets as terminal exits — the player falls back to hub-town on traversal. This is the documented W2 transitional behavior; W3 S2 zone authoring resolves it.
+
+**Port-mating discipline preserved.** Cross-zone mating reuses the chunk-level port rules unchanged: opposite directions (north-edge ↔ south-edge), matching tags (`exit` ↔ `entry`), same tile coordinate after offset. Zone schema adds NO new port-mating semantics — it only adds the routing layer that says "this exit port leads to that zone's entry port." The R-PROCGEN.b risk (chunk-port mating gaps at procedural seams) per `risk-register.md` post-v1.1 is mitigated by this reuse: cross-zone seams are mated by the same code path that mates intra-zone seams, so a single port-mating fix lands at both.
+
+**Save-schema implication (additive on v5):** cross-zone exit traversal persists the source zone's clear-state (which anchors visited, which procedural chunks the player entered) under the per-character key. The W2 procgen-spike sibling ticket's `world_seed` save-write is the entry point; this zone schema doesn't add new save fields directly — it adds the `zone_id` namespace that the W2 save-write organizes against.

@@ -1,0 +1,80 @@
+[gd_resource type="Resource" script_class="ZoneDef" load_steps=8 format=3]
+
+; Worked-example ZoneDef for the M3 Tier 3 W1 zone-schema spike (ticket
+; 86c9xuap4). This is the FIRST zone authored against the new schema — it
+; demonstrates the data shape the procgen spike (sibling ticket 86c9xub9p)
+; will consume and the W2 S1 retrofit will replicate across the rest of S1.
+;
+; Anchors (in zone-graph order):
+;   entry         → s1_room01 (Threshold — existing single-entry chunk)
+;   npc_room      → s1_room02 (Antechamber — quiet, room for a stationary NPC)
+;   quest_target  → s1_room04 (Marksman's Perch — Shooter-only chunk;
+;                              good "find the marksman" objective room)
+;   boss_room     → s1_room08 (Bossward Threshold — already has boss_door
+;                              port toward Stratum1BossRoom.tscn)
+;   exit          → s1_z1_descent (re-uses s1_room08 chunk GEOMETRY but
+;                                  distinct anchor room_id; demonstrates
+;                                  the "two anchors may share chunk
+;                                  geometry, must have distinct room_ids"
+;                                  convention per ZoneAnchor.gd doc).
+;                  target_zone_id = &"s2_z1_sunken_entrance" — cross-zone
+;                  mating per level-chunks.md § "Cross-zone transitions".
+;                  Targets a not-yet-authored S2 zone; the assembler will
+;                  treat the unresolved target_zone_id as a terminal exit
+;                  until S2 zones land in W3.
+;
+; Procedural slot pool: 4 existing S1 mid-tier chunks. Procgen draws from
+; this pool with per-character zone_seed to fill 1..3 slots between each
+; consecutive anchor pair (see min_/max_slots_between_anchors).
+;
+; This .tres is the spike artifact — NOT yet wired into Main.tscn. W2's
+; assemble_floor impl + S1 retrofit consumes it.
+
+[ext_resource type="Script" path="res://resources/level/ZoneDef.gd" id="1_zone"]
+[ext_resource type="Script" path="res://resources/level/ZoneAnchor.gd" id="2_anchor"]
+
+[sub_resource type="Resource" id="Resource_anchor_entry"]
+script = ExtResource("2_anchor")
+room_id = &"s1_z1_threshold"
+chunk_id = &"s1_room01"
+anchor_kind = &"entry"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_npc"]
+script = ExtResource("2_anchor")
+room_id = &"s1_z1_antechamber"
+chunk_id = &"s1_room02"
+anchor_kind = &"npc_room"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_quest"]
+script = ExtResource("2_anchor")
+room_id = &"s1_z1_marksmans_perch"
+chunk_id = &"s1_room04"
+anchor_kind = &"quest_target"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_boss"]
+script = ExtResource("2_anchor")
+room_id = &"s1_z1_bossward"
+chunk_id = &"s1_room08"
+anchor_kind = &"boss_room"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_exit"]
+script = ExtResource("2_anchor")
+room_id = &"s1_z1_descent"
+chunk_id = &"s1_room08"
+anchor_kind = &"exit"
+target_zone_id = &"s2_z1_sunken_entrance"
+
+[resource]
+script = ExtResource("1_zone")
+zone_id = &"s1_z1_outer_cloister"
+display_name = "Outer Cloister"
+stratum_id = 1
+anchors = [SubResource("Resource_anchor_entry"), SubResource("Resource_anchor_npc"), SubResource("Resource_anchor_quest"), SubResource("Resource_anchor_boss"), SubResource("Resource_anchor_exit")]
+procedural_slot_pool = [&"s1_room03", &"s1_room05", &"s1_room06", &"s1_room07"]
+min_slots_between_anchors = 1
+max_slots_between_anchors = 3
+port_mating_rules = {}
