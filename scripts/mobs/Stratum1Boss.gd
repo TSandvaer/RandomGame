@@ -318,11 +318,170 @@ var _animated_sprite_resolved: bool = false
 # Attack-telegraph tween — ref kept so death-during-telegraph can cancel it.
 var _attack_telegraph_tween: Tween = null
 
+# v7 slam-impact sprite-flash tween (PR #291 v7) — ref kept so a second slam
+# arriving before the previous flash completes can kill+restart without
+# leaving the sprite stuck mid-flash. Independent from `_hit_flash_tween`
+# (which is take_damage-driven and may run simultaneously on a slam-self-hit).
+var _slam_impact_flash_tween: Tween = null
+
+# T5 slam-telegraph indicator runtime — Node2D child created at telegraph start
+# and freed on slam-fire or boss-death. Held by ref so `_fire_slam_hit` and
+# `_die` can drive the fade-out + cleanup. Null when no telegraph is armed.
+var _slam_indicator: Node2D = null
+var _slam_indicator_tween: Tween = null
+
 ## Red tint for melee/slam telegraph (player-journey.md Beat 6). Sub-1.0 all
 ## channels for HTML5 gl_compatibility safety (PR #137 lesson). Brighter than
 ## grunts to make the boss wind-up clearly readable.
 const ATTACK_TELEGRAPH_TINT: Color = Color(1.0, 0.25, 0.25, 1.0)  # vivid red, HTML5 safe
 const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.080
+
+# ---- M3 Tier 2 Wave 2 T5+T6 — slam telegraph indicator + aftershock burst --
+# T5 (ticket 86c9wjyrc): visible slam-telegraph danger-zone circle outline.
+# T6 (ticket 86c9wjyuv): slam aftershock ember-burst on slam-fire impact.
+#
+# Implementation note (T5 deviation from ticket title): the ticket says
+# "Polygon2D circle" but Polygon2D natively renders filled convex polygons —
+# rendering an outline ring would require either (a) a 32-vertex annulus
+# polygon (32 outer + 32 inner verts), or (b) a Node2D._draw() + draw_arc()
+# call. Option (b) is the canonical Godot 4 idiom for a circle outline and
+# does NOT touch the html5-export.md § Polygon2D rendering quirks failure
+# class (which is the PR #137 swing-wedge bug — that was a FILLED polygon).
+# We use Node2D + _draw() + draw_arc(). The 32-segment arc renders identically
+# on `forward_plus` and `gl_compatibility` (verified pattern via Godot 4.3
+# rendering docs — `draw_arc` is part of the canvas-item draw API, not the
+# Polygon2D rasterizer).
+
+## T5 slam telegraph circle indicator — ember-orange outline at SLAM_HITBOX_RADIUS.
+## Color: #FF6A2A at alpha 0.5. Sub-1.0 RGB channels per html5-export.md HDR-clamp
+## rule (PR #137 lesson — gl_compatibility clamps Color channels to [0, 1]).
+const SLAM_INDICATOR_COLOR: Color = Color(1.0, 0.416, 0.165, 0.5)
+const SLAM_INDICATOR_LINE_WIDTH: float = 2.0
+## Fade-in / fade-out duration at telegraph start / slam-fire (Priya AC).
+const SLAM_INDICATOR_FADE: float = 0.080
+## draw_arc segment count — 32 segments produce a smooth circle at 80 px radius.
+const SLAM_INDICATOR_ARC_POINTS: int = 32
+## T5 strobe parameters (Sponsor 2026-05-21 soak — "circle disappears too fast,
+## should also be blinking"). After fade-in, the modulate.a strobes between a
+## high and low value at ~5 Hz (one full cycle = 200 ms) across the hold window
+## (~420 ms = SLAM_TELEGRAPH_DURATION - fade_in - fade_out budget). That budget
+## fits ~2 full pulses, which is sufficient to read as "danger imminent."
+##
+## 5 Hz is well within feel-targets for boss-AoE telegraphs in shipped ARPGs
+## and below the seizure-risk threshold for our class of stimulus (small,
+## peripheral, low-contrast, color-only — not the high-contrast full-screen
+## red-flashing pattern epilepsy guidance restricts). The base color α=0.5
+## multiplies through; perceived peak = HIGH × 0.5 = 0.5, perceived trough =
+## LOW × 0.5 = 0.125 — strong on/off contrast.
+##
+## Sponsor's "disappears too fast" complaint maps to the absence of motion
+## during the 420 ms hold (a static circle reads as decoration); strobing
+## restores the "imminent" read without lengthening combat-timing windows.
+const SLAM_INDICATOR_STROBE_HZ: float = 5.0
+const SLAM_INDICATOR_STROBE_HIGH: float = 1.0   # perceived peak alpha = 1.0 × 0.5 = 0.5
+const SLAM_INDICATOR_STROBE_LOW: float = 0.25   # perceived trough     = 0.25 × 0.5 = 0.125
+
+## T6 slam aftershock burst — v7 "make it unmissable" intensity stack (PR #291,
+## Sponsor 2026-05-21 v6 soak: "cannot see the sparkles you captured in your
+## Playwright headless screenshots"). The v5/v6 ramp + 24 particles + 1.5 scale
+## was demonstrably present in Playwright captures but perceptually invisible
+## in real-browser motion — Playwright headless captures perception-subliminal
+## frames that the human eye never resolves AND/OR CPUParticles2D rendering
+## under `gl_compatibility` real-browser differs from headless. Documented as a
+## new HTML5 divergence class in `.claude/docs/html5-export.md` (Playwright
+## headless vs interactive divergence).
+##
+## v7 intensity stack — five changes layered to push the burst over the
+## perceptibility threshold even at the periphery of vision:
+##   1. Particle count 24 → 56 — more area of perceptual signal.
+##   2. Initial scale 1.5 → 2.5 — bigger embers read more clearly.
+##   3. Initial velocity 40-80 → 80-140 — particles escape boss-sprite
+##      occlusion faster, reach screen-areas not under sprite.
+##   4. Rising gravity -50 → -100 — steeper rise, clears sprite-top within
+##      the first 100 ms of the 350 ms lifetime.
+##   5. Ramp[0] flat hold + pure-white impact color — ramp dwells at
+##      `AFTERSHOCK_FLASH_WHITE` (now pure #FFFFFF, not the warm-cream
+##      #FFF2BF that blended into the boss's red hue family) for the first
+##      ~30% of lifetime (~100 ms), then transitions to ember at 0.40.
+##      The flat hold is the load-bearing perceptual fix — instant decay at
+##      t=0 meant the bright frame never persisted long enough to register.
+## Plus: brief sprite-modulate flash on the boss itself at slam-impact
+## (`_play_slam_impact_flash`), giving the impact a "shake-and-flash" feel
+## that's unmistakable even without seeing the particles clearly.
+##
+## v5/v6 history (kept for trace continuity): 12 → 24 particles + ember-only
+## → ember+impact-flash ramp + lifetime 0.20 → 0.35 + rising gravity. All
+## those changes were correct in direction but insufficient in magnitude.
+const SLAM_AFTERSHOCK_PARTICLE_COUNT: int = 56
+## Lifetime stays at 350 ms — v5 screenshot capture confirmed duration is
+## sufficient, the visibility problem was magnitude not duration. Bumping
+## further would risk reading as a separate effect from the slam impact.
+const SLAM_AFTERSHOCK_LIFETIME: float = 0.35
+## Impact-flash color for the aftershock ramp[0]. v7 BUMPED to pure white
+## (#FFFFFF) from v5's warm-cream #FFF2BF — Sponsor's real-browser report
+## "cannot see the sparkles" with a warm-cream start against red armor is the
+## hue-family-blend failure mode. Pure white is maximally outside the boss's
+## red/orange hue cone; the contrast jump on the impact frame is what makes
+## the burst read at peripheral vision. All channels = 1.0 — exactly at the
+## HDR clamp boundary (HTML5 `gl_compatibility` clamps to [0,1]; pure white
+## is the boundary, not over it). See `.claude/docs/html5-export.md` § HDR
+## modulate clamp.
+const AFTERSHOCK_FLASH_WHITE: Color = Color(1.0, 1.0, 1.0, 1.0)  # #FFFFFF
+## v7: ramp[0] flat-hold duration as a fraction of lifetime. The bright
+## impact color dwells at this offset before transitioning to ember. 0.30 ×
+## 350 ms = 105 ms — long enough for human vision to resolve (well above
+## the ~16 ms flicker-fusion threshold). v5/v6 had instant decay (offset
+## 0.0 only at the bright color) which meant only the t=0 frame was bright.
+const AFTERSHOCK_FLASH_HOLD_OFFSET: float = 0.30
+## v7: offset at which the ramp transitions from impact-flash to ember-light.
+## The 0.30 → 0.40 segment is the "decay" zone — quick transition so the
+## flash decays cleanly, then ember tail to lifetime end.
+const AFTERSHOCK_FLASH_DECAY_OFFSET: float = 0.40
+## Outward velocity range (px/s) — v7 BUMPED from 40-80 → 80-140. Faster
+## initial velocity ensures particles escape the boss sprite's occlusion
+## footprint (~32 px radius) within the first ~50 ms, reaching screen-areas
+## not covered by the boss body where contrast against the dark floor is
+## maximal.
+const SLAM_AFTERSHOCK_VELOCITY_MIN: float = 80.0
+const SLAM_AFTERSHOCK_VELOCITY_MAX: float = 140.0
+## Spread is half-angle around `direction`. 180° + direction=UP gives uniform
+## omni-radial emission — mirrors death burst.
+const SLAM_AFTERSHOCK_SPREAD: float = 180.0
+## Rising gravity — v7 BUMPED from -50 → -100 px/s². Steeper rise so particles
+## clear the boss sprite top (~24 px above origin) within the first ~100 ms
+## of the 350 ms lifetime, putting the ember tail above the sprite where it
+## reads against the dark room background instead of the red armor.
+const SLAM_AFTERSHOCK_GRAVITY: Vector2 = Vector2(0.0, -100.0)
+## Particle scale — v7 BUMPED from 1.5 → 2.5. Bigger ember footprint gives
+## each particle more screen-area of perceptual signal, which is the
+## load-bearing fix-shape for the Playwright-vs-interactive divergence:
+## headless captures resolve sub-pixel detail the eye in motion does not.
+const SLAM_AFTERSHOCK_SCALE: float = 2.5
+## z_index +1 lifts the burst draw-layer above the boss AnimatedSprite2D
+## (sprite z_index=0). Per `.claude/docs/html5-export.md` § "Z-index
+## sensitivity" — never rely on negative z_index in `gl_compatibility`; this
+## positive lift ensures the burst draws over the boss body sprite.
+const SLAM_AFTERSHOCK_Z_INDEX: int = 1
+
+# ---- v7 slam-impact sprite flash (ticket 86c9wjyuv, PR #291 v7) ------
+# Brief modulate flash on the boss sprite at slam-fire moment. The particle
+# burst is the primary visual tell; this flash is a secondary "shake-and-
+# flash" cue that triggers peripheral-vision motion-detection even if the
+# player isn't looking directly at the boss. Two-tween fire-and-restore:
+# tween rest → SLAM_IMPACT_FLASH_TINT (50 ms) → rest (80 ms). Total budget
+# 130 ms is well under the 200 ms SLAM_RECOVERY window so the flash always
+# completes before the next state transition.
+##
+## Pure-white at α=1.0 with a slight blue accent (g=b=1.0, r=0.95) to break
+## out of the boss's red hue family — same rationale as the particle
+## AFTERSHOCK_FLASH_WHITE bump. Sub-1.0 R channel keeps the value strictly
+## below the HDR clamp; G+B at 1.0 are exactly at the clamp boundary which
+## `gl_compatibility` handles cleanly. Mirrors `Player.SWING_FLASH_TINT`'s
+## "all channels ≤ 1.0" discipline from `html5-export.md`.
+const SLAM_IMPACT_FLASH_TINT: Color = Color(1.0, 1.0, 1.0, 1.0)  # pure white pulse
+const SLAM_IMPACT_FLASH_IN: float = 0.030
+const SLAM_IMPACT_FLASH_HOLD: float = 0.020
+const SLAM_IMPACT_FLASH_OUT: float = 0.080
 
 
 func _ready() -> void:
@@ -684,6 +843,11 @@ func _begin_slam_telegraph() -> void:
 	_set_state(STATE_TELEGRAPHING_SLAM)
 	# Attack-telegraph visual: red-glow for slam wind-up.
 	_play_attack_telegraph(SLAM_TELEGRAPH_DURATION * t_mult)
+	# T5 (ticket 86c9wjyrc): visible danger-zone circle indicator at slam outer
+	# radius. Parent-relative to the boss so it tracks any boss displacement
+	# during the telegraph window. Spawn BEFORE the marker hitbox so headless
+	# tests inspecting children see both in deterministic order.
+	_spawn_slam_indicator(_slam_telegraph_left)
 	# A "telegraph" marker hitbox — zero damage, big radius, short life —
 	# lets the player see the danger zone. We spawn it as a real Hitbox on
 	# enemy_hitbox layer with damage=0 so it doesn't actually hurt — purely
@@ -738,6 +902,22 @@ func _fire_slam_hit() -> void:
 	_slam_recovery_left = SLAM_RECOVERY * rec_mult
 	_slam_cooldown_left = SLAM_COOLDOWN
 	_set_state(STATE_SLAM_RECOVERY)
+	# T5 (ticket 86c9wjyrc): fade out the danger-zone indicator on slam-fire.
+	# The fade-out tween auto-frees the indicator on completion.
+	_fade_out_slam_indicator()
+	# T6 (ticket 86c9wjyuv): aftershock ember-burst at slam origin. v7 scales
+	# up to 56 particles + impact-flash ramp w/ flat hold + faster outward
+	# velocity — see SLAM_AFTERSHOCK_* constants for the v7 intensity stack
+	# rationale (Sponsor "cannot see sparkles" 2026-05-21 v6 soak).
+	# Parented to the room (not the boss) so the burst persists past
+	# slam-recovery if the boss subsequently dies and queue_frees itself.
+	_spawn_slam_aftershock()
+	# v7: brief pure-white sprite-modulate flash on the boss itself, paired
+	# with the particle burst. Gives a "shake-and-flash" peripheral-vision
+	# tell that's unmistakable even when the player isn't looking at the boss.
+	# Runs in parallel with `_spawn_slam_aftershock`'s burst — combined effect
+	# is the v7 "unmissable" target.
+	_play_slam_impact_flash()
 	swing_spawned.emit(SWING_KIND_SLAM_HIT, hb)
 
 
@@ -865,6 +1045,10 @@ func _die() -> void:
 	_phase_transition_left = 0.0
 	velocity = Vector2.ZERO
 	_cancel_attack_telegraph_tween()
+	# T5 (ticket 86c9wjyrc): if boss dies mid-slam-telegraph, free the danger-
+	# zone indicator immediately — no fade-out, the climax burst should not
+	# share the screen with a stale telegraph circle.
+	_force_free_slam_indicator()
 	_set_state(STATE_DEAD)
 	# CRITICAL CONTRACT (Uma `combat-visual-feedback.md` §3a): boss_died
 	# fires at the START of the death sequence (this frame), NOT after the
@@ -952,6 +1136,262 @@ func _cancel_attack_telegraph_tween() -> void:
 	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
 		_attack_telegraph_tween.kill()
 		_attack_telegraph_tween = null
+
+
+# ---- T5 slam-telegraph indicator (ticket 86c9wjyrc) -------------------
+
+## Spawn the slam-telegraph danger-zone circle indicator as a child of the boss.
+## Parent-relative so the indicator follows the boss if it moves during telegraph.
+## Uses a Node2D + `_draw()` + `draw_arc()` (NOT Polygon2D — see header comment
+## under "Implementation note (T5 deviation from ticket title)" for rationale).
+## `telegraph_duration` is the actual armed duration (varies with phase-3 enrage).
+## Fade-in over SLAM_INDICATOR_FADE, hold for the rest, fade-out triggered
+## externally by `_fade_out_slam_indicator()` on slam-fire.
+func _spawn_slam_indicator(telegraph_duration: float) -> void:
+	if not is_inside_tree():
+		return
+	# Defensive: if a prior indicator still exists (shouldn't under nominal
+	# state-machine flow, but rapid telegraph re-entry would stack them),
+	# free it before spawning the new one.
+	_force_free_slam_indicator()
+	var indicator: Node2D = SlamTelegraphIndicator.new()
+	indicator.position = Vector2.ZERO  # boss-centered (parent-relative)
+	# Start fully transparent — fade-in tween drives the reveal.
+	indicator.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	add_child(indicator)
+	_slam_indicator = indicator
+	if _slam_indicator_tween != null and _slam_indicator_tween.is_valid():
+		_slam_indicator_tween.kill()
+	# Fade-in then strobe (Sponsor 2026-05-21 — "should also be blinking").
+	# Replaces the prior flat-hold with a `tween_method`-driven sine-wave pulse
+	# at SLAM_INDICATOR_STROBE_HZ between LOW and HIGH alpha for the hold
+	# duration. The underlying draw color stays at α=0.5; the multiplied
+	# modulate.a strobes the perceived alpha between 0.125 (trough) and 0.5
+	# (peak). Slam-fire fade-out is still triggered externally by
+	# `_fade_out_slam_indicator()` — it kills this tween and owns the channel.
+	_slam_indicator_tween = create_tween()
+	_slam_indicator_tween.tween_property(
+		indicator, "modulate:a", SLAM_INDICATOR_STROBE_HIGH, SLAM_INDICATOR_FADE)
+	# Strobe across the remaining window. tween_method drives a custom callback
+	# every frame across `hold_dur` seconds; the callback writes modulate.a
+	# from a sine wave. tween_interval would only delay; we want continuous
+	# motion during the hold.
+	var hold_dur: float = max(0.0, telegraph_duration - SLAM_INDICATOR_FADE)
+	if hold_dur > 0.0:
+		var strobe_cb: Callable = func(t: float) -> void:
+			if not is_instance_valid(indicator):
+				return
+			# Sine wave 0 → 1 → 0 → 1 across `t` seconds. `t` is elapsed tween
+			# time (0 → hold_dur). Map to phase via STROBE_HZ.
+			# sin() output is [-1, 1]; remap to [LOW, HIGH].
+			var phase: float = t * SLAM_INDICATOR_STROBE_HZ * TAU
+			var s: float = (sin(phase) + 1.0) * 0.5  # [0, 1]
+			indicator.modulate.a = lerp(
+				SLAM_INDICATOR_STROBE_LOW, SLAM_INDICATOR_STROBE_HIGH, s)
+		_slam_indicator_tween.tween_method(strobe_cb, 0.0, hold_dur, hold_dur)
+	_combat_trace("Stratum1Boss._spawn_slam_indicator",
+		("radius=%.0f color=(%.2f,%.2f,%.2f,%.2f) telegraph_duration=%.2f " +
+		 "fade=%.3f strobe_hz=%.1f strobe=[%.2f..%.2f]") % [
+			SLAM_HITBOX_RADIUS,
+			SLAM_INDICATOR_COLOR.r, SLAM_INDICATOR_COLOR.g,
+			SLAM_INDICATOR_COLOR.b, SLAM_INDICATOR_COLOR.a,
+			telegraph_duration, SLAM_INDICATOR_FADE,
+			SLAM_INDICATOR_STROBE_HZ,
+			SLAM_INDICATOR_STROBE_LOW, SLAM_INDICATOR_STROBE_HIGH])
+
+
+## Trigger fade-out on the slam-telegraph indicator (called from `_fire_slam_hit`).
+## Frees the indicator on tween completion. Idempotent — null-checked.
+func _fade_out_slam_indicator() -> void:
+	if _slam_indicator == null:
+		return
+	if not is_instance_valid(_slam_indicator):
+		_slam_indicator = null
+		return
+	# Kill the fade-in/hold tween so the fade-out animation owns the modulate
+	# channel cleanly without a race against the hold step.
+	if _slam_indicator_tween != null and _slam_indicator_tween.is_valid():
+		_slam_indicator_tween.kill()
+	# Capture local ref so the lambda's free-on-finished closure works even
+	# if `_slam_indicator` is reassigned mid-tween (rapid re-telegraph corner).
+	var indicator: Node2D = _slam_indicator
+	_slam_indicator = null
+	_slam_indicator_tween = create_tween()
+	_slam_indicator_tween.tween_property(
+		indicator, "modulate:a", 0.0, SLAM_INDICATOR_FADE)
+	_slam_indicator_tween.finished.connect(func() -> void:
+		if is_instance_valid(indicator):
+			indicator.queue_free())
+
+
+## Immediate free of the slam-telegraph indicator without fade-out. Used by
+## `_die` (death-mid-telegraph) and as a defensive double-spawn guard in
+## `_spawn_slam_indicator`. Idempotent — null-checked + queued-for-deletion check.
+func _force_free_slam_indicator() -> void:
+	if _slam_indicator_tween != null and _slam_indicator_tween.is_valid():
+		_slam_indicator_tween.kill()
+		_slam_indicator_tween = null
+	if _slam_indicator == null:
+		return
+	if is_instance_valid(_slam_indicator) and not _slam_indicator.is_queued_for_deletion():
+		_slam_indicator.queue_free()
+	_slam_indicator = null
+
+
+# ---- T6 slam aftershock burst (ticket 86c9wjyuv) ---------------------
+
+## Spawn a 12-particle ember aftershock at the slam origin. Half-volume mirror
+## of `_spawn_death_particles` (12 vs 24 particles), parented to the room (not
+## the boss) so the burst persists past slam-recovery + boss death.
+##
+## Physics-flush safety: see `_spawn_death_particles` for the full rationale —
+## `_fire_slam_hit` runs during the physics step's slam-telegraph countdown
+## path, and a direct `add_child` from that callstack risks Godot 4's
+## "Can't change this state while flushing queries" panic if any Area2D state
+## downstream of the new particle node mutates. Deferred add_child sidesteps
+## the class entirely. Mirror of the death-burst pattern.
+func _spawn_slam_aftershock() -> void:
+	var room: Node = get_parent()
+	if room == null:
+		return
+	var burst: CPUParticles2D = CPUParticles2D.new()
+	burst.global_position = global_position
+	burst.amount = SLAM_AFTERSHOCK_PARTICLE_COUNT
+	burst.one_shot = true
+	burst.explosiveness = 1.0
+	burst.lifetime = SLAM_AFTERSHOCK_LIFETIME
+	burst.emitting = true
+	# Omni-radial: direction=UP + spread=180 → uniform 360° emission. Same
+	# shape as the death burst.
+	burst.direction = Vector2.UP
+	burst.spread = SLAM_AFTERSHOCK_SPREAD
+	burst.initial_velocity_min = SLAM_AFTERSHOCK_VELOCITY_MIN
+	burst.initial_velocity_max = SLAM_AFTERSHOCK_VELOCITY_MAX
+	# v7 impact-flash ramp with FLAT HOLD on the bright color (PR #291 v7,
+	# Sponsor "cannot see sparkles" report 2026-05-21). Four-stop Gradient:
+	#   offset 0.00 = AFTERSHOCK_FLASH_WHITE (pure white)
+	#   offset 0.30 = AFTERSHOCK_FLASH_WHITE (FLAT HOLD — load-bearing fix)
+	#   offset 0.40 = EMBER_LIGHT (decay through warm orange)
+	#   offset 1.00 = EMBER_DEEP (ember tail)
+	# The flat hold at 0.0→0.30 means the bright frame dwells for ~105 ms
+	# (30% of 350 ms lifetime) instead of decaying instantly at t=0 like the
+	# v5/v6 ramp. This is the load-bearing perceptual fix — human vision needs
+	# ≥~50 ms of sustained signal to register a transient at peripheral focus,
+	# and v5's instant-decay impact-flash was sub-threshold despite being
+	# captured perfectly by Playwright's headless frame-sampling.
+	#
+	# Gradient.new() starts with 2 default points at offsets 0.0 and 1.0;
+	# set_color writes them, add_point inserts intermediates.
+	var ramp: Gradient = Gradient.new()
+	ramp.set_color(0, AFTERSHOCK_FLASH_WHITE)
+	ramp.set_color(1, EMBER_DEEP)
+	ramp.add_point(AFTERSHOCK_FLASH_HOLD_OFFSET, AFTERSHOCK_FLASH_WHITE)
+	ramp.add_point(AFTERSHOCK_FLASH_DECAY_OFFSET, EMBER_LIGHT)
+	burst.color_ramp = ramp
+	# T6 visibility-fix (Sponsor soak 2026-05-21 — "see no aftershock"): rise +
+	# z_index +1 so the burst climbs above the boss sprite during its short
+	# lifetime instead of staying behind it. Mirrors `SlamTelegraphIndicator`
+	# z_index=1 (see html5-export.md § Z-index sensitivity) and the death-burst
+	# rising-gravity pattern below.
+	burst.gravity = SLAM_AFTERSHOCK_GRAVITY
+	burst.z_index = SLAM_AFTERSHOCK_Z_INDEX
+	burst.scale_amount_min = SLAM_AFTERSHOCK_SCALE
+	burst.scale_amount_max = SLAM_AFTERSHOCK_SCALE
+	# Physics-flush safety: `_fire_slam_hit` runs in the slam-telegraph countdown
+	# path inside `_physics_process`. Deferred add_child avoids the 4.x panic
+	# class — same rationale as `_spawn_death_particles`.
+	room.call_deferred("add_child", burst)
+	burst.finished.connect(burst.queue_free)
+	# Diagnostic trace (T6 visibility hunt — Sponsor soak 2026-05-21). Captures
+	# parent-path + z-index + scale alongside the existing particle/lifetime/
+	# velocity/origin fields so a future "still invisible" report can rule out
+	# scene-tree-parent / z-order / scale regressions without re-instrumenting.
+	# Per `diagnostic-traces-before-hypothesized-fixes` — these stay in the code
+	# permanently so the next regression diagnoses itself.
+	_combat_trace("Stratum1Boss._spawn_slam_aftershock",
+		("particles=%d lifetime=%.2f vel=[%.0f..%.0f] gravity=(%.0f,%.0f) " +
+		 "scale=%.2f z_index=%d origin=(%.0f,%.0f) " +
+		 "ramp_hold=[0..%.2f]=white decay=%.2f parent_path=%s") % [
+			SLAM_AFTERSHOCK_PARTICLE_COUNT, SLAM_AFTERSHOCK_LIFETIME,
+			SLAM_AFTERSHOCK_VELOCITY_MIN, SLAM_AFTERSHOCK_VELOCITY_MAX,
+			SLAM_AFTERSHOCK_GRAVITY.x, SLAM_AFTERSHOCK_GRAVITY.y,
+			SLAM_AFTERSHOCK_SCALE, SLAM_AFTERSHOCK_Z_INDEX,
+			global_position.x, global_position.y,
+			AFTERSHOCK_FLASH_HOLD_OFFSET, AFTERSHOCK_FLASH_DECAY_OFFSET,
+			String(room.get_path()) if room.is_inside_tree() else "<not-in-tree>"])
+
+
+## v7 slam-impact sprite flash (PR #291 v7, ticket 86c9wjyuv) — secondary
+## visual cue for the slam impact that complements the particle aftershock.
+## Brief pure-white modulate flash on the boss's AnimatedSprite2D for the
+## ~130 ms IN+HOLD+OUT budget, then restores the sprite's rest modulate.
+## Runs in PARALLEL with the particle burst — together they give a
+## "shake-and-flash" tell that triggers peripheral-vision motion-detection
+## even when the player isn't looking directly at the boss.
+##
+## Distinct from `_play_hit_flash`:
+##   - `_play_hit_flash` is take_damage-driven (boss took a hit, soft-red
+##     tint, mirrors Grunt/PracticeDummy hit-flash convention).
+##   - `_play_slam_impact_flash` is slam-fire-driven (boss DEALT a hit,
+##     pure-white pulse, mirrors PR #137 Player.SWING_FLASH discipline).
+## They use separate tween refs so a slam-self-hit (boss damaged by player
+## counter while boss is mid-slam) doesn't have one tween cancelling the
+## other mid-flash.
+##
+## 3-branch sprite resolver mirrors `_play_hit_flash` — branches discriminated
+## by the same `_hit_flash_target` resolution. This means the resolver runs
+## once across both flash types (whichever fires first wires the target).
+func _play_slam_impact_flash() -> void:
+	if _is_dead:
+		return
+	# Resolve the flash target (idempotent — `_play_hit_flash` uses the same
+	# branch resolution, so we share the cached _hit_flash_target ref).
+	if _hit_flash_target == null:
+		var sprite: Node = get_node_or_null("Sprite")
+		if sprite is AnimatedSprite2D:
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = true
+			_sprite_modulate_at_rest = (sprite as AnimatedSprite2D).modulate
+		elif sprite is ColorRect:
+			_hit_flash_target = sprite
+			_hit_flash_uses_sprite = true
+			_hit_flash_uses_animated_sprite = false
+			_sprite_color_at_rest = (sprite as ColorRect).color
+		else:
+			_hit_flash_target = self
+			_hit_flash_uses_sprite = false
+			_hit_flash_uses_animated_sprite = false
+	if not _captured_modulate_at_rest:
+		_modulate_at_rest = modulate
+		_captured_modulate_at_rest = true
+	if _slam_impact_flash_tween != null and _slam_impact_flash_tween.is_valid():
+		_slam_impact_flash_tween.kill()
+	if not is_inside_tree():
+		return
+	_slam_impact_flash_tween = create_tween()
+	if _hit_flash_uses_animated_sprite:
+		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
+		_slam_impact_flash_tween.tween_property(asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+		_slam_impact_flash_tween.tween_property(asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+		_slam_impact_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, SLAM_IMPACT_FLASH_OUT)
+	elif _hit_flash_uses_sprite:
+		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
+		_slam_impact_flash_tween.tween_property(sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+		_slam_impact_flash_tween.tween_property(sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+		_slam_impact_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, SLAM_IMPACT_FLASH_OUT)
+	else:
+		_slam_impact_flash_tween.tween_property(self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+		_slam_impact_flash_tween.tween_property(self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+		_slam_impact_flash_tween.tween_property(self, "modulate", _modulate_at_rest, SLAM_IMPACT_FLASH_OUT)
+	# Diagnostic trace — distinct tag from _play_hit_flash so the trace stream
+	# can discriminate "boss got hit" (hit_flash) vs "boss dealt slam" (slam_impact_flash).
+	_combat_trace("Stratum1Boss._play_slam_impact_flash",
+		"tint=(%.2f,%.2f,%.2f) budget_ms=%.0f branch=%s" % [
+			SLAM_IMPACT_FLASH_TINT.r, SLAM_IMPACT_FLASH_TINT.g, SLAM_IMPACT_FLASH_TINT.b,
+			(SLAM_IMPACT_FLASH_IN + SLAM_IMPACT_FLASH_HOLD + SLAM_IMPACT_FLASH_OUT) * 1000.0,
+			"animated_sprite" if _hit_flash_uses_animated_sprite else ("color_rect" if _hit_flash_uses_sprite else "self_modulate")
+		])
 
 
 ## §2 hit-flash. M3W-4 3-branch resolver per `.claude/docs/combat-architecture.md`
@@ -1336,21 +1776,51 @@ static func _vec_to_dir_suffix(v: Vector2) -> String:
 
 
 func _apply_mob_def() -> void:
+	# Boss HP multiplier (Sponsor 2026-05-21 soak-iteration utility). Resolves
+	# to 1.0 (no-op) outside HTML5 and when the `boss_hp_mult` URL param is
+	# absent. Multiplied IN even on the bare-instance fallback path so headless
+	# GUT tests using `DebugFlags.set_boss_hp_mult_for_test(0.5)` can exercise
+	# the nerf without supplying a MobDef.
+	var hp_mult: float = _resolve_boss_hp_mult()
 	if mob_def == null:
 		# Bare-instantiated boss (tests). Use spec defaults — 600 HP, 12 dmg
 		# (rebalanced M1 RC soak-4, was 15), 80 px/s.
 		# Phase-2 and phase-3 thresholds resolve to 396 and 198.
-		hp_max = 600
-		hp_current = 600
+		var bare_hp: int = max(1, int(round(600.0 * hp_mult)))
+		hp_max = bare_hp
+		hp_current = bare_hp
 		damage_base = 12
 		move_speed_base = 80.0
 		move_speed = move_speed_base
 		return
-	hp_max = mob_def.hp_base
-	hp_current = mob_def.hp_base
+	var scaled_hp: int = max(1, int(round(float(mob_def.hp_base) * hp_mult)))
+	hp_max = scaled_hp
+	hp_current = scaled_hp
 	damage_base = mob_def.damage_base
 	move_speed_base = mob_def.move_speed
 	move_speed = move_speed_base
+
+
+## Resolve the boss HP multiplier from the DebugFlags autoload (defaults to 1.0
+## when the autoload is missing — bare-instance unit-test edge). Centralised so
+## both branches of `_apply_mob_def` share the same gate + the multiplier value
+## is testable without re-instantiating the boss.
+func _resolve_boss_hp_mult() -> float:
+	if not is_inside_tree():
+		# Bare unit-test edge: instantiate-then-set-fields without scene tree.
+		# Use the autoload via `Engine.get_main_loop()` so we still get the test
+		# injection value if the test wrote one before adding the boss.
+		var ml: SceneTree = Engine.get_main_loop() as SceneTree
+		if ml == null:
+			return 1.0
+		var df: Node = ml.root.get_node_or_null("DebugFlags")
+		if df == null:
+			return 1.0
+		return df.boss_hp_mult
+	var df_in: Node = get_node_or_null("/root/DebugFlags")
+	if df_in == null:
+		return 1.0
+	return df_in.boss_hp_mult
 
 
 func _apply_layers() -> void:
