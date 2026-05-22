@@ -359,3 +359,56 @@ func test_stratum_exit_activate_deferred_after_boss_death() -> void:
 		"REGRESSION-86c9ujq8d + 86c9unkr2: interaction area IS monitoring after " +
 		"the double-defer settles (call_deferred activate + await physics_frame inside _arm_interaction_area_after_flush) — " +
 		"player can walk in and trigger descend_triggered")
+
+
+# ---- M3-T2-W3-T13 — BossNameplate wiring -----------------------------
+
+## REGRESSION-86c9wjz2d — BossNameplate is spawned in `_assemble_room_fixtures`
+## and shown on `entry_sequence_completed`. Catches:
+##   1. The nameplate scene isn't loaded (path drift / missing scene file).
+##   2. The nameplate isn't added as a child of the room (parent / freed
+##      lifecycle drift).
+##   3. `show_for(boss)` isn't called from `_complete_entry_sequence` —
+##      e.g. a future refactor moves the slide-in to a different beat
+##      and the nameplate stays hidden forever.
+func test_boss_nameplate_spawned_in_deferred_fixture_pass() -> void:
+	var room: Stratum1BossRoom = _make_room()
+	# Pre-drain: deferred pass has not landed.
+	assert_null(room.get_boss_nameplate(),
+			"BossNameplate is NOT built synchronously in _ready (deferred)")
+	await get_tree().process_frame
+	# Post-drain: BossNameplate is in the tree, parented under the room.
+	var np: Node = room.get_boss_nameplate()
+	assert_not_null(np,
+			"REGRESSION-86c9wjz2d: BossNameplate built in deferred fixture pass")
+	assert_true(np is BossNameplate,
+			"BossNameplate spawned as the correct script type")
+	assert_eq(np.get_parent(), room,
+			"BossNameplate is parented under the boss room (lifecycle tied)")
+	# Pre-`show_for`: nameplate is hidden (no `show_for` call yet).
+	# `is_shown()` will be true only after entry_sequence_completed fires.
+	assert_false((np as BossNameplate).is_shown(),
+			"BossNameplate hidden before entry_sequence_completed")
+
+
+func test_boss_nameplate_shown_on_entry_sequence_completed() -> void:
+	# End-to-end wire: room.complete_entry_sequence → nameplate.show_for(boss)
+	# → nameplate.is_shown() == true. Catches any future refactor that
+	# moves the show_for call out of `_complete_entry_sequence` and leaves
+	# the nameplate dormant.
+	var room: Stratum1BossRoom = _make_room()
+	await get_tree().process_frame
+	var np: BossNameplate = room.get_boss_nameplate() as BossNameplate
+	assert_not_null(np, "precondition: nameplate spawned")
+	# Trigger + complete the entry sequence (test-helper fast-forwards
+	# the 1.8 s timer + boss wake fast-forward).
+	room.trigger_entry_sequence()
+	room.complete_entry_sequence_for_test()
+	# After completion, the nameplate has called show_for(boss).
+	assert_true(np.is_shown(),
+			"REGRESSION-86c9wjz2d: nameplate.show_for called from " +
+			"_complete_entry_sequence — slide-in tween armed")
+	# Boss name rendered uppercase from MobDef.display_name
+	# ("Warden of the Outer Cloister" → "WARDEN OF THE OUTER CLOISTER").
+	assert_eq(np.get_name_label().text, "WARDEN OF THE OUTER CLOISTER",
+			"nameplate renders boss display_name in uppercase")

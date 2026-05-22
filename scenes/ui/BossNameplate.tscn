@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://b0embergrave_boss_nameplate"]
+
+[ext_resource type="Script" path="res://scripts/ui/BossNameplate.gd" id="1_nameplate"]
+
+[node name="BossNameplate" type="CanvasLayer"]
+script = ExtResource("1_nameplate")
+layer = 10
