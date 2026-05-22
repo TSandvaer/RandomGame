@@ -337,7 +337,20 @@ func test_movement_before_trigger_does_not_engage_skip() -> void:
 	# room load and trigger (e.g. WASD held while approaching the door),
 	# the skip handler must reject the press — the entry sequence
 	# hasn't started yet, there's nothing to collapse.
-	var room: Stratum1BossRoom = _make_room()
+	#
+	# Bare-test escape (per Stratum1BossRoom.gd:315-321): set
+	# `boss_scene_path = ""` BEFORE `add_child` so `_spawn_boss` fails
+	# cleanly + `_boss` stays null. `_assemble_room_fixtures` then
+	# gates on `_boss != null` and does NOT auto-fire
+	# `trigger_entry_sequence()`. Without this escape, the deferred
+	# fixture pass lands BEFORE we get a chance to assert
+	# "sequence inactive" and the bonus regression-guard test
+	# tests a different invariant than intended (Tess REQUEST CHANGES
+	# on PR #306).
+	var packed: PackedScene = load("res://scenes/levels/Stratum1BossRoom.tscn")
+	var room: Stratum1BossRoom = packed.instantiate()
+	room.boss_scene_path = ""
+	add_child_autofree(room)
 	await _drain_fixture_pass()
 	room.set_skip_eligible_for_test(true)
 	# No trigger_entry_sequence yet — sequence inactive.
