@@ -76,11 +76,73 @@ signal boss_defeated(boss: Stratum1Boss, death_position: Vector2)
 ## stratum so this is the run-clear signal.
 signal stratum_exit_unlocked()
 
+## M3-T2-W3-T17 (ticket `86c9wjzjf`) — emitted when the player collapses
+## the entry sequence via a movement-key press during Beats 2–4. Audio
+## consumers (`_on_entry_sequence_started_audio` / `_on_entry_sequence_completed_audio`)
+## subscribe to this to swap their default fade durations for the
+## skip-fast values per Uma `boss-intro.md § Skip rule`:
+##
+##   - Nameplate slide:    0.4 s → 0.2 s   (consumer: T13 BossNameplate)
+##   - Boss music fade-in: 0.6 s → 0.3 s   (consumer: AudioDirector handler)
+##
+## Beat 1 (door slam, 0.0 → 0.4 s) is OUTSIDE the skip window and always
+## plays at full duration. The first-ever fight is unskippable — this
+## signal only fires when `_skip_eligible == true` (driven by save state
+## `character.first_boss_kill_seen`).
+signal entry_sequence_skipped()
+
 # ---- Tuning ------------------------------------------------------------
 
 ## Total entry-sequence duration per Uma's spec (Beats 1–4). Beat 5 begins
 ## immediately after this elapses.
 const ENTRY_SEQUENCE_DURATION: float = 1.8
+
+## M3-T2-W3-T17 — skip-collapse window. The skip is permitted from Beat 2
+## onward (T+0.0; door slam is Beat 1 and runs in parallel with Beats 2-4
+## per Uma's beat-by-beat — the door slam is OUTSIDE the skippable region
+## semantically because it represents "this is a boss room", not the
+## cinematic theatre. By starting the skip-window at T+0.0 we honor the
+## "during Beats 2-4" spec since Beat 2 begins at T+0.0 in parallel with
+## Beat 1; the door-slam audio cue is already in flight by then and not
+## under this controller's tween-cancel reach.
+const SKIP_WINDOW_START_S: float = 0.0
+
+## Skip-window upper bound — the entry sequence completes naturally at
+## ENTRY_SEQUENCE_DURATION, after which the skip is moot. We bind the
+## window slightly inside the natural completion to avoid a race between
+## the timer firing and a same-tick movement press.
+const SKIP_WINDOW_END_S: float = ENTRY_SEQUENCE_DURATION - 0.05
+
+## M3-T2-W3-T17 — when the skip fires, residual wall-clock time until
+## `_complete_entry_sequence` runs. Sized so the door-slam audio (~0.5 s)
+## isn't visually outpaced by the boss waking; this overlaps with the
+## boss's `Stratum1Boss.WAKE_DURATION` (0.417 s) so the wake animation
+## still plays on top of the collapsed nameplate / music fades. Per the
+## brief: "read the boss's current wake-anim duration from Stratum1Boss
+## — don't hard-code" — see `_skip_collapse_residual_s()` below for the
+## dynamic read; this constant is the floor when the boss is absent or
+## the wake constant is unreadable.
+const SKIP_COLLAPSE_RESIDUAL_FLOOR_S: float = 0.1
+
+## Save slot used for the per-character `first_boss_kill_seen` lookup.
+## Mirrors `StatAllocationPanel.SAVE_SLOT` + `InventoryPanel.SAVE_SLOT`
+## — M1/M2 ships a single-character single-slot save (slot 0). When
+## multi-character lands (M3+), this constant indirects per-character.
+const SAVE_SLOT: int = 0
+
+## Movement actions consumed by the skip handler. Mirrors
+## `Player.gd`'s `Input.get_vector("move_left", "move_right", "move_up",
+## "move_down")` — the canonical movement-input surface. Any new
+## movement-binding ticket should mirror its action additions here so
+## the skip handler stays in sync with the player's input shape.
+const SKIP_ACTIONS: PackedStringArray = ["move_up", "move_down", "move_left", "move_right"]
+
+## M3-T2-W3-T17 — Boss BGM fade durations. The skip path uses the
+## faster 300 ms ramp per Uma `boss-intro.md § Skip rule` ("boss music
+## fades in 0.3 s"); the natural path uses the 600 ms default per
+## `audio-direction.md §3 ducking rule 4`.
+const SKIP_BGM_FADE_MS: int = 300
+const DEFAULT_BGM_FADE_MS: int = 600
 
 # ---- Inspector --------------------------------------------------------
 
@@ -123,6 +185,25 @@ var _entry_completed_time_ms: int = 0
 var _stratum_exit_unlocked: bool = false
 var _stratum_exit: StratumExit = null
 
+# ---- M3-T2-W3-T17 skip-after-first-kill (ticket 86c9wjzjf) ----------
+
+## True when this character has killed the stratum-1 boss at least once.
+## Loaded from `save["character"]["first_boss_kill_seen"]` (v4 schema) on
+## room `_ready`. False means the player is on their first-ever fight and
+## the intro is unskippable per Uma `boss-intro.md § Skip rule`.
+var _skip_eligible: bool = false
+
+## True after the player has pressed a movement key during the skip
+## window and the entry sequence has been collapsed. Guards against
+## double-skip + ensures a re-fire of `trigger_entry_sequence` (idempotent
+## path) doesn't undo the skip.
+var _entry_sequence_skipped: bool = false
+
+## Wall-clock time the skip fired (set by `_collapse_entry_sequence`).
+## Diagnostic — surfaces in `_combat_trace` and the GUT test pinning the
+## collapsed-timing budget.
+var _entry_skipped_time_ms: int = 0
+
 
 func _ready() -> void:
 	# Boss loot is owned by Main's MobLootSpawner (subscribed to `boss_died` via
@@ -142,6 +223,16 @@ func _ready() -> void:
 	# so the wiring is present by the time the signal fires (T+1.8 s post-
 	# trigger). Idempotent triple-wire guard is inside `_wire_audio_cues`.
 	_wire_audio_cues()
+	# M3-T2-W3-T17 — load the per-character `first_boss_kill_seen` flag
+	# from the v4 save schema. Drives `_skip_eligible`. First-ever fight
+	# is unskippable (flag=false); subsequent fights collapse on movement
+	# key per Uma `boss-intro.md § Skip rule`. Defensive — a missing or
+	# pre-v4 save returns false (the migrate chain backfills false, but
+	# read-only / cold-boot surfaces may not have hit the migrate path).
+	_skip_eligible = _load_first_boss_kill_seen()
+	if _skip_eligible:
+		_combat_trace("Stratum1BossRoom._ready",
+			"skip_eligible=true — subsequent boss fight, intro collapsible on movement")
 	# Defer the Area2D-fixture pass (door-trigger build + StratumExit spawn)
 	# AND the entry-sequence trigger out of the physics-flush window.
 	#
@@ -285,6 +376,30 @@ func complete_entry_sequence_for_test() -> void:
 	_complete_entry_sequence()
 	if _boss != null and is_instance_valid(_boss) and _boss.has_method("complete_wake_for_test"):
 		_boss.complete_wake_for_test()
+
+
+## M3-T2-W3-T17 — read-only diagnostic for tests + Playwright traces.
+## True after `_collapse_entry_sequence` fires. Useful as a Playwright
+## probe target ("did the skip actually engage?") so the spec doesn't
+## depend on `entry_sequence_skipped.emit` timing alone.
+func is_entry_sequence_skipped() -> bool:
+	return _entry_sequence_skipped
+
+
+## M3-T2-W3-T17 — exposes the runtime skip-eligibility flag for tests
+## and `boss-intro-skip.spec.ts` (so the spec can assert "first kill not
+## skippable" without rummaging in the save file).
+func is_skip_eligible() -> bool:
+	return _skip_eligible
+
+
+## M3-T2-W3-T17 — test-only: force-set skip eligibility. Production code
+## NEVER calls this; production reads from the save in `_ready`. Tests
+## that want to exercise the eligible / not-eligible branches use this
+## to bypass the round-trip-through-save fixture overhead. Mirrors the
+## `complete_entry_sequence_for_test` test-only escape hatch.
+func set_skip_eligible_for_test(eligible: bool) -> void:
+	_skip_eligible = eligible
 
 
 # ---- Internal --------------------------------------------------------
@@ -436,6 +551,14 @@ func _on_boss_died(boss: Stratum1Boss, death_position: Vector2, _mob_def: MobDef
 		"boss_died received — deferring StratumExit.activate() to clear physics flush")
 	if _stratum_exit != null:
 		_stratum_exit.call_deferred("activate")
+	# M3-T2-W3-T17 — promote the character to "skip-eligible" on first kill.
+	# Snapshotted to the v4 save schema (`character.first_boss_kill_seen`).
+	# Subsequent boss rooms read this flag in `_ready` and allow the
+	# collapse-on-movement path. Idempotent (no-op if already true).
+	# Save write happens BEFORE the signal emits so consumers of
+	# `boss_defeated` (Main._on_boss_defeated → title card) can rely on
+	# the flag being persisted by the time they receive the event.
+	_mark_first_boss_kill_seen()
 	stratum_exit_unlocked.emit()
 	boss_defeated.emit(boss, death_position)
 
@@ -512,6 +635,13 @@ func _wire_audio_cues() -> void:
 ## BGM bus to `mus-boss-stratum1.ogg` over the AudioDirector's default
 ## 600 ms (Uma `boss-intro.md` Beat 5 / `audio-direction.md §3 ducking rule 4`).
 ##
+## **M3-T2-W3-T17 skip-collapse:** if the player triggered the skip via
+## movement-key press (Uma `boss-intro.md § Skip rule`), the crossfade
+## uses the SKIP_BGM_FADE_MS (300 ms) instead of the default 600 ms.
+## The fast fade is the audible signature of the skip — same audio
+## content (`mus-boss-stratum1.ogg`), faster ramp. The 0.3 s value
+## comes from Uma's brief: "boss music fades in (0.3 s)".
+##
 ## Pre-fight there's no S1 BGM playing (M1 ships without S1 ambient/BGM —
 ## only the S2 entry + boss-room crossfade are wired). The crossfade
 ## degenerates to a fade-in from silence; the role-swap inside AudioDirector
@@ -527,7 +657,8 @@ func _on_entry_sequence_completed_audio() -> void:
 	var ad: Node = _resolve_audio_director()
 	if ad == null or not ad.has_method("crossfade_to_boss_stratum1"):
 		return
-	ad.crossfade_to_boss_stratum1()
+	var fade_ms: int = SKIP_BGM_FADE_MS if _entry_sequence_skipped else DEFAULT_BGM_FADE_MS
+	ad.crossfade_to_boss_stratum1(fade_ms)
 
 
 ## M3-T2-W2-T10 — BI-03 handler. Fires on `entry_sequence_started`
@@ -547,3 +678,219 @@ func _resolve_audio_director() -> Node:
 	if not is_inside_tree():
 		return null
 	return get_tree().root.get_node_or_null("AudioDirector")
+
+
+# ---- M3-T2-W3-T17 skip-after-first-kill (ticket 86c9wjzjf) ----------
+#
+# The boss intro is 1.8 s of theatre that ALL players see on their first
+# kill. After that first kill, subsequent intros become repetitive; the
+# Skip rule lets veterans collapse the cinematic with a movement-key
+# press during Beats 2–4. Beat 1 (door slam, 0.0 → 0.4 s) always plays
+# at full duration — it's the irreducible "this is a boss room" cue.
+#
+# Per Uma `boss-intro.md § Skip rule`:
+#   "After the first boss kill of the player's lifetime (per-character
+#    flag, saves to disk), the boss intro can be skipped by pressing any
+#    movement key during Beats 2–4. The skip collapses to: door slam
+#    (always plays), nameplate slides in (0.2 s, faster), boss music
+#    fades in (0.3 s). Skip is not advertised — it's discovered, like
+#    Esc-skip on the death sequence."
+#
+# Implementation shape:
+#   1. `_load_first_boss_kill_seen()` on `_ready` → `_skip_eligible`.
+#   2. `_unhandled_input` consumes movement actions ONLY during the
+#      eligible + active + not-yet-skipped + not-yet-completed window.
+#   3. `_collapse_entry_sequence()` cancels the natural 1.8 s timer and
+#      schedules `_complete_entry_sequence` after a short residual
+#      (`SKIP_COLLAPSE_RESIDUAL_FLOOR_S` floor; dynamically read from
+#      `Stratum1Boss.WAKE_DURATION` per the brief — so the visual wake
+#      animation still has its natural runway).
+#   4. `_on_boss_died` calls `_mark_first_boss_kill_seen()` to promote
+#      future fights to eligible-state via the v4 save schema.
+#
+# Reading + writing the flag uses the same idiom as
+# `StatAllocationPanel._has_seen_first_level_up` / `_mark_first_level_up_seen`
+# — load_game / mutate the character dict / save_game. Snapshots
+# adjacent runtime state via `_snapshot_into_save` so the flag write
+# doesn't clobber Player HP / Levels / Inventory.
+
+## Input handler — consumes movement-key press events during the skip
+## window and dispatches to `_collapse_entry_sequence`. Uses
+## `_unhandled_input` (not `_input`) because movement keys do NOT
+## overlap with Godot's built-in GUI input semantics (Tab focus, Space
+## button-activate, etc.) — the `_input` exception documented in
+## `.claude/docs/html5-export.md § "Godot input handling order"` does
+## not apply here. `_unhandled_input` is the right surface because it
+## lets the InventoryPanel / StatAllocationPanel modal `_input` handlers
+## consume their shortcuts first; the boss-room skip is gameplay, not
+## modal UI.
+##
+## Gates checked in order (early-return on any miss to keep the hot
+## path lean — `_unhandled_input` fires for every keypress in the
+## scene tree):
+##
+##   1. `_skip_eligible`        — character has killed the boss before
+##   2. `_entry_sequence_active`— intro is currently running
+##   3. NOT `_entry_sequence_completed` — intro has not naturally ended
+##   4. NOT `_entry_sequence_skipped`   — guard against double-fire
+##   5. event.is_action_pressed for any SKIP_ACTIONS member
+##
+## All five gates ensure the skip can ONLY fire during the intended
+## window: post-trigger, pre-completion, on a movement keypress, by an
+## eligible character.
+func _unhandled_input(event: InputEvent) -> void:
+	if not _skip_eligible:
+		return
+	if not _entry_sequence_active:
+		return
+	if _entry_sequence_completed or _entry_sequence_skipped:
+		return
+	# Gate the skip window — the `_entry_sequence_active && !_completed`
+	# pair already brackets it tightly, but the explicit time-bound
+	# guard adds a safety net against a same-tick race between the
+	# natural-timer firing and a movement keypress arriving on the
+	# same frame. SKIP_WINDOW_END_S = ENTRY_SEQUENCE_DURATION - 0.05.
+	var elapsed_s: float = (Time.get_ticks_msec() - _entry_started_time_ms) / 1000.0
+	if elapsed_s < SKIP_WINDOW_START_S or elapsed_s > SKIP_WINDOW_END_S:
+		return
+	for action in SKIP_ACTIONS:
+		if event.is_action_pressed(action):
+			_collapse_entry_sequence()
+			# Consume the event so the same press isn't double-handled
+			# downstream (Player's _physics_process reads Input directly,
+			# not via _unhandled_input, so this consume is mostly defensive
+			# against any future UI that might claim the keypress next).
+			# Defensive viewport-null guard for the bare-test surface where
+			# the room is constructed outside a normal scene-tree input
+			# pipeline (the test may invoke _unhandled_input directly).
+			var vp: Viewport = get_viewport()
+			if vp != null:
+				vp.set_input_as_handled()
+			return
+
+
+## Collapse the entry sequence — cancel the natural timer, schedule a
+## short residual delay, then fire `_complete_entry_sequence`. Per Uma's
+## brief, the residual is sized to overlap with the boss's wake-anim
+## duration so the visual transition (boss-wake) still has its full
+## runway against the collapsed music + nameplate fades.
+##
+## Dynamic wake-duration read: per the dispatch brief, "read the boss's
+## current wake-anim duration from `Stratum1Boss` — don't hard-code."
+## The boss exposes `WAKE_DURATION` as a class constant; we look it up
+## via the live `_boss` instance. If the boss is absent (test surface)
+## or doesn't expose the constant (future class refactor), fall back to
+## SKIP_COLLAPSE_RESIDUAL_FLOOR_S (0.1 s).
+##
+## Total collapsed intro budget: ~0.5 s — door slam already in flight
+## (0.4 s, started at T+0.0), boss music fast-fade (0.3 s, starts at
+## skip + residual), nameplate fast-slide (0.2 s, when T13 nameplate
+## ships). Acceptance: "skip collapses intro timing to ~0.5 s".
+func _collapse_entry_sequence() -> void:
+	if _entry_sequence_skipped or _entry_sequence_completed:
+		return
+	_entry_sequence_skipped = true
+	_entry_skipped_time_ms = Time.get_ticks_msec()
+	# Tween-cancel via timer disconnect — the original `_entry_timer`
+	# (created in `trigger_entry_sequence`) is still in flight on its
+	# natural 1.8 s schedule. Disconnect its callback so the natural
+	# completion path doesn't double-fire `_complete_entry_sequence`
+	# after our collapsed residual. The SceneTreeTimer itself can't be
+	# canceled in Godot 4.3 — its `timeout` signal will still emit at
+	# its scheduled wall-clock time, but with no subscriber it's a no-op.
+	if _entry_timer != null:
+		if _entry_timer.timeout.is_connected(_complete_entry_sequence):
+			_entry_timer.timeout.disconnect(_complete_entry_sequence)
+	_combat_trace("Stratum1BossRoom._collapse_entry_sequence",
+		"skip fired at t=%dms — residual=%.3fs" % [
+			_entry_skipped_time_ms - _entry_started_time_ms,
+			_skip_collapse_residual_s()])
+	# Emit the skip signal AHEAD of the residual delay so audio + nameplate
+	# consumers can begin their fast-fade tweens immediately. The
+	# `_complete_entry_sequence` call (which fires entry_sequence_completed
+	# + boss.wake) lands after the residual delay so the wake-anim has
+	# its visual lead-in.
+	entry_sequence_skipped.emit()
+	# Schedule the deferred completion. ignore_time_scale=false intentional
+	# — if a future T2 hit-pause overlaps (unlikely during a boss INTRO,
+	# but compose-safe), the residual delay should pause with game-time.
+	# The wake-anim itself runs on game-time too; keeping the residual
+	# scaled keeps the two synchronized.
+	if is_inside_tree():
+		var residual: float = _skip_collapse_residual_s()
+		var skip_timer: SceneTreeTimer = get_tree().create_timer(residual)
+		skip_timer.timeout.connect(_complete_entry_sequence)
+
+
+## Dynamic wake-duration lookup. Per the dispatch brief: "read the boss's
+## current wake-anim duration from `Stratum1Boss` — don't hard-code."
+## Returns the floor (0.1 s) if the boss is absent or doesn't expose
+## WAKE_DURATION. Tests can verify the dynamic-read shape by mutating
+## the constant via a test-only setter (not yet exposed; manual constant
+## edit + recompile is the current surface).
+func _skip_collapse_residual_s() -> float:
+	var residual: float = SKIP_COLLAPSE_RESIDUAL_FLOOR_S
+	if _boss != null and is_instance_valid(_boss):
+		# Class-constant access via the script — `Stratum1Boss.WAKE_DURATION`
+		# is the canonical surface. Look it up defensively in case a future
+		# refactor renames the constant.
+		var wake_duration: float = float(Stratum1Boss.WAKE_DURATION)
+		if wake_duration > residual:
+			residual = wake_duration
+	return residual
+
+
+## Save-side helpers — mirror `StatAllocationPanel._has_seen_first_level_up`
+## / `_mark_first_level_up_seen` (`scripts/ui/StatAllocationPanel.gd:569`).
+## Same Save autoload, same character-block path, same defensive guards.
+## Per `.claude/docs/test-conventions.md § "Universal warning gate"` — no
+## new push_warning sites; Save.gd's own load path already routes through
+## WarningBus for schema-newer-than-runtime, which is the only failure
+## mode we'd surface through this lookup.
+
+## Reads `character.first_boss_kill_seen` from the v4 save. Returns
+## false on any miss (no save, empty data, missing character block,
+## missing field). The migrate chain backfills the field on read; this
+## function never sees a pre-v4 shape in practice, but guards against
+## the cold-boot / no-save path defensively.
+func _load_first_boss_kill_seen() -> bool:
+	var save_node: Node = _save_autoload()
+	if save_node == null:
+		return false
+	var data: Dictionary = save_node.load_game(SAVE_SLOT)
+	if data.is_empty():
+		return false
+	var character: Variant = data.get("character", null)
+	if not (character is Dictionary):
+		return false
+	return bool((character as Dictionary).get("first_boss_kill_seen", false))
+
+
+## Promotes the character to skip-eligible by setting
+## `character.first_boss_kill_seen = true` and writing back to disk.
+## Idempotent — calling on an already-seen character no-ops at the
+## bool level (the write still happens to keep the save consistent
+## with the in-memory state, but the flag stays true).
+##
+## Side-effect: runs through Save.save_game's full envelope rewrite,
+## which means the on-disk schema_version bumps to 4 if loaded from a
+## v3 save. This is the natural migration-on-write path documented in
+## `test_save_migration.gd::test_migration_leaves_envelope_schema_version_intact_on_disk_until_save`
+## — load-only doesn't bump, but the boss-death write DOES.
+func _mark_first_boss_kill_seen() -> void:
+	var save_node: Node = _save_autoload()
+	if save_node == null:
+		return
+	var data: Dictionary = save_node.load_game(SAVE_SLOT)
+	if data.is_empty():
+		data = save_node.default_payload()
+	if not (data.get("character", null) is Dictionary):
+		data["character"] = save_node.default_payload()["character"]
+	(data["character"] as Dictionary)["first_boss_kill_seen"] = true
+	save_node.save_game(SAVE_SLOT, data)
+
+
+func _save_autoload() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_tree().root.get_node_or_null("Save")

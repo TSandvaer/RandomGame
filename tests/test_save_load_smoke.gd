@@ -19,11 +19,12 @@ extends GutTest
 ##     This is the LOAD-BEARING test. If it's red, the Sponsor soak meta-
 ##     finding would recur silently.
 ##
-##   Variant 2 — MIGRATION: a v2 save dict loaded under the current v3
-##     runtime fires the v2→v3 migration path, schema is reported as v3
-##     post-load, and the migration produces ZERO warnings via WarningBus.
-##     (v4 migration variant deferred — schema v4 not yet landed; see
-##     `test_save_v4_stress.gd` scaffolds pending W3-T6.)
+##   Variant 2 — MIGRATION: a v0 save dict loaded under the current v4
+##     runtime fires the full v0→v4 migration chain, schema is reported as
+##     v4 post-load, and the migration produces ZERO warnings via WarningBus.
+##     (T17 added the v3→v4 step for `first_boss_kill_seen`; the older
+##     `test_save_v4_stress.gd` stash/ember-bag scaffolds remain pending
+##     W3-T6 stash-UI work.)
 ##
 ##   Variant 3 — UNKNOWN-ID GRACEFUL: a save dict with a truly unknown item
 ##     id ('future_item_from_m3') triggers a WarningBus emission (expected —
@@ -206,17 +207,16 @@ func test_smoke_both_starter_items_registered_in_content_registry() -> void:
 # =========================================================================
 # VARIANT 2 — MIGRATION: v0 save → migrate to current schema → zero warnings
 # =========================================================================
-## The "v3 save → v4 migration" variant from the ticket is DEFERRED —
-## schema v4 is not yet on main (see `test_save_v4_stress.gd` which is
-## all-pending, awaiting W3-T6). The live migration variant here is v0→v3,
+## Schema v4 landed via M3-T2-W3-T17 (`first_boss_kill_seen` for the
+## boss-intro skip rule). The live migration variant here is v0→v4,
 ## which exercises the FULL migration chain (_migrate_v0_to_v1 →
-## _migrate_v1_to_v2 → _migrate_v2_to_v3) and verifies it is warning-clean.
-##
-## Once v4 lands (W3-T6), add test_v3_to_v4_migration_no_warnings() here.
+## _migrate_v1_to_v2 → _migrate_v2_to_v3 → _migrate_v3_to_v4) and verifies
+## it is warning-clean. The v3→v4 step is also tested in isolation under
+## `tests/test_first_boss_kill_skip.gd` and `tests/test_save_migration.gd`.
 
 func test_migration_v0_to_current_schema_emits_no_warnings() -> void:
 	## A v0 fixture (no schema_version) migrates cleanly to the current
-	## schema (v3 as of 2026-05-02) without firing any WarningBus emissions.
+	## schema (v4 as of 2026-05-22) without firing any WarningBus emissions.
 	## The only warnings the migration path emits are for "schema newer than
 	## runtime" (an intentional future-save safety net) — v0 is OLDER than
 	## runtime, so that path never triggers here.
@@ -232,11 +232,13 @@ func test_migration_v0_to_current_schema_emits_no_warnings() -> void:
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_false(loaded.is_empty(), "v0 fixture must load without returning {}")
 
-	# Verify migration landed at v3 fields (structural migration smoke).
+	# Verify migration landed at v4 fields (structural migration smoke).
 	assert_true(loaded.has("meta"), "migration added 'meta' block (v0→v1)")
 	assert_true(loaded["character"].has("xp_to_next"), "migration added 'xp_to_next' (v1→v2)")
 	assert_true(loaded["character"].has("stats"), "migration added 'stats' block (v2→v3)")
 	assert_true(loaded["character"].has("unspent_stat_points"), "migration added 'unspent_stat_points' (v2→v3)")
+	assert_true(loaded["character"].has("first_boss_kill_seen"),
+		"migration added 'first_boss_kill_seen' (v3→v4)")
 
 	# Schema post-migration — the in-memory data is at the current schema.
 	# Confirm by saving back and reading the envelope.
@@ -245,9 +247,9 @@ func test_migration_v0_to_current_schema_emits_no_warnings() -> void:
 	var raw2: String = f2.get_as_text()
 	f2.close()
 	var envelope: Dictionary = JSON.parse_string(raw2)
-	assert_eq(int(envelope["schema_version"]), 3,
-		"on-disk envelope is v3 after migration + resave (MIGRATION VARIANT: "
-		+ "schema_version on disk must equal current SCHEMA_VERSION=3, not 0)")
+	assert_eq(int(envelope["schema_version"]), 4,
+		"on-disk envelope is v4 after migration + resave (MIGRATION VARIANT: "
+		+ "schema_version on disk must equal current SCHEMA_VERSION=4, not 0)")
 
 	# NoWarningGuard asserts zero emissions in after_each().
 
