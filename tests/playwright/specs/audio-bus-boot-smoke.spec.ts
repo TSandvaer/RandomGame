@@ -101,6 +101,8 @@ test.describe("audio bus boot smoke — AudioDirector + 5-bus layout (W3-T9)", (
     // 4. No `AudioDecodingError` / `AudioContext` warnings. Browsers log
     //    these as console.warn when an OGG fails to decode (e.g.
     //    Vorbis container malformed) or the AudioContext can't start.
+    // FLAKY: see ClickUp 86c9xy0mk — fail-first-pass-retry on AudioContext
+    // user-gesture race; accept-and-document per Sponsor 2026-05-22.
     const audioErr = capture.findUnexpectedLine(
       /AudioDecodingError|AudioContext.*not.*allowed|AudioContext.*failed/i
     );

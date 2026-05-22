@@ -265,6 +265,8 @@ async function waitForNewLine(
 // asserts aggro only, not gate.
 
 test.describe("soak-narrative finding #1 — Room 2 mob-aggro observable after player hit", () => {
+  // FLAKY: see ClickUp 86c9xy0mk — fail-first-pass-retry on Room 02 first-hit
+  // timing; accept-and-document per Sponsor 2026-05-22.
   test(
     "Room 2 grunt transitions to chasing state after player's first hit lands",
     async ({ page, context }) => {

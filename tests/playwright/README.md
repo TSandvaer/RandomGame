@@ -285,6 +285,17 @@ The harness runs via `.github/workflows/playwright-e2e.yml`:
 
 ---
 
+## Known persistent flakes (do not bisect; cite ticket)
+
+These specs fail on first attempt + pass on retry consistently across recent `main` runs. Triage decision: **accept-and-document** (Option C) per Sponsor 2026-05-22. Do NOT bisect these failures as if they were new regressions — they are pre-existing, race-shaped, and intentionally not yet fixed.
+
+- `audio-bus-boot-smoke.spec.ts:110` (ClickUp `86c9xy0mk`) — fail-first-pass-retry on AudioContext user-gesture race
+- `soak-narrative-regression.spec.ts:268` (ClickUp `86c9xy0mk`) — fail-first-pass-retry on Room 02 first-hit timing
+
+**Escalation threshold:** re-evaluate Options A (fix the underlying race) or B (`test.retry(1)` suppression) when a 3rd persistent-flake surfaces OR when main Playwright signal-to-noise crosses tolerance. Triage call lives with Tess.
+
+---
+
 ## Environment variables
 
 | Var | Required | Description |
