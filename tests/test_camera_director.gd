@@ -587,26 +587,52 @@ func test_follow_target_same_params_re_engage_no_spam_signal() -> void:
 # ---- _process integration: deadzone + clamp work together --------------
 
 func test_process_follow_with_deadzone_holds_camera_inside_box() -> void:
-	# Camera at default snap position; engage follow with 40×24 deadzone;
-	# target moves +30 in X (inside deadzone) → camera holds.
+	# Test the "target moves inside deadzone → camera holds" invariant.
+	#
+	# Setup challenge: after `follow_target` engages with a non-zero deadzone,
+	# the camera converges to the deadzone EDGE relative to the target (NOT
+	# to the target itself). So a naive "move target by 30 px" test asserts
+	# against the wrong baseline — the camera-to-target distance after
+	# convergence is exactly `deadzone`, not zero.
+	#
+	# Two-step engage ensures determinism regardless of prior camera position:
+	#   1. Engage with zero deadzone → camera snap-follows target to (100, 100).
+	#   2. Re-engage with the real deadzone → camera holds at (100, 100) since
+	#      it's already inside.
+	# Then move target by a known offset BELOW deadzone and verify hold.
 	var t: Node2D = _setup_follow_target_at(Vector2(100, 100))
-	_director.follow_target(t, Vector2(40, 24))
+	# Step 1: zero-deadzone engage to deterministically place camera at (100, 100).
+	_director.follow_target(t, Vector2.ZERO)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var cam: Camera2D = _director.get_camera()
+	assert_eq(cam.global_position, Vector2(100, 100),
+		"step 1: zero-deadzone engage snap-followed camera to target (100, 100)")
+	# Step 2: switch to the real deadzone — camera already inside, holds.
+	_director.follow_target(t, Vector2(40, 24))
+	await get_tree().process_frame
 	var pos_before: Vector2 = cam.global_position
-	# Move target by 30 px (inside deadzone half-extent 40).
+	assert_eq(pos_before, Vector2(100, 100),
+		"step 2: re-engage with non-zero deadzone holds camera (target inside dz)")
+	# Step 3: move target by 30 in X (< deadzone half-extent 40) → camera holds.
 	t.global_position = Vector2(130, 100)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert_eq(cam.global_position, pos_before,
-		"camera holds while target moves inside deadzone")
+		"camera holds while target moves +30 in X (inside ±40 deadzone)")
 
 
 func test_process_follow_with_deadzone_shifts_camera_on_edge_cross() -> void:
+	# Same two-step engage as the "holds" test — see that test for rationale.
+	# Step 1: zero-deadzone snap-follow places camera at target (100, 100).
+	# Step 2: real deadzone engage holds the camera at (100, 100).
+	# Step 3: target moves to (160, 100); dx = 60 > deadzone.x = 40 → camera
+	#         shifts so target lands at right deadzone edge: cam.x = 160 - 40 = 120.
 	var t: Node2D = _setup_follow_target_at(Vector2(100, 100))
-	_director.follow_target(t, Vector2(40, 24))
+	_director.follow_target(t, Vector2.ZERO)
 	await get_tree().process_frame
+	await get_tree().process_frame
+	_director.follow_target(t, Vector2(40, 24))
 	await get_tree().process_frame
 	var cam: Camera2D = _director.get_camera()
 	# Move target by 60 px (outside deadzone) → camera shifts to (target - 40, ...).
