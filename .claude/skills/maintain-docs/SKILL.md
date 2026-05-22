@@ -26,6 +26,15 @@ Skip the rest of the skill and end silently if this turn was:
 
 The bar is high: most turns fail this filter. Only continue when the turn produced a non-obvious insight, a new feature area, a gotcha, or a validated pattern future Claude would benefit from knowing cold.
 
+**Unmerged-API defer rule (Drew PR #318 finding 2026-05-22).** Even if the early-exit filter doesn't fire, captures that would cite a function / API / file / commit only present on an UNMERGED feature branch should DEFER until the parent PR merges. The alternative is to keep the proposal but tag it explicitly as "pending PR #N merge" so peer-reviewers know the cite cannot be verified against `main` yet. Empirical case: PR #318's initial draft included a `CameraDirector.follow_target` cite from the still-open PR #314 spike branch; Drew's peer-review caught the premature cite and the capture was scope-reduced + deferred until PR #314 merges. The consolidator (Step 4) should reject proposals that violate this rule unless the "pending PR #N" tag is present.
+
+**Ticket-id cites > scratch `.md` cites (Tess PR #321 finding 2026-05-22).** When a capture would cite a source artifact, prefer cite shapes that are durable in `git log`:
+
+- **PREFER:** ClickUp ticket IDs (`86c9xw8xd`), PR numbers (`PR #321`), commit SHAs (`a885d56`), file:line refs against a known commit (`tests/playwright/specs/equip-flow.spec.ts:142 @ eb6714e`).
+- **AVOID:** paths to scratch markdown files that aren't yet committed (`team/<role>/_pr<N>-review.md`, `team/<role>/<topic>-investigation-2026-05-22.md`). These vanish on branch switch, get cleaned during workspace passes, and aren't retrievable from `git log` by future readers.
+
+Empirical case: PR #318's initial draft cited `team/tess-qa/playwright-red-main-investigation-2026-05-22.md` (Tess's morning investigation doc). The doc was uncommitted scratch in the worktree at cite-time; the PR couldn't merge until the cite was replaced with the parent P0 ticket reference (`86c9xw8xd`). Future maintain-docs captures should default to ticket-id cites when the source artifact isn't yet in `git log` — the ticket is durable; the scratch doc may not be.
+
 ## Step 2: Inventory + conversation brief
 
 - List `<PROJECT_ROOT>/.claude/docs/` contents.

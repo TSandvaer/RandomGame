@@ -100,6 +100,10 @@ Opt-out semantics mirror the GUT side: `test.use({ expectedUserWarnings: [/regex
 
 **A bug class is "covered" only when BOTH surfaces have a test for it** when the bug class can manifest in either lane. The Sponsor M2 RC meta-finding was that headless GUT and the Playwright suite both shipped green for 24 hours while the Sponsor's manual soak found three production warnings — every test path was scoped, none was universal. The two-surface warning gate is the structural answer.
 
+## Playwright CI mechanics (auto-trigger / classification / failure-list triage)
+
+The sections below cover **CI mechanics** — when Playwright fires, how to verify status, how to classify failures, how the orchestrator gates merges. For **renderer-perception mechanics** (`gl_compatibility` divergence, headless-vs-real-browser visibility, author HTML5 self-soak), scroll down past these sections to § "Author HTML5 self-soak" + § "Playwright headless ≠ real-browser perception". The two doc clusters are intentionally separate but co-located. If you're authoring a PR: start here for the auto-trigger contract. If you're verifying visual perception: scroll down.
+
 ### Playwright e2e CI auto-triggers on every PR — but author + orchestrator must still verify (PR #299, corrects PR #293)
 
 **Updated 2026-05-22** during P0 ticket `86c9xw8xd` (Playwright-red on main 7 days) investigation chain. Earlier convention (PR #293 era) said Playwright was `workflow_dispatch`-only and required manual kicks on `feat/*` branches. **That is now stale.** As of PR #299 (commit `9773250`, 2026-05-21), `playwright-e2e.yml` has a `pull_request` trigger that **auto-fires on every PR push** — all branch prefixes (`feat/*`, `fix/*`, `docs/*`, `spike/*`). The two-surface gate (GUT + Playwright) is now structurally two-surface from the moment a PR opens.
@@ -127,7 +131,7 @@ If Playwright is red on the PR's HEAD, the author MUST classify:
 
 **Why docs-only specifically:** A docs-only PR is GUARANTEED not to introduce gameplay regressions — its Playwright failures are 100% pre-existing-on-main. That makes it the cleanest control for "what failures are baseline right now?"
 
-**Workflow shape:**
+**Workflow shape** — the `gh run view <id> --log | grep "✘ \[" | sort -u` filter is the canonical Playwright-triage shorthand. Bookmark it; every failure-list comparison uses some shape of this command.
 
 ```bash
 # 1. Pull failure list from PR under review
