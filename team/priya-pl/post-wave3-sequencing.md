@@ -1,6 +1,6 @@
 # Post-Wave-3 Sequencing — From Now to Ship
 
-**Owner:** Priya · **Authored:** 2026-05-22 · **Amended:** 2026-05-22 (v1.1) · **Status:** v1.1 — Sponsor signed §6 SI-1 through SI-5 same-day + added a fifth Diablo-shape directive (randomized maps per character). M3 Tier 3 scope locked; procgen spike added to W1.
+**Owner:** Priya · **Authored:** 2026-05-22 · **Amended:** 2026-05-22 (v1.1), 2026-05-22 (v1.2 — W2 ticket family filed), 2026-05-23 (v1.3 — post-W1 audit + W2 ticket-shape verdict) · **Status:** v1.3 — W1 closed for 4 system-shape spikes; procgen spike (`86c9xub9p`) in flight; SI-8 still gating on procgen-spike PR-merge. W2 ticket family verdict = 5 keep-as-is / 2 amend (paper-shaped already in v1.2 §5.1) / 0 new.
 
 ## v1.1 amendment — 2026-05-22 — randomized-maps directive + §6 SI-1..5 Sponsor sign-off
 
@@ -134,6 +134,239 @@ In addition to all v1.0 §8 references, this amendment cites:
 
 - **`team/drew-dev/level-chunks.md`** § "Why ports, not free-form transitions" — the port-mating discipline that pre-shapes the procgen system. Already cited in v1.0 §8 § "Why chunks"; v1.1 specifically pins the "Why ports" subsection as load-bearing for Commitment 5.
 - **`team/devon-dev/save-schema-v5-plan.md`** — verified to exist (M3 Tier 1 spike landed by Devon). Commitment 5's `world_seed` additive field rides on top of v5's per-character key structure (`data.characters[N].world_seed: int`) without touching the non-additive multi-character lift. The v5 spike's pointer-shadow strategy (per `save-schema-v5-plan.md §4.4`) is unaffected.
+
+---
+
+## v1.2 amendment — 2026-05-22 (post-W1) — W2 ticket family filed + Drew nit routing + R-PROCGEN W1 update
+
+This amendment folds the W2 ticket pre-shape into discrete dispatch-ready tickets, routes Drew's PR #320 review nits across the W2 tickets, and updates R-PROCGEN's W1 probability now that the procgen spike is in flight.
+
+**Authored:** end of M3 Tier 3 W1 — after PR #314 camera-scroll spike merge, PR #319 dialogue spike merge, PR #312 zone-schema spike merge, PR #320 save-survey merge, PR #323 modal-input-gate merge, PR #325 docs cleanup merge, procgen spike `86c9xub9p` dispatched to Drew Part A → Devon Parts B/C/D (in flight).
+
+**Substantive sections that change:** §5 NEW W2 ticket family + Drew nit routing; §7 R-PROCGEN row updated (probability state now that spike is in flight).
+
+### v1.2 — §5 — W2 ticket family filed + Drew nit routing
+
+**Seven W2 tickets filed.** Inline IDs below; pre-filed serially per `parallel-dispatch-ticket-race` memory (Priya creates the ticket roster solo BEFORE worker dispatch fans out, so worker briefs reference the IDs without searching).
+
+| # | Ticket ID | Title | Owner | Size | Priority |
+|---|---|---|---|---|---|
+| W2-T1 | `86c9y0zmg` | `feat(camera): continuous-scroll integration + S1 light retrofit` | Drew + Devon | M | P0 |
+| W2-T2 | `86c9y0zyv` | `feat(dialogue): impl + first 3 hub-town dialogue trees + signal-signature wiring` | Devon + Drew | L | P0 |
+| W2-T3 | `86c9y1045` | `feat(level): assemble_floor impl + S1 procgen retrofit` (SI-8-dependent) | Drew + Devon | L-XL (SI-8a/b) / M (SI-8c) | P0 |
+| W2-T4 | `86c9y108t` | `feat(save): per-character world_seed save-write + v5 additive field` | Devon | S-M | P0 |
+| W2-T5 | `86c9y10fv` | `feat(ui): world-map UI minimal — Diablo-II per-act parchment map` | Devon | M | P0 |
+| W2-T6 | `86c9y10p4` | `art(pixellab): Sponsor batch wave 2 — Stoker + Boss + PracticeDummy + 3 hub-town NPCs` | Sponsor + Drew | L | P1 |
+| W2-T7 | `86c9y10x3` | `docs(save): PR #320 review-nit corrections — signal signature + v5-paper-vs-impl footnote + v6 multi-bounty edge case` | Devon | S | P1 |
+
+**Total W2 work estimate:** ~30-45 ticks across 7 dispatch surfaces (size varies on SI-8 lock — see W2-T3 SI-8 scope branches).
+
+#### v1.2 — §5.1 — Drew PR #320 review-nit routing
+
+Drew's PR #320 review (comment id 4519855248) approved Devon's save-schema v5 Tier 3 additive survey with 3 nits + 1 optional refinement, explicitly flagged "fix-on-W2-dispatch, not in this PR." Each nit is routed to the W2 ticket that most-naturally captures it:
+
+**Drew nits 1 + 2 — `dialogue_closed` signal payload + `close()` signature.**
+
+- **Survey-doc impact:** Survey §2.4 says save-write fires on `dialogue_closed(npc_id, branch_key)` and "Coupling guard for W2 impl" describes `DialogueController.close(npc_id, branch_key)`. **Actual engine surface:** signal is `dialogue_closed(npc_id)` single-arg (`scripts/dialogue/DialogueController.gd:116` + line 232); close is `close() -> void` (`DialogueController.gd:226`). The controller reads `_active_tree.npc_id` internally.
+- **Routed to W2-T2** `feat(dialogue): impl + first 3 hub-town dialogue trees + signal-signature wiring` (Devon + Drew) — Part D acceptance: the QuestActionRouter listener stub MUST read `current_branch_key()` synchronously BEFORE `close()` clears state. Paired GUT test `test_quest_action_listener_reads_branch_key_before_close.gd` pins the read-order discipline.
+- **Survey-doc correction also routed to W2-T7** — structural fix for future W2/W3 readers grepping the survey.
+- **Why dual-route:** Part D in W2-T2 protects the W2 implementer from the wording trap regardless of whether W2-T7 lands first; W2-T7 ensures the survey doc itself is accurate for future readers.
+
+**Drew nit 3 — `_migrate_v5_to_v5_tier3` function name + Save.gd HEAD = v4.**
+
+- **Survey-doc impact:** Survey header references a forward-looking migration function name; Save.gd HEAD is `SCHEMA_VERSION = 4` (v5 lift is paper-only per PR #256 plan, not impl). Future readers grepping for the function name will not find it.
+- **Routed to W2-T4** `feat(save): per-character world_seed save-write + v5 additive field` (Devon) — Part D acceptance: one-line footnote update to survey § header noting Save.gd HEAD is still v4 + v5 lift is paper-only at survey authorship time.
+- **Survey-doc correction also routed to W2-T7** — centralized cleanup for the same reason.
+- **Why dual-route:** W2-T4's Part D is the inline correction during the world_seed dispatch (Devon is editing the survey anyway as he wires the field); W2-T7 ensures the broader set of nits + the optional refinement land in one structural cleanup so the survey doc is accurate going into W3+.
+
+**Drew optional refinement — v6 multi-bounty edge case.**
+
+- **Survey-doc impact:** §9 v6 trigger guard does not enumerate the case where Track 3 W2 extends `active_bounty` from `Dictionary | null` to `Array[Dictionary]` (multiple concurrent bounties). This would be a `save-schema-v4-plan.md §4.1` rule 2 violation (type change) → v6 trigger.
+- **Routed to W2-T7 only** — single-route because (a) the addendum is paper-shape, (b) no W2 ticket currently depends on multi-bounty shape (Track 3 W2 ships single-active-bounty per `mvp-scope.md §M3` shape), and (c) routing to a non-cleanup ticket would scatter the addendum.
+
+**Routing summary:**
+
+| Drew finding | Routing | Inline impact | Survey-doc cleanup |
+|---|---|---|---|
+| Nit 1 — `dialogue_closed` payload | W2-T2 Part D + W2-T7 | dialogue listener wiring | survey §2.4 |
+| Nit 2 — `close()` signature | W2-T2 Part D + W2-T7 | dialogue listener wiring | survey §2.4 |
+| Nit 3 — `_migrate_v5_to_v5_tier3` name + Save.gd HEAD = v4 | W2-T4 Part D + W2-T7 | save-write impl context | survey § header footnote |
+| Optional — v6 multi-bounty edge case | W2-T7 only | (n/a — no W2 depends on multi-bounty) | survey §9 addendum |
+
+This routing matches the v1.1 §4 W2 surface enumeration AND the `parallel-dispatch-ticket-race` mitigation (Priya files all 7 tickets serially BEFORE worker dispatch fans).
+
+#### v1.2 — §5.2 — SI-8-dependent slice handling for W2-T3
+
+W2-T3 procgen impl (`feat(level): assemble_floor impl + S1 procgen retrofit`) has substantially different scope across SI-8 options (a / b / c). The W2-T3 ticket pre-shapes the COMMON scope (FloorAssembler.gd runtime, Main.gd integration, paired tests, HTML5 verification) + enumerates THREE SI-8 scope branches in § "SI-8 scope branches":
+
+- **SI-8 (a) — fully procedural chunk-fill between anchors** → L-XL (7-10 ticks). S1 8-room refactor + Stratum1 ZoneDef authoring + ~6-12 procedural chunks.
+- **SI-8 (b) — partially procedural with hand-pinned set-pieces** → L (5-7 ticks). S1 8 rooms become anchors; smaller `procedural_slot_pool`.
+- **SI-8 (c) — hybrid by stratum, S1+S2 hand-pinned, S3-S8 procedural** → M (3-5 ticks). S1 minimal retrofit; per-character seed drives anchor variant selection only; zone authoring deferred to M5.
+
+**Why pre-shape with explicit SI-8 branches rather than wait for SI-8 lock:** Sponsor decides SI-8 at procgen-spike `86c9xub9p` PR-merge moment (per v1.1 §6 SI-8 lockable-by). Without the pre-shaped ticket, orchestrator would either (a) wait for SI-8 to lock before filing the ticket (delaying W2 dispatch by 1-2 days) or (b) file a single-scope ticket and re-scope post-SI-8 (per `parallel-dispatch-ticket-race` memory, re-scope is exactly the wasted-work the memory warns against). Pre-shaping with the three-fork SI-8 acceptance keeps the ticket dispatchable IMMEDIATELY at SI-8 lock — Sponsor signs SI-8 at PR-merge, orchestrator's NEXT tool round inlines the SI-8 outcome in the dispatch brief, W2-T3 dispatches without re-shape.
+
+**Dispatch-time contract:** when orchestrator dispatches W2-T3, the dispatch brief MUST inline the locked SI-8 option (a / b / c) so the worker (Drew + Devon) knows which scope branch to execute. The ticket as filed is option-neutral — the dispatch brief is the binding decision-anchor.
+
+#### v1.2 — §5.3 — Dispatch order recommendation for W2
+
+Per `team/priya-pl/m3-tier3-w1-tickets.md` W1 dispatch-order precedent (5 parallel Day-1 dispatches across 5 worktrees; 2 parallel Day-2 dispatches accounting for Devon-wt serialization). W2 has similar Devon-wt bottleneck — Devon is co-author on W2-T1, primary on W2-T2, W2-T4, W2-T5, secondary on W2-T3. Recommend the following dispatch sequencing for the next orchestrator session:
+
+**Day-1 (after SI-8 locks via procgen-spike PR-merge — 3-4 parallel):**
+
+- **Drew** → `86c9y0zmg` W2-T1 camera-scroll integration (Drew-wt; Part C Devon-spec later)
+- **Devon** → `86c9y108t` W2-T4 world_seed save-write (small; lands fastest; unblocks W2-T3)
+- **Sponsor + Drew** → `86c9y10p4` W2-T6 PixelLab batch wave 2 (orchestrator main-session-led generation; Drew integration PRs land per character)
+- **Tess** → continues acceptance-plan rows as W1 spike PRs surface (already in flight from W1)
+
+**Day-2 (after W2-T4 lands OR is far enough along to consume world_seed — 2-3 parallel):**
+
+- **Drew + Devon** → `86c9y1045` W2-T3 procgen impl (SI-8-locked scope; serializes Drew Part A → Devon Parts C+D per multi-author worktree pattern)
+- **Devon** → `86c9y0zyv` W2-T2 dialogue impl (Devon-wt available after W2-T4 PR opens; folds Drew nits 1+2 in Part D)
+- **Devon** → `86c9y10fv` W2-T5 world-map UI minimal (Devon-wt; sequences after dialogue impl OR parallel if Devon-wt freed)
+
+**Day-3+:**
+
+- **Devon** → `86c9y10x3` W2-T7 survey-doc cleanup (small; lands during drain)
+- W2 acceptance plan close + drain
+
+**Why this order:**
+
+- **W2-T4 first on Devon-wt** because it's small (S-M), unblocks W2-T3, and lands fastest of Devon-wt tickets.
+- **W2-T1 first on Drew-wt** because it's independent of SI-8 + provides production-wiring scaffold W2-T3 consumes.
+- **W2-T6 art batch in parallel** because Sponsor labor is the critical path; the earlier the batch starts, the more time for re-rolls + integration PRs.
+- **W2-T3 procgen impl on Day-2** because it depends on W2-T4 world_seed + W2-T1 camera-scroll wiring.
+- **W2-T2 dialogue impl after W2-T3** because Devon-wt single-tenancy + dialogue is medium-priority (W3 hub-town impl is the consumer; not strictly W2-gating).
+- **W2-T5 world-map UI** after W2-T2 OR parallel — Devon-wt available depending on dialogue impl PR timing.
+- **W2-T7 cleanup during drain** — small, P1, can absorb any free Devon-wt cycle.
+
+### v1.2 — §7.1 — R-PROCGEN probability state update (W1 in flight)
+
+Per v1.1 §7 R-PROCGEN — med probability / high impact. Updated state at end-of-W1:
+
+- **W1 procgen spike `86c9xub9p` in flight** (Drew Part A dispatched; Devon Parts B/C/D follow per multi-author serialization).
+- **Sibling W1 spikes that procgen consumes have all landed:** zone-schema (PR #312, merged `36b0b77`) + camera-scroll (PR #314, merged `6718a07`) + save-survey (PR #320, merged `c4c07ce`). Zero blockers on procgen spike dispatch.
+- **R-PROCGEN sub-risks empirically pending:**
+    - **R-PROCGEN.a — Seed-binding bugs:** mitigated by Devon's Part B GUT round-trip test (in spike, promoted to production by W2-T4).
+    - **R-PROCGEN.b — Chunk-port mating gaps at seams:** mitigated by Drew's Part A FloorAssembler port-mating discipline preserving `level-chunks.md` § "Why ports" patterns.
+    - **R-PROCGEN.c — HTML5 procedural-seam rendering divergence:** the empirical surface that drives SI-8 lock. Spike's Part C HTML5 verification + Self-Test Report is the data Sponsor uses to decide SI-8 (a / b / c).
+- **Probability update:** held at MED at W1 in-flight state. Will re-score at W2 end (post-spike-PR-merge + post-W2-T3-merge):
+    - If spike + W2-T3 both close clean → demote R-PROCGEN to held off-top-5 (sub-risks all closed).
+    - If spike + W2-T3 surface a single sub-risk → keep at med; re-mitigate at the specific sub-risk.
+    - If spike surfaces R-PROCGEN.c unworkable → SI-8 (c) fallback kicks in; R-PROCGEN re-shapes against the hybrid-by-stratum scope.
+
+**Follow-up note for end-of-W2 risk-register review:** the W2 close retrospective should re-score R-PROCGEN based on:
+1. Procgen spike PR findings (Part D Q1/Q2/Q3 verdict).
+2. SI-8 outcome (a / b / c).
+3. W2-T3 + W2-T4 implementation experience (any sub-risk surfaced inline).
+4. HTML5 visual-verification round (Tess + Sponsor-soak per W6-W7 sub-track).
+
+Risk register update lands in next Priya weekly batch (Monday cadence) AFTER end-of-W2 review.
+
+### v1.2 — §8.1 — Cross-references added
+
+In addition to all v1.1 §8 references, this amendment cites:
+
+- **`team/devon-dev/save-schema-v5-tier3-additions.md`** (PR #320, merged `c4c07ce`) — Devon's save-schema v5 Tier 3 additive layer survey. W2-T4 + W2-T7 are the downstream consumers.
+- **`team/uma-ux/world-map-direction.md`** (PR #308, merged `481dc62`) — Uma's world-map UI direction doc; W2-T5 implements per its parchment + zone-state-as-geometry spec.
+- **`.claude/docs/dialogue-system.md`** (PR #319 spike landing) — canonical signal signature for `dialogue_closed(npc_id)` (single-arg) + `close() -> void` (no-args) per Drew nit 1+2 correction routing.
+- **`.claude/docs/camera-scroll.md`** (PR #314 spike landing) — production-wiring patterns W2-T1 consumes.
+- **PR #320 comment id 4519855248** — Drew's review with the three nits + optional refinement that drive W2-T7's scope.
+
+---
+
+## v1.3 amendment — 2026-05-23 — post-W1 audit pass + W2 ticket-shape verdict + S2 pre-shape gap callout
+
+This amendment audits the W2 ticket family against post-W1 reality, surfaces a structural gap (S2 pre-shape), and flags the SI-8 still-pending state. It does NOT supersede v1.2 — v1.2's ticket family is intact; this amendment is a verdict + delta pass against it.
+
+**Authored:** start of W2 transition planning, after Drew Part A of procgen spike pushed to `drew/86c9xub9p-procgen-part-a` (HEAD `72e1cd6`) but Devon Parts B/C/D still pending + procgen spike PR not yet open. Main HEAD at `37bc2ee` (hooks chore PR landed). No new functional code on main since the v1.2 W2 ticket family was filed.
+
+### v1.3 — §A — W1 outcomes summary (verified against main HEAD)
+
+W1 spike landings, by ticket (verified against `gh pr list --state merged --limit 12` on `priya/m3-tier3-w2-pre-shape` at `37bc2ee`):
+
+| W1 ticket | Spike PR | Merge SHA | Status | Doc captured |
+|---|---|---|---|---|
+| `86c9xu9yt` camera-scroll | #314 | `6718a07` | Merged | `.claude/docs/camera-scroll.md` |
+| `86c9xuab3` dialogue | #319 | confirmed-merged via log | Merged | `.claude/docs/dialogue-system.md` |
+| `86c9xuap4` zone-schema | #312 | confirmed-merged | Merged | (worked example `s1_z1_outer_cloister.tres`) |
+| `86c9xubkj` world-map UI direction | #308 | confirmed-merged | Merged | `team/uma-ux/world-map-direction.md` |
+| `86c9xuc17` save-survey | #320 | confirmed-merged | Merged | `team/devon-dev/save-schema-v5-tier3-additions.md` |
+| `86c9xucuc` Tess M3 Tier 3 acceptance plan scaffold | N/A | (deferred — Tess on in-flight QA per W1 Day-1 dispatch caveat) | Pending | TBD |
+| `86c9xub9p` procgen spike | (PR NOT YET OPEN) | Drew Part A `72e1cd6` pushed | **In flight** | TBD |
+
+Plus W1-companion captures that landed orthogonally:
+- PR #323 — InventoryPanel modal-input-gate (generalizes Player dialogue gate per `86c9xxg0n` / Sponsor Option A)
+- PR #325 — post-W1 doc captures (modal-input-gate + spike-class spec + source-scan pin + soak-routing rule)
+- PR #316 — M3 retro mitigations 1+2+3 (landed retro tightened-final-report contract + claim-fidelity amendment)
+- PR #324 — session-closure captures (Drew unmerged-API-defer + Tess 3 finds + morning-Tess incident)
+
+**SI-8 still NOT locked.** Per v1.1 §6, SI-8 is lockable at procgen-spike PR-merge moment. Drew Part A is on a branch; Devon Parts B/C/D pending; spike PR not yet open. Sponsor decision deferred until spike PR surfaces empirical answers to the three proof questions (seed round-trip / anchor-procgen composition / HTML5 procedural-seam rendering).
+
+### v1.3 — §B — W2 ticket-shape verdict (per ticket)
+
+Per CLAUDE.md "never fabricate, never guess" — **ClickUp MCP is not connected in the current orchestrator session**, so I cannot fetch the seven W2 ticket bodies via `clickup_get_task` to verify acceptance criteria byte-for-byte. The verdict below is grounded in the v1.2 §5 ticket-roster table + the routing tables + the dispatch-order recommendation that I authored in the same prior session. If Sponsor / next orchestrator finds drift between the v1.2 table and the actual ClickUp ticket bodies, this verdict is the canonical paper-shape and ClickUp body updates should reconcile to it (route via `clickup_update_task` once MCP is reconnected).
+
+| W2 ticket | Verdict | Rationale |
+|---|---|---|
+| W2-T1 `86c9y0zmg` camera-scroll integration | **Keep as-is** | `.claude/docs/camera-scroll.md` § "Open follow-ups" enumerates the exact W2 scope (S1 retrofit + `Main._load_room_at_index → set_world_bounds`); no scope drift from W1 spike findings |
+| W2-T2 `86c9y0zyv` dialogue impl + 3 hub-town trees | **Amend — fold v1.2 Part D explicitly** | v1.2 §5.1 routed Drew nits 1+2 (`dialogue_closed(npc_id)` single-arg signature + `close() -> void` no-args) into "Part D" of this ticket; ticket body MUST inline the `current_branch_key()`-before-`close()` read-order discipline + paired GUT test name `test_quest_action_listener_reads_branch_key_before_close.gd`. Verdict: amend ticket body if not yet inlined |
+| W2-T3 `86c9y1045` assemble_floor impl + S1 procgen retrofit | **Keep as-is, dispatch-blocked on SI-8** | v1.2 §5.2 pre-shaped with three SI-8 scope branches; option-neutral; dispatch brief (not ticket) inlines locked option. No re-shape needed until SI-8 surfaces from procgen spike PR |
+| W2-T4 `86c9y108t` world_seed save-write + v5 additive field | **Amend — fold v1.2 Part D** | v1.2 §5.1 routed Drew nit 3 (`_migrate_v5_to_v5_tier3` name + Save.gd HEAD = v4) into "Part D" of this ticket; ticket body MUST inline the survey § header footnote correction acceptance criterion |
+| W2-T5 `86c9y10fv` world-map UI minimal — Diablo-II per-act parchment map | **Keep as-is** | `team/uma-ux/world-map-direction.md` (PR #308) is the binding direction doc; v1.2 §8.1 cross-reference still load-bearing; no scope drift |
+| W2-T6 `86c9y10p4` PixelLab batch wave 2 | **Keep as-is** | Sponsor labor cadence is the critical path; ticket is open-ended on Sponsor capacity per `m3-art-pass-collaboration-shape` memory; no W1-finding-driven scope change |
+| W2-T7 `86c9y10x3` survey-doc cleanup + v6 multi-bounty edge case | **Keep as-is** | v1.2 §5.1 routing table is the load-bearing scope; small (S) cleanup ticket; no W1 surface change |
+
+**Net verdict:** 5 keep-as-is / 2 amend / 0 new. The two amendments are both **already paper-shaped in v1.2 §5.1** — they require ClickUp body updates to inline the v1.2 §5.1 Part D acceptance criteria. If ticket bodies were filed as one-line headlines, the amendment ask is "expand acceptance to mirror v1.2 §5.1 Part D content." If ticket bodies already inline v1.2 §5.1, amendment is a no-op and verdict collapses to "keep as-is."
+
+**Recommended next action:** next orchestrator session (with ClickUp MCP reconnected) runs `clickup_get_task` on W2-T2 + W2-T4, verifies Part D acceptance criteria are inlined; if not, `clickup_update_task` to amend.
+
+### v1.3 — §C — Identified W2 gaps (post-W1 reality check)
+
+The W2 ticket family is dispatch-ready for the **system-shape** lane (camera, dialogue, procgen, save, world-map UI, art batch, doc cleanup). But the brief's gap-question prompted a re-read of v1.1 §3 calendar — and one structural gap surfaces:
+
+**Gap 1 — Tess M3 Tier 3 acceptance plan scaffold (`86c9xucuc`) NOT YET landed.** Per `m3-tier3-w1-tickets.md` recommendation, Tess scaffold was Day-1 W1 dispatch; ticket roster table above shows it as Pending. If Tess was on in-flight QA at W1 Day-1, the scaffold ticket may have slipped into W2. **Action:** verify ticket status next session; if still Pending, escalate to Day-1 W2 dispatch (Tess scaffold-from-day-1 pattern still applies). No new ticket needed — `86c9xucuc` already exists.
+
+**Gap 2 — NO S2 pre-shape work in W2.** Per v1.1 §3 calendar, Weeks 4-5 = "Sub-track 5c S2 content authoring (zones + new mobs) WITH procedural chunk-fill inside zones via the W2 assembler." Weeks 4-5 starts at W3+ in the wave-naming convention. The W2 ticket family does NOT pre-shape any S2 content authoring tickets (Stratum2 ZoneDef authoring, 2 new mob archetypes Sunken-Scholar + Bone-Catalyst, S2 chunk authoring, S2 boss room). **Action:** this is intentional per the W2 scope (system-shape land first, then content scales against locked shape). **But:** pre-shaping a W3 ticket roster as the W2 mid-retro lands is the right cadence — Priya's next dispatch (post-W2 mid-retro) should produce a W3 ticket pre-shape doc analogous to this v1.2 amendment. Not blocking W2 dispatch; flagging for the W2 mid-retro action list.
+
+**Gap 3 — NO ticket for HTML5 procedural-seam Sponsor-soak round in W2.** Per v1.1 §4 W6-W7 ticket pre-shape, the HTML5 procedural-seam Sponsor-soak round lands W6-W7 (Tess + Sponsor). At W2 timing this is mid-future; not a W2 gap. **Action:** none in W2; flag for W5 pre-shape doc.
+
+**No new W2 tickets filed.** The system-shape W2 lane is complete; S2 content authoring deferred to W3+ per v1.1 §3 calendar intent.
+
+### v1.3 — §D — Calendar honesty pass
+
+W1 calendar shape (v1.1 §3): Week 1 = SI-8 signs + 3 spikes + Sub-track 5a PixelLab batch wave 1.
+
+Actual W1 outcomes (post-2026-05-22 close):
+- 4 of the 5 system-shape spikes landed (camera-scroll, dialogue, zone-schema, save-survey, world-map direction).
+- Procgen spike `86c9xub9p` — Drew Part A pushed, Devon Parts B/C/D pending, PR not yet open. **~1-2 day slip** behind the Week 1 calendar shape.
+- SI-8 NOT YET signed (gated on procgen-spike PR-merge). Calendar shape said "Week 1 — Sponsor signs SI-8" — this slips with procgen.
+- Tess `86c9xucuc` acceptance plan scaffold — pending per ticket status; if Tess on in-flight QA at Day-1, slip into W2.
+- Sub-track 5a PixelLab batch wave 1 — not yet visible in W1 PRs; appears to have not started or is in Sponsor-private execution. Sponsor labor capacity is the critical path; no orchestrator-side action needed unless Sponsor flags strain.
+- Unplanned wins: PR #323 modal-input-gate (W1 Sponsor Option A signed mid-W1); PR #316 M3 retro mitigations; PR #325 post-W1 doc captures; PR #324 session-closure captures.
+
+**Calendar verdict:** W1 timing is **on the floor of v1.1 §3** but not slipping below it. Tier 3 stays at 7-10 weeks honest middle. The ~1-2 day procgen spike slip is absorbed inside the W1 buffer (W1 spans Days 1-7 nominal; procgen lands Day 8-9 → still within Week 1.5). **No calendar update to v1.1 §3.** If procgen spike PR slips beyond 2026-05-25 (Day 4), update §3 to reflect 7-10 → 7.5-10.5 weeks; until then, hold.
+
+**Honest grade on W1 velocity:** **B+**. Massive parallel landing (4 system-shape spikes + 4 orthogonal captures in 1 calendar day) is high velocity; the procgen spike not closing in the same day is the gap that prevents an A grade — that's the SI-8 gating ticket and it's the largest W1 surface (L-XL). No sandbagging; no sugar-coating.
+
+### v1.3 — §E — Risk register state post-W1
+
+Per v1.2 §7.1 R-PROCGEN held at med probability / high impact. Post-W1 update:
+
+- **R-SCROLL** — DEMOTED. Camera-scroll spike #314 landed with paired Playwright spec + GUT pins + HUD-immunity preserved; Sponsor soaked. No HTML5 regression surfaced. Demote off top-5 risks.
+- **R-DIALOGUE** — DEMOTED. Dialogue spike #319 landed with three GUT pin sets + Playwright boot smoke + `.claude/docs/dialogue-system.md` capture. Schema converged in one pass; modal UI shipped with the spike. Demote off top-5 risks.
+- **R-MAP** — HELD. World-map direction #308 landed; impl is W2-T5; Sponsor soak gate at W2-T5 PR-merge moment.
+- **R-PROCGEN** — HELD AT MED. Spike not yet closed; SI-8 still gating. v1.2 §7.1 rescore conditions unchanged.
+- **R-ART** — HELD. Sub-track 5a PixelLab batch wave 1 visibility low at W1 close; sentinel watch continues.
+
+Risk-register update lands in next Priya weekly batch (Monday cadence) — captures these demotions + R-PROCGEN re-score at end-of-W2.
+
+### v1.3 — §F — Cross-references added
+
+In addition to all v1.2 §8.1 references, this amendment cites:
+
+- **PR #316** — `pm(process): land M3 retro mitigations 1+2+3` — landed the tightened-final-report contract amendment (claim-fidelity + return-timing). Sub-agent reports across W2 dispatch MUST conform.
+- **PR #324** — session-closure captures (Drew unmerged-API-defer + Tess 3 finds + morning-Tess incident). Process-incident discipline pattern.
+- **`team/priya-pl/m3-tier3-w1-tickets.md`** — the W1 dispatch-ready ticket roster; W2 dispatch order in v1.2 §5.3 mirrors its parallel-dispatch shape.
 
 ---
 
