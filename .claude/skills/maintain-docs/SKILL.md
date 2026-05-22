@@ -1,6 +1,6 @@
 ---
 name: maintain-docs
-description: Auto-triggered after every turn (via Stop hook) — reviews the turn for findings/new/altered code worth capturing in `.claude/docs/`. Spawns 3 parallel sonnet proposers + 1 sonnet consolidator, auto-applies merged doc edits, and reports only when documentation was actually changed. Also invokable manually via /maintain-docs.
+description: Auto-triggered after every turn (via Stop hook) — silently reviews the turn for findings/new/altered code worth capturing in `.claude/docs/`. Spawns 3 parallel sonnet proposers + 1 sonnet consolidator, auto-applies merged doc edits, and emits output to the main thread ONLY when documentation was actually changed. Also invokable manually via /maintain-docs.
 ---
 
 # Maintain Docs (auto)
@@ -9,9 +9,9 @@ Capture non-obvious knowledge from the current turn into `<PROJECT_ROOT>/.claude
 
 ## Step 0: Visibility policy (read first)
 
-- **Always** emit a short start message so the user knows the hook fired (e.g. `Reviewing turn for doc-worthy findings...`).
-- **Always** report the outcome, even when nothing changes (e.g. `No documentation updates warranted this turn.`).
-- Keep both the start message and no-change message to a single line each — don't over-narrate.
+- **Run silently by default.** Do NOT emit a start message; do NOT emit a no-change message. The user does not need to know on every turn that the hook fired.
+- Emit output to the main thread ONLY when documentation was actually changed (see Step 6).
+- Subagent spawns and tool calls are fine — they appear in the trace but do not bloat the main thread message log.
 
 ## Step 1: Early-exit filter
 
@@ -123,7 +123,7 @@ If the consolidated plan is empty, return exactly: NO_CHANGES
 
 ## Step 5: Apply the plan
 
-If consolidator returned `NO_CHANGES` → emit `No documentation updates warranted this turn.` and stop.
+If consolidator returned `NO_CHANGES` → stop silently (emit nothing to the main thread).
 
 Otherwise, apply each operation:
 
@@ -144,11 +144,13 @@ Documentation updated based on this turn's findings:
 
 No preamble. No "I'll now...". No closing. No summary of what the skill did — only the list of changed files and why.
 
+When no changes were applied, emit NOTHING to the main thread.
+
 ## Guardrails
 
 - **Never commit, stage, or touch git state.**
 - **Never edit files outside `.claude/docs/` and CLAUDE.md.**
-- **Always report the outcome** — even when nothing changed, confirm with a single line.
+- **Stay silent unless docs changed.** No start message, no no-change message — main-thread output is reserved for the Step 6 report, which only fires when docs were actually updated.
 - **Quality over quantity.** Docs are trusted context; polluting them makes them worse, not better.
 - **Avoid CLAUDE.md bloat.** Only add index lines for genuinely new doc files.
 - **Do not re-invoke yourself.** The Stop hook's `stop_hook_active` flag prevents re-entry, but don't spawn nested maintain-docs calls either.
