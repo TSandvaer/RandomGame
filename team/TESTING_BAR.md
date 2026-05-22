@@ -105,6 +105,134 @@ func test_grunt_hit_flash_applied_to_visible_sprite_not_parent_body():
 
 ---
 
+## Load-bearing memory rules ported here for sub-agent visibility
+
+These rules originate as auto-memory entries in the orchestrator's user-scope (`~/.claude/projects/c--Trunk-PRIVATE-RandomGame/memory/`). Sub-agents do NOT auto-read auto-memory; they only see rule content when the orchestrator puts it in a dispatch brief. The M3 retrospective (2026-05-22, PR #315) found that "rule codified ≠ rule applied" was a recurring root cause (pattern P3) — sub-agents were unaware of rules that lived only in auto-memory. The fix is here: port the load-bearing rules into a doc sub-agents read at dispatch time. The auto-memory entries continue to exist as the orchestrator's reference; this is the sub-agent-facing mirror.
+
+**How to use:** if you are a sub-agent, the rules below are binding on you regardless of whether your dispatch brief restates them. Each section begins with `Auto-memory: <memory-name>` so the lineage is preserved.
+
+---
+
+### Auto-memory: `html5-visual-verification-gate`
+
+**Rule:** UX-visible PRs that touch Godot's `Tween`, `CanvasItem.modulate`, `Polygon2D`, or `CPUParticles2D` primitives MUST get an explicit HTML5-runtime verification before merge — either Sponsor confirmation on a debug build, or a debug-build with logging that traces the visual path. Headless GUT tests passing is NOT a sufficient signal for these primitives.
+
+**Why:** PRs #115 (mob hit-flash + death-tween) and #122 (player swing-wedge + ember-flash) shipped with green headless tests + Tess sign-off. Both completely failed to render in HTML5: tweens didn't fire, modulate animations were no-ops, particles didn't spawn. Worse, PR #115 gated `mob.queue_free` on `_death_tween.finished` — when the tween hung in HTML5, mobs became functionally immortal, breaking the entire combat loop. Headless tests asserted "tween fires" not "visual change is observable"; product-vs-component completeness gap. Devon's PR #136 hot-fix (decouple queue_free from tween) restored the combat loop but the visual layer was still broken until follow-up work.
+
+**How to apply.** When working a PR with `feat(combat)` / `fix(ui)` / `design(ux)` scope that touches Tween/modulate/Polygon2D/CPUParticles2D code paths:
+- The testing-bar requires HTML5 verification, not just headless GUT.
+- Require either (a) Sponsor confirms in soak before merge, or (b) ship a debug build with `[combat-trace]`-style logging that proves the visual call chain reaches the renderer.
+- Tess's sign-off comment must explicitly state HTML5 verification status, not just "headless green."
+- Critical functional code paths (like `queue_free` gating) must NEVER depend on a visual primitive firing — use `SceneTreeTimer` or `call_deferred` as the source of truth, with the visual tween as a parallel cosmetic path.
+- Self-Test Report on UX-visible PRs touching these primitives needs an explicit HTML5 line item (not just a runtime check assertion).
+
+This is the canonical poster-child for `product-vs-component-completeness` (below). Reference both rules together when working visual-layer surfaces.
+
+---
+
+### Auto-memory: `html5-visual-gated-author-self-soak`
+
+**Rule:** For any PR touching an `html5-visual-verification-gate` class surface (CPUParticles2D, tween modulate, Polygon2D, ColorRect with HDR colors, Area2D state mutations, z-index ordering, shape outlines via `_draw()`, any new `gl_compatibility`-rendered visual primitive), the **authoring agent** MUST self-soak the actual HTML5 release-build in an incognito browser (DevTools F12 console open) before posting the Self-Test Report and claiming fix-complete.
+
+**GUT-green + CI-green are NECESSARY but NOT SUFFICIENT.** Headless GUT and the release-build CI step do not exercise the `gl_compatibility` WebGL2 pipeline; they exercise the engine's import + headless paths only. Bugs that manifest only on `gl_compatibility` (HDR clamp, Polygon2D rendering quirks, z=0 same-z occlusion, shader compat, particle emission semantics) are invisible to those two surfaces. The only surface that catches them is an actual browser running the release-build.
+
+**Empirical precedent — PR #291 (2026-05-21).** Drew authored T5+T6+B3+B4 fixes. Two consecutive iterations were both APPROVED by Tess based on GUT-green + CI-green. Both were Sponsor-soaked in HTML5 incognito — and BOTH reported that T6 aftershock was invisible AND B3 slam-animation was still kicking the wrong frames. Drew's pattern in both iterations: empirical diagnosis from desktop builds + diagnostic-trace confidence + GUT paired tests covering the code paths. Tess sign-off on the test layer. **No actual browser-side verification by the author.** The gl_compatibility-runtime divergence bit twice. Sponsor verbatim 2026-05-21: *"prevent claiming fix-complete on GUT+CI alone."*
+
+**How to apply — for AUTHORING agents.**
+
+1. **Before posting Self-Test Report v1**, build the release artifact: `gh workflow run release-github.yml --ref <branch>` → wait for green → `gh api repos/<owner>/<repo>/actions/runs/<run-id>/artifacts` → download.
+2. **Extract to a fresh empty folder** (per service-worker cache trap — never reuse a previous soak folder).
+3. **Serve locally**: `python -m http.server 8080` (or `py -m http.server 8080` on Windows).
+4. **Open in incognito** browser with DevTools F12 console open.
+5. **Verify `[BuildInfo]` SHA** matches the branch HEAD SHA.
+6. **Reach the gated surface and exercise it.** For combat: trigger the boss/mob behavior under test. For UI: open the panel + interact. For audio: enter the room and listen.
+7. **Capture evidence**: screenshot, console log paste, or trace-line capture proving the visual behavior matches the design intent.
+8. **Then post the Self-Test Report** with a "HTML5 author-self-soak" section including the evidence captured.
+
+**Burden of proof for infeasibility.** Hand-waved infeasibility claims are not acceptable. Before claiming "cannot be done headless," demonstrate failure of three approaches in order: (a) Playwright input simulation, (b) existing `[combat-trace]` / debug hook in the codebase, (c) new debug-only URL param to bypass the trigger. Only if all three fail with concrete documented failure modes is "infeasible" an acceptable claim. Drew's PR #291 v6 empirical precedent established that Playwright-screenshot capture from a CLI agent IS feasible for HTML5-class surfaces on this codebase.
+
+**CRITICAL — Playwright headless ≠ real-browser perception.** Playwright headless screenshots prove "particles spawned with the right config." They do NOT prove "a human will see them in real-time motion." Self-Test Report claims must be honest: cite what Playwright proves (trace + config + spawn position) and route visibility-of-effect verification to Sponsor interactive soak. Authors MUST NOT claim "Sponsor will see it" from Playwright headless evidence alone.
+
+---
+
+### Auto-memory: `self-test-report-gate`
+
+**Rule:** Any PR that touches a **player-visible surface** (scene tree, UI, visual feedback, audio cue, input affordance, save format, level content) MUST include a Self-Test Report comment from the author BEFORE Tess reviews. Tess's review starts from the report, not from a cold-read of the diff.
+
+**Categories that REQUIRE the Self-Test Report:**
+- `feat(integration)`, `feat(ui)`, `feat(combat)`, `feat(level)`, `feat(audio)`, `feat(progression)`, `feat(gear)`
+- `fix(ui)`, `fix(combat)`, `fix(level)`, `fix(audio)`, `fix(integration)`
+- `design(spec)` only when the spec is consumed by an in-flight `feat` PR (otherwise design is paper-only)
+
+**Categories that do NOT require it (CI green is sufficient):**
+- `chore(ci|repo|build|state|orchestrator|planning)`
+- `docs(team|scope)`
+- `test(...)` (test-only PRs)
+- `.tres`-only data refactors
+
+**Why:** The M1 Main.tscn-stub miss (~30 PRs of "feature-complete" claims while the runnable build was a week-1 boot stub) would have been caught on the first PR if every author had to point at the actual playable surface. The first time someone tried that and saw "Embergrave — boot OK + Player square," the entire team would have realized Main.tscn was unwired. This rule is the process artifact that operationalizes `product-vs-component-completeness` (below).
+
+**How to apply.** After `gh pr create`, post a PR comment with the Self-Test Report. Full format in `team/GIT_PROTOCOL.md` § "Self-Test Report (UX-visible PRs)" — includes build artifact SHA + scene path + verification method + AC walkthrough + side-effect inventory + cross-lane integration check + open concerns. **If the report is missing on a UX-visible PR, Tess bounces immediately** — don't burn review budget cold-reading the diff.
+
+**Headless-environment fallback:** if the agent has no browser binary (GUT-only environment), the Self-Test Report uses `godot --headless` to load the actual entry scene + drive the play loop programmatically. The verification section notes "verified via headless integration test, no browser repro available — Sponsor's interactive soak is the final gate." For HTML5-visual-gated surfaces, this fallback is composed with the author-self-soak burden of proof above (try Playwright input simulation first).
+
+---
+
+### Auto-memory: `testing-bar`
+
+The full Definition of Done above (§ "Definition of Done (DoD)") IS the codified testing-bar rule — this section is intentionally a back-pointer to confirm alignment.
+
+**Rule (one-liner):** by the time anything reaches the Sponsor for sign-off, it must already have been hammered thoroughly. Sponsor's role is acceptance, not bug-finding. If the Sponsor finds a bug during sign-off, the team failed its testing bar.
+
+**Why:** Sponsor's explicit directive 2026-05-02: *"I want you to use a lot of time testing, I don't want to debug and return findings all the time."*
+
+**How to apply.** Every feature task includes: paired GUT tests in the same commit, green CI, integration check vs the relevant acceptance criterion, **three edge-case probes** (rapid input, mid-action interrupt, save/load round-trip across the feature's state, OS-level interruption like tab-blur for HTML5), and **Tess sign-off** before flipping ClickUp to `complete`. Devs cannot self-sign feature PRs. The bar caught the silent-skip bug (Stratum1BossRoom parse error hid 31 tests) only because integration coverage was being layered. Honor it.
+
+The Definition of Done above is the binding shape; this back-pointer exists so sub-agents searching for "testing-bar" in this doc land at the right anchor.
+
+---
+
+### Auto-memory: `product-vs-component-completeness`
+
+**Rule:** Component-level test coverage and CI-green status are NOT proof the product is shippable. A feature is not "complete" until it is **instantiated in the entry-scene's runtime tree** and reachable through the same path the player uses.
+
+- **CI green + paired tests** = component-complete. The unit/integration tests prove the system works in isolation.
+- **Component instantiated in the play surface** (entry scene loads it; it appears in the runnable build artifact) = product-complete.
+- **Sponsor sign-off requires product-complete**, not component-complete.
+
+**Why:** On 2026-05-03 the Sponsor downloaded the `embergrave-html5-591bcc8` artifact, served it locally, and saw: a Player square + "Embergrave — boot OK. WASD to move..." banner. Nothing else. **All M1 systems** (grunts, charger, shooter, boss, rooms 1-8, RoomGate, StratumProgression, level-up math, damage formula, affix system, inventory panel, stat-allocation panel, save migration) **shipped as isolated components with their own scenes + autoloads but were never instantiated in the runnable scene tree.** For ~30+ PRs and many heartbeat ticks, the orchestrator confidently reported "M1 feature-complete" while the actual playable build was a week-1 smoke stub. The Sponsor's first 2-minute soak exposed the gap. The flag was raised twice in writing (Tess run-013, Priya week-3 retro W3-A1) and ignored both times.
+
+**How to apply.**
+
+1. Treat any agent report of "feature-complete" as **component-complete only** until you have independently verified the integration surface — read the entry-scene file (`scenes/Main.tscn` or whatever `run/main_scene` points at) and confirm the new system is instantiated there or in a scene that Main.tscn loads.
+2. Watch for "(Note, not blocking)" or similar throwaway flags in QA reports. If any reviewer writes "X is not yet wired into Main.tscn" or "Main.tscn is still a stub," that is a P0 flag, not a side note. Elevate to a gating ticket.
+3. Don't dispatch features faster than you integrate them. If 5 subsystems land but `Main.tscn` hasn't been touched in those 5 PRs, you are accumulating integration debt.
+4. For HTML5/web: **the build artifact is the truth.** Don't claim "shippable" until you (or an agent) has triggered a release build, downloaded the artifact, extracted it, and either visually inspected the entry scene or driven an end-to-end integration test through the same path the player uses.
+5. Tickets that say "implement the panel" are NOT the same as "wire the panel into the game." Make wiring explicit on every UI/system ticket — in the dispatch brief, in the acceptance criteria, in the Done clause.
+
+**Mantra:** components pass tests. Products integrate. Don't conflate them.
+
+---
+
+### Auto-memory: `agent-verify-evidence`
+
+**Rule:** Agents must verify against actual evidence (CI logs, file contents, repro output) before refusing a task or asserting impossibility. Reasoning from training-data priors produces high-confidence wrong answers.
+
+**Why:** On 2026-05-02 Tess discovered a real bug — `_ = body` at `Stratum1BossRoom.gd:204` is rejected by GDScript 4.3's parser, cascading to silently break two test files from loading. A freshly-dispatched Drew agent halted the task, declaring "the premise is incorrect: `_ = body` IS valid GDScript 4.3 syntax." He cited language-design priors and refused the (correct, narrowly-scoped) fix. The orchestrator pulled the actual CI log:
+```
+SCRIPT ERROR: Parse Error: Expected statement, found "_" instead.
+          at: GDScript::reload (res://scripts/levels/Stratum1BossRoom.gd:204)
+```
+The bug was real. The fix (rename param to `_body`, drop the discard line) landed in PR #69 — previously-skipped tests now run AND pass (531 total, +31 newly visible). Agents (especially fresh ones with no session history) lean heavily on training-data priors. Strong priors + no evidence-checking = high-confidence wrong answers.
+
+**How to apply.**
+
+- When working a bug from a task brief: verify the symptom in the actual evidence (CI logs, file contents, repro output) **before** refusing or asserting impossibility. Include this check in your run-log.
+- If you find yourself thinking "this can't be right" / "this isn't a real bug" / "this won't compile" — pull the actual artifact (`gh run view --log`, Read the file, run the repro) and look. Don't reason from priors.
+- An agent that says "I see X in the actual file/log" should be trusted more than one that says "I know X about the language." Be the former.
+
+---
+
 ## Final-report shape — TIGHT (orchestrator-bound reports)
 
 Every sub-agent's task-completion message back to the orchestrator MUST be tight. ≤200 words. Required content only:
