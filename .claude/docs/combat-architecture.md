@@ -767,6 +767,27 @@ This two-path duck-type lookup is the canonical pattern for test-friendly boss-p
 
 **Non-ASCII caution:** if `display_name` ever contains non-ASCII characters, the title-card `Label` will hit the Godot 4.3 `gl_compatibility` default-font tofu trap. Import a custom `.ttf` covering the codepoint before shipping non-ASCII boss names.
 
+## SceneTreeTimer cancel-and-residual pattern (Godot 4.3)
+
+**Context:** boss-intro skip (T17, PR #306), future cinematic skips, InventoryPanel time-slow overlap, future hit-pause composition — any sequence built from `get_tree().create_timer(d).timeout` callbacks that needs to be **interrupted and short-circuited** rather than allowed to complete naturally.
+
+**Godot 4.3 constraint:** `SceneTreeTimer` does **not** expose a `cancel()` / `stop()` method. The timer always runs to completion and emits `timeout` at the scheduled time. The only handle to break the natural chain is `timeout.disconnect(callback)` — which prevents the queued callback from running, but does NOT free the timer or release the engine frames it occupies.
+
+**Cancel-and-residual pattern:**
+1. Hold a reference to the active `SceneTreeTimer` in member state (e.g. `_entry_sequence_timer: SceneTreeTimer`).
+2. On skip-trigger: `if _entry_sequence_timer: _entry_sequence_timer.timeout.disconnect(_callback)` — disconnects the natural-completion handler.
+3. **Execute the residual logic via a separate code path** that fast-forwards remaining state (e.g. `_collapse_entry_sequence()` plays door-slam-fast + nameplate-slide-fast + audio-fade-fast and emits the same `entry_sequence_skipped` signal the natural path would have emitted).
+4. Clear the timer reference: `_entry_sequence_timer = null` so a re-entry check can detect the cancel.
+
+**Why this is non-obvious:** the natural reflex is to call `timer.queue_free()` or look for a `cancel()` method. Neither exists. Trying `timer.disconnect("timeout", ...)` works but couples the disconnect site to the signal-name string; `timer.timeout.disconnect(callback)` is the typed-Callable form and survives renaming.
+
+**Pattern composition:** skip-able sequences should be authored so that **every state transition is idempotent on the skip path** — if the natural callback partially ran before disconnect, the residual code must safely complete from any partial state. T17 mitigates this by reading the boss's current wake-anim duration dynamically (`Stratum1Boss.WAKE_DURATION`) rather than caching a snapshot — the skip-residual computes "what's left" at call time, not at sequence-start time.
+
+**Future consumers** that should follow this pattern:
+- T16 cinematic boss-death (skip the 0.9 s ember rise → straight to title-card if Sponsor wants it).
+- InventoryPanel time-slow overlap (already partially implemented; verify it uses disconnect not cancel).
+- Future hit-pause composition (multiple overlapping pauses where a higher-priority pause cancels a lower-priority one).
+
 ## Cross-references
 
 - HTML5-renderer-specific quirks (HDR clamp, Polygon2D, service worker cache): `.claude/docs/html5-export.md`

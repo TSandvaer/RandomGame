@@ -9,6 +9,32 @@ and behavioral surprises. This doc covers the PixelLab side and the seam between
 
 ---
 
+## Execution context — orchestrator main session ONLY
+
+**`mcp__pixellab__*` and `mcp__pixel-mcp__*` are NOT dispatchable to sub-agents.**
+
+Empirically confirmed 2026-05-21 (Devon T8 boss wake-anim blocker): sub-agent personas at
+`.claude/agents/{role}.md` enumerate a specific tool list, and **no role enumerates the
+PixelLab or pixel-mcp tools**. Devon's persona lists only `mcp__clickup__*` plus the basics
+(Read/Write/Edit/Grep/Glob/Bash/Skill/WebFetch). Attempting `mcp__pixellab__animate_character`
+from a sub-agent returns `No such tool available`. Direct REST bypass via `curl` with the
+Bearer token is harness-blocked by the auto-mode credential-leakage classifier.
+
+**Execution model:** The orchestrator main session runs all PixelLab + pixel-mcp tool calls
+directly (steps 1–10 in the canonical pipeline below), saves the final exported PNGs to a
+checkout-able path under `assets/sprites/<char>/`, **then** dispatches a sub-agent (Devon for
+engine integration, Drew for game-side hook-up) to do the integration work:
+- Add the `<state>_<dir>` animation key to the relevant `.tres` SpriteFrames resource
+- Hook into the state machine (`wake()`, `dash()`, etc.)
+- Write paired GUT test
+- Open the PR
+
+This split is durable until persona files are updated to include `mcp__pixellab__*` /
+`mcp__pixel-mcp__*` (out of scope as of 2026-05-21 — would expand sub-agent attack surface +
+need explicit Sponsor approval).
+
+---
+
 ## Canonical hybrid pipeline
 
 ```
@@ -445,6 +471,20 @@ gens on retries; pick a workaround:
 
 Document the workaround in the character's commit message so future iteration knows the
 direction is using a substitute, not a true walking-template render.
+
+---
+
+**Per-direction template variance — single template, different motion across directions (PR #291 B3 finding, 2026-05-21):**
+
+Same template can produce **different motion semantics across directions**, not just visual quality differences. The `surprise-uppercut` template on the eye-variant boss (`80a555b9-a2cc-4b81-b66b-f9de61415e4c`) generated 8 directions × 7 frames each on 2026-05-17. The drop-in into `Stratum1Boss.tres` as the `slam` animation appeared correct (frame paths verified, PNG bytes verified as the template output), but **the SOUTH rotation produced a body-swaying side-strike** rather than the centered overhead uppercut the template name implies.
+
+**Diagnostic:** per-frame center-of-mass analysis on `slam/south/*.png` shows 15-pixel sideways body sway across the 7 frames — visually reads as a sideways-stepping strike, not an overhead uppercut. Other directions' frames may differ.
+
+**Why this matters:** if you select a template by its NAME ("surprise-uppercut" reads as "overhead uppercut"), you may get motion that matches the name in some directions but not others. Always inspect ALL 8 directions before declaring the animation correct. The PixelLab template engine's interpretation of "uppercut" is rotation-dependent in ways the docs don't surface.
+
+**Workaround:** for character beats with strict per-direction motion requirements (combat slam, dash, charge), try multiple templates AND verify each direction independently. If only some directions read correctly, try direction borrowing (cardinal from diagonal) per the multi-template-failure pattern above. If no template family produces all-correct directions, consider a custom `action_description` call (more expensive, more controllable).
+
+**Selection heuristic for action animations:** prefer templates with the most descriptive motion verbs (`overhead-strike`, `two-handed-slam`) over compound-action templates (`surprise-uppercut` which combines surprise reaction + uppercut motion — the surprise reaction may dominate in some directions). The PR #291 B3 follow-up ticket `86c9x8tc9` is re-rolling slam with a different template choice (likely custom `action_description="overhead two-handed weapon slam"`).
 
 ---
 
