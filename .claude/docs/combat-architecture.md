@@ -701,6 +701,35 @@ Both are swallowed by the focus system while a Control is focused. A spec that c
 
 **Generalised rule:** any Playwright spec that needs to close (or otherwise dismiss) a focus-holding panel after a click landed on a focusable child Control must NOT rely on `Tab`/`Escape`/any GUI-action key reaching `_unhandled_input`. Add a test-only direct-action method on the panel, wire it to a dedicated key handled in `_input()` (gated on `OS.has_feature("web")`), and have the spec assert a confirmation trace. Pattern check: does the spec press a key to dismiss UI immediately after clicking a focusable Control? If yes, it needs the `_input()`-handled hook, not a key-picking lottery.
 
+## Modal-input-gate — group-lookup predicate union (PR #323 finding)
+
+A class of input-leak surfaced by `InventoryPanel` LMB-on-Button (ticket `86c9xxg0n`): clicking a focusable `Button` inside an open modal panel propagates the click to `Player._process_grounded`'s attack/dodge input-polls, committing a weapon swing while the panel is open. Same root cause family as the dialogue-click bug (PR #319 seed) — the Player input pipeline doesn't know any modal is active.
+
+**The pattern — `_modal_is_active()` union via SceneTree group-lookup.** Player owns a single predicate that unions all modal surfaces:
+
+```gdscript
+func _modal_is_active() -> bool:
+    return _dialogue_is_active() or _inventory_is_open()
+
+func _inventory_is_open() -> bool:
+    var tree := Engine.get_main_loop() as SceneTree
+    if tree == null:
+        return false
+    var panels := tree.get_nodes_in_group("inventory_panel")
+    for p in panels:
+        if p.has_method("is_open") and p.is_open():
+            return true
+    return false
+```
+
+The gate sits at `Player.gd:1178-1179` — AFTER the velocity-write (`:1155-1161`) and BEFORE the attack/dodge input-polls (`:1180-1185`). Movement remains free while modals are open; attack/dodge are suppressed. Each participating modal calls `add_to_group("inventory_panel")` in `_ready()` (or its own group name) and exposes an `is_open()` method. No autoload dependency required.
+
+**Why group-lookup rather than `Main.get_inventory_panel()`:** decouples Player from Main's scene shape. Bare-instanced GUT tests get safe-default `false` because no node is in the group. Adding a new modal (Quest log, Settings) is one-liner — add the panel to a group, extend `_modal_is_active()` with one more `or` clause.
+
+**Why `_input()` is not the right layer:** `_input()` intercepts events before GUI focus consumption, but the input-polling pattern uses `Input.is_action_pressed` from `_process_grounded` — a different surface than `_input()`. The modal-gate sits inside the polling path, not inside event handling. The GUI focus-consumption rule (§ above) and the modal-input-gate rule are complementary: focus-consumption is about *closing* the panel (event-layer Tab/Escape interception); modal-gate is about *what player does while the panel is open* (poll-layer attack/dodge suppression).
+
+**Apply this pattern when** a new modal panel (anything that pauses or partially overlays gameplay while accepting input) is introduced. Even if the panel doesn't currently visit Player-relevant coordinates, future scenes might. The cite-of-record is PR #323 (commit `2779647`, ticket `86c9xxg0n`): predicate at `Player.gd:1187-1228`, group registration at `InventoryPanel.gd:141-147`, structural source-scan pin in `tests/test_player_modal_input_gate.gd:194` (see `test-conventions.md` § "Source-scan structural pins"), 4 paired GUT tests covering all 4 cells of the dialogue × inventory truth table.
+
 ## Harness coverage gap — player-driven helpers + stale-trace consumption
 
 Two classes of harness blindness surfaced during M2 W3 by Sponsor manual soak + Drew's diagnostic-via-trace work on PR #212 / PR #221. Both invalidate the naive "AC4 green = gameplay works" reading and define the contract that future fixture authors must respect.
