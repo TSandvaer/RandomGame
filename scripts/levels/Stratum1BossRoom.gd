@@ -111,6 +111,12 @@ const ENTRY_SEQUENCE_DURATION: float = 1.8
 ## walks "deeper" to descend.
 @export var stratum_exit_position: Vector2 = Vector2(240.0, 30.0)
 
+## M3-T2-W3-T13 — res:// path to the BossNameplate scene. Lazy-spawned
+## in `_assemble_room_fixtures` and shown on `entry_sequence_completed`.
+## Per Uma `boss-intro.md` §"Boss nameplate spec" + Priya w3-dispatch-plan
+## §3 Brief 1. Indirected via export so tests can opt in/out cleanly.
+@export_file("*.tscn") var boss_nameplate_scene_path: String = "res://scenes/ui/BossNameplate.tscn"
+
 # ---- Runtime ----------------------------------------------------------
 
 var _boss: Stratum1Boss = null
@@ -122,6 +128,10 @@ var _entry_started_time_ms: int = 0
 var _entry_completed_time_ms: int = 0
 var _stratum_exit_unlocked: bool = false
 var _stratum_exit: StratumExit = null
+## M3-T2-W3-T13 — BossNameplate instance (typed loosely as Node for
+## test-friendliness; production resolves to BossNameplate via cast in
+## `_spawn_boss_nameplate`).
+var _boss_nameplate: Node = null
 
 
 func _ready() -> void:
@@ -191,6 +201,10 @@ func _assemble_room_fixtures() -> void:
 		return
 	_build_door_trigger()
 	_spawn_stratum_exit()
+	# M3-T2-W3-T13 — spawn the boss nameplate. Hidden by default; the
+	# `entry_sequence_completed` handler calls `show_for(boss)` at T+1.8 s
+	# to start the slide-in tween.
+	_spawn_boss_nameplate()
 	# HTML5-only datapoint (ticket 86c9tv8uf): confirms the deferred fixture
 	# pass actually ran and the door-trigger Area2D is now in the tree +
 	# monitoring. If a physics-flush regression ever re-breaks the Area2D
@@ -243,6 +257,12 @@ func get_door_trigger() -> Area2D:
 
 func get_stratum_exit() -> StratumExit:
 	return _stratum_exit
+
+
+## M3-T2-W3-T13 — boss nameplate accessor (typed loosely so tests with
+## opted-out nameplate scene get a null cleanly).
+func get_boss_nameplate() -> Node:
+	return _boss_nameplate
 
 
 func is_entry_sequence_active() -> bool:
@@ -384,6 +404,13 @@ func _complete_entry_sequence() -> void:
 	_entry_sequence_active = false
 	_entry_completed_time_ms = Time.get_ticks_msec()
 	entry_sequence_completed.emit()
+	# M3-T2-W3-T13 — kick the nameplate slide-in at Beat 4 → Beat 5 boundary.
+	# Per Uma `boss-intro.md` Beat 4 (T+1.2 → T+1.8); the slide-in tween itself
+	# runs 0.4 s easing out. Fires AFTER `entry_sequence_completed.emit()` so
+	# subscribers see the signal before the nameplate begins animating.
+	if _boss_nameplate != null and is_instance_valid(_boss_nameplate) \
+			and _boss_nameplate.has_method("show_for"):
+		_boss_nameplate.call("show_for", _boss)
 	# Wake the boss now that Beats 1–4 are over.
 	if _boss != null and not _boss.is_dead():
 		_boss.wake()
@@ -438,6 +465,31 @@ func _on_boss_died(boss: Stratum1Boss, death_position: Vector2, _mob_def: MobDef
 		_stratum_exit.call_deferred("activate")
 	stratum_exit_unlocked.emit()
 	boss_defeated.emit(boss, death_position)
+
+
+## M3-T2-W3-T13 — Lazy-spawn the BossNameplate CanvasLayer at room
+## assembly. Stays hidden (modulate.a = 0, offscreen) until
+## `_complete_entry_sequence` calls `show_for(boss)`. Adding as a child
+## of the room means the nameplate is freed cleanly when the room is
+## freed — same lifecycle as the door trigger and stratum exit.
+##
+## Tests opt out by setting `boss_nameplate_scene_path = ""` (or by
+## constructing the room without the export wired). The handler that
+## drives `show_for` guards on null + has_method so the room boots fine
+## without the scene.
+func _spawn_boss_nameplate() -> void:
+	if boss_nameplate_scene_path == "":
+		return
+	var packed: PackedScene = load(boss_nameplate_scene_path) as PackedScene
+	if packed == null:
+		push_warning("[Stratum1BossRoom] BossNameplate scene missing at '%s'" % boss_nameplate_scene_path)
+		return
+	var node: Node = packed.instantiate()
+	if node == null:
+		push_warning("[Stratum1BossRoom] BossNameplate failed to instantiate")
+		return
+	_boss_nameplate = node
+	add_child(_boss_nameplate)
 
 
 func _spawn_stratum_exit() -> void:
