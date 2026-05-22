@@ -127,7 +127,129 @@ See memory `gh-run-list-race-on-just-pushed` for why `--commit <sha>` is mandato
 
 > **Playwright e2e:** kicked manually at SHA `<sha>` — run `<url>` — verdict: green / red / N/A (surface not Playwright-covered)
 
-**Open follow-up (Sponsor-class decision, queued separately):** wire `playwright-e2e.yml` to auto-trigger on `feat/*` push, matching Headless GUT. Until then the manual-kick convention is the gap-closer. PR #293 (Tess re-QA flag) is the precedent.
+### Author HTML5 self-soak — mandatory before claiming fix-complete on visual-gated surfaces (PR #291 v3 two-iteration failure)
+
+**The bar:** for any PR touching an HTML5-visual-gated surface (CPUParticles2D, tween modulate, Polygon2D, ColorRect with HDR colors, Area2D state mutations, z-index ordering, shape outlines via `_draw()`, any new `gl_compatibility`-rendered primitive), the **authoring agent MUST self-soak the actual HTML5 release-build in an incognito browser with DevTools F12 console open** before posting the Self-Test Report and claiming fix-complete.
+
+**Why:** GUT-green + CI-green are *necessary but not sufficient*. They exercise the engine's headless paths only, not the `gl_compatibility` WebGL2 pipeline. Bugs that manifest only on gl_compatibility (HDR clamp, Polygon2D quirks, z=0 same-z occlusion, shader compat, particle emission semantics) are invisible to those two surfaces.
+
+**Empirical precedent — PR #291 (2026-05-21):** Drew authored T5+T6+B3+B4 fixes. Two consecutive iterations (SHA `3f3e9a7` v3 → SHA `670769f` v3-with-B3) were both Tess-APPROVED on GUT-green + CI-green. Both were Sponsor-soaked in HTML5 incognito — and both reported that T6 aftershock was invisible AND B3 slam-animation was still kicking. The gl_compatibility-runtime divergence bit twice in a row because the author never opened a browser. The Sponsor on the second failure said verbatim: **"prevent claiming fix-complete on GUT+CI alone."**
+
+**Author Self-Test Report MUST include an "HTML5 author-self-soak" section** with:
+
+1. Release artifact link (the exact build the author soaked)
+2. BuildInfo SHA verification line from the DevTools console
+3. The visual behavior observed (screenshot or text description of what the author saw in browser)
+4. Trace excerpts from DevTools console if any `[combat-trace]` lines were emitted during the test interaction
+5. Pass/fail call: did the visual match the design intent in the actual browser?
+
+Without that section, the PR is treated as **not yet at "ready for QA"** regardless of GUT/CI status — Tess will REQUEST CHANGES asking for the section.
+
+**For the orchestrator dispatching such work** — every dispatch brief targeting an HTML5-visual-gated surface must include the author-self-soak step explicitly in the agent's task list. Example brief language: "Build the release artifact, extract, serve locally, open incognito + DevTools, verify the visual matches in browser. THIS IS MANDATORY — do not post the Self-Test Report claiming fix-complete on GUT-green + CI-green alone."
+
+**Composition with the per-surface escape clause** (`html5-export.md` § HTML5 visual-verification gate): the escape clause governs whether a Sponsor pre-merge soak is required. The author-self-soak requirement applies regardless — even on escape-clause-eligible surfaces (SpriteFrames-anim drop-ins on the established mob-roster path, Label-text changes), the author must still self-soak before claiming fix-complete. The escape clause waives the Sponsor gate, not the author gate.
+
+**What this rule does NOT cover:** pure code refactors that change no visual surface; backend / save / inventory / data-model changes without a visual; audio-only changes. For those classes, GUT-green + CI-green remain sufficient per the existing testing-bar.
+
+### Edge case — CLI-agent unsoakable surfaces (PR #300 finding)
+
+Sub-agents in CLI environments (no GUI browser, no input devices) **cannot interactively drive the game** through multi-room traversal to reach late-game surfaces. PR #300 (boss wake-anim) surfaced this: Devon could verify the build LOADS and `[BuildInfo]` SHA was correct in headless Playwright probe, but could NOT visually verify the wake animation — that required interactive play through 7 rooms.
+
+**Resolution pattern:**
+
+1. **Author posts the structural blocker explicitly.** Self-Test Report includes "Structural soak blocker" section listing what could not be verified and why. Partial evidence (build loads, SHA verified, console clean, automated Playwright probes) is captured.
+2. **Author proposes ONE of three paths to orchestrator** rather than fabricating a pass:
+   - **(A) Sponsor manual soak** — interactive verification by Sponsor.
+   - **(B) Follow-up tooling PR** — land a soak-acceleration tool (e.g. `?start_room=N` URL param, like Drew's PR #291 v4 diag commit) so future CLI agents can bypass traversal. Re-soak with the tool.
+   - **(C) Renderer-safety escape clause** — for surfaces where the analysis is empirically sound (e.g. SpriteFrames-anim drops through the same engine path as the entire mob roster's walk/atk/die anims — empirically renderer-safe), the author argues the rule's spirit (catch gl_compatibility divergence) doesn't apply to this specific surface class.
+3. **Orchestrator surfaces the choice to Sponsor.** Any relaxation of the rule needs explicit Sponsor sign-off — orchestrator does NOT decide.
+
+**Why this isn't a rule-breaker:** the author-self-soak rule's spirit is "no fabrication of evidence; what the author CAN verify, they must." Structural unsoakability is not the author choosing to skip; it's the surface being out of reach. The rule still bites — author MUST enumerate what they couldn't soak and route the merge decision to Sponsor.
+
+**Burden of proof — "cannot be done headless" requires concrete failure evidence (PR #300 push-back, 2026-05-21).** Hand-waved infeasibility claims are not acceptable. Drew's PR #291 v6 captured 4 screenshots from a CLI-agent Playwright session at distinct timing windows (t+1ms / t+163ms / t+330ms / t+505ms via a 20ms-cadence local spec) — empirically proving HTML5-class surfaces ARE Playwright-screenshot-capturable from a CLI agent on this codebase. **Before claiming infeasibility, the author MUST demonstrate failure of three approaches in order:**
+
+1. **(a) Playwright input simulation** — drive the game state via `page.keyboard.press()` / `page.mouse.click()`. Highest evidence fidelity; closest to a real player session.
+2. **(b) Existing test-only hook** — grep for `[combat-trace]` near the visual trigger; check for a debug-only direct invocation (hotkey, JS-bridge call). Zero-marginal-cost if the hook exists.
+3. **(c) New debug-flag URL param** — add a small, debug-only URL param (e.g. `?force_wake_on_load=true`) that bypasses the natural trigger condition. Smaller code surface than (a) for complex triggers (multi-frame state machines, proximity-based AI), but only when (a) and (b) fail. Skipping straight to (c) creates per-PR-tool drift.
+
+If all three fail with concrete documented failure modes (specific Playwright error, code-path absence, build break), THEN "infeasible" becomes an acceptable claim and the merge routes to path A (Sponsor manual soak). Without that evidence, "cannot be done" is not acceptable — Drew's precedent disproves it as a blanket statement.
+
+### Playwright screenshot-burst timing — wall-clock dilation gotcha (PR #300 finding)
+
+When using Playwright `page.screenshot()` for author-self-soak screenshot captures against an HTML5 release headless build: **each `page.screenshot()` call dilates browser wall-clock by ~200 ms.** This was empirically discovered on PR #300 wake-anim self-soak: a 10-frame burst with `waitForTimeout(50)` between calls expected ~500 ms of wall-clock but consumed >2 seconds — long enough that an interleaved attack inside the burst was firing past `WAKE_DURATION=417ms` and missing the window the author was trying to assert against.
+
+**Rule — fire timing-sensitive engine interactions BEFORE the screenshot burst, not inside it.** The burst-capture pattern shape:
+
+```typescript
+// CORRECT — engine interaction first, then capture
+await triggerSlam(page);                     // fires the engine event we want to capture
+await waitForTraceLine(page, "_spawn_slam_aftershock");
+const startMs = Date.now();
+for (let i = 0; i < 12; i++) {
+  await page.screenshot({ path: `burst-${i.toString().padStart(2,"0")}.png` });
+  await page.waitForTimeout(20);             // ~20ms cadence + ~200ms dilation = ~220ms real per frame
+}
+
+// WRONG — engine interaction interleaved with screenshots
+for (let i = 0; i < 12; i++) {
+  if (i === 5) await firePlayerAttack(page); // attack fires too late due to dilation
+  await page.screenshot({ path: `burst-${i}.png` });
+}
+```
+
+**Wall-clock duration assertions must be loose** — if your spec asserts "wake completes within X ms," allow generous slack (3-5×) or rely on the `[combat-trace]` line for timing-of-record rather than the test runner's wall-clock. The engine continues stepping during `page.screenshot()` (the burst captures distinct anim frames even while wall-clock is dilated), so the trace remains accurate even when wall-clock isn't.
+
+**Why this matters for self-soak specs:** Drew's PR #291 burst-capture spec works because the slam aftershock is a one-shot fire event with no further engine interaction needed during the capture window. Devon's PR #300 wake-anim spec hit this gotcha because wake animation has internal state transitions (DORMANT → WAKING → ACTIVE) that the author may want to verify mid-capture; trying to interleave attack-during-wake into the burst was the failure shape. Fire the interaction first, capture from there.
+
+### Playwright headless ≠ real-browser perception (PR #291 v6→v7 finding)
+
+**Critical gap in the author-self-soak rule discovered 2026-05-21:** Playwright headless screenshot captures are NOT a sufficient gate for visibility-of-effect claims. They prove "particles spawned at the right position with the right config," not "a human will see them in real-time motion."
+
+**The empirical case:** Drew's PR #291 v6 captured 4 screenshots from Playwright headless at distinct timing windows (t+1ms / t+163ms / t+330ms / t+505ms) showing the slam aftershock burst. Tess APPROVED the test layer on this evidence. **Sponsor then soaked the same build in a real interactive incognito browser and reported "I cannot see the sparkles Drew sees in his screenshots."** Two failure modes are possible (any combination):
+
+- **(A) Sub-perceptual frames** — Playwright captures arbitrary timing windows (t+1ms etc.) that the human eye, sampling at ~60 Hz with motion-blur and attention drift, never actually resolves. A bright frame at t=1ms is rendered but invisible to perception.
+- **(B) Headless-vs-interactive rendering divergence** — `gl_compatibility` may render CPUParticles2D ramp/alpha/scale differently in headless Chromium (no full GPU compositor pipeline) than in interactive Chrome. Less well-empirically-confirmed than (A) but plausible.
+- **(C) Sprite occlusion + dispersion timing** — particles spawning at boss position are partially hidden behind the boss sprite at t=0; by the time they disperse out of occlusion (~50-100ms), the ramp[0] flash has decayed. The screenshot at t=1ms catches them still bundled at center; the eye in real-time only sees the late-ember tail outside the sprite.
+
+**Rule — Playwright headless is for trace + config verification, NOT for "this is visible" claims.** Author self-soak via Playwright remains MANDATORY (the new burden-of-proof rule above) — but the Self-Test Report MUST NOT claim "PASS — Sponsor will see it" from headless screenshot evidence alone. The honest claim shape: "trace + spawn position + ramp config + particle count all match v<N> design intent; visual-of-record verification deferred to Sponsor interactive soak per html5-visual-verification-gate."
+
+**For the orchestrator gating merges:** when an author's Self-Test Report cites Playwright screenshots as the visibility-of-effect proof, treat that as INCOMPLETE evidence. Sponsor's interactive soak remains the gate of record for CPUParticles2D / tween modulate / Polygon2D class. The author-self-soak rule is about *due diligence + trace verification*; it does NOT replace the Sponsor visual gate.
+
+**For the AUTHOR — implications for designing effects:** if Playwright-captured frames show the effect clearly but real-browser perception doesn't, the effect is too brief, too small, or too occluded for human real-time perception. Make it longer (clamp the bright ramp window for ~80-100ms, not just t=0), wider (more particles, larger scale, escape-velocity outward to clear sprite occlusion), or louder (brighter contrast or supplemental sprite-modulate flash). The fix is in the design, not the Playwright cadence.
+
+**Structural follow-up:** path (B) is the durable answer. A `?start_room=N` + `?boss_hp_mult=N` URL-param suite on `main` would let all future visual-gated PRs self-soak from a CLI agent (build → curl → headless-browser Playwright probe with screenshots → confirm visual). Without such tooling, late-game-state surfaces will keep falling to path (A), which doesn't scale.
+
+**Open follow-up (Sponsor-class decision, queued separately):** wire `playwright-e2e.yml` to auto-trigger on `feat/*` push, matching Headless GUT. Until then the manual-kick convention is the gap-closer. PR #293 (Tess re-QA flag) is the precedent. **Update 2026-05-21:** Sponsor picked option C — `pull_request: branches: [main]` triggers on both workflows. Implementation in flight via PR #299 (see SHA-semantics section below for the foot-gun caught during the meta-self-test).
+
+### Chained-workflow SHA-pin on `pull_request` events (PR #299 Devon-caught bug)
+
+**The trap.** When chaining workflows via `workflow_run` AND adding a `pull_request` trigger, `GITHUB_SHA` semantics differ between event types:
+
+| Event type | `GITHUB_SHA` value | Visible in `gh pr view --json headRefOid`? | Suitable for SHA-pin? |
+|---|---|---|---|
+| `push` / `workflow_run` (chain trigger) | commit SHA at branch tip | yes | yes |
+| `pull_request` | synthetic merge commit (`refs/pull/N/merge`, 2-parent) | no — exists only inside GitHub Actions runner | NO — fails fast on any downstream SHA-pin that uses `pull_request.head.sha` |
+
+`github.event.pull_request.head.sha` is the branch tip — same value as `gh pr view --json headRefOid`, same value humans soak against in DevTools `[BuildInfo]`.
+
+**Why this matters.** If `release-github.yml` stamps `GITHUB_SHA` into the artifact name on `pull_request` events, the artifact gets named after the synthetic merge commit. Downstream `playwright-e2e.yml`'s `resolve_via_pr_sha` then reads `pull_request.head.sha` (branch tip) and the W3-T11 SHA-pin verifier fails — refusing to run tests against an artifact whose SHA doesn't match. **This is the fail-fast contract working as designed**, but it means the chained CI silently never passes until the SHAs agree.
+
+**Resolution convention — stamp `pull_request.head.sha` on PR events.** In the upstream workflow that produces the SHA-pinned artifact:
+
+```yaml
+- name: Compute artifact SHA
+  run: |
+    if [ "${{ github.event_name }}" = "pull_request" ]; then
+      SHORT_SHA="${{ github.event.pull_request.head.sha }}"
+    else
+      SHORT_SHA="${{ github.sha }}"
+    fi
+    echo "SHORT_SHA=${SHORT_SHA:0:7}" >> $GITHUB_ENV
+```
+
+This keeps the artifact name and the downstream pin both anchored to the **human-visible branch-tip SHA**, preserving the Sponsor-soak ritual where the HUD `[BuildInfo]` SHA equals `gh pr view`'s `headRefOid` equals the artifact filename suffix.
+
+**Validation pattern — the meta-self-test.** A PR that *changes* CI workflow triggers should itself fire those triggers on PR-open. PR #299 did exactly this: opening the PR auto-launched both workflows on the PR HEAD, and the SHA-pin verifier caught the GITHUB_SHA vs `pull_request.head.sha` mismatch immediately. **For any CI workflow change, the PR opening the change IS the first end-to-end live test** — review the resulting workflow runs as part of peer-review before merging.
 
 ## Spec-string-vs-engine-emit drift (ticket `86c9upffv`)
 
@@ -182,6 +304,29 @@ const PASSIVE_DAMAGE_WINDOW_MS = 15_000;
 ## Visual primitives — see `team/TESTING_BAR.md` § "Visual primitives"
 
 Tier 1 (mandatory): target color ≠ rest color (`assert_ne`). Tier 2 (mandatory for parented modulate cascades): assertion lands on the visible-draw node, not the parent CharacterBody2D. Tier 3 (aspirational): framebuffer pixel-delta — deferred pending a renderer-painting CI lane. Full detail + rationale in `team/TESTING_BAR.md`.
+
+## Bare-test deferred-fixture auto-fire trap (PR #306 lesson)
+
+**What it is.** A GUT test instantiates `Stratum1BossRoom` (or any room with a `_ready` that does `call_deferred("_assemble_room_fixtures")`) directly, awaits a frame for the deferred call to drain, and then asserts on `_entry_sequence_active` state — but the test fails because `_assemble_room_fixtures()` auto-fires `trigger_entry_sequence()` **after one frame** when `_boss != null`. The bare-test premise (no boss should mean no auto-fire) collides with the production code's "if you brought a boss, kick the sequence off" convenience.
+
+**Why it bites bare tests specifically:** the GUT bare-test surface deliberately instantiates the room scene without the surrounding `Main.tscn` orchestration. The room's `_ready` runs anyway, and `call_deferred("_assemble_room_fixtures")` queues a frame-deferred call that the test's `await get_tree().process_frame` then services. By the time the test asserts on entry-sequence state, the auto-fire has already armed it.
+
+**Codified fix shape (PR #306, validated by Tess re-review):**
+
+```gdscript
+var room = preload("res://scenes/levels/Stratum1BossRoom.tscn").instantiate()
+room.boss_scene_path = ""    # <-- BEFORE add_child_autofree; sets the gate at Stratum1BossRoom.gd:321
+add_child_autofree(room)
+await _drain_fixture_pass() # process_frame drain still safe — auto-fire gate now closed
+```
+
+The gate at `Stratum1BossRoom.gd:321` (currently — verify line if refactored) checks `boss_scene_path != ""` before auto-firing `trigger_entry_sequence()`. Setting it to `""` before child-add closes the gate before the deferred call runs.
+
+**Order matters:** `boss_scene_path = ""` must be set **before** `add_child_autofree(room)`. Setting it after means `_ready` has already queued the deferred call against the original `boss_scene_path` value.
+
+**Scope of the pattern:** applies to ANY test instantiating a room/level scene whose `_ready` queues deferred fixture-pass / auto-fire logic. The same fix shape works for any scene that exposes the "if asset path is empty, skip the auto-fire" convention. When authoring a new room with auto-fire convenience, expose an `@export var <feature>_path: String` (default `""` or a real path) and gate the auto-fire on `path != ""` — that's the contract bare tests can rely on.
+
+**Symptom to recognize:** test premise reads "no boss should mean no entry-sequence-active" yet GUT log shows the entry sequence engaging anyway after a frame-drain await. The deferred-call resolution is the culprit, not the test order.
 
 ## Cross-references
 
