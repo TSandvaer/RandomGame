@@ -50,6 +50,26 @@ A dispatch brief should include:
 5. **Report format** — structured final report (PR #, files touched, tests added, ticket moves, artifact links)
 6. **Read `.claude/docs/` at start** — sub-agents do not inherit the SessionStart auto-load (see "Sub-agent doc-reading" below)
 
+### Step 0: `cd <worktree>` — naming is not enough
+
+Sub-agent shell tools inherit the **orchestrator's** working directory, not the worktree path that the dispatch brief names. **Naming the worktree in the brief is not sufficient** — the sub-agent will happily edit files in the inherited cwd (the project root) unless its very first action is a physical `cd <worktree-path>` (or every command is prefixed with `git -C <worktree-path>`).
+
+**Failure mode (observed 2026-05-22, Devon W1 camera-scroll spike):** Dispatch brief specified `Worktree: C:/Trunk/PRIVATE/RandomGame-devon-wt`. Devon's edits to `scripts/camera/CameraDirector.gd`, `tests/test_camera_director.gd`, `scenes/spike/`, `scripts/spike/`, and `tests/playwright/specs/camera-scroll-spike.spec.ts` all landed in `C:/Trunk/PRIVATE/RandomGame` (orchestrator's survey root). Devon-wt itself was clean at `HEAD = 82295e3` with only untracked scratch markdown. Recovery cost: SendMessage to relocate the WIP, plus a same-session re-survey to confirm devon-wt was actually being used after that. This is a recurring failure mode, not a one-off.
+
+**Dispatch-brief rule — every brief that targets a role worktree MUST begin with an explicit Step 0:**
+
+```
+Step 0 (DO THIS FIRST, before any other tool call):
+  cd C:/Trunk/PRIVATE/RandomGame-<role>-wt
+  git fetch origin
+  git checkout -B <agent-branch> origin/main
+  pwd  # verify
+```
+
+Alternative when only one or two git operations are needed: prefix every command with `git -C <worktree-path>` so cwd is irrelevant. For multi-step work (edits, GUT runs, builds, `gh` invocations), `cd`-once is more reliable than per-command `-C` because it also captures non-git tools (Read/Edit/Write/Grep when run without absolute paths).
+
+**Recovery when WIP lands in root:** `git -C <root> diff` to capture the patch, apply in the target worktree via `git -C <target-wt> apply`, then `git -C <root> checkout -- .` and clean untracked files. The orchestrator's survey root should always be clean — any `M` or untracked artifacts there are a worktree-inheritance bug, not legitimate work.
+
 ## Hard gates
 
 Several gates are non-negotiable per memory rules:
