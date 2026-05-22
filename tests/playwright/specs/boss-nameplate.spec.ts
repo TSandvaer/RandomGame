@@ -110,10 +110,13 @@ test.describe("M3-T13 BossNameplate visibility + slide-in + phase transition", (
 
     // ---- Phase 4: drive boss HP through phase 1 → phase 2 ---------------
     // The boss has `STATE_WAKING` for ~417 ms post-entry-sequence then
-    // transitions to `STATE_IDLE` (chasing). Wait for STATE_IDLE before
-    // attacking so the damage actually lands (waking is damage-immune).
+    // transitions to `STATE_IDLE` (chasing). Wait for STATE_IDLE handoff
+    // trace before attacking so the damage actually lands (waking is
+    // damage-immune). The trace is emitted from `_process_waking` at
+    // the moment `_wake_left` drains; see `scripts/mobs/Stratum1Boss.gd`
+    // line ~743.
     await capture.waitForLine(
-      /\[combat-trace\] Stratum1Boss\._set_state \| .*-> idle/,
+      /\[combat-trace\] Stratum1Boss\._process_waking \| wake-anim complete -> STATE_IDLE/,
       5_000
     );
 
