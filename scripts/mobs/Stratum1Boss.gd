@@ -219,13 +219,78 @@ const HIT_FLASH_IN: float = 0.020
 const HIT_FLASH_HOLD: float = 0.020
 const HIT_FLASH_OUT: float = 0.040
 const DEATH_TWEEN_DURATION: float = 0.200
-const DEATH_PARTICLE_COUNT: int = 24
 const DEATH_TARGET_SCALE: float = 0.6
 const BOSS_DEATH_HOLD: float = 0.400
 const BOSS_SHAKE_MAGNITUDE: float = 4.0   # logical px (VD-09 max budget)
 const BOSS_SHAKE_DURATION: float = 0.150
 const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
 const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
+
+## T16 climax burst — sustained 0.9 s ember-rise emitter that replaces the
+## pre-T16 single-explosive 24-particle burst. Wave 3 cinematic-climax beat
+## per Uma `boss-intro.md` F2 + Priya `w3-dispatch-plan.md` §3 Brief 4.
+##
+## **Why sustained, not explosive.** The pre-T16 shape was a one-frame
+## explosive pop (`explosiveness = 1.0`) that landed in the same physics
+## frame as `boss_died.emit` — perceptually a "flash + done" beat. The F2
+## design intent is "embers rising for the duration of the camera ease-in"
+## — the emitter sustains across the full 0.9 s window so the ember plume
+## is co-present with the camera zoom + vignette deepen, NOT a single
+## frame at the start of it.
+##
+## **Window math.** `one_shot = true, explosiveness = 0.1, lifetime = 0.9`
+## spawns `amount` particles linearly across `(1 - explosiveness) × lifetime`
+## = 0.81 s of active emission, each living `lifetime` = 0.9 s. The last-
+## emitted particle is born at t≈0.81 and dies at t≈1.71. The PERCEIVED
+## "sustained rise" matches the 0.9 s emission window the brief calls for;
+## the trailing decay overlaps the BossDefeatedTitleCard's 1.2 s pre-fade
+## interval and dissipates well before the card fades in.
+##
+## **Why 56 particles + 2.5 scale (vs PR #291 T6 aftershock's 56/2.5).**
+## Same intensity reference as the v7 slam-aftershock — empirically the
+## "unmissable" floor against the boss sprite's red surcoat. The brief
+## "brighter + faster + more particles than the player-death-flow dissolve"
+## maps to: more particles (56 vs Grunt's 12), brighter ramp (impact-frame
+## white at ramp[0] vs Grunt's EMBER_LIGHT→EMBER_DEEP linear), faster
+## initial velocity (220 px/s vs Grunt's 30-60).
+##
+## **Impact frame at ramp[0].** Per `.claude/docs/html5-export.md` §
+## "Burst contrast against high-hue-saturation same-z sprites" (PR #291 v5
+## finding): ember-orange ramp stops blend perceptually into the boss's
+## red surcoat under WebGL2 compositing. A near-white IMPACT frame at
+## ramp[0] breaks the perceptual blend and gives the burst a perceptually-
+## distinct opening flash.
+##
+## **z_index = +1.** Per `.claude/docs/html5-export.md` § "Z-index
+## sensitivity" + PR #291 T6 same-z-occlusion finding: a same-z-as-sprite
+## CPUParticles2D burst may render BEHIND the emitting sprite under
+## `gl_compatibility`. Explicit +1 lifts the burst above the boss sprite
+## (which sits at z = 0 in the room).
+const CLIMAX_BURST_PARTICLE_COUNT: int = 56
+const CLIMAX_BURST_LIFETIME: float = 0.9
+## Mostly-sustained emission. 0.0 would be purely linear over the window;
+## 0.1 keeps the very first frame slightly weighted so the burst "starts"
+## visibly rather than dripping in.
+const CLIMAX_BURST_EXPLOSIVENESS: float = 0.1
+const CLIMAX_BURST_SCALE_MIN: float = 2.0
+const CLIMAX_BURST_SCALE_MAX: float = 2.5
+const CLIMAX_BURST_VELOCITY_MIN: float = 80.0
+const CLIMAX_BURST_VELOCITY_MAX: float = 220.0
+## Upward gravity stronger than Grunt's `Vector2(0, -40)` — embers rise
+## quickly so the plume clears the boss's collapsing sprite by ~t=0.3 s.
+const CLIMAX_BURST_GRAVITY_Y: float = -120.0
+## Spread (degrees) of the emission cone around the `direction` vector.
+## 90° = quarter-circle upward fan. Narrower than Grunt's 180° hemisphere
+## because the cinematic intent is "rising plume" not "exploding sphere".
+const CLIMAX_BURST_SPREAD_DEG: float = 90.0
+## z_index: lift above sprite default 0 to avoid same-z occlusion on
+## gl_compatibility. PR #291 T6 precedent.
+const CLIMAX_BURST_Z_INDEX: int = 1
+## Impact frame at ramp[0] — perceptually-distinct near-white that breaks
+## the orange-on-red blend per `.claude/docs/html5-export.md` § burst-contrast.
+## Sub-1.0 every channel for HDR-clamp safety; high luminance + warm tint
+## to read as "ember flash" not "white pop".
+const CLIMAX_BURST_IMPACT_FLASH: Color = Color(1.0, 0.949, 0.749, 1.0)  # #FFF2BF
 
 ## Hit-flash modulate tint for the AnimatedSprite2D path (M3W-1 / M3W-4 convention).
 ## Mirrors `PracticeDummy.HIT_FLASH_TINT` + `Grunt.HIT_FLASH_TINT` verbatim per the
@@ -1696,35 +1761,59 @@ func _play_climax_shake() -> void:
 	_shake_tween.tween_property(self, "position", rest_offset, leg)
 
 
-## §3 boss-climax burst: 24 ember particles parented to the room (so they
-## persist past queue_free). Same shape as grunt burst, 4× the volume.
-func _spawn_death_particles() -> void:
+## T16 boss-climax burst — sustained 0.9 s ember-rise emitter (replaces the
+## pre-T16 single-explosive 24-particle burst). Composed with the F2 camera
+## zoom + Vignette deepen orchestrated from `Stratum1BossRoom._on_boss_died`.
+##
+## Constants block above (`CLIMAX_BURST_*`) carries the full design rationale;
+## this function is the wiring. Returns the burst node so the boss-room
+## orchestrator (and tests) can introspect the emitter shape without
+## re-traversing the room's child list.
+##
+## Physics-flush safety: see Grunt._spawn_death_particles for full rationale.
+## `_die` runs during the physics-step body_entered chain; deferred add_child
+## avoids Godot 4's "Can't change this state while flushing queries" panic.
+func _spawn_death_particles() -> CPUParticles2D:
 	var room: Node = get_parent()
 	if room == null:
-		return
+		return null
 	var burst: CPUParticles2D = CPUParticles2D.new()
 	burst.global_position = global_position
-	burst.amount = DEATH_PARTICLE_COUNT
+	# z_index lifts the burst above the boss sprite (z=0) per PR #291 T6
+	# same-z occlusion lesson — keep this BEFORE deferred add_child so the
+	# property is set when the engine first reads the canvas-item draw order.
+	burst.z_index = CLIMAX_BURST_Z_INDEX
+	burst.amount = CLIMAX_BURST_PARTICLE_COUNT
 	burst.one_shot = true
-	burst.explosiveness = 1.0
-	burst.lifetime = 0.30
+	burst.explosiveness = CLIMAX_BURST_EXPLOSIVENESS
+	burst.lifetime = CLIMAX_BURST_LIFETIME
 	burst.emitting = true
 	burst.direction = Vector2.UP
-	burst.spread = 180.0
-	burst.initial_velocity_min = 30.0
-	burst.initial_velocity_max = 60.0
-	burst.gravity = Vector2(0.0, -40.0)
-	burst.scale_amount_min = 1.0
-	burst.scale_amount_max = 1.0
+	burst.spread = CLIMAX_BURST_SPREAD_DEG
+	burst.initial_velocity_min = CLIMAX_BURST_VELOCITY_MIN
+	burst.initial_velocity_max = CLIMAX_BURST_VELOCITY_MAX
+	burst.gravity = Vector2(0.0, CLIMAX_BURST_GRAVITY_Y)
+	burst.scale_amount_min = CLIMAX_BURST_SCALE_MIN
+	burst.scale_amount_max = CLIMAX_BURST_SCALE_MAX
+	# 3-stop color ramp: impact flash → ember-light → ember-deep. The
+	# impact-flash at ramp[0] is the perceptually-distinct near-white frame
+	# that breaks the orange-on-red blend per PR #291 v5/v7 finding; the
+	# mid-stop sustains the warm orange through the rise; the deep stop is
+	# the cooling-ember tail. Offsets shifted slightly so the flash is
+	# concentrated in the first ~12% of each particle's life.
 	var ramp: Gradient = Gradient.new()
-	ramp.set_color(0, EMBER_LIGHT)
+	ramp.set_color(0, CLIMAX_BURST_IMPACT_FLASH)
 	ramp.set_color(1, EMBER_DEEP)
+	ramp.add_point(0.12, EMBER_LIGHT)
 	burst.color_ramp = ramp
-	# Physics-flush safety: see Grunt._spawn_death_particles for full rationale.
-	# `_die` runs during the physics-step body_entered chain; deferred add_child
-	# avoids Godot 4's "Can't change this state while flushing queries" panic.
 	room.call_deferred("add_child", burst)
 	burst.finished.connect(burst.queue_free)
+	_combat_trace("Stratum1Boss._spawn_death_particles",
+		"climax sustained burst — amount=%d lifetime=%.2f explosiveness=%.2f scale=[%.1f,%.1f] z=%d" % [
+			burst.amount, burst.lifetime, burst.explosiveness,
+			burst.scale_amount_min, burst.scale_amount_max, burst.z_index
+		])
+	return burst
 
 
 # ---- Helpers ----------------------------------------------------------

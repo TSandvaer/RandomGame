@@ -144,6 +144,29 @@ const SKIP_ACTIONS: PackedStringArray = ["move_up", "move_down", "move_left", "m
 const SKIP_BGM_FADE_MS: int = 300
 const DEFAULT_BGM_FADE_MS: int = 600
 
+## T16 (`86c9wjzgh`, M3 Tier 2 Wave 3) cinematic-climax tunings. Per
+## `team/uma-ux/boss-intro.md` F2 + `team/priya-pl/w3-dispatch-plan.md`
+## §3 Brief 4. Constants are exported as class constants so paired tests
+## can pin both the values + the call-shape without re-deriving from
+## downstream APIs (CameraDirector.request_zoom signature, Vignette F2
+## named method).
+##
+## **Why 1.5× normalized zoom.** Uma's spec calls for "1.5× zoom centered
+## on the boss's last position" — Wave 2 T9 explicitly noted that T16
+## "is the gate for non-1.0 zoom visual verification." First production
+## consumer of non-1.0 `CameraDirector.request_zoom`.
+##
+## **Why 0.9 s duration.** Locked to Vignette F2 duration
+## (`Vignette.F2_BOSS_DEFEAT_DURATION = 0.9`) + the sustained ember-rise
+## emission window (`Stratum1Boss.CLIMAX_BURST_LIFETIME = 0.9`). The
+## three cinematic-layer effects (zoom + vignette + embers) share the
+## 0.9 s window so they read as one cinematic beat, not three staggered
+## events. Title-card pre-fade delay (1.2 s) lands the card AFTER all
+## three settle — Uma's "silence-as-punctuation" entry into the card.
+const T16_CAMERA_ZOOM_TARGET: float = 1.5
+const T16_CAMERA_ZOOM_DURATION: float = 0.9
+const T16_HORN_SFX_CUE_ID: StringName = &"sfx-boss-kill-horn"
+
 # ---- Inspector --------------------------------------------------------
 
 ## res:// path to the boss scene. Indirected via export so tests can swap
@@ -586,6 +609,28 @@ func _on_boss_died(boss: Stratum1Boss, death_position: Vector2, _mob_def: MobDef
 	# `boss_defeated` (Main._on_boss_defeated → title card) can rely on
 	# the flag being persisted by the time they receive the event.
 	_mark_first_boss_kill_seen()
+	# T16 (`86c9wjzgh`, M3 Tier 2 Wave 3) — cinematic-climax orchestration.
+	# `_on_boss_died` is the natural orchestration site because it fires
+	# exactly once per boss death and already owns the boss-room post-death
+	# state flips. The boss itself drives:
+	#   - The 0.3 s F1 freeze via `TimeScaleDirector.freeze(...)` in
+	#     `Stratum1Boss._die` (PR #287 T2, already wired).
+	#   - The sustained 0.9 s ember-rise burst via
+	#     `Stratum1Boss._spawn_death_particles` (T16 refactor).
+	# This handler drives the room-level cinematic-layer calls:
+	#   - F2 camera zoom 1.5× over 0.9 s anchored at death position
+	#     (CameraDirector autoload — first non-1.0 production zoom).
+	#   - F2 vignette deepen to 80% over 0.9 s (Vignette.boss_defeat_climax —
+	#     locked named-method per Uma vignette-spec §"Duration locks").
+	#   - F2 horn SFX placeholder (Devon's T16b sibling will land the
+	#     `sfx-boss-kill-horn` cue + asset; the placeholder call emits an
+	#     UNKNOWN cue_id trace line in the interim — the play_sfx contract
+	#     no-ops safely on unknown ids per AudioDirector.play_sfx contract).
+	#
+	# F3 ramp-out (camera reset + vignette return) is wired in
+	# `Main._on_boss_defeated` where the BossDefeatedTitleCard lifecycle
+	# lives — see `scenes/Main.gd` for the title_card_dismissed → F3 chain.
+	_play_t16_cinematic_climax(death_position)
 	stratum_exit_unlocked.emit()
 	boss_defeated.emit(boss, death_position)
 
@@ -946,3 +991,100 @@ func _save_autoload() -> Node:
 	if not is_inside_tree():
 		return null
 	return get_tree().root.get_node_or_null("Save")
+
+
+# ---- T16 cinematic climax (M3 Tier 2 Wave 3 — ticket 86c9wjzgh) -------
+
+## T16 F2 orchestration — fires camera zoom + vignette deepen + horn SFX
+## on `boss_died`. Composes with:
+##   - `TimeScaleDirector.freeze(0.3)` already fired by `Stratum1Boss._die`
+##     (PR #287 T2 — final freeze precedes this handler by one physics tick
+##     because the boss's `boss_died.emit` is the trigger; the freeze and
+##     this handler run in the same synchronous emit chain, but the freeze
+##     uses an `ignore_time_scale=true` SceneTreeTimer so it auto-releases
+##     on wall-clock regardless of how the rest of this chain composes).
+##   - `Stratum1Boss._spawn_death_particles` sustained ember emitter (T16
+##     refactor in the same PR) — runs over the same 0.9 s window.
+##
+## **Why route through this room, not Stratum1Boss directly.** The boss is
+## the per-mob actor — it shouldn't reach into room-level cinematic-layer
+## globals (CameraDirector, Vignette). The room is the natural composition
+## site: it already owns `entry_sequence_started`/`_completed` cinematic
+## hooks (door slam, ambient duck, BGM crossfade), and adding F2 here keeps
+## the entry/exit cinematic surfaces symmetric on a single owner.
+##
+## **Resolution is soft.** All three downstream services (CameraDirector,
+## Vignette, AudioDirector) are resolved via `get_tree().root.get_node_or_null`
+## so bare-test surfaces that don't include them are no-op'd cleanly without
+## crashing. Production wires all three via project.godot autoloads +
+## Main's vignette instantiation.
+##
+## **Vignette lives under Main, not under root.** Unlike CameraDirector
+## (autoload at root) and AudioDirector (autoload at root), `Vignette` is
+## instantiated by Main as a child node. Resolution walks via Main's
+## `get_vignette()` accessor; falls back to a tree-search for the bare-test
+## case where the boss room is constructed without Main.
+##
+## `death_position` is the boss's `global_position` at the moment
+## `boss_died.emit` fires — captured by the room handler signature, not
+## re-read off the (possibly already-fading) boss node.
+func _play_t16_cinematic_climax(death_position: Vector2) -> void:
+	# Camera: zoom to 1.5× over 0.9 s, anchored at the boss's last position.
+	# `request_zoom(target_normalized_scale, duration, anchor)` per
+	# `scripts/camera/CameraDirector.gd` — non-zero anchor pins the camera
+	# to that world coordinate; subsequent `reset_to_player(...)` (fired
+	# from Main on title-card-dismiss) returns to follow mode.
+	var cam: Node = _resolve_camera_director()
+	if cam != null and cam.has_method("request_zoom"):
+		cam.request_zoom(T16_CAMERA_ZOOM_TARGET, T16_CAMERA_ZOOM_DURATION, death_position)
+		_combat_trace("Stratum1BossRoom._play_t16_cinematic_climax",
+			"camera request_zoom target=%.2f duration=%.2f anchor=(%.1f,%.1f)" % [
+				T16_CAMERA_ZOOM_TARGET, T16_CAMERA_ZOOM_DURATION,
+				death_position.x, death_position.y
+			])
+	# Vignette: 80% deepen over 0.9 s, ease-in-out-cubic — calls the locked
+	# named convenience method per Uma vignette-spec §"Duration locks per
+	# consumer".
+	var vig: Node = _resolve_vignette()
+	if vig != null and vig.has_method("boss_defeat_climax"):
+		vig.boss_defeat_climax()
+		_combat_trace("Stratum1BossRoom._play_t16_cinematic_climax",
+			"vignette boss_defeat_climax fired")
+	# Horn SFX placeholder — Devon's T16b sibling lands the
+	# `sfx-boss-kill-horn` cue + asset. Until then, `play_sfx` hits the
+	# UNKNOWN cue_id safe-no-op branch and emits an UNKNOWN trace line
+	# (per `scripts/audio/AudioDirector.gd::play_sfx` contract).
+	var ad: Node = _resolve_audio_director()
+	if ad != null and ad.has_method("play_sfx"):
+		ad.play_sfx(T16_HORN_SFX_CUE_ID)
+
+
+## Resolve CameraDirector autoload, or null in bare-test surfaces.
+func _resolve_camera_director() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_tree().root.get_node_or_null("CameraDirector")
+
+
+## Resolve the Vignette instance. Production lives under Main as a child;
+## the room itself is also a descendant of Main (Room → World → Main). Walk
+## the parent chain looking for a node exposing `get_vignette()` — covers
+## both production (Main at SceneTree root) and integration tests (Main
+## parented under GUT). Falls back to null on bare-test surfaces with no
+## Main ancestor.
+func _resolve_vignette() -> Node:
+	if not is_inside_tree():
+		return null
+	var n: Node = self
+	while n != null:
+		if n.has_method("get_vignette"):
+			var vig: Node = n.get_vignette()
+			if vig != null:
+				return vig
+		n = n.get_parent()
+	# Last-resort fallback for orphan-test surfaces that add a Vignette
+	# under the SceneTree root directly (not via Main).
+	for child in get_tree().root.get_children():
+		if child is Vignette:
+			return child
+	return null

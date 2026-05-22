@@ -20,6 +20,13 @@ func before_each() -> void:
 	if d != null and d.has_method("reset"):
 		d.reset()
 	Engine.time_scale = 1.0
+	# T16 (`86c9wjzgh`, M3 Tier 2 Wave 3) — `_on_boss_died` now drives a
+	# `CameraDirector.request_zoom(1.5, 0.9, death_pos)` call as part of the
+	# F2 cinematic. The zoom + anchor-override state leaks into subsequent
+	# tests unless reset. Snap back to follow mode + 1.0× before every test.
+	var cam: Node = Engine.get_main_loop().root.get_node_or_null("CameraDirector")
+	if cam != null and cam.has_method("reset_to_player"):
+		cam.reset_to_player(0.0)  # snap (duration=0), no tween
 
 
 func after_each() -> void:
@@ -27,6 +34,9 @@ func after_each() -> void:
 	if d != null and d.has_method("reset"):
 		d.reset()
 	Engine.time_scale = 1.0
+	var cam: Node = Engine.get_main_loop().root.get_node_or_null("CameraDirector")
+	if cam != null and cam.has_method("reset_to_player"):
+		cam.reset_to_player(0.0)
 
 
 # ---- Helpers ----------------------------------------------------------

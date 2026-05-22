@@ -1105,6 +1105,25 @@ func _on_boss_defeated(boss: Stratum1Boss, death_position: Vector2) -> void:
 		# zero-arg lambda forwards into the default-fade method cleanly).
 		card.title_card_dismissed.connect(func() -> void:
 			ad.resume_stratum1_ambient_at_60_percent())
+	# T16 F3 ramp-out (`86c9wjzgh`, M3 Tier 2 Wave 3). The F2 camera zoom +
+	# vignette deepen were fired from `Stratum1BossRoom._on_boss_died` over
+	# the same 0.9 s window as the sustained ember emitter; the card then
+	# pre-fade-delays for 1.2 s and runs its 0.4 s fade-in + 0.8 s hold + 0.4
+	# s fade-out. On `title_card_dismissed` (after the fade-out completes
+	# and the card is about to queue_free), F3 returns the camera to player-
+	# follow over 0.4 s and the vignette to S1 default 30% over 0.4 s.
+	#
+	# Two separate connections so a future ticket can detach one without
+	# disturbing the other (e.g. if a "post-card cinematic" beat lands
+	# between F3 vignette and F3 camera). Same shape as the audio-resume
+	# wiring above — soft no-ops when the autoload / Vignette is absent.
+	var cam: Node = _camera_director()
+	if cam != null and cam.has_method("reset_to_player"):
+		card.title_card_dismissed.connect(func() -> void:
+			cam.reset_to_player())
+	if _vignette != null and _vignette.has_method("boss_defeat_return"):
+		card.title_card_dismissed.connect(func() -> void:
+			_vignette.boss_defeat_return())
 	card.show_for(boss, death_position)
 
 
@@ -1363,3 +1382,11 @@ func _stratum_progression() -> Node:
 
 func _audio_director() -> Node:
 	return get_tree().root.get_node_or_null("AudioDirector")
+
+
+## T16 (`86c9wjzgh`, M3 Tier 2 Wave 3) — CameraDirector autoload resolver.
+## Mirrors `_audio_director()` shape so bare-test surfaces (e.g.
+## `tests/integration/test_t16_boss_death_cinematic_wiring.gd`) can
+## construct Main without crashing if the autoload is absent.
+func _camera_director() -> Node:
+	return get_tree().root.get_node_or_null("CameraDirector")
