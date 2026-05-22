@@ -26,12 +26,19 @@ const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 const SPRITE_FRAMES_PATH: String = "res://assets/sprites/boss/Stratum1Boss.tres"
 const ANIM_DIRS: Array[String] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 const ANIM_STATES: Array[String] = [
-	"walk", "atk", "atk_telegraph", "slam", "slam_telegraph", "hit", "die"
+	"walk", "atk", "atk_telegraph", "slam", "slam_telegraph", "hit", "die", "wake"
 ]
 const LOOPING_STATES: Array[String] = ["walk"]
 const ONE_SHOT_STATES: Array[String] = [
-	"atk", "atk_telegraph", "slam", "slam_telegraph", "hit", "die"
+	"atk", "atk_telegraph", "slam", "slam_telegraph", "hit", "die", "wake"
 ]
+# Per-state FPS map — M3W-4 ran every anim at 8 fps; M3-T2-W1-T8 wake (Uma BI-06
+# ~500ms target band) ships at 12 fps (5 frames -> ~417 ms).
+const STATE_FPS: Dictionary = {
+	"walk": 8.0, "atk": 8.0, "atk_telegraph": 8.0,
+	"slam": 8.0, "slam_telegraph": 8.0, "hit": 8.0, "die": 8.0,
+	"wake": 12.0,
+}
 
 
 class FakePlayer:
@@ -63,7 +70,7 @@ func _make_scene_boss_in_room() -> Array:
 # ---- SpriteFrames resource shape --------------------------------------
 
 func test_sprite_frames_resource_exposes_all_state_x_direction_keys() -> void:
-	# 7 states × 8 directions = 56 sub-animation keys.
+	# 8 states × 8 directions = 64 sub-animation keys (wake added in M3-T2-W1-T8).
 	var frames: SpriteFrames = load(SPRITE_FRAMES_PATH) as SpriteFrames
 	assert_not_null(frames, "Stratum1Boss SpriteFrames .tres loads")
 	for state in ANIM_STATES:
@@ -88,14 +95,17 @@ func test_sprite_frames_loop_flags_match_convention() -> void:
 				"'%s' is one-shot (loop=false)" % anim_name)
 
 
-func test_sprite_frames_fps_is_8_across_all_anims() -> void:
-	# FPS=8 across all anims per M3W-1 convention.
+func test_sprite_frames_fps_matches_state_fps_map() -> void:
+	# M3W-1 baseline shipped FPS=8 across all anims. M3-T2-W1-T8 wake-anim
+	# (Uma BI-06 ~500 ms target band) ships at 12 fps to land 5 frames in
+	# ~417 ms. Per-state FPS map pins both.
 	var frames: SpriteFrames = load(SPRITE_FRAMES_PATH) as SpriteFrames
 	for state in ANIM_STATES:
+		var expected_fps: float = STATE_FPS[state]
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
-			assert_eq(frames.get_animation_speed(anim_name), 8.0,
-				"'%s' plays at 8 fps (M3W-1 convention)" % anim_name)
+			assert_eq(frames.get_animation_speed(anim_name), expected_fps,
+				"'%s' plays at %.1f fps" % [anim_name, expected_fps])
 
 
 # ---- Scene shape — production .tscn uses AnimatedSprite2D ------------

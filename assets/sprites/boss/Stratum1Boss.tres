@@ -1,4 +1,4 @@
-[gd_resource type="SpriteFrames" load_steps=393 format=3 uid="uid://b0embergrave_boss_sprite_frames"]
+[gd_resource type="SpriteFrames" load_steps=433 format=3 uid="uid://b0embergrave_boss_sprite_frames"]
 
 [ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/walk/south/frame_000.png" id="f_000"]
 [ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/walk/south/frame_001.png" id="f_001"]
@@ -392,6 +392,47 @@
 [ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/die/south-west/frame_004.png" id="f_389"]
 [ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/die/south-west/frame_005.png" id="f_390"]
 [ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/die/south-west/frame_006.png" id="f_391"]
+
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south/frame_000.png" id="f_392"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south/frame_001.png" id="f_393"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south/frame_002.png" id="f_394"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south/frame_003.png" id="f_395"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south/frame_004.png" id="f_396"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south-east/frame_000.png" id="f_397"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south-east/frame_001.png" id="f_398"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south-east/frame_002.png" id="f_399"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south-east/frame_003.png" id="f_400"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south-east/frame_004.png" id="f_401"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/east/frame_000.png" id="f_402"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/east/frame_001.png" id="f_403"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/east/frame_002.png" id="f_404"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/east/frame_003.png" id="f_405"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/east/frame_004.png" id="f_406"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north-east/frame_000.png" id="f_407"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north-east/frame_001.png" id="f_408"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north-east/frame_002.png" id="f_409"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north-east/frame_003.png" id="f_410"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north-east/frame_004.png" id="f_411"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north/frame_000.png" id="f_412"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north/frame_001.png" id="f_413"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north/frame_002.png" id="f_414"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north/frame_003.png" id="f_415"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north/frame_004.png" id="f_416"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north-west/frame_000.png" id="f_417"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north-west/frame_001.png" id="f_418"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north-west/frame_002.png" id="f_419"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north-west/frame_003.png" id="f_420"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/north-west/frame_004.png" id="f_421"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/west/frame_000.png" id="f_422"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/west/frame_001.png" id="f_423"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/west/frame_002.png" id="f_424"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/west/frame_003.png" id="f_425"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/west/frame_004.png" id="f_426"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south-west/frame_000.png" id="f_427"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south-west/frame_001.png" id="f_428"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south-west/frame_002.png" id="f_429"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south-west/frame_003.png" id="f_430"]
+[ext_resource type="Texture2D" path="res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/wake/south-west/frame_004.png" id="f_431"]
 
 [resource]
 animations = [
@@ -1851,5 +1892,165 @@ animations = [
 "loop": false,
 "name": &"die_sw",
 "speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_392")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_393")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_394")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_395")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_396")
+}],
+"loop": false,
+"name": &"wake_s",
+"speed": 12.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_397")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_398")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_399")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_400")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_401")
+}],
+"loop": false,
+"name": &"wake_se",
+"speed": 12.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_402")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_403")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_404")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_405")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_406")
+}],
+"loop": false,
+"name": &"wake_e",
+"speed": 12.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_407")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_408")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_409")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_410")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_411")
+}],
+"loop": false,
+"name": &"wake_ne",
+"speed": 12.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_412")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_413")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_414")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_415")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_416")
+}],
+"loop": false,
+"name": &"wake_n",
+"speed": 12.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_417")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_418")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_419")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_420")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_421")
+}],
+"loop": false,
+"name": &"wake_nw",
+"speed": 12.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_422")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_423")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_424")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_425")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_426")
+}],
+"loop": false,
+"name": &"wake_w",
+"speed": 12.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_427")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_428")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_429")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_430")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_431")
+}],
+"loop": false,
+"name": &"wake_sw",
+"speed": 12.0
 }
 ]

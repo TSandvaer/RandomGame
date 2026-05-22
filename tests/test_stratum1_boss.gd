@@ -492,22 +492,83 @@ func test_dormant_boss_does_not_act() -> void:
 		"dormant boss never swings")
 
 
-func test_wake_transitions_to_idle() -> void:
+func test_wake_transitions_to_waking_then_idle() -> void:
+	# M3-T2-W1-T8 (ticket 86c9wjyp9): `wake()` now transitions DORMANT -> WAKING
+	# (damage-immune wake-anim window), not DORMANT -> IDLE directly. The boss
+	# auto-advances to IDLE after WAKE_DURATION (~417 ms) via `_process_waking`.
+	# `boss_woke.emit()` fires at the START of WAKING — same Beat-3 audio timing
+	# as before; the wake-anim is overlaid on top of the existing signal.
 	var b: Stratum1Boss = _make_dormant_boss()
 	watch_signals(b)
 	b.wake()
-	assert_eq(b.get_state(), Stratum1Boss.STATE_IDLE)
-	assert_signal_emit_count(b, "boss_woke", 1)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_WAKING,
+		"wake() lands the boss in WAKING for the ~417ms wake-anim window")
+	assert_signal_emit_count(b, "boss_woke", 1,
+		"boss_woke fires once on wake entry (Beat 3)")
+	# Tick past WAKE_DURATION → boss transitions to IDLE.
+	for _i in 30:  # 30 * 0.016 = 480 ms > WAKE_DURATION 417 ms
+		b._physics_process(0.016)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_IDLE,
+		"after WAKE_DURATION elapsed in physics ticks, boss reaches IDLE")
 
 
 func test_wake_is_idempotent() -> void:
 	# Calling wake() twice does not re-fire boss_woke or interrupt state.
+	# Second call must early-return because state is no longer DORMANT
+	# (it's WAKING after the first call) — M3-T2-W1-T8 (86c9wjyp9).
 	var b: Stratum1Boss = _make_dormant_boss()
 	b.wake()
 	watch_signals(b)
 	b.wake()
 	assert_signal_emit_count(b, "boss_woke", 0,
-		"second wake() call is no-op")
+		"second wake() call is no-op (state already WAKING, not DORMANT)")
+
+
+func test_take_damage_during_waking_is_ignored() -> void:
+	# M3-T2-W1-T8 (86c9wjyp9): damage-immunity extends from DORMANT through
+	# WAKING. A player can't kill the boss before the wake-anim has played
+	# even if their swing lands in the first frame after `wake()`.
+	var b: Stratum1Boss = _make_dormant_boss()
+	b.wake()
+	assert_eq(b.get_state(), Stratum1Boss.STATE_WAKING, "precondition: WAKING")
+	var hp_before: int = b.get_hp()
+	b.take_damage(50, Vector2.ZERO, null)
+	assert_eq(b.get_hp(), hp_before,
+		"damage is rejected during WAKING (immunity matches DORMANT)")
+
+
+func test_take_damage_lands_after_wake_window_closes() -> void:
+	# Complement to above — once wake-anim completes the boss MUST be
+	# damage-eligible. Catches the regression where someone widens the
+	# immunity guard but forgets to release it on WAKING -> IDLE transition.
+	var b: Stratum1Boss = _make_dormant_boss()
+	b.wake()
+	for _i in 30:  # tick past WAKE_DURATION
+		b._physics_process(0.016)
+	assert_eq(b.get_state(), Stratum1Boss.STATE_IDLE, "precondition: IDLE")
+	var hp_before: int = b.get_hp()
+	b.take_damage(50, Vector2.ZERO, null)
+	assert_lt(b.get_hp(), hp_before,
+		"damage lands after the wake-anim window closes")
+
+
+func test_complete_wake_for_test_helper_advances_to_idle() -> void:
+	# The test-only fast-forward helper `complete_wake_for_test()` is what
+	# the Stratum1BossRoom test wraps to keep room-based integration tests
+	# landing in IDLE after entry-sequence completion. Pin it directly so a
+	# refactor that removes the helper without updating the chain surfaces
+	# here, not in 8 downstream integration tests.
+	var b: Stratum1Boss = _make_dormant_boss()
+	b.wake()
+	assert_eq(b.get_state(), Stratum1Boss.STATE_WAKING, "precondition: WAKING")
+	b.complete_wake_for_test()
+	assert_eq(b.get_state(), Stratum1Boss.STATE_IDLE,
+		"complete_wake_for_test fast-forwards WAKING -> IDLE")
+	# Idempotent — calling on a non-WAKING boss is a no-op (does not move
+	# IDLE -> DORMANT or perturb other states).
+	b.complete_wake_for_test()
+	assert_eq(b.get_state(), Stratum1Boss.STATE_IDLE,
+		"complete_wake_for_test is idempotent (no-op on non-WAKING boss)")
 
 
 # ---- Layers / hitbox contract -----------------------------------------
