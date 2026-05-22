@@ -138,6 +138,13 @@ var _tooltip: ItemTooltip = null
 
 func _ready() -> void:
 	layer = PANEL_LAYER
+	# Register in the "inventory_panel" group so `Player._inventory_is_open()`
+	# can resolve us by group rather than coupling to `Main`'s scene shape
+	# (ticket 86c9xxg0n — Sponsor's Option A modal-input-gate generalization;
+	# mirrors the "player" group lookup pattern used by Pickup / Grunt /
+	# Player._resolve_player). Idempotent: add_to_group is a no-op if already
+	# in the group.
+	add_to_group("inventory_panel")
 	_build_ui()
 	# Subscribe to Inventory autoload changes so the view refreshes after
 	# pickups / equips happen outside the panel UI flow.

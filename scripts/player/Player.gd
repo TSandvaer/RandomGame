@@ -1164,16 +1164,18 @@ func _process_grounded(_delta: float) -> void:
 	# dodge feels weird if you press W and dodge backwards toward the mouse).
 	# Attacks pass Vector2.ZERO so try_attack uses the mouse-derived `_facing`.
 	#
-	# **DialoguePanel input-leak gate** (ticket 86c9xuab3 — M3 Tier 3 W1
-	# dialogue system spike; pre-empts the analogous InventoryPanel leak ticket
-	# 86c9xwxhu). When a dialogue session is active, attack + dodge input must
-	# be suppressed — otherwise the player can swing through a conversation
-	# (visually disconcerting + LMB clicks on response buttons would double-fire
-	# as both UI selection AND a player swing). Movement is intentionally NOT
-	# gated (Diablo convention — player can walk away to abort dialogue per
-	# Uma's dialogue-direction.md draft; controller's signal-less close is
-	# the formal-exit channel via Esc, but walking off is a soft abort).
-	if _dialogue_is_active():
+	# **Modal-input-gate** (ticket 86c9xxg0n — Sponsor's Option A; generalized
+	# from the dialogue-only seed in 86c9xuab3 / PR #319). When ANY modal UI
+	# surface is active (DialogueController session OR InventoryPanel open),
+	# attack + dodge input must be suppressed — otherwise the player can swing
+	# through a conversation or fire a swing when clicking an inventory cell
+	# (Godot 4 Control event consumption does NOT block `Input.is_action_*`
+	# polling in the same frame, so LMB on a Button still trips attack_light
+	# from _process_grounded). Movement is intentionally NOT gated (Diablo
+	# convention — player can WASD-walk while a panel is open; only attack/
+	# dodge are suppressed). Future modals (Quest log, Settings) plug into the
+	# `_modal_is_active()` union by adding a single check there.
+	if _modal_is_active():
 		return
 	if Input.is_action_just_pressed("dodge"):
 		try_dodge(input_dir)
@@ -1183,11 +1185,20 @@ func _process_grounded(_delta: float) -> void:
 		try_attack(ATTACK_HEAVY, Vector2.ZERO)
 
 
-## Returns true when a DialogueController session is currently open. Gates
-## attack + dodge input in `_process_grounded` so the player cannot swing
-## through an active dialogue (ticket 86c9xuab3 — pre-empts InventoryPanel
-## leak class ticket 86c9xwxhu). Returns false when the DialogueController
-## autoload is missing (bare-instanced test contexts) — safe default.
+## Returns true when ANY modal UI surface is currently active — DialogueController
+## session OR InventoryPanel open. The production input-gate predicate (ticket
+## 86c9xxg0n — Sponsor's Option A; generalizes the dialogue-only seed from
+## ticket 86c9xuab3 / PR #319). Future modals (Quest log, Settings) plug in by
+## adding a single OR clause here. Returns false when no autoload / scene-instance
+## is reachable (bare-instanced test contexts) — safe default.
+func _modal_is_active() -> bool:
+	return _dialogue_is_active() or _inventory_is_open()
+
+
+## Returns true when a DialogueController session is currently open. Component
+## of `_modal_is_active()`. Kept as a named helper so `test_dialogue_panel.gd`
+## can pin the dialogue-surface invariant independently. Returns false when the
+## DialogueController autoload is missing (bare-instanced test contexts).
 func _dialogue_is_active() -> bool:
 	var loop: SceneTree = Engine.get_main_loop() as SceneTree
 	if loop == null:
@@ -1198,6 +1209,23 @@ func _dialogue_is_active() -> bool:
 	if not dc.has_method("is_active"):
 		return false
 	return dc.is_active()
+
+
+## Returns true when an `InventoryPanel` is registered in the "inventory_panel"
+## SceneTree group AND its `is_open()` returns true. Component of
+## `_modal_is_active()`. Lookup is via group (not Main.get_inventory_panel())
+## so the predicate stays decoupled from `Main`'s scene shape — bare-instanced
+## test contexts return false because no node is in the group. Safe default.
+func _inventory_is_open() -> bool:
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return false
+	var panel: Node = loop.get_first_node_in_group("inventory_panel")
+	if panel == null:
+		return false
+	if not panel.has_method("is_open"):
+		return false
+	return panel.is_open()
 
 
 func _process_dodge(_delta: float) -> void:
