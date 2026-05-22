@@ -1,0 +1,3 @@
+[log] [procgen-spike] ready zone=s1_z1_outer_cloister world_seed=3238090725 zone_seed=3555059973 chunks=13 bounds=(0,0,6240,256) mating_errors=1
+[log] [procgen-spike] assemble | placement=s1_room01@0,s1_room05@480,s1_room02@960,s1_room05@1440,s1_room03@1920,s1_room04@2400,s1_room05@2880,s1_room06@3360,s1_room08@3840,s1_room05@4320,s1_room03@4800,s1_room06@5280,s1_room08@5760
+[log] [procgen-spike] port_mating_errors | count=1 first=chunks[0]=s1_room01 <-> chunks[1]=s1_room05: left chunk has no open EAST port

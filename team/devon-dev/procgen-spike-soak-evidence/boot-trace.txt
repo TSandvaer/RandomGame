@@ -1,0 +1,17 @@
+[log] [Save] autoload ready (schema v4)
+[log] [BuildInfo] build: e900222
+[log] [DebugFlags] debug_build=false test_mode=false fast_xp=false web=true boss_hp_mult=1.000 start_room=-1
+[log] [CameraDirector] ready normalized_zoom=1.000 baseline=(2.6667,2.6667)
+[log] [combat-trace] CameraDirector.follow_target | target=PlayerMarker deadzone=(40.0,24.0)
+[log] [combat-trace] CameraDirector.set_world_bounds | pos=(0,0) size=(6240,256)
+[log] [procgen-spike] ready zone=s1_z1_outer_cloister world_seed=3238090725 zone_seed=3555059973 chunks=13 bounds=(0,0,6240,256) mating_errors=1
+[log] [procgen-spike] assemble | placement=s1_room01@0,s1_room05@480,s1_room02@960,s1_room05@1440,s1_room03@1920,s1_room04@2400,s1_room05@2880,s1_room06@3360,s1_room08@3840,s1_room05@4320,s1_room03@4800,s1_room06@5280,s1_room08@5760
+[log] [procgen-spike] port_mating_errors | count=1 first=chunks[0]=s1_room01 <-> chunks[1]=s1_room05: left chunk has no open EAST port
+[log] [combat-trace] CameraDirector.state | zoom=2.6667 pos=(240,128)
+[log] [combat-trace] CameraDirector.state | zoom=2.6667 pos=(240,128)
+[log] [combat-trace] CameraDirector.state | zoom=2.6667 pos=(240,128)
+[log] [combat-trace] CameraDirector.state | zoom=2.6667 pos=(240,128)
+[log] [combat-trace] CameraDirector.state | zoom=2.6667 pos=(240,128)
+[log] [combat-trace] CameraDirector.state | zoom=2.6667 pos=(240,128)
+[log] [combat-trace] CameraDirector.state | zoom=2.6667 pos=(240,128)
+[log] [combat-trace] CameraDirector.state | zoom=2.6667 pos=(240,128)
