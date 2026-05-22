@@ -65,6 +65,9 @@ For deep-dive reference, see the topic files in `.claude/docs/`:
 - [PixelLab Pipeline](.claude/docs/pixellab-pipeline.md) — PixelLab tool sequence (create_character → get_character → curl), canvas-size trap (`size` is character height not canvas), quantize dupe-slot mitigation, doctrine-compliance strategies (per-slot nearest-neighbor validated as BEST), cost model, `import_image` param trap
 - [TimeScaleDirector](.claude/docs/time-scale-director.md) — stacked-request ownership of `Engine.time_scale`, priority-overlay resolution, `freeze()` sugar with `ignore_time_scale` timer, InventoryPanel migration policy
 - [Dialogue System](.claude/docs/dialogue-system.md) — DialogueTreeDef / DialogueBranch / DialogueResponse Resource schema, DialogueController autoload (single-session + branch resolution + quest_action side-effect channel), DialoguePanel modal UI, Player attack-input gating convention seed
+- [Camera Layer](.claude/docs/camera-layer.md) — `CameraDirector` autoload + zoom API (T9), Director-with-internal-puppet pattern (sibling to `AudioDirector` / `TimeScaleDirector`), default-zoom = viewport-stretch ratio calibration (NOT `Vector2(1,1)`)
+- [Camera Scroll](.claude/docs/camera-scroll.md) — continuous-scroll `follow_target` + deadzone + `set_world_bounds` clamp on `CameraDirector` (M3 Tier 3 W1 spike PR #314), foundation for S1 retrofit / procgen `assemble_floor` / S2 consumers
+- [Sponsor Soak Routing](.claude/docs/sponsor-soak-routing.md) — when Playwright + Tess is sufficient (mechanical correctness) vs when Sponsor soak is the binding gate (subjective feel, first-of-class visual, tier-completion); right-sizing the Sponsor ask
 
 ## Key references outside `.claude/docs/`
 

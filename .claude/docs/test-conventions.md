@@ -389,6 +389,79 @@ The gate at `Stratum1BossRoom.gd:358` (currently — verify line if refactored) 
 
 **Symptom to recognize:** test premise reads "no boss should mean no entry-sequence-active" yet GUT log shows the entry sequence engaging anyway after a frame-drain await. The deferred-call resolution is the culprit, not the test order.
 
+## Spike-class specs — diag-build-gated activation pattern (PR #314 finding)
+
+**Context.** M3 Tier 3 W1 (PR #314, commit `e695bd9`) shipped a continuous-scroll camera spike that lives in `scenes/spike/CameraScrollSpike.tscn` — a hand-stitched 3-chunk test scene, NOT a feature of the production play loop. The matching Playwright spec `tests/playwright/specs/camera-scroll-spike.spec.ts` lives in `tests/playwright/specs/` (auto-discovered by Playwright) and runs on every CI Playwright lane, but it must NOT fail against the production artifact where `run/main_scene = Main.tscn`. The diag-build pattern (per `html5-export.md` § "Diagnostic-build pattern") flips the spike to active only on a transient `diag/*` branch with `project.godot::run/main_scene` swapped to the spike scene.
+
+**The two-step engage pattern.** Race the spike's boot line against the production boot line; skip cleanly if production wins.
+
+```typescript
+const SPIKE_BOOT_REGEX = /\[CameraScrollSpike\] ready/;
+const MAIN_BOOT_REGEX = /\[Main\] M1 play-loop ready/;
+
+await Promise.race([
+  capture.waitForLine(SPIKE_BOOT_REGEX, BOOT_TIMEOUT_MS),
+  capture.waitForLine(MAIN_BOOT_REGEX, BOOT_TIMEOUT_MS),
+]);
+
+const spikeBootLine = capture.getLines().find((l) => SPIKE_BOOT_REGEX.test(l.text));
+
+test.skip(
+  spikeBootLine === undefined,
+  "Production artifact (Main.tscn) loaded — spike scene not active. " +
+    "To activate: see file header for the diag-build workflow."
+);
+
+// ... spike-only assertions below ...
+```
+
+**Why race-then-skip rather than a static `test.describe.skip`:** the spec needs to determine activation **at runtime by reading the boot console**, not from a static config. A static skip flag would require diag-build authors to also flip a spec-side switch (drift risk). The race pattern is self-configuring — flip `run/main_scene` in `project.godot`, the spec auto-activates against the resulting artifact. Production runs see `[Main] M1 play-loop ready` first, `spikeBootLine === undefined`, `test.skip(...)` fires → 1 skipped, 0 failed.
+
+**What this pattern PROVES (when active):**
+
+- Spike scene boots without `USER WARNING:` / `USER ERROR:` (universal warning gate still on per test-base.ts fixture).
+- `[combat-trace]` trace lines fire confirming API invocation (e.g. `CameraDirector.follow_target | target=PlayerMarker deadzone=(40,24)`).
+- No physics-flush panic from new mutation paths (per `godot-physics-flush-area2d-rule`).
+- BuildInfo SHA still emits (overall boot chain intact).
+
+**What it does NOT cover:** human-perception assertions (chunk-seam z-index, tile gaps, HUD anchoring during scroll). Per the `Playwright headless ≠ real-browser perception` section above, those require Sponsor / author interactive soak via the diag-build workflow. Trace + config verification is the spec's job; visibility-of-effect is the soak's job.
+
+**Apply this shape whenever** a Playwright spec targets a non-production scene only reachable via the diag-build pattern. Examples: future room-boundary spikes, isolated boss-test scenes, perf-stress spikes. The cite-of-record is PR #314 commit `e695bd9` + `tests/playwright/specs/camera-scroll-spike.spec.ts:80-110` (the activation race + skip block).
+
+## Source-scan structural pins — code-ordering invariants no behavioural test can pin (PR #323 finding)
+
+**The trap.** Some invariants are about **code ordering inside a single function**, not about externally-observable behaviour. Example from PR #323: the gate-check `if _modal_is_active(): return` in `Player._process_grounded` must sit AFTER the velocity-write (`velocity = input_dir * speed`) but BEFORE the attack/dodge input-polls. A future refactor moving the gate above the velocity-write would break movement-while-modal-open without breaking ANY behavioural test — bare-instanced GUT tests can't synthesise `Input.is_action_*` global state in Godot 4 GDScript, so they can't directly observe the input-polling output.
+
+**The pattern — read the source file and assert positional relationships.**
+
+```gdscript
+const PLAYER_SOURCE_PATH := "res://scripts/Player.gd"
+
+func test_movement_input_not_gated_by_inventory() -> void:
+    var source := FileAccess.get_file_as_string(PLAYER_SOURCE_PATH)
+    assert_gt(source.length(), 0, "Player.gd readable as resource")
+
+    var velocity_pos := source.find("velocity = input_dir * speed")
+    var gate_pos := source.find("if _modal_is_active():\n\t\treturn")
+
+    assert_gt(velocity_pos, -1, "velocity-write line present")
+    assert_gt(gate_pos, -1, "modal-gate line present")
+    assert_lt(velocity_pos, gate_pos,
+        "velocity-write must precede modal-gate (movement not gated by modals)")
+```
+
+**Why this isn't fragile.** The needle strings are full-line idioms unique to the file. A whitespace-only refactor (single-line → wrapped) breaks the find, but produces a LOUD assertion failure ("velocity-write line present"), not a silent miss. A semantic refactor that legitimately reshapes the function must update the pin in the same PR — surfacing the invariant for re-review.
+
+**Why this isn't a code-style pin.** The assertion does NOT check formatting, brace style, or comment presence. It checks **the relative position of two semantic load-bearing lines** — a contract no `assert_eq(behaviour, expected)` can express because the failure mode (modal-open suppresses movement) requires player input the test environment cannot synthesise.
+
+**Apply this pattern when:**
+
+- An ordering invariant exists between two statements inside one function.
+- No behavioural shim is available to assert the invariant directly (Godot 4 GDScript can't stub `Input.is_action_pressed`, can't intercept input-poll return values, can't stub the global engine input state).
+- A refactor reshaping the function would be load-bearing — silent reversal would be a real regression.
+
+**Cite shape.** PR #323 introduced this pattern in `tests/test_player_modal_input_gate.gd:194` (commit `2779647`, ticket `86c9xxg0n`). The same shape can pin any "this line must come before / after that line" invariant — `Mob._die` cleanup ordering, save-migration step ordering, resource-load-vs-init ordering. Use sparingly; behavioural tests remain the default. Source-scan pins exist for invariants the behavioural surface cannot reach.
+
 ## Cross-references
 
 - `team/TESTING_BAR.md` — Definition-of-Done, visual-primitive tiers, role-specific obligations
