@@ -315,12 +315,12 @@ Tier 1 (mandatory): target color ≠ rest color (`assert_ne`). Tier 2 (mandatory
 
 ```gdscript
 var room = preload("res://scenes/levels/Stratum1BossRoom.tscn").instantiate()
-room.boss_scene_path = ""    # <-- BEFORE add_child_autofree; sets the gate at Stratum1BossRoom.gd:321
+room.boss_scene_path = ""    # <-- BEFORE add_child_autofree; closes the gate at Stratum1BossRoom.gd:358
 add_child_autofree(room)
 await _drain_fixture_pass() # process_frame drain still safe — auto-fire gate now closed
 ```
 
-The gate at `Stratum1BossRoom.gd:321` (currently — verify line if refactored) checks `boss_scene_path != ""` before auto-firing `trigger_entry_sequence()`. Setting it to `""` before child-add closes the gate before the deferred call runs.
+The gate at `Stratum1BossRoom.gd:358` (currently — verify line if refactored) checks `if _boss != null:` before auto-firing `trigger_entry_sequence()`. Setting `boss_scene_path = ""` before child-add closes the gate indirectly: `_spawn_boss()` (around `:485`) calls `load(boss_scene_path)`, which returns null on the empty path → `push_error` + early return → `_boss` stays null → the `_boss != null` gate fails → no auto-fire.
 
 **Order matters:** `boss_scene_path = ""` must be set **before** `add_child_autofree(room)`. Setting it after means `_ready` has already queued the deferred call against the original `boss_scene_path` value.
 
