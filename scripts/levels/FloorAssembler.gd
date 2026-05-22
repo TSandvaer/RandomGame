@@ -341,8 +341,15 @@ func _sweep_port_mating(
 		var right_chunk: LevelChunkDef = resolved[right_pc.chunk_id]
 		var pair_err: String = _check_port_mating(left_chunk, right_chunk)
 		if pair_err != "":
+			# ASCII-only separator (`<->` not `↔`) — Godot 4.3 HTML5
+			# default-font lacks U+2194 glyph coverage, so non-ASCII
+			# renders as a tofu box in any UI surface that displays this
+			# string. See `.claude/docs/html5-export.md` § "Default-font
+			# glyph coverage". The ProcgenSpike scene surfaces this
+			# string in its amber-error HUD label — empirically caught
+			# during the M3 Tier 3 W1 author-self-soak (commit ff67d0c).
 			errors.append(
-				"chunks[%d]=%s ↔ chunks[%d]=%s: %s"
+				"chunks[%d]=%s <-> chunks[%d]=%s: %s"
 				% [i, str(left_pc.chunk_id), i + 1, str(right_pc.chunk_id), pair_err]
 			)
 	return errors

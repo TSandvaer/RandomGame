@@ -86,7 +86,7 @@ const MAIN_BOOT_REGEX = /\[Main\] M1 play-loop ready/;
 // The fixed world_seed pinned by ProcgenSpike.gd::SPIKE_WORLD_SEED (0xC10157E5).
 // If a future refactor changes the constant, this spec's exact-match
 // regex must be updated in lockstep.
-const SPIKE_WORLD_SEED = 0xc10157e5; // 3238060005
+const SPIKE_WORLD_SEED = 0xc10157e5; // 3238090725 (verified against Godot %d output)
 const SPIKE_ZONE_ID = "s1_z1_outer_cloister";
 
 test.describe("ProcgenSpike — M3-T3-W1 procgen visual proof scene", () => {
