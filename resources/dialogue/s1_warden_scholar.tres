@@ -1,0 +1,67 @@
+[gd_resource type="Resource" script_class="DialogueTreeDef" load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueTreeDef.gd" id="1_tree"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueBranch.gd" id="2_branch"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueResponse.gd" id="3_response"]
+
+[sub_resource type="Resource" id="Resource_response_accept"]
+script = ExtResource("3_response")
+text = "I'll find what you lost."
+next_branch_key = &"flavor"
+quest_action = &"accept_bounty:s1_warden_scholar"
+
+[sub_resource type="Resource" id="Resource_response_decline"]
+script = ExtResource("3_response")
+text = "Not today."
+next_branch_key = &""
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_response_more"]
+script = ExtResource("3_response")
+text = "Tell me more about the codex."
+next_branch_key = &"codex_detail"
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_response_codex_back"]
+script = ExtResource("3_response")
+text = "Back."
+next_branch_key = &"pre_quest"
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_branch_flavor"]
+script = ExtResource("2_branch")
+lines = ["The walls hum quieter when you stand close.", "Mind the ash. It remembers footsteps."]
+responses = []
+
+[sub_resource type="Resource" id="Resource_branch_pre_quest"]
+script = ExtResource("2_branch")
+lines = ["Warden... ranger... whatever the cloister calls me now.", "I had a codex. The ember took it. It's in the Vaults below."]
+responses = [SubResource("Resource_response_accept"), SubResource("Resource_response_more"), SubResource("Resource_response_decline")]
+
+[sub_resource type="Resource" id="Resource_branch_codex_detail"]
+script = ExtResource("2_branch")
+lines = ["Leather bound. Iron-stitched. The Warden-Scholars wrote it across three lifetimes.", "The ember does not read. It only burns."]
+responses = [SubResource("Resource_response_codex_back")]
+
+[sub_resource type="Resource" id="Resource_branch_quest_active"]
+script = ExtResource("2_branch")
+lines = ["Still nothing? Walk deeper. The Vaults swallow patient feet first."]
+responses = []
+
+[sub_resource type="Resource" id="Resource_branch_quest_completed"]
+script = ExtResource("2_branch")
+lines = ["The codex. You... thank you.", "I will read it once more before I let the ember finish its work."]
+responses = []
+
+[resource]
+script = ExtResource("1_tree")
+npc_id = &"s1_warden_scholar"
+display_name = "The Warden-Scholar"
+branches = {
+&"flavor": SubResource("Resource_branch_flavor"),
+&"pre_quest": SubResource("Resource_branch_pre_quest"),
+&"codex_detail": SubResource("Resource_branch_codex_detail"),
+&"quest_active": SubResource("Resource_branch_quest_active"),
+&"quest_completed": SubResource("Resource_branch_quest_completed")
+}
+default_branch_key = &"flavor"

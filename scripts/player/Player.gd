@@ -1163,12 +1163,41 @@ func _process_grounded(_delta: float) -> void:
 	# Dodge still consumes input_dir (movement-direction dodge by design — the
 	# dodge feels weird if you press W and dodge backwards toward the mouse).
 	# Attacks pass Vector2.ZERO so try_attack uses the mouse-derived `_facing`.
+	#
+	# **DialoguePanel input-leak gate** (ticket 86c9xuab3 — M3 Tier 3 W1
+	# dialogue system spike; pre-empts the analogous InventoryPanel leak ticket
+	# 86c9xwxhu). When a dialogue session is active, attack + dodge input must
+	# be suppressed — otherwise the player can swing through a conversation
+	# (visually disconcerting + LMB clicks on response buttons would double-fire
+	# as both UI selection AND a player swing). Movement is intentionally NOT
+	# gated (Diablo convention — player can walk away to abort dialogue per
+	# Uma's dialogue-direction.md draft; controller's signal-less close is
+	# the formal-exit channel via Esc, but walking off is a soft abort).
+	if _dialogue_is_active():
+		return
 	if Input.is_action_just_pressed("dodge"):
 		try_dodge(input_dir)
 	elif Input.is_action_just_pressed("attack_light"):
 		try_attack(ATTACK_LIGHT, Vector2.ZERO)
 	elif Input.is_action_just_pressed("attack_heavy"):
 		try_attack(ATTACK_HEAVY, Vector2.ZERO)
+
+
+## Returns true when a DialogueController session is currently open. Gates
+## attack + dodge input in `_process_grounded` so the player cannot swing
+## through an active dialogue (ticket 86c9xuab3 — pre-empts InventoryPanel
+## leak class ticket 86c9xwxhu). Returns false when the DialogueController
+## autoload is missing (bare-instanced test contexts) — safe default.
+func _dialogue_is_active() -> bool:
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return false
+	var dc: Node = loop.root.get_node_or_null("DialogueController")
+	if dc == null:
+		return false
+	if not dc.has_method("is_active"):
+		return false
+	return dc.is_active()
 
 
 func _process_dodge(_delta: float) -> void:
