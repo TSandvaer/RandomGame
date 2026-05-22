@@ -428,6 +428,81 @@ func test_boss_wake_and_phase_break_cues_exist_in_sfx_paths() -> void:
 		"SFX_PATHS contains sfx-boss-wake (M3-T2-W1-T7)")
 
 
+# ---- Section 5c: M3-T2-W3-T16b boss-kill horn (Beat F2 cinematic) -----
+# Maps to Uma `boss-intro.md` Beat F2 + `audio-direction.md` row
+# sfx-boss-kill-horn (AD-23 tester check). Fires from
+# `Stratum1BossRoom._play_t16_cinematic_climax(death_position)` (Drew's
+# T16a wiring); paired-test surface here pins:
+#   1. Cue id matches the constant Drew's wiring references (producer ↔
+#      consumer string contract — same shape as the team-constants drift
+#      pin in `.claude/docs/test-conventions.md`).
+#   2. SFX_PATHS has the cue → resource map entry.
+#   3. The shipped OGG loads as an AudioStream (asset exists + decodes).
+#   4. Cue duration matches the 0.9 s Uma F2 spec (loose tolerance for
+#      OGG encoder padding — asserts within 0.85 .. 0.95 s window).
+#   5. `play_sfx(SFX_BOSS_KILL_HORN)` records `last_sfx_id` correctly
+#      (i.e. the cue is dispatched, not silently hit the UNKNOWN no-op).
+#
+# **Regression guard contract:** if a future PR drops the OGG asset, renames
+# the cue id, breaks the SFX_PATHS entry, or alters the composer-emitted
+# duration outside the F2 window, this file catches the regression at CI
+# time. The bug class is "boss-kill horn no longer fires / wrong cue / wrong
+# duration" — invisible to existing tests (which were authored before this
+# cue existed) and otherwise only catchable by Sponsor's interactive soak.
+
+func test_sfx_boss_kill_horn_cue_id_constant_matches_wiring_string() -> void:
+	# Drew's `Stratum1BossRoom.gd::T16_HORN_SFX_CUE_ID` is the consumer-side
+	# StringName. The constant value MUST equal the producer-side
+	# `AudioDirector.SFX_BOSS_KILL_HORN` StringName, or play_sfx hits the
+	# UNKNOWN safe-no-op branch and the horn is silent. Pin both sides.
+	assert_eq(String(AudioDirectorScript.SFX_BOSS_KILL_HORN),
+		"sfx-boss-kill-horn",
+		"AudioDirector.SFX_BOSS_KILL_HORN string == 'sfx-boss-kill-horn'")
+	# Cross-check Drew's consumer-side string. Stratum1BossRoom defines
+	# `T16_HORN_SFX_CUE_ID` (StringName); they must agree.
+	var BossRoomScript: Script = preload("res://scripts/levels/Stratum1BossRoom.gd")
+	assert_eq(String(BossRoomScript.T16_HORN_SFX_CUE_ID),
+		"sfx-boss-kill-horn",
+		"Stratum1BossRoom.T16_HORN_SFX_CUE_ID matches the producer-side cue id")
+
+
+func test_sfx_boss_kill_horn_in_sfx_paths() -> void:
+	# Regression guard against the cue-id ↔ SFX_PATHS map drift class.
+	assert_true(AudioDirectorScript.SFX_PATHS.has(&"sfx-boss-kill-horn"),
+		"SFX_PATHS contains sfx-boss-kill-horn (M3-T2-W3-T16b)")
+	var path: String = AudioDirectorScript.SFX_PATHS[&"sfx-boss-kill-horn"]
+	assert_eq(path, "res://audio/sfx/mobs/sfx-boss-kill-horn.ogg",
+		"SFX_PATHS entry points to audio/sfx/mobs/ (audio-direction.md §4 folder rule)")
+
+
+func test_sfx_boss_kill_horn_asset_loads_and_duration_matches_spec() -> void:
+	# Asset exists, decodes as AudioStream, AND duration is within the
+	# Uma F2 window (0.9 s ± 50 ms tolerance for OGG encoder framing).
+	# A future re-encode that drifts the duration outside the window
+	# would silently shift the cinematic timing — the horn-tail-into-
+	# silence-at-T+1.2s contract depends on the 0.9 s duration landing.
+	var path: String = AudioDirectorScript.SFX_PATHS[&"sfx-boss-kill-horn"]
+	var stream: Resource = load(path)
+	assert_not_null(stream,
+		"sfx-boss-kill-horn loads at %s" % path)
+	assert_true(stream is AudioStream,
+		"sfx-boss-kill-horn is an AudioStream subclass (got %s)" % stream.get_class())
+	var length_s: float = (stream as AudioStream).get_length()
+	assert_between(length_s, 0.85, 0.95,
+		"sfx-boss-kill-horn duration %.3f s within F2 spec window (0.85..0.95)" % length_s)
+
+
+func test_play_sfx_boss_kill_horn_records_last_sfx_id() -> void:
+	# Pin the producer-side dispatch — play_sfx(SFX_BOSS_KILL_HORN) is the
+	# only thing Drew's `_play_t16_cinematic_climax` does for audio; assert
+	# the cue is recognized, not silently dispatched into the UNKNOWN branch.
+	var ad: Node = _get_audio_director()
+	ad.reset_sfx_pool_index_for_test()
+	ad.play_sfx(AudioDirectorScript.SFX_BOSS_KILL_HORN)
+	assert_eq(ad.get_last_sfx_id(), StringName("sfx-boss-kill-horn"),
+		"play_sfx(SFX_BOSS_KILL_HORN) records last_sfx_id (Beat F2 cinematic horn)")
+
+
 # ---- Section 6: Wiring is idempotent (re-`_ready` doesn't double-connect)
 
 func test_grunt_re_ready_does_not_double_connect() -> void:
