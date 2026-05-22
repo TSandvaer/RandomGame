@@ -1,0 +1,87 @@
+[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_procgen_spike"]
+
+[ext_resource type="Script" path="res://scripts/spike/ProcgenSpike.gd" id="1_spike"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_marker"]
+size = Vector2(12, 16)
+
+[node name="ProcgenSpike" type="Node2D"]
+script = ExtResource("1_spike")
+
+; ---- World root — floor chunks + seam markers spawned at runtime ----
+; ProcgenSpike.gd's _ready() loads the worked-example ZoneDef, runs
+; FloorAssembler.assemble_floor(...), and spawns ColorRect floor +
+; Label + 2-px seam-marker nodes under this World. The hand-stitched
+; ColorRects from the camera-scroll spike are intentionally not
+; replicated here — the placement IS the proof; we render what the
+; assembler produces.
+
+[node name="World" type="Node2D" parent="."]
+
+; ---- Marker (the camera's follow target) ----
+; Same shape as the camera-scroll spike: CharacterBody2D + 12×16
+; ember-orange Sprite ColorRect. WASD via the production move_*
+; InputMap. ProcgenSpike.gd repositions the marker to the entry
+; anchor's left-quarter in _ready (so the marker doesn't spawn off the
+; rendered floor).
+
+[node name="PlayerMarker" type="CharacterBody2D" parent="."]
+position = Vector2(0, 128)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PlayerMarker"]
+shape = SubResource("RectangleShape2D_marker")
+
+[node name="Sprite" type="ColorRect" parent="PlayerMarker"]
+offset_left = -6.0
+offset_top = -8.0
+offset_right = 6.0
+offset_bottom = 8.0
+color = Color(1, 0.42, 0.16, 1)
+mouse_filter = 2
+
+; ---- HUD (CanvasLayer — immune to camera per HUD-immunity invariant) ----
+
+[node name="HUD" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="BuildLabel" type="Label" parent="HUD"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 700.0
+offset_bottom = 24.0
+text = "[ProcgenSpike] build=…"
+
+[node name="AssembleLabel" type="Label" parent="HUD"]
+offset_left = 8.0
+offset_top = 28.0
+offset_right = 700.0
+offset_bottom = 44.0
+text = "seed=… chunks=… (anchors=… procedural=…)"
+
+[node name="MarkerPosLabel" type="Label" parent="HUD"]
+offset_left = 8.0
+offset_top = 48.0
+offset_right = 400.0
+offset_bottom = 64.0
+text = "marker=(…,…)"
+
+[node name="CameraPosLabel" type="Label" parent="HUD"]
+offset_left = 8.0
+offset_top = 68.0
+offset_right = 400.0
+offset_bottom = 84.0
+text = "camera=(…,…)"
+
+[node name="ChunksLabel" type="Label" parent="HUD"]
+offset_left = 8.0
+offset_top = 88.0
+offset_right = 700.0
+offset_bottom = 104.0
+text = "bounds=(…)"
+
+[node name="MatingLabel" type="Label" parent="HUD"]
+offset_left = 8.0
+offset_top = 108.0
+offset_right = 1272.0
+offset_bottom = 124.0
+text = "port_mating_errors=…"
