@@ -73,6 +73,18 @@ const _V2_MAX_LEVEL: int = 5
 # character's lifetime, subsequent boss intros can be collapsed by
 # pressing any movement key during Beats 2–4. Default false (first-ever
 # fight is NOT skippable). Mirrors `first_level_up_seen` lifecycle exactly.
+#
+# Additive v4 extension (2026-05-22, M3 Tier 3 W1 procgen spike Part B,
+# ticket 86c9xub9p): `character.world_seed` — per-character procgen seed
+# rolled on character creation, immutable thereafter. Drives
+# `FloorAssembler.derive_zone_seed(...)` so every character sees a
+# deterministic-per-them map layout (Diablo-shape per
+# `m3-diablo-shape-directive` memory). Default `0` is the migration
+# back-fill (legacy v3/v4 characters); fresh characters get a rolled
+# `randi()` value via `default_payload()`. Stays on schema v4 — the v5
+# plan (multi-character lift) owns the next bump; world_seed is a
+# purely additive field within v4's character block per the
+# additive-only rule in `save-schema-v4-plan.md §4.1`.
 const DEFAULT_PAYLOAD: Dictionary = {
 	"character": {
 		"name": "Ember-Knight",
@@ -92,6 +104,12 @@ const DEFAULT_PAYLOAD: Dictionary = {
 		"first_boss_kill_seen": false,
 		"hp_current": 100,
 		"hp_max": 100,
+		# Per-character procgen seed — rolled on character creation,
+		# immutable thereafter. Default 0 is the migration back-fill
+		# sentinel; fresh characters get a non-zero rolled value via
+		# `default_payload()`. See `scripts/levels/FloorAssembler.gd`
+		# § "Seed-derivation contract" for the consumer side.
+		"world_seed": 0,
 	},
 	"stash": [],         # list of item dicts
 	"equipped": {},      # slot -> item dict
@@ -186,10 +204,23 @@ func load_game(slot: int = 0) -> Dictionary:
 
 ## Returns a fresh deep-copy of the default payload. Used by new-game flow
 ## and as a fallback by save_game when no data is supplied.
+##
+## Rolls a fresh `character.world_seed` via `randi()` so each new character
+## gets a distinct per-character procgen seed (Diablo-shape per
+## `m3-diablo-shape-directive`). The seed is immutable thereafter — the
+## migration back-fill default (`0`) is replaced HERE so a hand-rolled
+## "new character" flow + the `save_game(slot, null)` fallback both land
+## on a meaningful seed.
 func default_payload() -> Dictionary:
 	# Manual deep-copy because Dictionary.duplicate(true) duplicates nested
 	# arrays/dicts — exactly what we want.
-	return DEFAULT_PAYLOAD.duplicate(true)
+	var payload: Dictionary = DEFAULT_PAYLOAD.duplicate(true)
+	# Fresh roll for new characters. randi() returns [0, 2^32); we keep the
+	# full range so the FloorAssembler.derive_zone_seed cascade has plenty
+	# of entropy. Hash collisions across characters are statistically
+	# negligible at population sizes we'll ever ship.
+	payload["character"]["world_seed"] = randi()
+	return payload
 
 
 # ---- Crash-safe write helper -------------------------------------------
@@ -348,12 +379,24 @@ func _migrate_v2_to_v3(data: Dictionary) -> Dictionary:
 ## Mirrors the `_migrate_v2_to_v3` defensive-guard idiom — character
 ## block backfilled if missing; per-field `has()` check before backfill
 ## (idempotent on already-v4 data).
+##
+## Additive 2026-05-22 (M3 Tier 3 W1 procgen Part B, ticket 86c9xub9p):
+## also backfills `character.world_seed` to `0` for legacy v3/v4 saves
+## (sentinel meaning "rolled on first new-character creation, this
+## character predates the seed roll"). Idempotent — re-running on
+## already-v4 data with a non-zero `world_seed` does NOT overwrite it.
+## Migrated characters that hit a procgen surface before a fresh new-
+## character flow re-rolls will see a deterministic but boring
+## `derive_zone_seed(0, ...)` layout — acceptable for migrated saves;
+## the M3 multi-character title flow will re-roll for any fresh slot.
 func _migrate_v3_to_v4(data: Dictionary) -> Dictionary:
 	if not data.has("character") or not (data["character"] is Dictionary):
 		data["character"] = DEFAULT_PAYLOAD["character"].duplicate(true)
 	var character: Dictionary = data["character"]
 	if not character.has("first_boss_kill_seen"):
 		character["first_boss_kill_seen"] = false
+	if not character.has("world_seed"):
+		character["world_seed"] = 0
 	return data
 
 

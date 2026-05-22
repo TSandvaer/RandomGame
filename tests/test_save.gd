@@ -116,7 +116,9 @@ func test_envelope_carries_schema_version_and_saved_at() -> void:
 	var parsed: Variant = JSON.parse_string(raw)
 	assert_true(parsed is Dictionary)
 	# Schema is at v4 as of 2026-05-22 (added first_boss_kill_seen for the
-	# boss-intro skip rule per M3-T2-W3-T17, ticket 86c9wjzjf).
+	# boss-intro skip rule per M3-T2-W3-T17, ticket 86c9wjzjf). Additive
+	# v4 extension 2026-05-22 added `character.world_seed` (M3 Tier 3 W1
+	# procgen spike Part B, ticket 86c9xub9p) — no schema bump.
 	assert_eq(int(parsed["schema_version"]), 4, "envelope contains schema_version=4")
 	assert_true(parsed.has("saved_at"))
 	assert_true(parsed.has("data"))
