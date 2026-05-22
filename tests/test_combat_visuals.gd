@@ -390,9 +390,16 @@ func test_grunt_death_particles_parented_to_room_not_self() -> void:
 	assert_eq(_count_particles_under(g), 0, "burst NOT parented to mob")
 
 
-func test_boss_death_particles_count_is_24() -> void:
-	# Climax bump per Uma §3 boss-addendum: 24 particles vs grunt's 6.
-	assert_eq(Stratum1Boss.DEATH_PARTICLE_COUNT, 24, "boss climax = 4× particle volume")
+func test_boss_climax_burst_is_sustained_high_particle_count() -> void:
+	# T16 (`86c9wjzgh`, M3 Tier 2 Wave 3) — replaced the legacy 24-particle
+	# one-shot pop with a sustained 0.9 s ember-rise emitter. The constant
+	# moved from `DEATH_PARTICLE_COUNT = 24` to `CLIMAX_BURST_PARTICLE_COUNT
+	# = 56` and the emission shape changed from `explosiveness = 1.0` to
+	# `~0.1` (mostly sustained). Per `tests/test_stratum1_boss_climax_burst.gd`
+	# for the full T16 invariants; this test pins the cross-mob comparative
+	# bar (boss > grunt × N) from a class-level constant comparison.
+	assert_gt(Stratum1Boss.CLIMAX_BURST_PARTICLE_COUNT, Grunt.DEATH_PARTICLE_COUNT * 4,
+		"boss climax particle count > 4× grunt particle count (Uma §3 climax bump, T16 refresh)")
 	var room: Node2D = autofree(Node2D.new())
 	add_child(room)
 	var b: Stratum1Boss = BossScript.new()
@@ -404,7 +411,8 @@ func test_boss_death_particles_count_is_24() -> void:
 	# Find the burst and assert its `amount`.
 	var burst: CPUParticles2D = _first_particle_under(room)
 	assert_not_null(burst, "boss spawns a burst under the room")
-	assert_eq(burst.amount, 24, "boss burst is 24 particles per Uma §3 climax bump")
+	assert_eq(burst.amount, Stratum1Boss.CLIMAX_BURST_PARTICLE_COUNT,
+		"boss burst amount matches CLIMAX_BURST_PARTICLE_COUNT (T16 sustained-emission refactor)")
 
 
 # ---- Boss climax: shake + 400ms hold + 200ms decay -----------------
