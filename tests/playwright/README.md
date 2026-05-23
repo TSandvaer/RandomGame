@@ -294,6 +294,27 @@ These specs fail on first attempt + pass on retry consistently across recent `ma
 
 **Escalation threshold:** re-evaluate Options A (fix the underlying race) or B (`test.retry(1)` suppression) when a 3rd persistent-flake surfaces OR when main Playwright signal-to-noise crosses tolerance. Triage call lives with Tess.
 
+**Update 2026-05-23:** the two flakes above were promoted to **quarantined** along with four additional persistent failures — see next section. Escalation threshold reached: Option A (proper triage) is now in flight under ClickUp `86c9y00m1`. The escalation-threshold pattern documented above stands as the convention for future flake-class decisions.
+
+---
+
+## Quarantined specs (do not bisect; pending triage)
+
+These specs are quarantined via `test.skip(...)` because they fail consistently (no retry-green) across recent `main` runs (15/15 since 2026-05-22 14:57Z, run IDs `26295172465` through `26316145193`). Workflow has been burning ~8.5 runner-hours/day on red signal that no longer carries fix-pressure information. Quarantine is the cheapest restore-to-green operation; a proper triage ticket owns the re-enable.
+
+| Spec | Cause | Re-enable gate |
+|---|---|---|
+| `pr291-aftershock-visual.spec.ts:33` | `Stratum1Boss.wake.*now IDLE` 10000ms timeout — headless-vs-real-browser perception divergence | Headless boss-wake state-machine determinism or URL-param activation trigger |
+| `pr291-boss-slam-diag.spec.ts:28` | Same root-cause class as above | Same |
+| `pr300-wake-anim-visual.spec.ts:49` | `in-wake attack must NOT land damage` assert + boss-wake IDLE timeout — same class | Same |
+| `t16-cinematic-climax.spec.ts:42` | `Universal console-warning gate: 1 USER WARNING/ERROR line` — pre-existing warning at boot, cinematic class | Identify warning source, route through `WarningBus.warn` or add `expectedUserWarnings` allow-list |
+| `audio-bus-boot-smoke.spec.ts:41` | Promoted from documented flake (`86c9xy0mk`) — retry no longer reliably green | AudioContext race determinism investigation |
+| `soak-narrative-regression.spec.ts:270` | Promoted from documented flake (`86c9xy0mk`) — Room 02 traversal nondeterminism | Room 02 boot determinism (spawn timing, walk duration) |
+
+**Triage ticket:** ClickUp `86c9y00m1` ("Playwright quarantine triage — re-enable 6 quarantined specs"). Owns the proper investigation + re-enable PRs.
+
+**Rule:** when a quarantined spec is re-enabled, the PR doing so MUST cite this ticket + verify the spec passes 8 consecutive runs against `main` HEAD before removing the `test.skip()` (sample-size discipline N>=8).
+
 ---
 
 ## Environment variables

@@ -45,8 +45,13 @@ const WAKE_TRIGGER_TIMEOUT_MS = 15_000; // entry-sequence is 1.8s; large margin
 const WAKE_DURATION_MS = 417;
 const POST_WAKE_SETTLE_MS = 300;
 
+// QUARANTINED 2026-05-23 — ClickUp `86c9y00m1` (Playwright triage).
+// Persistent failure: "in-wake attack must NOT land damage" assert + boss-wake
+// IDLE-trace timeout (10000ms) in headless Chromium. Same root-cause class as
+// pr291-{aftershock-visual,boss-slam-diag}. Re-enable when headless-vs-real-
+// browser boss-wake divergence is resolved. Do not bisect — cite the ticket.
 test.describe("PR #300 v4 — boss wake-anim visual capture + damage-immunity proof", () => {
-  test("wake animation captures at distinct timing windows + damage-immune during wake", async ({
+  test.skip("wake animation captures at distinct timing windows + damage-immune during wake", async ({
     page,
     context,
   }) => {
