@@ -65,7 +65,11 @@ import {
   clearRoom01Dummy,
   waitForRoom02Load,
 } from "../fixtures/room01-traversal";
-import { clickAimedAtSpawn } from "../fixtures/mouse-facing";
+import {
+  clickAimedAtSpawn,
+  clickAtWorldPos,
+  latestPlayerPos,
+} from "../fixtures/mouse-facing";
 
 const BOOT_TIMEOUT_MS = 30_000;
 /** AC2 hard deadline: ≤60 s from `[Main] M1 play-loop ready` to first Room02 kill. */
@@ -159,17 +163,60 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
     await waitForRoom02Load(page, 1500);
 
     // ---- Phase 3: Drive combat to first Room02 grunt kill ----
+    //
+    // **Aim-at-live-Grunt-position strategy (this PR, ticket TBD —
+    // empirical trace-driven fix per `diagnostic-traces-before-hypothesized-fixes`):**
+    //
+    // The prior `clickAimedAtSpawn(canvas, capture, "NE")` approach assumed
+    // the player stays near `DEFAULT_PLAYER_SPAWN = (240, 200)` and the
+    // grunts stay near their NE chunk-local spawn positions (256, 96) +
+    // (320, 160). Both assumptions are empirically violated post-PR-#293
+    // (CameraDirector T9) + post-PR-#255 (mouse-direction attacks):
+    //
+    //   - Trace on SHA `3fcf464` (run `26321757155`): Room 01 dummy-clear
+    //     leaves the player at world `(364, 121)` (far NE), then Room 02
+    //     teleport places the player at `(240, 214)` (14 px SOUTH of spawn).
+    //     The keyboard `down("w") + down("d") + waitForTimeout(100)` walks
+    //     the player to `(300, 158)` (≈42 px NE drift from spawn), where the
+    //     player then stands still firing NE attacks. The 2 grunts CHASE
+    //     toward the player and converge at `(276, 146)` + `(284, 180)` —
+    //     both WEST/SW of the player at `(300, 158)`. The NE-aimed swing
+    //     wedge cannot reach them. 37 attacks fire over the 60s budget;
+    //     ZERO `Hitbox.hit | team=player target=Grunt` lines land.
+    //
+    //   - Game-side combat pipeline is HEALTHY: trace shows
+    //     `Inventory.equip | source=auto_pickup damage_after=6` (iron_sword
+    //     equipped), `Player.try_attack | POST damage=6 hitbox=@Area2D@*`
+    //     (Hitbox spawns with the weapon-scaled damage), and 24 grunt-side
+    //     `Hitbox.hit | team=enemy target=Player damage=2` lines (grunts
+    //     CAN reach the player). The pipeline works — the harness aim
+    //     misses geometrically.
+    //
+    // The fix: read the latest `[combat-trace] Grunt.pos | pos=(x,y)` line
+    // and aim AT that world coord. Grunts are alive while they emit
+    // `Grunt.pos` (the throttled emitter early-returns on `_is_dead`).
+    // Falls back to spawn-NE aim if no `Grunt.pos` trace is available
+    // (extremely rare — the grunts emit `.pos` within ~250ms of room load).
+    // This is the SAME pattern `chaseAndClearMultiChaserRoom` uses for
+    // Rooms 05-08 (PR #198), narrowly applied to AC2's 2-grunt case.
 
-    // Set facing NE — Room02 grunts spawn at chunk-local (256, 96) and
-    // (320, 160), both NE of the player spawn (240, 200). NE-facing
-    // click-only attacks land on either (Player.try_attack falls back to
-    // _facing when input_dir is zero-length, so the NE facing persists
-    // across all subsequent click-only attacks).
-    await page.keyboard.down("w");
-    await page.keyboard.down("d");
-    await page.waitForTimeout(100);
-    await page.keyboard.up("w");
-    await page.keyboard.up("d");
+    function latestGruntWorldPos(
+      capture: ConsoleCapture
+    ): { x: number; y: number } | null {
+      const lines = capture.getLines();
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const t = lines[i].text;
+        if (!/\[combat-trace\] Grunt\.pos \|/.test(t)) continue;
+        const m = t.match(/pos=\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/);
+        if (!m) continue;
+        return { x: parseInt(m[1], 10), y: parseInt(m[2], 10) };
+      }
+      return null;
+    }
+
+    // Small wait so Room 02 grunts spawn + emit at least one `Grunt.pos`
+    // line before the first aim read. APPROACH_WAIT_MS (600ms) generously
+    // covers the 250ms `Grunt.pos` throttle + a few physics frames.
     await page.waitForTimeout(APPROACH_WAIT_MS);
 
     let firstKillAt: number | null = null;
@@ -190,12 +237,37 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
         `86c9qbb3k — the player is fistless until they grab the dummy drop).`
     ).toBeGreaterThan(5_000); // Need at least 5s to land a grunt kill.
 
+    let lastLoggedGruntPos: { x: number; y: number } | null = null;
     while (Date.now() - combatStart < remainingDeadlineMs) {
-      // Mouse-direction attacks (PR #255, ticket 86c9uthf0): aim NE-of-spawn
-      // so the swing wedge covers Room02's NE-spawning grunts. Canvas-center
-      // (640, 360) is far SE of the player at (240, 200) on the no-Camera2D
-      // viewport — clicking there would aim SE and miss every grunt.
-      await clickAimedAtSpawn(canvas, capture, "NE");
+      // Read the latest live Grunt position from the throttled `Grunt.pos`
+      // trace and click AT that world coord. The Player's mouse-facing
+      // resolver computes `_facing = (mouse_world - player_world).normalized()`
+      // — clicking at the grunt's world position aims the swing wedge
+      // exactly toward the grunt regardless of player drift. The
+      // `clickAtWorldPos` helper applies the live camera transform.
+      const gruntPos = latestGruntWorldPos(capture);
+      if (gruntPos != null) {
+        if (
+          lastLoggedGruntPos == null ||
+          lastLoggedGruntPos.x !== gruntPos.x ||
+          lastLoggedGruntPos.y !== gruntPos.y
+        ) {
+          const playerPos = latestPlayerPos(capture);
+          console.log(
+            `[ac2-first-kill] aim_at_grunt: grunt=(${gruntPos.x},${gruntPos.y}) ` +
+              `player=${
+                playerPos ? `(${playerPos.x},${playerPos.y})` : "<no pos trace>"
+              }`
+          );
+          lastLoggedGruntPos = gruntPos;
+        }
+        await clickAtWorldPos(canvas, capture, gruntPos.x, gruntPos.y);
+      } else {
+        // Fallback if no Grunt.pos trace yet (pre-spawn): aim NE of spawn
+        // (the original strategy — works when player+grunts are both at
+        // their initial positions).
+        await clickAimedAtSpawn(canvas, capture, "NE");
+      }
       attacks++;
       await page.waitForTimeout(ATTACK_INTERVAL_MS);
 
@@ -226,12 +298,75 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
           Date.now() - combatStart
         }ms.\nLast 30 console lines:\n${recentLines}`
       );
+      // Look for the game-side health signals to triage the failure
+      // empirically — the hypothesis menu below uses what's MISSING from the
+      // trace to discriminate (per `diagnostic-traces-before-hypothesized-
+      // fixes`). Grep the dumped Last-30-console-lines OUTPUT to confirm.
+      const playerHits = capture
+        .getLines()
+        .filter((l) =>
+          /\[combat-trace\] Hitbox\.hit \| team=player target=Grunt/.test(l.text)
+        ).length;
+      const equipLines = capture
+        .getLines()
+        .filter((l) =>
+          /\[combat-trace\] Inventory\.equip \| .*source=auto_pickup.*damage_after=(\d+)/.test(
+            l.text
+          )
+        );
+      const gruntPosLines = capture
+        .getLines()
+        .filter((l) => /\[combat-trace\] Grunt\.pos \|/.test(l.text)).length;
+      const hypothesisHints: string[] = [];
+      if (gruntPosLines === 0) {
+        hypothesisHints.push(
+          "ZERO Grunt.pos lines — grunts never spawned (room load failed) " +
+            "OR the .pos trace was removed (a Grunt.gd refactor regression)."
+        );
+      } else if (playerHits === 0) {
+        hypothesisHints.push(
+          `Hitbox.hit (team=player target=Grunt) NEVER fired despite ${attacks} ` +
+            `attacks + ${gruntPosLines} Grunt.pos lines. Either swing wedge ` +
+            `geometry missed the grunts (HARNESS aim drift — fixed in this ` +
+            `spec's aim-at-live-Grunt-position strategy; if regressed, check ` +
+            `clickAtWorldPos / Grunt.pos trace fidelity) OR Hitbox.body_entered ` +
+            `is silently failing (PR #143 class — defer-monitoring rule violated; ` +
+            `check Hitbox.gd _init/_ready).`
+        );
+      } else {
+        hypothesisHints.push(
+          `${playerHits} Hitbox.hit (team=player target=Grunt) lines DID fire, ` +
+            `but no Grunt._die. Hits land but don't kill — likely a damage ` +
+            `attribution bug or HP regression (Grunt.gd._take_damage or ` +
+            `Damage.compute_player_damage).`
+        );
+      }
+      if (equipLines.length === 0) {
+        hypothesisHints.push(
+          "NO Inventory.equip auto_pickup line — Room 01 iron_sword pickup " +
+            "never landed; player is FISTLESS in Room 02 (damage=1 per swing, " +
+            "Grunt HP=50 → 50 swings to kill, won't fit in 60s). PR #145/#146 " +
+            "regression class."
+        );
+      } else {
+        const m = equipLines[0].text.match(/damage_after=(\d+)/);
+        const dmg = m ? m[1] : "?";
+        if (m && parseInt(m[1], 10) < 2) {
+          hypothesisHints.push(
+            `Inventory.equip line fired but damage_after=${dmg} (not >=2). ` +
+              `Damage formula regression — Damage.compute_player_damage not ` +
+              `respecting weapon.base_damage.`
+          );
+        } else {
+          hypothesisHints.push(
+            `iron_sword equipped with damage_after=${dmg} (healthy).`
+          );
+        }
+      }
       throw new Error(
         `AC2 deadline exceeded: no Grunt._die within ${FIRST_KILL_DEADLINE_MS}ms ` +
           `of [Main] M1 play-loop ready. ${attacks} attacks fired in Room02. ` +
-          `Likely regressions: PR #145/#146 fistless-start (damage=1 not 6); ` +
-          `or Hitbox monitoring not activating (PR #143 regression); ` +
-          `or Stage 2b Room01 dummy clear taking too long (helper drift).`
+          `Empirical hypothesis hints:\n  - ${hypothesisHints.join("\n  - ")}`
       );
     }
     expect(firstKillElapsed).not.toBeNull();
@@ -305,10 +440,18 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
     const tweenDeadline = Date.now() + 5_000;
     let queueFreeLine: string | null = null;
     while (Date.now() < tweenDeadline) {
-      // Continue clicking to keep engine ticks flowing. Aim NE-of-spawn
-      // (mouse-direction attacks — PR #255) so the swing still targets the
-      // already-dying grunt area in Room 02.
-      await clickAimedAtSpawn(canvas, capture, "NE");
+      // Continue clicking to keep engine ticks flowing. Aim AT the latest
+      // live Grunt position (same strategy as Phase 3 above) so the click
+      // resolves to a meaningful world coord regardless of player drift —
+      // when the first grunt has died but the second is still alive, the
+      // `Grunt.pos` trace targets the survivor. Falls back to spawn-NE if
+      // both grunts have died and no `Grunt.pos` trace fires.
+      const gp = latestGruntWorldPos(capture);
+      if (gp != null) {
+        await clickAtWorldPos(canvas, capture, gp.x, gp.y);
+      } else {
+        await clickAimedAtSpawn(canvas, capture, "NE");
+      }
       const found = capture
         .getLines()
         .find((l) =>
