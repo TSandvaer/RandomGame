@@ -134,12 +134,22 @@ For `chore`/`docs`/`test`/data PRs that don't need a Self-Test Report, replace t
 
 **Regression guard:** Name at least one test (GUT or Playwright spec) that would fail if this feature broke in a future unrelated PR. If none exists, add it in this PR.
 
+**Reviewer track (hard gate — PR cannot merge without it):**
+- **Game-side PRs** (combat / mobs / level / save / progression / gear / UI / audio / Player) → **Drew** reviews.
+- **Harness / inventory / engine / build / CI / Playwright fixtures** → **Devon** reviews.
+- **Tess-authored PRs** → **Drew** OR **Devon** per `tess-cant-self-qa-peer-review` (pick by PR surface — game-side → Drew, harness/inventory → Devon).
+- **Priya-authored process / docs PRs** → **Devon** OR **Drew** per `auto-execute-classes-without-sponsor-ack` § peer-reviewer-selection-by-surface (pick a role different from the author; engine-adjacent docs → Devon; game-side docs → Drew).
+- Reviewer posts `APPROVE: <reasoning>` via `gh pr comment <N> --body-file <approve-doc>` per `shared-git-identity-blocks-formal-pr-approval` (the harness blocks `gh pr review --approve` on shared git identity). Orchestrator admin-merges after the APPROVE comment lands.
+- **No `APPROVE` comment from the tracked reviewer = no merge.** Period. Even `chore` / `docs` / `test` PRs without Tess QA need the peer-review APPROVE for the merge tool-round to fire. Audit finding 2026-05-23: zero formal PR reviews on the last 30 merges (all via `gh pr comment APPROVE` workaround per `shared-git-identity-blocks-formal-pr-approval`) — this hard-line codifies the actual practice so the convention is explicit, not implicit.
+
 Report back when done.
 ```
 
 Replace `<list of artifacts>`, `<NNN>`, and `<list of facts>` with task-specific values.
 
 The **Regression guard** line is non-negotiable. It forces every dispatch to produce a named, durable regression surface — not just "paired tests for this PR's logic." All four M2 RC Sponsor-soak findings (2026-05-15) were regressions in surfaces that had previously been tested by component-scoped tests; none had system-scoped regression guards. The named test is the artifact a future unrelated PR's CI run flips RED against, so the regression surfaces at PR-time rather than at Sponsor-soak-time.
+
+The **Reviewer-track hard-gate** line is non-negotiable. MARIAN-TUTOR codified the equivalent rule at `:194` of their dispatch template; the audit (2026-05-23) found Embergrave had been operating on the same convention implicitly — every merge had a peer `APPROVE` comment — but the rule was nowhere written down. Codifying it here removes the silent-convention failure mode (a future agent might skip peer-review on a "trivial" PR and merge directly). Foundation: memory `tess-cant-self-qa-peer-review` (the existing rule this generalizes) + `shared-git-identity-blocks-formal-pr-approval` (the workaround the rule cites).
 
 ## Final-report shape — TIGHT + cite-able evidence (mandatory in every dispatch)
 
