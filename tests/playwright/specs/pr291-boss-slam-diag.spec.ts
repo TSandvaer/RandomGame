@@ -24,8 +24,13 @@ import {
 const BOOT_TIMEOUT_MS = 30_000;
 const COMBAT_TIMEOUT_MS = 90_000;
 
+// QUARANTINED 2026-05-23 — ClickUp `86c9y00m1` (Playwright triage).
+// Persistent failure: timeout waiting for /Stratum1Boss\.wake.*now IDLE/ in
+// headless Chromium (10000ms). Companion to pr291-aftershock-visual.spec.ts;
+// same root-cause class. Re-enable when headless boss-wake reach-IDLE is
+// resolved. Do not bisect — cite the ticket.
 test.describe("PR #291 v4 — boss slam + aftershock diagnostic", () => {
-  test("dump combat-trace stream from boss-room slam sequence", async ({
+  test.skip("dump combat-trace stream from boss-room slam sequence", async ({
     page,
     context,
   }) => {

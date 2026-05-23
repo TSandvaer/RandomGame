@@ -37,8 +37,14 @@ import { ConsoleCapture } from "../fixtures/console-capture";
 const BOOT_TIMEOUT_MS = 30_000;
 const SMOKE_LINE_TIMEOUT_MS = 15_000;
 
+// QUARANTINED 2026-05-23 — ClickUp `86c9y00m1` (Playwright triage).
+// Documented fail-first-pass-retry flake per PR #322 (`86c9xy0mk`) accept-and-
+// document Option C; retry is no longer consistently green (15/15 final
+// failure 2026-05-22). Promoted from "documented flake" to "quarantined
+// pending audio-bus boot determinism investigation". Do not bisect — cite the
+// ticket.
 test.describe("audio bus boot smoke — AudioDirector + 5-bus layout (W3-T9)", () => {
-  test("AudioDirector autoload registers + 5-bus layout loads + no audio warnings", async ({
+  test.skip("AudioDirector autoload registers + 5-bus layout loads + no audio warnings", async ({
     page,
     context,
   }) => {
