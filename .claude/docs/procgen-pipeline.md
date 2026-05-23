@@ -1,8 +1,6 @@
 # Procgen Pipeline — FloorAssembler runtime conventions
 
-What this doc covers: the `FloorAssembler` runtime conventions introduced in the M3 Tier 3 W1 procgen spike (ticket `86c9xub9p`, pending PR #328 merge). The **zone schema data shapes** (ZoneDef / ZoneAnchor / procedural_slot_pool) live in `team/drew-dev/level-chunks.md` § "Zone schema (M3 Tier 3 W1 spike)" — this doc covers the runtime API, seed-derivation mechanics, mating discipline, and spike-class workflow patterns that future agents need when extending or retrofitting the assembler.
-
-> **Status:** all file paths and line references below cite the unmerged branch `drew/86c9xub9p-procgen-part-a` (Part A) / `devon/86c9xub9p-procgen-part-bcd` (Parts B/C/D) — verify against `main` HEAD after PR #328 merges; update this status line on merge.
+What this doc covers: the `FloorAssembler` runtime conventions introduced in the M3 Tier 3 W1 procgen spike (ticket `86c9xub9p`, PR #328 merged `5304b62` 2026-05-22). The **zone schema data shapes** (ZoneDef / ZoneAnchor / procedural_slot_pool) live in `team/drew-dev/level-chunks.md` § "Zone schema (M3 Tier 3 W1 spike)" — this doc covers the runtime API, seed-derivation mechanics, mating discipline, and spike-class workflow patterns that future agents need when extending or retrofitting the assembler.
 
 ## Seed-cascade contract
 
@@ -20,7 +18,7 @@ zone_seed = FloorAssembler.derive_zone_seed(stratum_seed, zone_id)
 
 **Why two layers, not one big hash:** the stratum layer anchors cross-zone consistency — all S1 zones share an entropy space disjoint from S2's even when zone IDs collide numerically. A single `hash(world_seed, stratum, zone)` would re-roll every zone whenever stratum count changes; the two-layer design lets stratum-level adjustments (adding a stratum, rebalancing zone count) leave sibling subtrees stable. Per-zone derivation makes `assemble_floor` a pure function of `(zone_def, seed)` — same inputs always produce same output, which IS the same-layout verification (and the test strategy).
 
-**GUT pins** (pending PR #328): `test_derive_stratum_seed_is_deterministic` + `test_derive_zone_seed_is_deterministic` in `tests/test_floor_assembler.gd`.
+**GUT pins:** `test_derive_stratum_seed_is_deterministic` + `test_derive_zone_seed_is_deterministic` in `tests/test_floor_assembler.gd`.
 
 **Save-schema binding:** `Character.world_seed` is rolled on creation and round-trips through `Save.gd` (additive on v5 per `team/devon-dev/save-schema-v5-plan.md`). The stratum/zone derivation from `world_seed` is the caller's responsibility — `FloorAssembler` is seed-consumer only.
 

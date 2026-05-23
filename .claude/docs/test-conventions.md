@@ -544,12 +544,14 @@ func test_movement_input_not_gated_by_inventory() -> void:
 
 A sibling source-scan pin from PR #347 (`tests/test_quest_action_listener_reads_branch_key_before_close.gd`) enforces a different invariant class: **state lifecycle across signal-handler boundaries**. The `QuestActionRouter` listener autoload must snapshot `DialogueController.current_branch_key()` synchronously BEFORE `DialogueController.close()` clears the controller's state. If a refactor moves the snapshot AFTER the close, the read returns empty string — silently breaking any downstream quest-state logic that depends on the branch key.
 
-The pin reads both `QuestActionRouter.gd` and the related controller source, and asserts:
+The pin source-scans `QuestActionRouter.gd` and asserts:
 
 - The autoload's `_action_branch_key` field exists (snapshot location is autoload state, NOT controller state — so it survives both controller navigation and `close()`).
 - The snapshot read site precedes the `close()` call site within the listener's signal handler.
 
-**Why this differs from the PR #323 pattern.** PR #323 pins one-function relative ordering (two lines inside `Player._process_grounded`). This W2-T2 pin spans TWO source files (the autoload and the controller it observes). The same source-scan API (`FileAccess.get_file_as_string` + `.find` + `assert_lt`) applies, but the pin enumerates load-bearing sites across the autoload/controller boundary. **Apply this two-file variant whenever a signal-handler's correctness depends on temporally-ordered reads/writes against a different autoload's state** — controllers that emit `<thing>_closed` signals AND clear state in the same call are the most common shape.
+The complementary half of the invariant — that `DialogueController.current_branch_key()` actually exists as a callable surface — is checked via **runtime introspection** (autoload-instance `has_method(...)` lookup), NOT source-scan. This is the hybrid shape worth naming explicitly.
+
+**Why this differs from the PR #323 pattern.** PR #323 pins one-function relative ordering (two lines inside `Player._process_grounded`) — pure source-scan. This W2-T2 pin is a **hybrid**: one file source-scanned (the autoload — `FileAccess.get_file_as_string` + `.find` + `assert_lt`) AND the cross-autoload surface checked via runtime introspection (`autoload.has_method("current_branch_key")`). **Apply this hybrid variant whenever a signal-handler's correctness depends on temporally-ordered reads/writes against a different autoload's API** — the source-scan side pins the read-order invariant inside the observer; the introspection side pins that the observed surface still exists. Controllers that emit `<thing>_closed` signals AND clear state in the same call are the most common shape.
 
 **Cite shape.** PR #347 introduced this pattern in `tests/test_quest_action_listener_reads_branch_key_before_close.gd` (merge commit `12916d9`, ticket `86c9y0zyv`). The pattern was flagged as a new exemplar in Devon's W2-T2 dispatch final report.
 
