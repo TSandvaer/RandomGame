@@ -137,8 +137,8 @@ gh pr merge <num> --squash --delete-branch --admin
 # - Do not delete local branches (worktree-conflict pattern)
 
 # ClickUp audit sweep
-# Use mcp__clickup__clickup_filter_tasks (list 901523123922) to compare board state vs reality
-# Use mcp__clickup__clickup_update_task to flip status
+# Use mcp__clickup__get_tasks (list 901523123922) to compare board state vs reality
+# Use mcp__clickup__update_task to flip status
 
 # Tess sign-off pattern (harness denies self-approval)
 # Tess agents post approval via: gh pr comment <num> --body "Approved per <evidence>."
@@ -206,7 +206,7 @@ When picking up the project after a pause, do these in order:
    - `git fetch origin && git log origin/main --oneline -10` (verify tip; expect `5e471f0` or newer)
    - `gh pr list --state open --json number,title,headRefName`
    - `gh run list --workflow=release-github.yml --limit 5` (latest release-build; W2 RC `d9cc159` is the canonical Sponsor target)
-3. **Check ClickUp board reality vs STATE.md:** `mcp__clickup__clickup_filter_tasks` on list `901523123922`. If MCP is down, drain `team/log/clickup-pending.md` on reconnect.
+3. **Check ClickUp board reality vs STATE.md:** `mcp__clickup__get_tasks` on list `901523123922`. If MCP is down, drain `team/log/clickup-pending.md` on reconnect.
 4. **Decide path** based on signal:
    - **Sponsor has soaked M2** → triage findings → file as `bug(...)` ClickUp tasks → W3-T10 fix-forward absorber. If ≥3 P0s, W3-T10 promotes from M to L per R6 trigger threshold.
    - **Sponsor still pre-soak / no signal** → dispatch the W3 backlog at full parallel cadence. T2 + T3 + T5 + T6 + T9 are all dispatch-ready day 1. T1 dispatches as soon as the brief is written (Uma's design is merged). T4 (S2 boss room L) starts after T2 lands.

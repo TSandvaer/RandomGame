@@ -83,8 +83,8 @@ Every ticket lifecycle event is a paired ClickUp status move that fires in the S
 
 ```markdown
 **ClickUp lifecycle (paired flips, NOT advisory):**
-- **At run-start** (if orchestrator hasn't already flipped): `mcp__clickup__clickup_update_task task_id=<ticket> status="in progress"`. Same tool round as your first work.
-- **On PR open** (`gh pr create`): immediately fire `mcp__clickup__clickup_update_task task_id=<ticket> status="ready for qa test"` in the same response. The orchestrator-side dispatch flip + your PR-open flip = two complementary safeguards.
+- **At run-start** (if orchestrator hasn't already flipped): `mcp__clickup__update_task task_id=<ticket> status="in progress"`. Same tool round as your first work.
+- **On PR open** (`gh pr create`): immediately fire `mcp__clickup__update_task task_id=<ticket> status="ready for qa test"` in the same response. The orchestrator-side dispatch flip + your PR-open flip = two complementary safeguards.
 - **MCP unreachable:** queue the flip in `team/log/clickup-pending.md` per `team/CLICKUP_FALLBACK.md` (`ENTRY NNN: <ticket_id> -> <new_status> (reason: <one-line>)`). Orchestrator flushes on reconnect.
 - **Don't lie to the board.** If you can't open the PR (ran into a blocker), don't flip to `ready for qa test` — keep it at `in progress` and surface the blocker.
 ```
@@ -218,7 +218,7 @@ This block is non-negotiable in every dispatch. The Stop hook already runs for s
 
 ```markdown
 **ClickUp state:**
-- MCP server is intermittent this session. If you can't reach `mcp__clickup__clickup_*` tools, queue your status updates in `team/log/clickup-pending.md` per `team/CLICKUP_FALLBACK.md`.
+- MCP server is intermittent this session. If you can't reach `mcp__clickup__*` tools, queue your status updates in `team/log/clickup-pending.md` per `team/CLICKUP_FALLBACK.md`.
 - Queue ENTRY format: `ENTRY NNN: <ticket_id> -> <new_status> (reason: <one-line>)`.
 - Check the file's last entry number and increment.
 - Orchestrator replays the queue when MCP reconnects.
