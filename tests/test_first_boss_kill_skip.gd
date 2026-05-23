@@ -326,10 +326,19 @@ func test_skip_collapses_intro_timing_to_about_half_a_second() -> void:
 	# Validates the brief's "skip collapses intro timing to ~0.5 s"
 	# acceptance — measured against the boss's WAKE_DURATION constant
 	# (currently 0.417 s) plus the skip-fire latency (typically <50 ms
-	# in headless GUT). Tolerance is generous (0.7 s upper bound)
-	# because GUT scheduling under different load can add 100-200 ms;
-	# the assertion is "skip is dramatically faster than the natural
-	# 1.8 s", not "skip is exactly 0.5 s".
+	# in headless GUT). The assertion is "skip is dramatically faster
+	# than the natural 1.8 s", not "skip is exactly 0.5 s".
+	#
+	# Measurement methodology: await the `entry_sequence_completed`
+	# signal directly rather than `await create_timer(0.8).timeout` +
+	# fixed-bound assertion. The fixed-timer approach was structurally
+	# at-bound — the 0.8 s timer wait IS the measurement floor, leaving
+	# zero margin for frame-scheduling overhead at the < 800 ms bound
+	# (PR #357 surfaced this — CI variance of 7-12 ms tipped it over).
+	# Signal-await measures actual completion-fire time with frame-period
+	# precision (~16 ms at 60Hz), so the assertion bound is a real
+	# behavioral bound on the collapsed sequence, not a race against
+	# the fixture timer.
 	var room: Stratum1BossRoom = _make_room()
 	await _drain_fixture_pass()
 	room.set_skip_eligible_for_test(true)
@@ -342,23 +351,27 @@ func test_skip_collapses_intro_timing_to_about_half_a_second() -> void:
 	event.pressed = true
 	room._unhandled_input(event)
 	assert_true(room.is_entry_sequence_skipped(), "skip engaged")
-	# Wait for the residual timer to fire entry_sequence_completed.
-	# Stratum1Boss.WAKE_DURATION is 0.417 s; residual floors at 0.1 s.
-	# Wait 0.8 s as a generous upper bound for the residual + frame
-	# scheduling overhead — the natural 1.8 s would NOT have fired by
-	# then, so any completion signal here is the collapsed path.
-	await get_tree().create_timer(0.8).timeout
+	# Await the actual completion-fire signal. GUT's per-test timeout
+	# (default 10 s) bounds this if the signal never fires — a real
+	# wedge surfaces as a test timeout rather than a silent skip-bug.
+	# `assert_true(room.is_entry_sequence_skipped())` above already
+	# guards the "skip didn't engage" case.
+	if not room.is_entry_sequence_completed():
+		await room.entry_sequence_completed
 	assert_true(
 		room.is_entry_sequence_completed(),
-		"skip-collapsed sequence completes within the 0.8 s wait"
+		"skip-collapsed sequence fires entry_sequence_completed"
 	)
 	var elapsed_ms: int = Time.get_ticks_msec() - trigger_ms
 	# Lower bound: dynamic wake-duration read from Stratum1Boss
-	# (0.417 s). Upper bound: 0.8 s (well below the natural 1.8 s).
-	# Stratum1Boss.WAKE_DURATION + a generous frame-scheduling envelope.
+	# (0.417 s). Upper bound: 700 ms — comfortably under the natural
+	# 1.8 s, but tight enough to catch a regression that doubled the
+	# collapsed sequence (e.g. a spurious extra timer chain). Was 800 ms
+	# pre-PR-#357 fix; bound is meaningful only against the signal-fire
+	# timestamp, not a fixed-timer-driven floor.
 	assert_gt(elapsed_ms, 300, "collapsed sequence respects the wake-duration runway (>=0.3 s)")
 	assert_lt(
-		elapsed_ms, 800, "collapsed sequence completes well under the natural 1.8 s (target ~0.5 s)"
+		elapsed_ms, 700, "collapsed sequence completes well under the natural 1.8 s (target ~0.5 s)"
 	)
 
 
