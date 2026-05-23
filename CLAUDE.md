@@ -67,6 +67,7 @@ For deep-dive reference, see the topic files in `.claude/docs/`:
 - [Dialogue System](.claude/docs/dialogue-system.md) — DialogueTreeDef / DialogueBranch / DialogueResponse Resource schema, DialogueController autoload (single-session + branch resolution + quest_action side-effect channel), DialoguePanel modal UI, Player attack-input gating convention seed
 - [Camera Layer](.claude/docs/camera-layer.md) — `CameraDirector` autoload + zoom API (T9), Director-with-internal-puppet pattern (sibling to `AudioDirector` / `TimeScaleDirector`), default-zoom = viewport-stretch ratio calibration (NOT `Vector2(1,1)`)
 - [Camera Scroll](.claude/docs/camera-scroll.md) — continuous-scroll `follow_target` + deadzone + `set_world_bounds` clamp on `CameraDirector` (M3 Tier 3 W1 spike PR #314), foundation for S1 retrofit / procgen `assemble_floor` / S2 consumers
+- [Procgen Pipeline](.claude/docs/procgen-pipeline.md) — FloorAssembler seed-cascade (world_seed → stratum_seed → zone_seed), port-mating record-not-raise convention, AssembledFloor output shape (M3 Tier 3 W1, pending PR #328 merge)
 - [Sponsor Soak Routing](.claude/docs/sponsor-soak-routing.md) — when Playwright + Tess is sufficient (mechanical correctness) vs when Sponsor soak is the binding gate (subjective feel, first-of-class visual, tier-completion); right-sizing the Sponsor ask
 
 ## Key references outside `.claude/docs/`
