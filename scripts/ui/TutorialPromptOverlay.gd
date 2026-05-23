@@ -162,7 +162,10 @@ func _ready() -> void:
 ##   3.0; pass 0 for "fade-in then immediately fade-out" (no hold).
 ## - `anchor` — which screen edge to anchor against. Default CENTER_TOP per
 ##   Uma's first-input-prompt placement.
-func show_prompt(text: String, duration: float = DEFAULT_DURATION, anchor: AnchorPos = AnchorPos.BOTTOM) -> void:
+func show_prompt(
+		text: String,
+		duration: float = DEFAULT_DURATION,
+		anchor: AnchorPos = AnchorPos.BOTTOM) -> void:
 	# Replace-on-new-show: kill in-flight tween, restart from current alpha.
 	if _tween != null and _tween.is_valid():
 		_tween.kill()

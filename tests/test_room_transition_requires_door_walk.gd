@@ -364,7 +364,8 @@ func test_p0_room_cleared_not_emitted_on_gate_unlocked() -> void:
 	await get_tree().process_frame
 	assert_signal_not_emitted(g, "gate_traversed")
 	assert_eq(counter.n, 0,
-		"REGRESSION CHECK: room_cleared count must be 0 after gate_unlocked — player has not walked through the door")
+		"REGRESSION CHECK: room_cleared count must be 0 after gate_unlocked —"
+			+ " player has not walked through the door")
 
 
 ## P0 #1 full flow: mob die → gate_unlocked → player walks → gate_traversed → room_cleared.
@@ -417,7 +418,8 @@ func test_p0_death_tween_wait_then_door_walk_sequence() -> void:
 	assert_signal_emitted(g, "gate_unlocked", "gate_unlocked fired after wait")
 	assert_signal_not_emitted(g, "gate_traversed", "gate_traversed still not fired — player must walk")
 	assert_eq(counter.n, 0,
-		"REGRESSION CHECK: room counter still 0 after gate_unlocked — death-tween wait + gate_unlocked are NOT sufficient; door-walk required")
+		"REGRESSION CHECK: room counter still 0 after gate_unlocked — death-tween"
+			+ " wait + gate_unlocked are NOT sufficient; door-walk required")
 	# Player walks through.
 	g.traverse_for_test()
 	assert_eq(counter.n, 1, "room counter = 1 after door-walk")

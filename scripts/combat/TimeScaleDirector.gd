@@ -225,7 +225,11 @@ func _ready() -> void:
 ## explicit close); use > 0 for everything time-bounded.
 ##
 ## `priority` controls multi-request resolution; see class docstring.
-func request(reason: String, scale: float, duration: float, priority: int = PRIORITY_DEFAULT) -> void:
+func request(
+		reason: String,
+		scale: float,
+		duration: float,
+		priority: int = PRIORITY_DEFAULT) -> void:
 	if reason == "":
 		_warn("TimeScaleDirector.request: empty reason — refusing", "time_scale_director")
 		return

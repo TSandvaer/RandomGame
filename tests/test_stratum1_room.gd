@@ -68,7 +68,8 @@ func test_stratum1_room01_dummy_positioned_inside_bounds() -> void:
 	var bounds: Rect2 = room.get_bounds_px()
 	for m: Node in room.get_spawned_mobs():
 		var n: Node2D = m
-		assert_true(bounds.has_point(n.position), "dummy at %s inside bounds %s" % [str(n.position), str(bounds)])
+		assert_true(bounds.has_point(n.position),
+			"dummy at %s inside bounds %s" % [str(n.position), str(bounds)])
 
 
 func test_stratum1_room01_chunk_def_canonical() -> void:

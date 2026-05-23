@@ -144,8 +144,9 @@ func open(tree: DialogueTreeDef, quest_state: StringName = &"flavor") -> bool:
 		return false
 	var branch: DialogueBranch = tree.resolve_branch(quest_state)
 	if branch == null:
-		_warn("DialogueController.open: rejected — npc=%s has no branch for quest_state=%s and no default" %
-				[str(tree.npc_id), str(quest_state)])
+		_warn(("DialogueController.open: rejected — npc=%s has no branch for"
+				+ " quest_state=%s and no default")
+					% [str(tree.npc_id), str(quest_state)])
 		return false
 	# Latch session state.
 	_active = true
@@ -303,14 +304,16 @@ func _navigate_to_branch(branch_key: StringName) -> void:
 		close()
 		return
 	if not _tree.branches.has(branch_key):
-		_warn("DialogueController._navigate_to_branch: unknown branch_key=%s on npc=%s — closing dialogue" %
-				[str(branch_key), str(_tree.npc_id)])
+		_warn(("DialogueController._navigate_to_branch: unknown branch_key=%s on"
+				+ " npc=%s — closing dialogue")
+					% [str(branch_key), str(_tree.npc_id)])
 		close()
 		return
 	var next_branch: DialogueBranch = _tree.branches[branch_key] as DialogueBranch
 	if next_branch == null:
-		_warn("DialogueController._navigate_to_branch: branch_key=%s resolved to null on npc=%s — closing" %
-				[str(branch_key), str(_tree.npc_id)])
+		_warn(("DialogueController._navigate_to_branch: branch_key=%s resolved to"
+				+ " null on npc=%s — closing")
+					% [str(branch_key), str(_tree.npc_id)])
 		close()
 		return
 	_branch = next_branch

@@ -285,7 +285,8 @@ func test_boss_separates_from_player_approached_from_south() -> void:
 	# Tick 1: chase → telegraph.
 	b._physics_process(PHYS_DELTA)
 	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
-		"precondition: south-approach also triggers melee telegraph (no direction-asymmetry in trigger logic)")
+		"precondition: south-approach also triggers melee telegraph"
+			+ " (no direction-asymmetry in trigger logic)")
 
 	# Tick 2: telegraph expires → swing fires → pushback applied.
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.001)
@@ -296,7 +297,8 @@ func test_boss_separates_from_player_approached_from_south() -> void:
 
 	# Pushback must point NORTH (away from player below). i.e. velocity.y < 0.
 	assert_lt(b.velocity.y, 0.0,
-		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)" % [b.velocity.x, b.velocity.y])
+		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)"
+			% [b.velocity.x, b.velocity.y])
 
 	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
 	var pushback_dir: Vector2 = b.velocity.normalized()
@@ -324,7 +326,8 @@ func test_boss_separates_from_player_approached_from_north() -> void:
 	assert_gt(b.velocity.length(), 0.0,
 		"north-approach: boss velocity must be non-zero after swing-fire")
 	assert_gt(b.velocity.y, 0.0,
-		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)" % [b.velocity.x, b.velocity.y])
+		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)"
+			% [b.velocity.x, b.velocity.y])
 
 	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
 	var dot: float = b.velocity.normalized().dot(away_dir)
@@ -346,7 +349,8 @@ func test_boss_separates_from_player_approached_from_west() -> void:
 	assert_gt(b.velocity.length(), 0.0,
 		"west-approach: boss velocity must be non-zero after swing-fire")
 	assert_gt(b.velocity.x, 0.0,
-		"west-approach: pushback must point EAST (positive X) — got velocity=(%.2f,%.2f)" % [b.velocity.x, b.velocity.y])
+		"west-approach: pushback must point EAST (positive X) — got velocity=(%.2f,%.2f)"
+			% [b.velocity.x, b.velocity.y])
 
 	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
 	var dot: float = b.velocity.normalized().dot(away_dir)

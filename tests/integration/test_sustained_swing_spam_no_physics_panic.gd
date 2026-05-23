@@ -192,7 +192,8 @@ func test_player_sustained_swing_spam_no_panic_50_attacks() -> void:
 		# the tree under the player. Pre-fix the panic interrupts the
 		# call so this assertion captures the consequence directly.
 		assert_true(hb.is_inside_tree(),
-			"REGRESSION-86c9nx1dx: swing %d hitbox is in the tree synchronously after try_attack (pre-fix the panic aborts add_child)" % (i + 1))
+			("REGRESSION-86c9nx1dx: swing %d hitbox is in the tree synchronously after"
+				+ " try_attack (pre-fix the panic aborts add_child)") % (i + 1))
 		assert_eq(hb.get_parent(), p,
 			"swing %d hitbox parented under the player" % (i + 1))
 		# Per-swing monitoring assertion (ticket 86c9p1fk1) — phase 1:
@@ -201,7 +202,8 @@ func test_player_sustained_swing_spam_no_panic_50_attacks() -> void:
 		# tree monitoring-ON it would be the exact physics-flush-panic
 		# shape this whole test exists to guard against.
 		assert_false(hb.monitoring,
-			"TICKET-86c9p1fk1: swing %d hitbox is monitoring=false right after add_child (encapsulated _init defers activation)" % (i + 1))
+			("TICKET-86c9p1fk1: swing %d hitbox is monitoring=false right after add_child"
+				+ " (encapsulated _init defers activation)") % (i + 1))
 		assert_false(hb.monitorable,
 			"TICKET-86c9p1fk1: swing %d hitbox is monitorable=false right after add_child" % (i + 1))
 		# Step one physics frame so the hitbox's deferred activation +
@@ -217,9 +219,11 @@ func test_player_sustained_swing_spam_no_panic_50_attacks() -> void:
 		assert_true(hb.is_inside_tree(),
 			"swing %d hitbox still in tree one frame post-spawn (within 0.10s lifetime)" % (i + 1))
 		assert_true(hb.monitoring,
-			"TICKET-86c9p1fk1: swing %d hitbox monitoring flipped ON after deferred activation landed" % (i + 1))
+			("TICKET-86c9p1fk1: swing %d hitbox monitoring flipped ON after deferred"
+				+ " activation landed") % (i + 1))
 		assert_true(hb.monitorable,
-			"TICKET-86c9p1fk1: swing %d hitbox monitorable flipped ON after deferred activation landed" % (i + 1))
+			("TICKET-86c9p1fk1: swing %d hitbox monitorable flipped ON after deferred"
+				+ " activation landed") % (i + 1))
 
 	# `attack_spawned` emit-count proves all 50 swings ran end-to-end.
 	# Pre-fix the panic could interrupt before the emit, dropping the count.

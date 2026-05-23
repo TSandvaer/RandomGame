@@ -173,7 +173,10 @@ func test_hit_flash_modulate_endpoints_are_html5_safe() -> void:
 	# Sanity: tint is visibly different from rest white (otherwise the flash
 	# is a no-op — the PR #115/#140 trap class). Channel delta vs (1,1,1) ≥ 0.20.
 	var rest_white: Color = Color(1, 1, 1, 1)
-	var delta: float = absf(tint.r - rest_white.r) + absf(tint.g - rest_white.g) + absf(tint.b - rest_white.b)
+	var delta: float = (
+		absf(tint.r - rest_white.r)
+		+ absf(tint.g - rest_white.g)
+		+ absf(tint.b - rest_white.b))
 	assert_gt(delta, 0.20,
 		"HIT_FLASH_TINT delta vs (1,1,1) >= 0.20 (visible flash, not PR#115/#140 no-op trap)")
 

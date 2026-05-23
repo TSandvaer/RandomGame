@@ -140,7 +140,8 @@ extends Node
 ##   - `team/priya-pl/post-wave3-sequencing.md` §1 Commitment 1 + §4 W1 — W1 brief
 ##   - `team/uma-ux/boss-intro.md` BI-05 + F2 — Wave 3 consumers
 ##   - `.claude/docs/html5-export.md` — gl_compatibility + visual-verification gate
-##   - `.claude/docs/camera-layer.md` — full reference (updated with continuous-scroll § by W2 impl PR)
+##   - `.claude/docs/camera-layer.md` — full reference (updated with continuous-scroll §
+##     by W2 impl PR)
 
 
 # ---- Constants -------------------------------------------------------
@@ -355,7 +356,10 @@ func _emit_state_trace() -> void:
 ## **Idempotence:** if `target_normalized_scale` and `anchor` match the most
 ## recent in-flight request, this is a no-op. Different params kill the
 ## in-flight tween + start a new one (most-recent-call-wins).
-func request_zoom(target_normalized_scale: float, duration: float, anchor: Vector2 = Vector2.ZERO) -> void:
+func request_zoom(
+		target_normalized_scale: float,
+		duration: float,
+		anchor: Vector2 = Vector2.ZERO) -> void:
 	# Validate scale.
 	if is_nan(target_normalized_scale) or is_inf(target_normalized_scale):
 		_warn(("CameraDirector.request_zoom: non-finite scale (%s) — refusing"
@@ -415,7 +419,8 @@ func request_zoom(target_normalized_scale: float, duration: float, anchor: Vecto
 		# Update the live normalized mirror + signal on completion. Use a
 		# parallel value-tween of our own state so subscribers see smooth
 		# updates each frame.
-		_zoom_tween.parallel().tween_method(_on_zoom_tween_step, _current_normalized_zoom, clamped, clamped_duration)
+		_zoom_tween.parallel().tween_method(
+			_on_zoom_tween_step, _current_normalized_zoom, clamped, clamped_duration)
 		_zoom_tween.tween_callback(_on_zoom_tween_done.bind(clamped))
 
 	# Apply anchor.
@@ -487,7 +492,8 @@ func follow_target(target: Node2D, deadzone_px: Vector2 = Vector2.ZERO) -> void:
 		clear_follow_target()
 		return
 	# Validate + clamp deadzone.
-	if is_nan(deadzone_px.x) or is_nan(deadzone_px.y) or is_inf(deadzone_px.x) or is_inf(deadzone_px.y):
+	if (is_nan(deadzone_px.x) or is_nan(deadzone_px.y)
+			or is_inf(deadzone_px.x) or is_inf(deadzone_px.y)):
 		_warn(("CameraDirector.follow_target: non-finite deadzone (%s) — refusing"
 			% str(deadzone_px)), "camera_director")
 		return
@@ -505,7 +511,10 @@ func follow_target(target: Node2D, deadzone_px: Vector2 = Vector2.ZERO) -> void:
 				target.name, clamped_dz.x, clamped_dz.y])
 
 	var was_engaged: bool = _follow_target != null and is_instance_valid(_follow_target)
-	var changed: bool = (_follow_target != target) or (clamped_dz != _follow_deadzone) or not was_engaged
+	var changed: bool = (
+		(_follow_target != target)
+		or (clamped_dz != _follow_deadzone)
+		or not was_engaged)
 	_follow_target = target
 	_follow_deadzone = clamped_dz
 	if changed:
@@ -619,7 +628,10 @@ func _on_zoom_tween_done(final_normalized: float) -> void:
 ## entry; this helper assumes ≥ 0.
 ##
 ## Static-like: no member access except via params. Test-callable.
-func _compute_deadzone_follow_position(camera_pos: Vector2, target_pos: Vector2, deadzone: Vector2) -> Vector2:
+func _compute_deadzone_follow_position(
+		camera_pos: Vector2,
+		target_pos: Vector2,
+		deadzone: Vector2) -> Vector2:
 	var result: Vector2 = camera_pos
 	# X axis.
 	var dx: float = target_pos.x - camera_pos.x

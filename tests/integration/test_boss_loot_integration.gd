@@ -369,7 +369,8 @@ func test_stratum_exit_interaction_area_monitoring_active_after_boss_death() -> 
 	var area: Area2D = exit.get_interaction_area()
 	assert_not_null(area, "interaction area exists")
 	assert_true(area.monitoring,
-		"REGRESSION-86c9unkr2: StratumExit interaction_area.monitoring=true after double-defer — " +
-		"_arm_interaction_area_after_flush awaited physics_frame and wrote monitoring=true outside the flush")
+		"REGRESSION-86c9unkr2: StratumExit interaction_area.monitoring=true after"
+			+ " double-defer — _arm_interaction_area_after_flush awaited physics_frame"
+			+ " and wrote monitoring=true outside the flush")
 	assert_true(area.monitorable,
 		"REGRESSION-86c9unkr2: StratumExit interaction_area.monitorable=true parity post-defer")

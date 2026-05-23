@@ -57,7 +57,8 @@ const TITLE_TEXT: String = "STRATUM 2"
 const SUBTITLE_TEXT: String = "Coming in M2"
 
 ## Body copy explaining the loop-back option.
-const BODY_TEXT: String = "You have cleared the Outer Cloister.\nThe path deeper waits to be carved."
+const BODY_TEXT: String = (
+	"You have cleared the Outer Cloister.\nThe path deeper waits to be carved.")
 
 ## Button copy.
 const RETURN_BUTTON_TEXT: String = "Return to Stratum 1"

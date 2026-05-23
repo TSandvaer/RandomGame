@@ -163,7 +163,8 @@ func test_boss_takes_damage_from_real_hitbox_spawn() -> void:
 	var hb: Hitbox = _make_player_team_hitbox_at(boss.global_position, 6, 24.0)
 	await _await_physics_settles()
 	assert_lt(boss.get_hp(), hp_before,
-		"REGRESSION-86c9q96fv: boss must take damage from a real Hitbox spawn (hp %d -> %d)" % [hp_before, boss.get_hp()])
+		"REGRESSION-86c9q96fv: boss must take damage from a real Hitbox spawn (hp %d -> %d)"
+			% [hp_before, boss.get_hp()])
 	assert_eq(boss.get_hp(), hp_before - hb.damage,
 		"hit lands with the configured damage payload")
 

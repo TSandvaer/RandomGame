@@ -231,7 +231,8 @@ func test_boss_room_door_trigger_still_reachable() -> void:
 	# of that so the player overlaps the trigger before being stopped.
 	const TRIGGER_NORTH_EDGE_Y: float = 242.0
 	assert_gte(south_wall_top, TRIGGER_NORTH_EDGE_Y,
-		"south wall top is y=%.1f — must be >= %.1f (trigger north edge) to leave the door trigger reachable"
+		("south wall top is y=%.1f — must be >= %.1f (trigger north edge)"
+			+ " to leave the door trigger reachable")
 			% [south_wall_top, TRIGGER_NORTH_EDGE_Y])
 
 

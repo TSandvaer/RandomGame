@@ -104,7 +104,9 @@ func test_unknown_keys_preserved_through_round_trip() -> void:
 # ---- INV-1..INV-8 cross-check (pin via the 8 fixtures collectively) -
 
 func test_inv1_v3_to_v4_load_clean() -> void:
-	pending("awaiting W3-T6 — INV-1 via the v3-baseline-loaded-under-v4 path (re-use existing fixture)")
+	pending(
+		"awaiting W3-T6 — INV-1 via the v3-baseline-loaded-under-v4 path"
+			+ " (re-use existing fixture)")
 
 
 func test_inv2_empty_stash_backfill_via_fixture() -> void:

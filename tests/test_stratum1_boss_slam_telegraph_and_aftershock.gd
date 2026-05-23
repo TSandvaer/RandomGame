@@ -411,7 +411,8 @@ func test_slam_indicator_strobe_constants_are_sane() -> void:
 ## (`is_valid` + `is_running`) during the hold window. Verifies the strobe is
 ## not a no-op static hold by inspecting the tween's lifecycle, not by
 ## sampling modulate.a directly (headless tween cadence is too jittery for
-## reliable per-frame sampling — same constraint as test_slam_telegraph_indicator_frees_on_slam_fire).
+## reliable per-frame sampling — same constraint as
+## test_slam_telegraph_indicator_frees_on_slam_fire).
 func test_slam_indicator_strobe_tween_runs_during_hold() -> void:
 	var arr: Array = _arm_slam_telegraph()
 	var b: Stratum1Boss = arr[0]

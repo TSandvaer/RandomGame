@@ -29,7 +29,9 @@ class AssemblyResult:
 ##
 ## Returns null on validation failure (caller's responsibility to check
 ## `chunk_def.validate()` first if it cares about diagnostics).
-func assemble_single(chunk_def: LevelChunkDef, mob_factory: Callable = Callable()) -> AssemblyResult:
+func assemble_single(
+		chunk_def: LevelChunkDef,
+		mob_factory: Callable = Callable()) -> AssemblyResult:
 	if chunk_def == null:
 		push_error("LevelAssembler: chunk_def is null")
 		return null

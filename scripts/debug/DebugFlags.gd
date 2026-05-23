@@ -101,7 +101,8 @@ func _ready() -> void:
 	_resolve_boss_hp_mult()
 	_resolve_start_room()
 	# Single boot-time line for Tess's grep.
-	print("[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s web=%s boss_hp_mult=%.3f start_room=%d" % [
+	print(("[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s"
+			+ " web=%s boss_hp_mult=%.3f start_room=%d") % [
 		OS.is_debug_build(),
 		test_mode_enabled,
 		fast_xp_enabled,

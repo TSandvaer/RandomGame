@@ -120,7 +120,13 @@ func _physics_process(delta: float) -> void:
 
 ## Configure in one call. Call before add_child() so `_ready` reads the
 ## right team/lifetime/layer values.
-func configure(p_damage: int, p_velocity: Vector2, p_lifetime: float, p_team: StringName, p_source: Node, p_knockback: float = 60.0) -> void:
+func configure(
+		p_damage: int,
+		p_velocity: Vector2,
+		p_lifetime: float,
+		p_team: StringName,
+		p_source: Node,
+		p_knockback: float = 60.0) -> void:
 	damage = p_damage
 	velocity_vec = p_velocity
 	lifetime = p_lifetime

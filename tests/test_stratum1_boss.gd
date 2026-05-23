@@ -90,7 +90,8 @@ func _hit(b: Stratum1Boss, dmg: int) -> void:
 # ---- 1: full HP at spawn from MobDef --------------------------------
 
 func test_spawns_with_full_hp_from_mobdef() -> void:
-	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 600, "damage_base": 15, "move_speed": 80.0})
+	var def: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 600, "damage_base": 15, "move_speed": 80.0})
 	var b: Stratum1Boss = _make_boss_with_def(def)
 	assert_eq(b.get_hp(), 600, "starts at hp_base")
 	assert_eq(b.get_max_hp(), 600, "max_hp = hp_base at spawn")
@@ -322,14 +323,16 @@ func test_boss_hitbox_misses_player_during_iframes() -> void:
 	# take damage. The i-frame guarantee is at the LAYER level.
 	# Verify: hitbox masks only player layer; player layer is cleared.
 	assert_eq(hb.collision_mask, Hitbox.LAYER_PLAYER, "enemy hitbox masks player layer only")
-	assert_eq(player.collision_layer, 0, "player layer cleared during dodge — hitbox mask finds nothing")
+	assert_eq(player.collision_layer, 0,
+		"player layer cleared during dodge — hitbox mask finds nothing")
 
 
 # ---- 9: boss death triggers loot drop from boss_drops table ----------
 
 func test_boss_death_drops_loot_via_spawner() -> void:
 	# Build a tiny boss def with a mock loot table: one guaranteed entry.
-	var item: ItemDef = ContentFactory.make_item_def({"id": &"boss_test_drop", "tier": ItemDef.Tier.T2})
+	var item: ItemDef = ContentFactory.make_item_def(
+		{"id": &"boss_test_drop", "tier": ItemDef.Tier.T2})
 	var entry: LootEntry = ContentFactory.make_loot_entry(item, 1.0, 0)
 	var table: LootTableDef = ContentFactory.make_loot_table({"entries": [entry]})
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 100, "loot_table": table})

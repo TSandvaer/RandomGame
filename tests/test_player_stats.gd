@@ -246,7 +246,10 @@ func test_v0_migration_chains_through_to_v3() -> void:
 	# v0->v1 step backfills meta/equipped/stash/character; v1->v2 backfills
 	# xp_to_next; v2->v3 backfills stats/unspent.
 	var v0_data: Dictionary = {
-		"character": {"name": "Ancient", "level": 2, "xp": 50, "vigor": 1, "focus": 0, "edge": 0, "hp_current": 80, "hp_max": 105},
+		"character": {
+			"name": "Ancient", "level": 2, "xp": 50,
+			"vigor": 1, "focus": 0, "edge": 0,
+			"hp_current": 80, "hp_max": 105},
 	}
 	var migrated: Dictionary = _save().migrate(v0_data, 0)
 	assert_true(migrated.has("meta"), "v0->v1 backfilled meta")

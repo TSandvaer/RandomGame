@@ -91,7 +91,10 @@ func to_save_dict() -> Dictionary:
 ##
 ## Resolver signature (Callable):
 ##   func resolve(id: StringName) -> Resource:  # ItemDef or AffixDef
-static func from_save_dict(data: Dictionary, item_resolver: Callable, affix_resolver: Callable) -> ItemInstance:
+static func from_save_dict(
+		data: Dictionary,
+		item_resolver: Callable,
+		affix_resolver: Callable) -> ItemInstance:
 	if data == null or data.is_empty():
 		return null
 	var item_id_v: Variant = data.get("id", "")
@@ -123,7 +126,9 @@ static func from_save_dict(data: Dictionary, item_resolver: Callable, affix_reso
 			var aff_id: StringName = StringName(String(aff_id_v))
 			var aff_def: AffixDef = affix_resolver.call(aff_id) as AffixDef
 			if aff_def == null:
-				_emit_warning("ItemInstance.from_save_dict: unknown affix id '%s' on item '%s'" % [aff_id, item_id],
+				_emit_warning(
+					"ItemInstance.from_save_dict: unknown affix id '%s' on item '%s'"
+						% [aff_id, item_id],
 					"unknown_affix_id")
 				continue
 			var v: float = float(entry.get("value", 0.0))

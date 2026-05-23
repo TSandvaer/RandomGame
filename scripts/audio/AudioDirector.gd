@@ -241,7 +241,9 @@ func play_stratum2_bgm(fade_in_ms: int = DEFAULT_FADE_IN_MS) -> void:
 
 ## Start S2 Ambient with a fade-in on the Ambient bus. Idempotent.
 func play_stratum2_ambient(fade_in_ms: int = DEFAULT_FADE_IN_MS) -> void:
-	if _last_ambient_path == STREAM_PATH_S2_AMBIENT and _ambient_player != null and _ambient_player.playing:
+	if (_last_ambient_path == STREAM_PATH_S2_AMBIENT
+			and _ambient_player != null
+			and _ambient_player.playing):
 		return
 	var stream: AudioStream = _get_stream_s2_ambient()
 	if stream == null:
@@ -780,7 +782,8 @@ func _play_with_fade_in(player: AudioStreamPlayer, stream: AudioStream, fade_ms:
 
 # Ambient has its own tween slot so a BGM transition doesn't kill an in-flight
 # ambient fade.
-func _play_with_fade_in_ambient(player: AudioStreamPlayer, stream: AudioStream, fade_ms: int) -> void:
+func _play_with_fade_in_ambient(
+		player: AudioStreamPlayer, stream: AudioStream, fade_ms: int) -> void:
 	if player == null or stream == null:
 		return
 	if _ambient_fade_tween != null and _ambient_fade_tween.is_valid():

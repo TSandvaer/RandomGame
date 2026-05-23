@@ -1292,7 +1292,10 @@ func _update_mouse_facing() -> void:
 ##     delta exceeds the dead-zone.
 ##   - Returns the input `last_facing` unchanged inside the dead-zone.
 ##   - Exact-zero delta returns `last_facing` (no NaN from normalise(0)).
-static func _resolve_facing_from_mouse(mouse_global: Vector2, self_global: Vector2, last_facing: Vector2) -> Vector2:
+static func _resolve_facing_from_mouse(
+		mouse_global: Vector2,
+		self_global: Vector2,
+		last_facing: Vector2) -> Vector2:
 	var delta: Vector2 = mouse_global - self_global
 	if delta.length() < MOUSE_FACING_DEADZONE_PX:
 		return last_facing
@@ -1487,7 +1490,12 @@ func _exit_iframes_if_not_dodging() -> void:
 ## reach × full diameter). The wedge still reads as a directional sweep at
 ## M1 placeholder fidelity — the ColorRect mounts at the player center,
 ## extends `reach` px along the facing direction, and is `radius*2` px wide.
-func _spawn_swing_wedge(kind: StringName, dir: Vector2, reach: float, radius: float, lifetime: float) -> ColorRect:
+func _spawn_swing_wedge(
+		kind: StringName,
+		dir: Vector2,
+		reach: float,
+		radius: float,
+		lifetime: float) -> ColorRect:
 	# Drop any in-flight wedge so the new attack's cue is the only one
 	# visible. is_instance_valid covers the case where _on_wedge_finished
 	# already nulled the ref but the queue_free hasn't been processed yet.
@@ -1536,7 +1544,8 @@ func _spawn_swing_wedge(kind: StringName, dir: Vector2, reach: float, radius: fl
 	tween.tween_property(wedge, "modulate:a", 0.0, lifetime)
 	tween.tween_callback(Callable(self, "_on_wedge_finished").bind(wedge))
 	_combat_trace("Player.swing_wedge",
-		"spawned kind=%s lifetime=%.3f tween_valid=%s alpha=%.2f" % [kind, lifetime, tween.is_valid(), rgba.a])
+		"spawned kind=%s lifetime=%.3f tween_valid=%s alpha=%.2f"
+			% [kind, lifetime, tween.is_valid(), rgba.a])
 	return wedge
 
 
@@ -1557,7 +1566,12 @@ func _play_swing_flash() -> void:
 	tween.tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 1.0), SWING_FLASH_HALF_DURATION)
 	_active_flash_tween = tween
 	_combat_trace("Player.swing_flash",
-		"tween_valid=%s tint=(%.2f,%.2f,%.2f) duration=%.3f" % [tween.is_valid(), SWING_FLASH_TINT.r, SWING_FLASH_TINT.g, SWING_FLASH_TINT.b, SWING_FLASH_HALF_DURATION * 2.0])
+		"tween_valid=%s tint=(%.2f,%.2f,%.2f) duration=%.3f" % [
+			tween.is_valid(),
+			SWING_FLASH_TINT.r,
+			SWING_FLASH_TINT.g,
+			SWING_FLASH_TINT.b,
+			SWING_FLASH_HALF_DURATION * 2.0])
 
 
 ## Internal: tween-finished callback for the swing wedge. Frees the node and
@@ -1573,7 +1587,13 @@ func _on_wedge_finished(wedge: ColorRect) -> void:
 
 # ---- Hitbox spawn -------------------------------------------------------
 
-func _spawn_hitbox(dir: Vector2, damage: int, knockback: Vector2, reach: float, radius: float, lifetime: float) -> Hitbox:
+func _spawn_hitbox(
+		dir: Vector2,
+		damage: int,
+		knockback: Vector2,
+		reach: float,
+		radius: float,
+		lifetime: float) -> Hitbox:
 	var hitbox: Hitbox = HitboxScript.new()
 	# Configure BEFORE adding to tree so _ready() reads correct values.
 	hitbox.configure(damage, knockback, lifetime, Hitbox.TEAM_PLAYER, self)

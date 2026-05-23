@@ -108,7 +108,12 @@ func _physics_process(delta: float) -> void:
 
 ## Configure the hitbox in one call. Call before adding to the scene tree
 ## so `_ready` reads the right team/lifetime.
-func configure(p_damage: int, p_knockback: Vector2, p_lifetime: float, p_team: StringName, p_source: Node) -> void:
+func configure(
+		p_damage: int,
+		p_knockback: Vector2,
+		p_lifetime: float,
+		p_team: StringName,
+		p_source: Node) -> void:
 	damage = p_damage
 	knockback = p_knockback
 	lifetime = p_lifetime

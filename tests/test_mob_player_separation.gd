@@ -490,7 +490,8 @@ func test_grunt_separates_from_player_approached_from_south() -> void:
 		"south-approach: grunt velocity must be non-zero after swing-fire (separation from player)")
 	# Pushback must point NORTH (away from player below). i.e. velocity.y < 0.
 	assert_lt(g.velocity.y, 0.0,
-		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)" % [g.velocity.x, g.velocity.y])
+		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)"
+			% [g.velocity.x, g.velocity.y])
 
 	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
 	var pushback_dir: Vector2 = g.velocity.normalized()
@@ -518,7 +519,8 @@ func test_grunt_separates_from_player_approached_from_north() -> void:
 	assert_gt(g.velocity.length(), 0.0,
 		"north-approach: grunt velocity must be non-zero after swing-fire")
 	assert_gt(g.velocity.y, 0.0,
-		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)" % [g.velocity.x, g.velocity.y])
+		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)"
+			% [g.velocity.x, g.velocity.y])
 
 	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
 	var dot: float = g.velocity.normalized().dot(away_dir)
@@ -541,7 +543,8 @@ func test_grunt_separates_from_player_approached_from_west() -> void:
 	assert_gt(g.velocity.length(), 0.0,
 		"west-approach: grunt velocity must be non-zero after swing-fire")
 	assert_gt(g.velocity.x, 0.0,
-		"west-approach: pushback must point EAST (positive X) — got velocity=(%.2f,%.2f)" % [g.velocity.x, g.velocity.y])
+		"west-approach: pushback must point EAST (positive X) — got velocity=(%.2f,%.2f)"
+			% [g.velocity.x, g.velocity.y])
 
 	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
 	var dot: float = g.velocity.normalized().dot(away_dir)
@@ -595,7 +598,8 @@ func test_charger_separates_from_player_approached_from_south() -> void:
 		"south-approach: charger velocity must be non-zero on contact tick")
 	# Pushback must point NORTH (away from player below). i.e. velocity.y < 0.
 	assert_lt(c.velocity.y, 0.0,
-		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)" % [c.velocity.x, c.velocity.y])
+		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)"
+			% [c.velocity.x, c.velocity.y])
 
 	var away_dir: Vector2 = (c.global_position - p.global_position).normalized()
 	var pushback_dir: Vector2 = c.velocity.normalized()
@@ -625,7 +629,8 @@ func test_charger_separates_from_player_approached_from_north() -> void:
 	assert_gt(c.velocity.length(), 0.0,
 		"north-approach: charger velocity must be non-zero on contact tick")
 	assert_gt(c.velocity.y, 0.0,
-		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)" % [c.velocity.x, c.velocity.y])
+		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)"
+			% [c.velocity.x, c.velocity.y])
 
 	var away_dir: Vector2 = (c.global_position - p.global_position).normalized()
 	var dot: float = c.velocity.normalized().dot(away_dir)

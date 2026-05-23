@@ -70,7 +70,9 @@ func test_mob_registry_autoload_no_errors_on_boot() -> void:
 	# failure mode).
 	var reg: Node = _registry()
 	assert_not_null(reg)
-	for method: String in ["get_mob_def", "get_mob_scene", "has_mob", "apply_stratum_scaling", "spawn", "registered_ids"]:
+	for method: String in [
+			"get_mob_def", "get_mob_scene", "has_mob",
+			"apply_stratum_scaling", "spawn", "registered_ids"]:
 		assert_true(reg.has_method(method), "MobRegistry must expose %s()" % method)
 
 

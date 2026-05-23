@@ -364,7 +364,8 @@ func test_attack_while_overlapping_grunt_damages_grunt_via_signal_flow() -> void
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	assert_lt(grunt.get_hp(), hp_before,
-		"AC4b/86c9m36zh: clicking attack while overlapping grunt must damage grunt via signal flow (hp %d -> %d)" % [
+		("AC4b/86c9m36zh: clicking attack while overlapping grunt must damage"
+			+ " grunt via signal flow (hp %d -> %d)") % [
 			hp_before, grunt.get_hp(),
 		])
 

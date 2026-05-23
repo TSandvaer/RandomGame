@@ -80,7 +80,8 @@ signal room_cleared()
 
 ## res:// paths to the optional dressing scenes.
 @export_file("*.tscn") var room_gate_scene_path: String = "res://scenes/levels/RoomGate.tscn"
-@export_file("*.tscn") var healing_fountain_scene_path: String = "res://scenes/levels/HealingFountain.tscn"
+@export_file("*.tscn") var healing_fountain_scene_path: String = (
+	"res://scenes/levels/HealingFountain.tscn")
 
 ## If non-zero, spawn a RoomGate at this world position. Vector2.ZERO means
 ## "no gate" — used by the boss-room handoff or by test scaffolding.

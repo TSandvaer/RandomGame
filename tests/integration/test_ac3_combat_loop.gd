@@ -127,7 +127,8 @@ func test_dodge_iframes_prevent_enemy_damage() -> void:
 	var ok: bool = p.try_dodge(Vector2.RIGHT)
 	assert_true(ok, "dodge initiated")
 	assert_true(p.is_invulnerable(), "i-frames active")
-	assert_eq(p.collision_layer, 0, "AC3: dodge clears player collision_layer (i-frames at physics level)")
+	assert_eq(p.collision_layer, 0,
+		"AC3: dodge clears player collision_layer (i-frames at physics level)")
 	# Spawn an enemy-team hitbox masking player layer. Verify mask wouldn't
 	# pick the player up (collision_mask & player.collision_layer == 0).
 	var hb: Hitbox = _make_enemy_swing_at(p.global_position, p)
@@ -203,7 +204,8 @@ func test_single_hitbox_only_hits_once_per_target() -> void:
 	hb._try_apply_hit(grunt)
 	hb._try_apply_hit(grunt)
 	hb._try_apply_hit(grunt)
-	assert_eq(grunt.get_hp(), hp_before - 1, "AC3: hit applied exactly once despite repeat overlap calls")
+	assert_eq(grunt.get_hp(), hp_before - 1,
+		"AC3: hit applied exactly once despite repeat overlap calls")
 
 
 # ---- 7: dead grunt no longer takes damage -----------------------------
@@ -224,7 +226,8 @@ func test_attack_against_dead_grunt_is_noop() -> void:
 	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT) as Hitbox
 	hb._try_apply_hit(grunt)
 	assert_eq(grunt.get_hp(), 0, "HP stays at 0 after corpse-swing")
-	assert_signal_emit_count(grunt, "mob_died", 1, "mob_died still fires exactly once across corpse-hits")
+	assert_signal_emit_count(grunt, "mob_died", 1,
+		"mob_died still fires exactly once across corpse-hits")
 
 
 # ---- 8: dodge cooldown blocks immediate re-dodge in fight -------------

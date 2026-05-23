@@ -222,7 +222,8 @@ func _arm_interaction_area_after_flush() -> void:
 	# surfaces in the trace. Pre-fix the label was hard-coded "monitoring flipped
 	# ON" regardless of actual state — no signal whether the setter took effect.
 	_combat_trace("StratumExit.activate",
-		"mon_actual=%s mon_req=true — checking pre-existing body overlaps (knockback-overlap fix)" % str(_interaction_area.monitoring))
+		("mon_actual=%s mon_req=true — checking pre-existing body overlaps"
+			+ " (knockback-overlap fix)") % str(_interaction_area.monitoring))
 	# Diagnostic-only instrumentation (ticket `86c9uq0ky` — Finding 2 NEW bug
 	# class investigation, 2026-05-16 Sponsor soak of `8e76c74`). Sibling to
 	# `Pickup._activate_diag`. PR #241's double-defer proved `mon_actual=true`
@@ -251,7 +252,8 @@ func _arm_interaction_area_after_flush() -> void:
 	if ap != null:
 		area_parent_name = String(ap.name)
 	_combat_trace("StratumExit._arm_diag",
-		"overlapping_bodies=%d cs_disabled=%s cs_shape_set=%s monitoring=%s area_parent=%s area_in_tree=%s area_global_pos=(%.0f,%.0f)" % [
+		("overlapping_bodies=%d cs_disabled=%s cs_shape_set=%s monitoring=%s"
+			+ " area_parent=%s area_in_tree=%s area_global_pos=(%.0f,%.0f)") % [
 			_interaction_area.get_overlapping_bodies().size(),
 			cs_disabled, cs_shape_set,
 			str(_interaction_area.monitoring),

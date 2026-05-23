@@ -16,7 +16,8 @@ extends GutTest
 
 const SPRITE_FRAMES_PATH: String = "res://assets/sprites/boss/Stratum1Boss.tres"
 const ANIM_DIRS: Array[String] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
-const EXPECTED_FRAME_COUNT: int = 7  # surprise-uppercut template (was 7 for kick too — coincidence; pin)
+const EXPECTED_FRAME_COUNT: int = 7
+# surprise-uppercut template (was 7 for kick too — coincidence; pin)
 
 # Map .tres dir suffix → on-disk folder name (per anim-folder-map.md).
 const DIR_SUFFIX_TO_FOLDER: Dictionary = {

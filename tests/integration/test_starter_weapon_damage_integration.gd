@@ -170,10 +170,12 @@ func test_pickup_equip_drives_weapon_scaled_damage_not_fist() -> void:
 
 	var expected_light_dmg: int = DamageScript.compute_player_damage(weapon, 0, &"light")
 	assert_eq(hb.damage, expected_light_dmg,
-		"AC-B: hitbox.damage must equal Damage.compute_player_damage(iron_sword, 0, light) = %d" % expected_light_dmg)
+		"AC-B: hitbox.damage must equal Damage.compute_player_damage(iron_sword, 0, light) = %d"
+			% expected_light_dmg)
 	assert_gt(hb.damage, DamageScript.FIST_DAMAGE,
-		"AC-B: hitbox.damage=%d must be > FIST_DAMAGE=%d — if this fails, the pickup-equip " % [hb.damage, DamageScript.FIST_DAMAGE] +
-		"didn't propagate to Player._equipped_weapon (dual-surface miss)")
+		("AC-B: hitbox.damage=%d must be > FIST_DAMAGE=%d — if this fails, the"
+			+ " pickup-equip didn't propagate to Player._equipped_weapon"
+			+ " (dual-surface miss)") % [hb.damage, DamageScript.FIST_DAMAGE])
 
 	# Apply the hit and confirm HP drop matches formula output.
 	hb._try_apply_hit(grunt)

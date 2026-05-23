@@ -62,7 +62,9 @@ func test_s2_boss_room_door_trigger_exists_as_fallback() -> void:
 
 
 func test_s2_boss_room_door_trigger_idempotent_with_auto_fire() -> void:
-	pending("awaiting W3-T4 — trigger_entry_sequence is idempotent (auto-fire + door-trigger don't double-fire)")
+	pending(
+		"awaiting W3-T4 — trigger_entry_sequence is idempotent"
+			+ " (auto-fire + door-trigger don't double-fire)")
 
 
 func test_s2_boss_room_door_trigger_built_with_call_deferred() -> void:

@@ -29,7 +29,8 @@ func test_player_team_layer_routing() -> void:
 	hb.configure(5, Vector2.ZERO, 0.1, Hitbox.TEAM_PLAYER, null)
 	add_child_autofree(hb)
 	# Mask = enemy bit.
-	assert_eq(hb.collision_layer, Hitbox.LAYER_PLAYER_HITBOX, "player team -> player_hitbox layer (bit 3)")
+	assert_eq(hb.collision_layer, Hitbox.LAYER_PLAYER_HITBOX,
+		"player team -> player_hitbox layer (bit 3)")
 	assert_eq(hb.collision_mask, Hitbox.LAYER_ENEMY, "player team mask -> enemy (bit 4)")
 
 
@@ -37,7 +38,8 @@ func test_enemy_team_layer_routing() -> void:
 	var hb: Hitbox = HitboxScript.new()
 	hb.configure(5, Vector2.ZERO, 0.1, Hitbox.TEAM_ENEMY, null)
 	add_child_autofree(hb)
-	assert_eq(hb.collision_layer, Hitbox.LAYER_ENEMY_HITBOX, "enemy team -> enemy_hitbox layer (bit 5)")
+	assert_eq(hb.collision_layer, Hitbox.LAYER_ENEMY_HITBOX,
+		"enemy team -> enemy_hitbox layer (bit 5)")
 	assert_eq(hb.collision_mask, Hitbox.LAYER_PLAYER, "enemy team mask -> player (bit 2)")
 
 
@@ -66,7 +68,8 @@ func test_target_only_takes_damage_once() -> void:
 	hb._try_apply_hit(enemy)
 	hb._try_apply_hit(enemy)
 	hb._try_apply_hit(enemy)
-	assert_eq(enemy.hits.size(), 1, "single-hit-per-target invariant — multiple overlap signals must collapse")
+	assert_eq(enemy.hits.size(), 1,
+		"single-hit-per-target invariant — multiple overlap signals must collapse")
 	assert_true(hb.has_already_hit(enemy), "has_already_hit returns true after first hit")
 
 
