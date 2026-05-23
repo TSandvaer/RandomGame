@@ -29,7 +29,7 @@ const BOOT_TIMEOUT_MS = 30_000;
 const COMBAT_TIMEOUT_MS = 150_000;
 const POST_AFTERSHOCK_CAPTURE_FRAMES = 8;
 
-// QUARANTINED 2026-05-23 — ClickUp `86c9y00m1` (Playwright triage).
+// QUARANTINED 2026-05-23 — ClickUp `86c9y4hfx` (Playwright triage).
 // Persistent failure: Stratum1Boss wake/aftershock state machine does not reach
 // expected trace lines in headless Chromium within 10000ms (15/15 runs since
 // 2026-05-22 14:57Z). Visual-of-record is Sponsor interactive soak per
