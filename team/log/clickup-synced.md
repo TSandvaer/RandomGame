@@ -613,3 +613,33 @@ Source: PR #338 (`pm(stage2): file 8 gdlint Stage-2 follow-up tickets from PR #3
 - **List:** 901523123922 (RandomGame)
 - **Status @ flush:** to do
 - **Flushed:** 2026-05-23T~10:30Z (orchestrator main session)
+
+---
+
+## Flushed 2026-05-23 ~10:55 UTC (orchestrator) — ENTRIES 029-031 (3 update_task on W2-T2/T3/T4)
+
+Source: PR #339 (`pm(si8-lock): W2 unblock — procgen shape locked to (b) + 3 ticket-body queues`, merge commit `eff2ebf`). SI-8 (b) lock on PR #328 unblocked W2-T3 sizing; Priya's W2-T2/T4 stale-body sync per v1.3 §5.1 also folded.
+
+### ENTRY 2026-05-23-029 → update_task 86c9y0zyv
+
+- **ClickUp:** https://app.clickup.com/t/86c9y0zyv
+- **Op:** update_task (overwrite name + description)
+- **Target:** W2-T2 — feat(dialogue): DialogueController consumer wiring + 3 hub-town trees + QuestActionRouter stub
+- **Source:** PR #339 ENTRY queue (Priya-authored, Sponsor SI-8 (b) lock fidelity)
+- **Flushed:** 2026-05-23T~10:55Z (orchestrator main session — `mcp__clickup__update_task` × 3 in parallel)
+
+### ENTRY 2026-05-23-030 → update_task 86c9y1045
+
+- **ClickUp:** https://app.clickup.com/t/86c9y1045
+- **Op:** update_task (overwrite name + description)
+- **Target:** W2-T3 — feat(level): assemble_floor + S1 retrofit (SI-8 (b) LOCKED)
+- **Source:** PR #339 ENTRY queue (Priya-authored, Sponsor SI-8 (b) lock fidelity)
+- **Flushed:** 2026-05-23T~10:55Z (orchestrator main session — `mcp__clickup__update_task` × 3 in parallel)
+
+### ENTRY 2026-05-23-031 → update_task 86c9y108t
+
+- **ClickUp:** https://app.clickup.com/t/86c9y108t
+- **Op:** update_task (overwrite name + description)
+- **Target:** W2-T4 — feat(save): world_seed save-write + v5 additive field
+- **Source:** PR #339 ENTRY queue (Priya-authored, Sponsor SI-8 (b) lock fidelity)
+- **Flushed:** 2026-05-23T~10:55Z (orchestrator main session — `mcp__clickup__update_task` × 3 in parallel)
