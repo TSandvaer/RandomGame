@@ -142,6 +142,133 @@ jobs:
           # error, so the early check just makes diagnosis cheaper.
           test -f addons/gut/gut_cmdln.gd
 
+      # Devon static-analysis gate 2026-05-23 — surface GDScript style/lint
+      # findings via gdtoolkit. **Warnings-only for now**: both gdlint and
+      # gdformat steps wrap their invocation with `set +e` + an explicit
+      # `true` exit so they NEVER fail the workflow. Output is captured to
+      # disk and uploaded as an artifact on every run so reviewers can
+      # audit the warning surface, but the build stays green regardless of
+      # lint volume.
+      #
+      # Rollout plan (Sponsor-authorised 2026-05-23):
+      #   Stage 1 (this PR): warnings-only, surface baseline volume
+      #                      (~387 gdlint findings + ~179 gdformat
+      #                      reformats as of the dispatching commit).
+      #   Stage 2: clean-slate fix-pass tickets filed for the top rule
+      #            categories (max-line-length, class-definitions-order,
+      #            duplicated-load, max-public-methods, gdformat reformat).
+      #   Stage 3: drop the `set +e` / `true` guard and promote to errors
+      #            once the warning count is at zero / sustainably bounded.
+      #
+      # gdtoolkit is a Python package (pip). The barichello/godot-ci:4.3
+      # container's Dockerfile (verified upstream at
+      # https://github.com/abarichello/godot-ci/blob/master/Dockerfile)
+      # installs ONLY: ca-certificates git git-lfs unzip wget zip adb
+      # openjdk-17-jdk-headless rsync nodejs osslsigncode — NO python3,
+      # NO pip. The original PR #333 assumption that the image shipped
+      # Python was empirically false (CI run 26326920131 exit 127:
+      # `pip: command not found`). Drew's peer-review caught it; this
+      # step bootstraps python3 + pip if needed.
+      #
+      # Bootstrap shape (Drew's fix shape, PR #333 round 2):
+      #   1. Probe `python3 -m pip --version` first — fast-path if a
+      #      future container revision adds Python via ensurepip.
+      #   2. Fall back to `apt-get install -y python3 python3-pip` if
+      #      the probe fails. ~10-15s install cost on a cold container.
+      #   3. Then `python3 -m pip install --quiet gdtoolkit>=4.3,<5`.
+      # Using `python3 -m pip` over bare `pip` is defensive: it works
+      # whether pip is symlinked into PATH or only accessible via the
+      # python3 module loader.
+      #
+      # Pin to a known-working version range to avoid surprise rule-set
+      # drift on a transitive gdtoolkit release.
+      #
+      # Step placement: BEFORE `Stamp build SHA` / `Headless import` /
+      # `Run GUT tests` so static-analysis findings surface fast and don't
+      # wait on the expensive import path. The lint steps add ~15-20 s
+      # combined (including bootstrap); well under the 10-minute timeout.
+      - name: Install gdtoolkit (gdlint + gdformat)
+        run: |
+          set -euo pipefail
+          # Probe: does python3 + pip already exist? Fast-path return if so.
+          if python3 -m pip --version >/dev/null 2>&1; then
+            echo "python3 + pip already available — skipping apt bootstrap"
+          else
+            echo "python3 -m pip probe failed — bootstrapping via apt-get"
+            apt-get update
+            apt-get install -y --no-install-recommends python3 python3-pip
+          fi
+          # `--break-system-packages` is needed on Ubuntu noble (PEP 668
+          # externally-managed-environment guard); harmless on older
+          # Pythons that don't recognise the flag... actually they DO
+          # error on unknown flags, so gate it on a probe.
+          PIP_BREAK_FLAG=""
+          if python3 -m pip install --help 2>&1 | grep -q '\-\-break-system-packages'; then
+            PIP_BREAK_FLAG="--break-system-packages"
+          fi
+          python3 -m pip install --quiet ${PIP_BREAK_FLAG} 'gdtoolkit>=4.3,<5'
+          # Sanity: confirm the binaries are on PATH after install.
+          gdlint --version
+          gdformat --version
+
+      - name: gdlint (warnings-only)
+        run: |
+          # Intentional: warnings-only mode (Stage 1 of the gdtoolkit
+          # rollout — see the "Install gdtoolkit" step above for the
+          # staged plan). Output is captured to disk for artifact upload
+          # and a summary count is echoed inline so the step log is
+          # self-describing without needing to download the artifact.
+          mkdir -p lint-reports
+          set +e
+          gdlint scripts/ tests/ > lint-reports/gdlint.txt 2>&1
+          gdlint_exit=$?
+          set -e
+          # gdlint exits non-zero on any finding. The actual finding
+          # count is captured by matching the "<path>:<line>: Error:"
+          # shape gdlint emits per finding (the trailing
+          # "Failure: N problems found" line is gdlint's own summary).
+          finding_count=$(grep -cE '^[^[:space:]]+:[0-9]+: Error:' lint-reports/gdlint.txt || true)
+          echo "gdlint exit: ${gdlint_exit}   findings: ${finding_count}"
+          echo "=== gdlint output (first 40 lines) ==="
+          head -n 40 lint-reports/gdlint.txt || true
+          echo "=== (truncated; full output in ci-lint-reports artifact) ==="
+          # Belt-and-braces: the `set +e` already prevented gdlint's
+          # exit code from killing the step, but `true` here makes the
+          # warnings-only intent unambiguous in the workflow YAML.
+          true
+
+      - name: gdformat --check (warnings-only)
+        run: |
+          mkdir -p lint-reports
+          set +e
+          gdformat --check scripts/ tests/ > lint-reports/gdformat.txt 2>&1
+          gdformat_exit=$?
+          set -e
+          # gdformat --check prints "would reformat <path>" per file
+          # that needs formatting, plus a final
+          # "N files would be reformatted, M files would be left unchanged."
+          reformat_count=$(grep -cE '^would reformat ' lint-reports/gdformat.txt || true)
+          echo "gdformat exit: ${gdformat_exit}   would-reformat: ${reformat_count}"
+          echo "=== gdformat output (first 20 lines) ==="
+          head -n 20 lint-reports/gdformat.txt || true
+          echo "=== (truncated; full output in ci-lint-reports artifact) ==="
+          true
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          # Always-on (`if: always()`) because the lint artifact is most
+          # useful on GREEN runs during the warnings-only rollout — that's
+          # when reviewers need to see the residual surface to decide on
+          # follow-up fix-pass scope. Once the rules are promoted to
+          # errors (Stage 3), this can become `if: failure()` to match
+          # the test-artifacts pattern below.
+          name: ci-lint-reports-${{ github.run_id }}
+          path: lint-reports/
+          retention-days: 7
+          if-no-files-found: warn
+
       - name: Stamp build SHA into project
         run: |
           set -euo pipefail
