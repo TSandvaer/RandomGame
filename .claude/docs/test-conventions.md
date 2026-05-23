@@ -149,6 +149,50 @@ If diff shows additions → PR introduced new regressions → classify red-new �
 
 **Special handling for `test.fail()` glyphs.** Playwright renders `test.fail()` blocks that throw a placeholder error as `✘ [<spec>]` in the text output, but the run summary's `N failed` line counts them as PASS (fail-as-expected). When triaging failures, **bisect by spec-name from the `N failed` summary line, NOT by counting `✘` glyphs in the text output**. The morning Tess investigation of P0 `86c9xw8xd` initially conflated these two surfaces and produced a fabricated "9-failure cluster" framing; Devon's later investigation revealed the true `1 failed` count was a different spec entirely.
 
+### Shell-only / orch-tooling PRs — skip the sibling control, diff against prior PR's Playwright run (PR #326 finding)
+
+**When the sibling-control technique is overkill.** The docs-only sibling approach above is designed for game-side code PRs where you need to isolate "did my change add a regression?" When the PR under review is itself **mechanically incapable of affecting game-side Playwright** — i.e. it touches only shell hooks, `.claude/` tooling files, workflow YAML, or pure markdown docs — no sibling control is needed. A shell-only PR's Playwright failures are 100% pre-existing by definition; the only remaining question is which prior run to diff against.
+
+**Why `gh run list --commit <main-HEAD-SHA>` returns `[]` — and why that's the signal.** `playwright-e2e.yml` fires on `pull_request` open/sync, `workflow_dispatch`, and release-tag pushes — but NOT on plain main pushes. So querying by the most recent main HEAD commit:
+
+```bash
+gh run list --workflow=playwright-e2e.yml --commit <main-HEAD-SHA>
+```
+
+returns `[]`. That empty result is NOT an error — it is the confirming signal that Playwright didn't fire on that commit. Reach for the most recent Playwright run from any earlier merged PR as the baseline.
+
+**Workflow shape:**
+
+```bash
+# 1. Confirm Playwright didn't fire on main HEAD (empty = expected, not an error)
+gh run list --workflow=playwright-e2e.yml --commit <main-head-sha>
+# → [] : correct, proceed to step 2
+
+# 2. Pull the last merged-PR Playwright run from main branch
+gh run list --workflow=playwright-e2e.yml --branch main --limit 5 \
+  --json databaseId,headSha,createdAt,conclusion \
+  --jq '.[] | select(.conclusion != null)'
+# Pick the most recent completed run — this is the correct prior-PR baseline
+
+# 3. Diff failure sets
+gh run view <pr_run_id> --log-failed | grep "✘" | sort -u > /tmp/pr-fails.txt
+gh run view <baseline_run_id> --log-failed | grep "✘" | sort -u > /tmp/base-fails.txt
+diff /tmp/base-fails.txt /tmp/pr-fails.txt
+```
+
+**Interpretation:**
+- `[]` from step 1 is expected, not an error — it confirms Playwright doesn't auto-fire on main pushes.
+- Diff empty (or delta is a known persistent flake) → all PR failures are pre-existing → classify red-but-pre-existing-on-main → merge eligible.
+- Diff shows any failure NOT in the persistent-flake set → treat as red-new (BLOCKER) even for a shell-only PR — something upstream changed.
+
+**Saves the 17-minute rerun cost.** The instinct when session notes say "Playwright yellow" is to `gh run rerun --failed`. For a shell-only PR, that rerun produces the same failure set — the failures are pre-existing flakes, not regressions. The `[]`-from-main-commit + prior-PR-diff short-circuits the wait entirely.
+
+**Empirical case (PR #326, 2026-05-22):** PR was a shell-only `maintain-docs-stop.sh` change (orch-tooling). `gh run list --commit abd1182` returned `[]`. Located baseline via `gh run list --branch main` filtered to Playwright → run `26294689527` on SHA `615be229`. Delta: only `ac2-first-kill` in PR #326 not in baseline — confirmed persistent flake. Net new regressions: zero. Merged without rerun.
+
+**Summary decision tree:**
+- PR touches game-side code (`scripts/`, `scenes/`, `resources/`, `assets/`, `tests/`) → use the docs-only sibling control technique (§ above).
+- PR is shell-only / orch-tooling / docs-only (`.claude/`, `team/`, `docs/`, shell scripts, pure markdown) → query main HEAD commit → get `[]` → diff directly against most recent prior PR Playwright run → no rerun needed.
+
 ### CI race — initial PR push may show empty checks until rebase re-triggers (PR #318 finding)
 
 **The trap.** Occasionally a brand-new PR will show NO check-runs at all in `gh pr checks <num>` and `gh api repos/<org>/<repo>/commits/<sha>/check-runs` returns `{"total_count": 0}` — even though `playwright-e2e.yml` and `ci.yml` both have `pull_request` triggers configured. The workflows simply did not register against that initial push.
