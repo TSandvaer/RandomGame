@@ -38,7 +38,7 @@ const BOOT_TIMEOUT_MS = 30_000;
 const COMBAT_TIMEOUT_MS = 90_000;
 const POST_BOSS_DEATH_CAPTURE_FRAMES = 12;
 
-// QUARANTINED 2026-05-23 — ClickUp `86c9y00m1` (Playwright triage).
+// QUARANTINED 2026-05-23 — ClickUp `86c9y4hfx` (Playwright triage).
 // Persistent failure: "Universal console-warning gate: 1 USER WARNING/ERROR
 // line" pre-existing on every run since 2026-05-22 14:57Z. Warning source
 // triage is pending — likely cinematic-side push_warning that should route

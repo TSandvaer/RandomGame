@@ -264,7 +264,7 @@ async function waitForNewLine(
 // aggro and attack; they just don't unlock the gate correctly. This spec
 // asserts aggro only, not gate.
 
-// QUARANTINED 2026-05-23 — ClickUp `86c9y00m1` (Playwright triage).
+// QUARANTINED 2026-05-23 — ClickUp `86c9y4hfx` (Playwright triage).
 // Documented fail-first-pass-retry flake per PR #322 (`86c9xy0mk`); retry no
 // longer consistently green (15/15 final failure 2026-05-22). Root signal:
 // "At least one player→grunt Hitbox.hit must land in Room 02 before asserting

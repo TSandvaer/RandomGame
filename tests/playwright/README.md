@@ -294,7 +294,7 @@ These specs fail on first attempt + pass on retry consistently across recent `ma
 
 **Escalation threshold:** re-evaluate Options A (fix the underlying race) or B (`test.retry(1)` suppression) when a 3rd persistent-flake surfaces OR when main Playwright signal-to-noise crosses tolerance. Triage call lives with Tess.
 
-**Update 2026-05-23:** the two flakes above were promoted to **quarantined** along with four additional persistent failures — see next section. Escalation threshold reached: Option A (proper triage) is now in flight under ClickUp `86c9y00m1`. The escalation-threshold pattern documented above stands as the convention for future flake-class decisions.
+**Update 2026-05-23:** the two flakes above were promoted to **quarantined** along with four additional persistent failures — see next section. Escalation threshold reached: Option A (proper triage) is now in flight under ClickUp `86c9y4hfx`. The escalation-threshold pattern documented above stands as the convention for future flake-class decisions.
 
 ---
 
@@ -311,7 +311,7 @@ These specs are quarantined via `test.skip(...)` because they fail consistently 
 | `audio-bus-boot-smoke.spec.ts:41` | Promoted from documented flake (`86c9xy0mk`) — retry no longer reliably green | AudioContext race determinism investigation |
 | `soak-narrative-regression.spec.ts:270` | Promoted from documented flake (`86c9xy0mk`) — Room 02 traversal nondeterminism | Room 02 boot determinism (spawn timing, walk duration) |
 
-**Triage ticket:** ClickUp `86c9y00m1` ("Playwright quarantine triage — re-enable 6 quarantined specs"). Owns the proper investigation + re-enable PRs.
+**Triage ticket:** ClickUp `86c9y4hfx` ("Playwright quarantine triage — re-enable 6 quarantined specs"). Owns the proper investigation + re-enable PRs.
 
 **Rule:** when a quarantined spec is re-enabled, the PR doing so MUST cite this ticket + verify the spec passes 8 consecutive runs against `main` HEAD before removing the `test.skip()` (sample-size discipline N>=8).
 
