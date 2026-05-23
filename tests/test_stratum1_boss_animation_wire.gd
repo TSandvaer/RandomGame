@@ -23,6 +23,7 @@ extends GutTest
 ##     `hit_<dir>` plays from `take_damage` directly (not state-driven).
 
 const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
+const BOSS_SCENE: PackedScene = preload("res://scenes/mobs/Stratum1Boss.tscn")
 const SPRITE_FRAMES_PATH: String = "res://assets/sprites/boss/Stratum1Boss.tres"
 const ANIM_DIRS: Array[String] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 const ANIM_STATES: Array[String] = [
@@ -54,7 +55,7 @@ class FakePlayer:
 
 
 func _make_scene_boss() -> Stratum1Boss:
-	var packed: PackedScene = load("res://scenes/mobs/Stratum1Boss.tscn")
+	var packed: PackedScene = BOSS_SCENE
 	var b: Stratum1Boss = packed.instantiate() as Stratum1Boss
 	b.skip_intro_for_tests = true  # start in IDLE not DORMANT
 	add_child_autofree(b)
@@ -66,7 +67,7 @@ func _make_scene_boss_in_room() -> Array:
 	# for the deferred ember-particle add).
 	var room: Node2D = autofree(Node2D.new())
 	add_child(room)
-	var packed: PackedScene = load("res://scenes/mobs/Stratum1Boss.tscn")
+	var packed: PackedScene = BOSS_SCENE
 	var b: Stratum1Boss = packed.instantiate() as Stratum1Boss
 	b.skip_intro_for_tests = true
 	room.add_child(b)

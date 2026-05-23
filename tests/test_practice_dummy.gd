@@ -29,6 +29,7 @@ extends GutTest
 
 const PracticeDummyScript: Script = preload("res://scripts/mobs/PracticeDummy.gd")
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
+const PRACTICE_DUMMY_SCENE: PackedScene = preload("res://scenes/mobs/PracticeDummy.tscn")
 
 # ---- Helpers ----------------------------------------------------------
 
@@ -143,7 +144,7 @@ func test_die_emits_mob_died_exactly_once_with_null_mob_def() -> void:
 func test_hit_flash_uses_sprite_color_tween() -> void:
 	# Sprite child is loaded from PracticeDummy.tscn; bare-instanced dummy
 	# has no Sprite, so this test loads the production scene.
-	var packed: PackedScene = load("res://scenes/mobs/PracticeDummy.tscn")
+	var packed: PackedScene = PRACTICE_DUMMY_SCENE
 	var d: PracticeDummy = packed.instantiate() as PracticeDummy
 	add_child_autofree(d)
 	# Pre-hit — no flash tween yet.
@@ -158,7 +159,7 @@ func test_hit_flash_uses_sprite_color_tween() -> void:
 
 
 func test_second_hit_during_flash_kills_and_restarts_tween() -> void:
-	var packed: PackedScene = load("res://scenes/mobs/PracticeDummy.tscn")
+	var packed: PackedScene = PRACTICE_DUMMY_SCENE
 	var d: PracticeDummy = packed.instantiate() as PracticeDummy
 	add_child_autofree(d)
 	_hit_dummy(d, 1)

@@ -9,12 +9,13 @@ extends GutTest
 ##   4. Edge: button mash doesn't fire signal multiple times.
 
 const DescendScreenScript: Script = preload("res://scripts/screens/DescendScreen.gd")
+const DESCEND_SCREEN_SCENE: PackedScene = preload("res://scenes/screens/DescendScreen.tscn")
 
 # ---- Helpers ----------------------------------------------------------
 
 
 func _make_screen() -> DescendScreen:
-	var packed: PackedScene = load("res://scenes/screens/DescendScreen.tscn")
+	var packed: PackedScene = DESCEND_SCREEN_SCENE
 	var screen: DescendScreen = packed.instantiate()
 	add_child_autofree(screen)
 	return screen
@@ -24,7 +25,7 @@ func _make_screen() -> DescendScreen:
 
 
 func test_descend_screen_scene_loads() -> void:
-	var packed: PackedScene = load("res://scenes/screens/DescendScreen.tscn")
+	var packed: PackedScene = DESCEND_SCREEN_SCENE
 	assert_not_null(packed, "DescendScreen.tscn must load")
 	var instance: Node = packed.instantiate()
 	assert_true(instance is DescendScreen, "root is DescendScreen typed")

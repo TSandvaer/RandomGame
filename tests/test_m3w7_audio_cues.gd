@@ -45,6 +45,11 @@ extends GutTest
 
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
 const AudioDirectorScript: Script = preload("res://scripts/audio/AudioDirector.gd")
+const PlayerScript: Script = preload("res://scripts/player/Player.gd")
+const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
+const ChargerScript: Script = preload("res://scripts/mobs/Charger.gd")
+const ShooterScript: Script = preload("res://scripts/mobs/Shooter.gd")
+const Stratum1BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 
 var _warn_guard: NoWarningGuard
 
@@ -177,7 +182,7 @@ func test_play_sfx_pool_size_is_positive() -> void:
 
 
 func test_player_attack_spawned_light_plays_attack_light_cue() -> void:
-	var player: Player = preload("res://scripts/player/Player.gd").new()
+	var player: Player = PlayerScript.new()
 	add_child_autofree(player)
 	# Ready ran — signal is connected.
 	var ad: Node = _get_audio_director()
@@ -191,7 +196,7 @@ func test_player_attack_spawned_light_plays_attack_light_cue() -> void:
 
 
 func test_player_attack_spawned_heavy_plays_attack_heavy_cue() -> void:
-	var player: Player = preload("res://scripts/player/Player.gd").new()
+	var player: Player = PlayerScript.new()
 	add_child_autofree(player)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -204,7 +209,7 @@ func test_player_attack_spawned_heavy_plays_attack_heavy_cue() -> void:
 
 
 func test_player_damaged_positive_plays_player_hit_cue() -> void:
-	var player: Player = preload("res://scripts/player/Player.gd").new()
+	var player: Player = PlayerScript.new()
 	add_child_autofree(player)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -220,7 +225,7 @@ func test_player_damaged_zero_is_silent() -> void:
 	# Damaged(0) fires from the i-frame / post-hit-iframes blocked path —
 	# audio MUST NOT play (no hit landed). Pin the contract so a future
 	# refactor that removes the `amount <= 0` guard regresses here.
-	var player: Player = preload("res://scripts/player/Player.gd").new()
+	var player: Player = PlayerScript.new()
 	add_child_autofree(player)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -233,7 +238,7 @@ func test_player_dodge_started_plays_dodge_cue() -> void:
 	# `iframes_started`. Post-fix contract: only an intentional `try_dodge`
 	# fires the cue. See `test_player_iframes_started_alone_is_silent` below
 	# for the negative-control covering the take_damage post-hit-iframe path.
-	var player: Player = preload("res://scripts/player/Player.gd").new()
+	var player: Player = PlayerScript.new()
 	add_child_autofree(player)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -253,7 +258,7 @@ func test_player_iframes_started_alone_is_silent() -> void:
 	# dodge-whoosh — the bug PR #278 shipped. AD-05 is "intentional dodge
 	# ONLY"; bare `iframes_started.emit()` (without the paired `dodge_started`
 	# emit that `try_dodge` performs) must NOT play `sfx-player-dodge`.
-	var player: Player = preload("res://scripts/player/Player.gd").new()
+	var player: Player = PlayerScript.new()
 	add_child_autofree(player)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -270,7 +275,7 @@ func test_player_iframes_started_alone_is_silent() -> void:
 
 
 func test_grunt_damaged_plays_mob_hit() -> void:
-	var g: Grunt = preload("res://scripts/mobs/Grunt.gd").new()
+	var g: Grunt = GruntScript.new()
 	add_child_autofree(g)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -281,7 +286,7 @@ func test_grunt_damaged_plays_mob_hit() -> void:
 
 
 func test_grunt_mob_died_plays_mob_die() -> void:
-	var g: Grunt = preload("res://scripts/mobs/Grunt.gd").new()
+	var g: Grunt = GruntScript.new()
 	add_child_autofree(g)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -292,7 +297,7 @@ func test_grunt_mob_died_plays_mob_die() -> void:
 
 
 func test_grunt_light_telegraph_plays_telegraph_cue() -> void:
-	var g: Grunt = preload("res://scripts/mobs/Grunt.gd").new()
+	var g: Grunt = GruntScript.new()
 	add_child_autofree(g)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -305,7 +310,7 @@ func test_grunt_light_telegraph_plays_telegraph_cue() -> void:
 
 
 func test_grunt_swing_spawned_plays_impact_cue() -> void:
-	var g: Grunt = preload("res://scripts/mobs/Grunt.gd").new()
+	var g: Grunt = GruntScript.new()
 	add_child_autofree(g)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -318,7 +323,7 @@ func test_grunt_swing_spawned_plays_impact_cue() -> void:
 
 
 func test_charger_damaged_plays_mob_hit() -> void:
-	var c: Charger = preload("res://scripts/mobs/Charger.gd").new()
+	var c: Charger = ChargerScript.new()
 	add_child_autofree(c)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -329,7 +334,7 @@ func test_charger_damaged_plays_mob_hit() -> void:
 
 
 func test_charger_charge_telegraph_plays_telegraph_cue() -> void:
-	var c: Charger = preload("res://scripts/mobs/Charger.gd").new()
+	var c: Charger = ChargerScript.new()
 	add_child_autofree(c)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -342,7 +347,7 @@ func test_charger_charge_telegraph_plays_telegraph_cue() -> void:
 
 
 func test_charger_charge_hit_spawned_plays_impact_cue() -> void:
-	var c: Charger = preload("res://scripts/mobs/Charger.gd").new()
+	var c: Charger = ChargerScript.new()
 	add_child_autofree(c)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -355,7 +360,7 @@ func test_charger_charge_hit_spawned_plays_impact_cue() -> void:
 
 
 func test_shooter_aim_started_plays_telegraph_cue() -> void:
-	var s: Shooter = preload("res://scripts/mobs/Shooter.gd").new()
+	var s: Shooter = ShooterScript.new()
 	add_child_autofree(s)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -368,7 +373,7 @@ func test_shooter_aim_started_plays_telegraph_cue() -> void:
 
 
 func test_shooter_projectile_fired_plays_impact_cue() -> void:
-	var s: Shooter = preload("res://scripts/mobs/Shooter.gd").new()
+	var s: Shooter = ShooterScript.new()
 	add_child_autofree(s)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -381,7 +386,7 @@ func test_shooter_projectile_fired_plays_impact_cue() -> void:
 
 
 func test_boss_damaged_plays_mob_hit() -> void:
-	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	var b: Stratum1Boss = Stratum1BossScript.new()
 	add_child_autofree(b)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -396,7 +401,7 @@ func test_boss_damaged_plays_mob_hit() -> void:
 func test_boss_died_plays_boss_die_not_mob_die() -> void:
 	# Boss gets its own cue — heavier, longer than mob-die. Pin so a future
 	# refactor doesn't accidentally collapse to sfx-mob-die.
-	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	var b: Stratum1Boss = Stratum1BossScript.new()
 	add_child_autofree(b)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -409,7 +414,7 @@ func test_boss_died_plays_boss_die_not_mob_die() -> void:
 
 
 func test_boss_swing_spawned_melee_plays_impact() -> void:
-	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	var b: Stratum1Boss = Stratum1BossScript.new()
 	add_child_autofree(b)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -422,7 +427,7 @@ func test_boss_swing_spawned_melee_plays_impact() -> void:
 
 
 func test_boss_swing_spawned_slam_telegraph_plays_telegraph() -> void:
-	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	var b: Stratum1Boss = Stratum1BossScript.new()
 	add_child_autofree(b)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -435,7 +440,7 @@ func test_boss_swing_spawned_slam_telegraph_plays_telegraph() -> void:
 
 
 func test_boss_swing_spawned_slam_hit_plays_impact() -> void:
-	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	var b: Stratum1Boss = Stratum1BossScript.new()
 	add_child_autofree(b)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -455,7 +460,7 @@ func test_boss_swing_spawned_slam_hit_plays_impact() -> void:
 func test_boss_woke_plays_boss_wake_stinger() -> void:
 	# Uma BI-06: low brass + impact stinger fires once on boss wake
 	# (STATE_DORMANT → STATE_IDLE). Cue is `sfx-boss-wake`.
-	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	var b: Stratum1Boss = Stratum1BossScript.new()
 	add_child_autofree(b)
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
@@ -470,7 +475,7 @@ func test_boss_woke_plays_boss_wake_stinger() -> void:
 func test_phase_changed_plays_phase_break_sting() -> void:
 	# Uma BI-18: tritone tension chord fires once per phase boundary
 	# (66% → P2, 33% → P3). Cue is `sfx-phase-break`.
-	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	var b: Stratum1Boss = Stratum1BossScript.new()
 	add_child_autofree(b)
 	var ad: Node = _get_audio_director()
 	# Test P2 boundary.
@@ -605,7 +610,7 @@ func test_grunt_re_ready_does_not_double_connect() -> void:
 	# `_ready` runs once per add_to_tree, but tests that re-_ready a mob (or
 	# manually call `_wire_audio_cues` twice) shouldn't double-fire the cue.
 	# We assert the connection count stays at 1 across re-wires.
-	var g: Grunt = preload("res://scripts/mobs/Grunt.gd").new()
+	var g: Grunt = GruntScript.new()
 	add_child_autofree(g)
 	# Initial _ready connected the cues (count = 1). Calling _wire_audio_cues
 	# again is the test seam — idempotent guard.
@@ -629,7 +634,7 @@ func test_boss_wake_and_phase_break_wiring_idempotent_on_triple_wire() -> void:
 	# a handler and a single phase boundary plays the cue N times. The
 	# `is_connected` guards inside `_wire_audio_cues` are the structural
 	# fix; this test pins them.
-	var b: Stratum1Boss = preload("res://scripts/mobs/Stratum1Boss.gd").new()
+	var b: Stratum1Boss = Stratum1BossScript.new()
 	add_child_autofree(b)
 	b._wire_audio_cues()
 	b._wire_audio_cues()

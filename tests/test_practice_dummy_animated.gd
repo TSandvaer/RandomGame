@@ -22,6 +22,7 @@ extends GutTest
 ## animation wiring contract that downstream M3W PRs depend on.
 
 const PracticeDummyScript: Script = preload("res://scripts/mobs/PracticeDummy.gd")
+const PRACTICE_DUMMY_SCENE: PackedScene = preload("res://scenes/mobs/PracticeDummy.tscn")
 const SPRITE_FRAMES_PATH: String = "res://assets/sprites/practice_dummy/PracticeDummy.tres"
 const ANIM_DIRS: Array[String] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 const ANIM_STATES: Array[String] = ["hit", "die"]
@@ -31,7 +32,7 @@ const ANIM_STATES: Array[String] = ["hit", "die"]
 
 func _make_scene_dummy() -> PracticeDummy:
 	# Production scene-loaded dummy (Sprite child is AnimatedSprite2D).
-	var packed: PackedScene = load("res://scenes/mobs/PracticeDummy.tscn")
+	var packed: PackedScene = PRACTICE_DUMMY_SCENE
 	var d: PracticeDummy = packed.instantiate() as PracticeDummy
 	add_child_autofree(d)
 	return d
@@ -42,7 +43,7 @@ func _make_scene_dummy_in_room() -> Array:
 	# for the iron_sword pickup + ember-particle deferred adds).
 	var room: Node2D = autofree(Node2D.new())
 	add_child(room)
-	var packed: PackedScene = load("res://scenes/mobs/PracticeDummy.tscn")
+	var packed: PackedScene = PRACTICE_DUMMY_SCENE
 	var d: PracticeDummy = packed.instantiate() as PracticeDummy
 	room.add_child(d)
 	return [d, room]

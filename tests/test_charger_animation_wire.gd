@@ -17,6 +17,7 @@ extends GutTest
 ##       die → die_<dir> (from `_die` directly)
 
 const ChargerScript: Script = preload("res://scripts/mobs/Charger.gd")
+const CHARGER_SCENE: PackedScene = preload("res://scenes/mobs/Charger.tscn")
 const SPRITE_FRAMES_PATH: String = "res://assets/sprites/charger/Charger.tres"
 const ANIM_DIRS: Array[String] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 const ANIM_STATES: Array[String] = ["walk", "telegraph", "atk", "die"]
@@ -32,7 +33,7 @@ class FakePlayer:
 
 
 func _make_scene_charger() -> Charger:
-	var packed: PackedScene = load("res://scenes/mobs/Charger.tscn")
+	var packed: PackedScene = CHARGER_SCENE
 	var c: Charger = packed.instantiate() as Charger
 	add_child_autofree(c)
 	return c
@@ -41,7 +42,7 @@ func _make_scene_charger() -> Charger:
 func _make_scene_charger_in_room() -> Array:
 	var room: Node2D = autofree(Node2D.new())
 	add_child(room)
-	var packed: PackedScene = load("res://scenes/mobs/Charger.tscn")
+	var packed: PackedScene = CHARGER_SCENE
 	var c: Charger = packed.instantiate() as Charger
 	room.add_child(c)
 	return [c, room]

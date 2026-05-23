@@ -15,6 +15,8 @@ extends GutTest
 
 const StatAllocationPanelScript: Script = preload("res://scripts/ui/StatAllocationPanel.gd")
 const StatStringsScript: Script = preload("res://scripts/content/StatStrings.gd")
+const PLAYER_SCENE: PackedScene = preload("res://scenes/player/Player.tscn")
+const STAT_STRINGS_RES: Resource = preload("res://content/ui/stat_strings.tres")
 const TEST_SLOT: int = 987
 
 
@@ -235,7 +237,7 @@ func test_engine_time_scale_unchanged_while_panel_open() -> void:
 func test_player_process_mode_unchanged_while_panel_open() -> void:
 	# Non-modal: Player.process_mode must not be touched by the panel.
 	# Player stays in PROCESS_MODE_INHERIT throughout — keeps moving + attacking.
-	var player_scene: PackedScene = load("res://scenes/player/Player.tscn")
+	var player_scene: PackedScene = PLAYER_SCENE
 	assert_not_null(player_scene, "Player.tscn loads")
 	var player: Player = player_scene.instantiate()
 	add_child_autofree(player)
@@ -264,7 +266,7 @@ func test_player_can_move_while_panel_open() -> void:
 	# _physics_process will run) — headless GUT can't tick physics to
 	# directly observe move_and_slide(), but INHERIT is the necessary
 	# and sufficient condition.
-	var player_scene: PackedScene = load("res://scenes/player/Player.tscn")
+	var player_scene: PackedScene = PLAYER_SCENE
 	assert_not_null(player_scene, "Player.tscn loads")
 	var player: Player = player_scene.instantiate()
 	add_child_autofree(player)
@@ -287,7 +289,7 @@ func test_player_can_move_while_panel_open() -> void:
 
 
 func test_stat_strings_resource_loads_with_12_strings() -> void:
-	var ss: Resource = load("res://content/ui/stat_strings.tres")
+	var ss: Resource = STAT_STRINGS_RES
 	assert_not_null(ss, "stat_strings.tres must exist and load")
 	assert_true(ss is StatStrings, "loaded resource is StatStrings")
 	var statstrings: StatStrings = ss
@@ -310,7 +312,7 @@ func test_stat_strings_resource_loads_with_12_strings() -> void:
 
 
 func test_stat_strings_lookup_api_returns_uma_canonical_strings() -> void:
-	var ss: StatStrings = load("res://content/ui/stat_strings.tres")
+	var ss: StatStrings = STAT_STRINGS_RES as StatStrings
 	# Per Uma's canonical 12 strings table.
 	assert_eq(ss.get_header(&"vigor"), "VIGOR")
 	assert_eq(ss.get_header(&"focus"), "FOCUS")
@@ -330,7 +332,7 @@ func test_stat_strings_lookup_api_returns_uma_canonical_strings() -> void:
 
 
 func test_unknown_stat_id_returns_empty_string() -> void:
-	var ss: StatStrings = load("res://content/ui/stat_strings.tres")
+	var ss: StatStrings = STAT_STRINGS_RES as StatStrings
 	assert_eq(ss.get_header(&"unknown_stat"), "", "unknown stat id returns empty string (no crash)")
 
 

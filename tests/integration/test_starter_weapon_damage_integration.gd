@@ -32,6 +32,8 @@ extends GutTest
 ##      (P0 86c9q96m8 — unchanged by this PR, kept as a regression guard).
 
 const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
+const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
+const ContentFactoryScript: Script = preload("res://tests/factories/content_factory.gd")
 
 const PHYS_DELTA: float = 1.0 / 60.0
 
@@ -165,9 +167,7 @@ func test_pickup_equip_drives_weapon_scaled_damage_not_fist() -> void:
 	assert_eq(weapon.id, &"iron_sword", "AC-B: equipped weapon is the iron_sword")
 
 	# Build a minimal Grunt target (bare-instanced, same pattern as test_grunt.gd).
-	var GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 	var grunt: Grunt = GruntScript.new()
-	var ContentFactoryScript: Script = preload("res://tests/factories/content_factory.gd")
 	var def_overrides: Dictionary = {"hp_base": 50, "damage_base": 5, "move_speed": 60.0}
 	grunt.mob_def = ContentFactoryScript.make_mob_def(def_overrides)
 	add_child_autofree(grunt)
@@ -366,7 +366,6 @@ func test_lmb_click_equip_swap_real_main_drives_dual_surfaces() -> void:
 	# Build a higher-damage replacement weapon (a "Room 02 pickup"). This one
 	# does NOT auto-equip — a weapon is already equipped (first-weapon-only
 	# rule), so it lands in the grid for the user to LMB-click-equip.
-	var ContentFactoryScript: Script = preload("res://tests/factories/content_factory.gd")
 	var swap_def: ItemDef = (
 		ContentFactoryScript
 		. make_item_def(
@@ -435,7 +434,6 @@ func test_lmb_click_equip_swap_real_main_drives_dual_surfaces() -> void:
 	)
 
 	# Tier 3 — damage delta on a real Grunt confirms the swap took effect.
-	var GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 	var grunt: Grunt = GruntScript.new()
 	var def_overrides: Dictionary = {"hp_base": 100, "damage_base": 5, "move_speed": 60.0}
 	grunt.mob_def = ContentFactoryScript.make_mob_def(def_overrides)

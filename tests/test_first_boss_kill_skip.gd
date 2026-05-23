@@ -30,6 +30,7 @@ extends GutTest
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
 const BossRoomScript: Script = preload("res://scripts/levels/Stratum1BossRoom.gd")
 const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
+const BOSS_ROOM_SCENE: PackedScene = preload("res://scenes/levels/Stratum1BossRoom.tscn")
 const SAVE_SLOT: int = 0
 
 var _warn_guard: NoWarningGuard
@@ -80,7 +81,7 @@ func _save() -> Node:
 
 
 func _make_room() -> Stratum1BossRoom:
-	var packed: PackedScene = load("res://scenes/levels/Stratum1BossRoom.tscn")
+	var packed: PackedScene = BOSS_ROOM_SCENE
 	var room: Stratum1BossRoom = packed.instantiate()
 	add_child_autofree(room)
 	return room
@@ -414,7 +415,7 @@ func test_movement_before_trigger_does_not_engage_skip() -> void:
 	# "sequence inactive" and the bonus regression-guard test
 	# tests a different invariant than intended (Tess REQUEST CHANGES
 	# on PR #306).
-	var packed: PackedScene = load("res://scenes/levels/Stratum1BossRoom.tscn")
+	var packed: PackedScene = BOSS_ROOM_SCENE
 	var room: Stratum1BossRoom = packed.instantiate()
 	room.boss_scene_path = ""
 	add_child_autofree(room)

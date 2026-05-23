@@ -11,6 +11,8 @@ extends GutTest
 ## Why this is in Phase A and gets written first: a green CI on a project
 ## that fails to boot is silently broken. This is the cheapest catch.
 
+const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+
 # --- tu-boot-01 ----------------------------------------------------------
 
 
@@ -32,7 +34,7 @@ func test_main_scene_instantiates() -> void:
 	# tree) builds the world / HUD / Player / panels at runtime. We verify
 	# both that the .tscn loads (no parse errors) AND that the runtime
 	# scaffolding spawns a Player node when `_ready` fires.
-	var packed: PackedScene = load("res://scenes/Main.tscn")
+	var packed: PackedScene = MAIN_SCENE
 	assert_not_null(packed, "Main.tscn must load")
 	assert_true(packed.can_instantiate(), "Main.tscn must be instantiable (no parse errors)")
 	var instance: Node = packed.instantiate()
@@ -66,7 +68,7 @@ func test_engine_main_loop_is_alive() -> void:
 func test_main_scene_root_is_a_node() -> void:
 	# Trivial-but-load-bearing: catches a future where someone replaces
 	# Main.tscn's root with a Resource or sets it to abstract.
-	var packed: PackedScene = load("res://scenes/Main.tscn")
+	var packed: PackedScene = MAIN_SCENE
 	var instance: Node = packed.instantiate()
 	assert_true(instance is Node, "Main scene root must be a Node subclass")
 	instance.free()
