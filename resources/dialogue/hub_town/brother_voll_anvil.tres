@@ -1,0 +1,92 @@
+[gd_resource type="Resource" script_class="DialogueTreeDef" load_steps=15 format=3]
+
+; W2-T2 hub-town dialogue tree — Brother Voll, the Anvil-Keeper (smith).
+; npc_id: hub_brother_voll (canonical hub-town id per m3-design-seeds.md §2).
+;
+; quest_action verbs: reforge:weapon (anvil reforge) + open_vendor (when the
+; player just wants to see what Voll has on the bench). Track 3 W2 wires
+; both into the bounty / reward pipeline.
+
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueTreeDef.gd" id="1_tree"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueBranch.gd" id="2_branch"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueResponse.gd" id="3_response"]
+
+[sub_resource type="Resource" id="Resource_response_reforge_yes"]
+script = ExtResource("3_response")
+text = "Yes - reforge it."
+next_branch_key = &"reforge_confirm"
+quest_action = &"reforge:weapon"
+
+[sub_resource type="Resource" id="Resource_response_reforge_no"]
+script = ExtResource("3_response")
+text = "Not yet."
+next_branch_key = &""
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_response_browse"]
+script = ExtResource("3_response")
+text = "Show me your wares."
+next_branch_key = &""
+quest_action = &"open_vendor:hub_brother_voll"
+
+[sub_resource type="Resource" id="Resource_response_ask_anvil"]
+script = ExtResource("3_response")
+text = "Tell me about the anvil."
+next_branch_key = &"anvil_lore"
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_response_anvil_back"]
+script = ExtResource("3_response")
+text = "Back."
+next_branch_key = &"flavor"
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_response_done"]
+script = ExtResource("3_response")
+text = "Thank you, Brother."
+next_branch_key = &""
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_branch_flavor"]
+script = ExtResource("2_branch")
+lines = ["Brother Voll wipes his hands on a leather apron stained ember-orange.", "The anvil takes the ember the way a lung takes breath. Steady, then loud at the end."]
+responses = [SubResource("Resource_response_ask_anvil"), SubResource("Resource_response_browse")]
+
+[sub_resource type="Resource" id="Resource_branch_pre_quest"]
+script = ExtResource("2_branch")
+lines = ["I can reforge what you carry. Iron remembers the heat better than the man who wore it.", "Shall I work the blade now?"]
+responses = [SubResource("Resource_response_reforge_yes"), SubResource("Resource_response_reforge_no"), SubResource("Resource_response_browse")]
+
+[sub_resource type="Resource" id="Resource_branch_quest_active"]
+script = ExtResource("2_branch")
+lines = ["Walking with a bounty? Bring me what you find below. The forge remembers more than I do."]
+responses = [SubResource("Resource_response_browse"), SubResource("Resource_response_reforge_no")]
+
+[sub_resource type="Resource" id="Resource_branch_quest_completed"]
+script = ExtResource("2_branch")
+lines = ["The Sister sleeps lighter for what you brought back.", "I will burn a coal in her name tonight. Whatever you need from the bench is yours at cost."]
+responses = [SubResource("Resource_response_browse"), SubResource("Resource_response_done")]
+
+[sub_resource type="Resource" id="Resource_branch_reforge_confirm"]
+script = ExtResource("2_branch")
+lines = ["The hammer falls. The ember answers.", "It is done. Carry it well."]
+responses = [SubResource("Resource_response_done")]
+
+[sub_resource type="Resource" id="Resource_branch_anvil_lore"]
+script = ExtResource("2_branch")
+lines = ["This anvil was a stone the cloister found, not a thing the cloister made.", "It rings when the road is empty and sings when the road is full. I have learned the difference."]
+responses = [SubResource("Resource_response_anvil_back")]
+
+[resource]
+script = ExtResource("1_tree")
+npc_id = &"hub_brother_voll"
+display_name = "Brother Voll, the Anvil-Keeper"
+branches = {
+&"flavor": SubResource("Resource_branch_flavor"),
+&"pre_quest": SubResource("Resource_branch_pre_quest"),
+&"quest_active": SubResource("Resource_branch_quest_active"),
+&"quest_completed": SubResource("Resource_branch_quest_completed"),
+&"reforge_confirm": SubResource("Resource_branch_reforge_confirm"),
+&"anvil_lore": SubResource("Resource_branch_anvil_lore")
+}
+default_branch_key = &"flavor"

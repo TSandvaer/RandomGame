@@ -75,6 +75,7 @@ const ROOM_IDS: Array[StringName] = [
 
 const PLAYER_SCENE_PATH: String = "res://scenes/player/Player.tscn"
 const INVENTORY_PANEL_SCENE_PATH: String = "res://scenes/ui/InventoryPanel.tscn"
+const DIALOGUE_PANEL_SCENE_PATH: String = "res://scenes/ui/DialoguePanel.tscn"
 const STAT_PANEL_SCENE_PATH: String = "res://scenes/ui/StatAllocationPanel.tscn"
 const DESCEND_SCREEN_SCENE_PATH: String = "res://scenes/screens/DescendScreen.tscn"
 const BOSS_DEFEATED_TITLE_CARD_SCENE_PATH: String = "res://scenes/ui/BossDefeatedTitleCard.tscn"
@@ -95,6 +96,15 @@ var _world: Node2D = null
 var _player: Player = null
 var _hud: CanvasLayer = null
 var _inventory_panel: CanvasLayer = null
+## DialoguePanel mount (ticket W2-T2 `86c9y0zyv` — production wiring layer
+## for the W1 dialogue spike `86c9xuab3`). Mounted in `_ready` parallel to
+## the InventoryPanel mount; the panel subscribes to DialogueController
+## signals from its own `_ready` and self-shows on `branch_opened` /
+## self-hides on `dialogue_closed`. PANEL_LAYER = 90, above InventoryPanel
+## (80) and HUD (10) so a future "dialogue-during-inventory" path renders
+## correctly (single-session guard prevents it today, but layer ordering
+## future-proofs).
+var _dialogue_panel: CanvasLayer = null
 var _stat_panel: CanvasLayer = null
 var _descend_screen: CanvasLayer = null
 ## M3-T2-W2-T12 — global vignette CanvasLayer (layer 5). Built in _ready
@@ -190,6 +200,7 @@ func _ready() -> void:
 	_build_vignette()
 	_build_hud()
 	_build_inventory_panel()
+	_build_dialogue_panel()
 	_build_stat_panel()
 	_spawn_player()
 	_subscribe_to_levels()
@@ -256,6 +267,14 @@ func get_player() -> Player:
 
 func get_inventory_panel() -> CanvasLayer:
 	return _inventory_panel
+
+
+## W2-T2 `86c9y0zyv` — accessor parallel to `get_inventory_panel()`. Returns
+## the mounted DialoguePanel (or null in stripped test contexts). Tests pin
+## "DialoguePanel is mounted on Main" via this accessor + the source-scan
+## invariant in `tests/test_main_dialogue_panel_mounted.gd`.
+func get_dialogue_panel() -> CanvasLayer:
+	return _dialogue_panel
 
 
 func get_stat_panel() -> CanvasLayer:
@@ -887,6 +906,32 @@ func _build_inventory_panel() -> void:
 		return
 	_inventory_panel.name = "InventoryPanel"
 	add_child(_inventory_panel)
+
+
+## W2-T2 `86c9y0zyv` — mount the DialoguePanel into Main alongside
+## InventoryPanel. The panel self-subscribes to DialogueController signals
+## from its own `_ready` and hides until `branch_opened` fires; no
+## further wiring needed at this scene root. PANEL_LAYER = 90 sits above
+## InventoryPanel (80) so single-session guard violations (controller-side
+## bug — should never fire) render predictably rather than as the
+## bottom-edge ribbon stacked behind the inventory grid.
+##
+## Per `.claude/docs/dialogue-system.md` + `.claude/docs/html5-export.md` §
+## "Visual-verification escape clause": the panel's visible elements are
+## Label / Button / ColorRect / RichTextLabel — escape-clause-eligible
+## under HTML5 visual-verification gate when paired with an honest-disclose
+## probe list in the Self-Test Report.
+func _build_dialogue_panel() -> void:
+	var packed: PackedScene = load(DIALOGUE_PANEL_SCENE_PATH) as PackedScene
+	if packed == null:
+		push_warning("[Main] dialogue panel scene missing at %s" % DIALOGUE_PANEL_SCENE_PATH)
+		return
+	_dialogue_panel = packed.instantiate() as CanvasLayer
+	if _dialogue_panel == null:
+		push_warning("[Main] DialoguePanel did not instantiate as CanvasLayer")
+		return
+	_dialogue_panel.name = "DialoguePanel"
+	add_child(_dialogue_panel)
 
 
 ## M3-T2-W2-T12 — global vignette CanvasLayer. Renders above world (layer 0)
