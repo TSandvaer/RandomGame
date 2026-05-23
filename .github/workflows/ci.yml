@@ -160,19 +160,53 @@ jobs:
       #   Stage 3: drop the `set +e` / `true` guard and promote to errors
       #            once the warning count is at zero / sustainably bounded.
       #
-      # gdtoolkit is a Python package (pip). The barichello/godot-ci
-      # container already ships Python 3 + pip (Debian-based image), so
-      # no extra bootstrap is needed. Pin to a known-working version range
-      # to avoid surprise rule-set drift on a transitive release.
+      # gdtoolkit is a Python package (pip). The barichello/godot-ci:4.3
+      # container's Dockerfile (verified upstream at
+      # https://github.com/abarichello/godot-ci/blob/master/Dockerfile)
+      # installs ONLY: ca-certificates git git-lfs unzip wget zip adb
+      # openjdk-17-jdk-headless rsync nodejs osslsigncode — NO python3,
+      # NO pip. The original PR #333 assumption that the image shipped
+      # Python was empirically false (CI run 26326920131 exit 127:
+      # `pip: command not found`). Drew's peer-review caught it; this
+      # step bootstraps python3 + pip if needed.
+      #
+      # Bootstrap shape (Drew's fix shape, PR #333 round 2):
+      #   1. Probe `python3 -m pip --version` first — fast-path if a
+      #      future container revision adds Python via ensurepip.
+      #   2. Fall back to `apt-get install -y python3 python3-pip` if
+      #      the probe fails. ~10-15s install cost on a cold container.
+      #   3. Then `python3 -m pip install --quiet gdtoolkit>=4.3,<5`.
+      # Using `python3 -m pip` over bare `pip` is defensive: it works
+      # whether pip is symlinked into PATH or only accessible via the
+      # python3 module loader.
+      #
+      # Pin to a known-working version range to avoid surprise rule-set
+      # drift on a transitive gdtoolkit release.
       #
       # Step placement: BEFORE `Stamp build SHA` / `Headless import` /
       # `Run GUT tests` so static-analysis findings surface fast and don't
-      # wait on the expensive import path. The lint steps add ~5 s
-      # combined; well under the 10-minute job timeout.
+      # wait on the expensive import path. The lint steps add ~15-20 s
+      # combined (including bootstrap); well under the 10-minute timeout.
       - name: Install gdtoolkit (gdlint + gdformat)
         run: |
           set -euo pipefail
-          pip install --quiet 'gdtoolkit>=4.3,<5'
+          # Probe: does python3 + pip already exist? Fast-path return if so.
+          if python3 -m pip --version >/dev/null 2>&1; then
+            echo "python3 + pip already available — skipping apt bootstrap"
+          else
+            echo "python3 -m pip probe failed — bootstrapping via apt-get"
+            apt-get update
+            apt-get install -y --no-install-recommends python3 python3-pip
+          fi
+          # `--break-system-packages` is needed on Ubuntu noble (PEP 668
+          # externally-managed-environment guard); harmless on older
+          # Pythons that don't recognise the flag... actually they DO
+          # error on unknown flags, so gate it on a probe.
+          PIP_BREAK_FLAG=""
+          if python3 -m pip install --help 2>&1 | grep -q '\-\-break-system-packages'; then
+            PIP_BREAK_FLAG="--break-system-packages"
+          fi
+          python3 -m pip install --quiet ${PIP_BREAK_FLAG} 'gdtoolkit>=4.3,<5'
           # Sanity: confirm the binaries are on PATH after install.
           gdlint --version
           gdformat --version
