@@ -33,6 +33,7 @@ AudioDirector="*res://scripts/audio/AudioDirector.gd"
 TimeScaleDirector="*res://scripts/combat/TimeScaleDirector.gd"
 CameraDirector="*res://scripts/camera/CameraDirector.gd"
 DialogueController="*res://scripts/dialogue/DialogueController.gd"
+QuestActionRouter="*res://scripts/quests/QuestActionRouter.gd"
 
 [audio]
 

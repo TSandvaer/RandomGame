@@ -1,0 +1,85 @@
+[gd_resource type="Resource" script_class="DialogueTreeDef" load_steps=14 format=3]
+
+; W2-T2 hub-town dialogue tree — Hadda the Vendor (merchant).
+; npc_id: hub_hadda (canonical hub-town id per m3-design-seeds.md §2 NPC roster).
+; quest_actions wired here drive the QuestActionRouter listener stub
+; (autoload `QuestActionRouter`); Track 3 W2 BountyController consumes the
+; same signals to mutate Player.active_bounty / completed_bounties /
+; quest_progress per `team/devon-dev/save-schema-v5-tier3-additions.md` §4.
+;
+; State-branching covers four canonical quest_state keys per
+; post-wave3-sequencing.md §1 Commitment 2:
+;   - flavor       (default — no active bounty involvement; chat + vendor open)
+;   - pre_quest    (player has not yet accepted any bounty; full greeting)
+;   - quest_active (a Sister Ennick bounty is active; Hadda's voice changes)
+;   - quest_completed (player has turned in a bounty recently; warmer tone)
+;
+; All text is plain ASCII (no Unicode glyphs) per html5-export.md
+; § Default-font glyph coverage. Lines are short so the panel never overflows
+; vertically; this is hub-town flavor, not lore-dump territory.
+
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueTreeDef.gd" id="1_tree"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueBranch.gd" id="2_branch"]
+[ext_resource type="Script" path="res://scripts/dialogue/DialogueResponse.gd" id="3_response"]
+
+[sub_resource type="Resource" id="Resource_response_browse"]
+script = ExtResource("3_response")
+text = "Show me what you have."
+next_branch_key = &""
+quest_action = &"open_vendor:hub_hadda"
+
+[sub_resource type="Resource" id="Resource_response_ask_road"]
+script = ExtResource("3_response")
+text = "How are the roads?"
+next_branch_key = &"road_lore"
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_response_road_back"]
+script = ExtResource("3_response")
+text = "Back."
+next_branch_key = &"flavor"
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_response_leave"]
+script = ExtResource("3_response")
+text = "Maybe later."
+next_branch_key = &""
+quest_action = &""
+
+[sub_resource type="Resource" id="Resource_branch_flavor"]
+script = ExtResource("2_branch")
+lines = ["Hadda the Vendor leans on the counter, hands soot-marked.", "The forge is cold today. The road is colder. What can I sell you?"]
+responses = [SubResource("Resource_response_browse"), SubResource("Resource_response_ask_road"), SubResource("Resource_response_leave")]
+
+[sub_resource type="Resource" id="Resource_branch_pre_quest"]
+script = ExtResource("2_branch")
+lines = ["You walk like the cloister still owes you something.", "Sister Ennick has been asking after travelers. If you are one, she is upstairs."]
+responses = [SubResource("Resource_response_browse"), SubResource("Resource_response_ask_road"), SubResource("Resource_response_leave")]
+
+[sub_resource type="Resource" id="Resource_branch_quest_active"]
+script = ExtResource("2_branch")
+lines = ["Heard you took the Sister's job. Mind the lower stairs - the ember chews at the rope."]
+responses = [SubResource("Resource_response_browse"), SubResource("Resource_response_leave")]
+
+[sub_resource type="Resource" id="Resource_branch_quest_completed"]
+script = ExtResource("2_branch")
+lines = ["You came back. Not many do.", "Coin spends the same whether you earn it kind or hard. What do you need?"]
+responses = [SubResource("Resource_response_browse"), SubResource("Resource_response_leave")]
+
+[sub_resource type="Resource" id="Resource_branch_road_lore"]
+script = ExtResource("2_branch")
+lines = ["The northern road is ash to the knee. The eastern road is glass.", "South is the only road I would walk after dusk, and only with the lantern lit."]
+responses = [SubResource("Resource_response_road_back")]
+
+[resource]
+script = ExtResource("1_tree")
+npc_id = &"hub_hadda"
+display_name = "Hadda the Vendor"
+branches = {
+&"flavor": SubResource("Resource_branch_flavor"),
+&"pre_quest": SubResource("Resource_branch_pre_quest"),
+&"quest_active": SubResource("Resource_branch_quest_active"),
+&"quest_completed": SubResource("Resource_branch_quest_completed"),
+&"road_lore": SubResource("Resource_branch_road_lore")
+}
+default_branch_key = &"flavor"
