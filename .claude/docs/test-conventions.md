@@ -410,15 +410,22 @@ const PASSIVE_DAMAGE_WINDOW_MS = 15_000;
 
 Tier 1 (mandatory): target color ≠ rest color (`assert_ne`). Tier 2 (mandatory for parented modulate cascades): assertion lands on the visible-draw node, not the parent CharacterBody2D. Tier 3 (aspirational): framebuffer pixel-delta — deferred pending a renderer-painting CI lane. Full detail + rationale in `team/TESTING_BAR.md`.
 
-## `preload` of `.tres` with nested scripted sub-resources fails at parse-time (PR #357 lesson)
+## `preload` of `.tres` can bind to `null` at parse-time — exact differentiator unknown (PR #357 lesson)
 
-**What it is.** Hoisting a `load("res://...zone.tres")` call to a top-of-file `const FOO := preload("res://...zone.tres")` declaration is the canonical `gdlint duplicated-load` fix shape. But it does NOT work uniformly: `.tres` Resource files that contain **nested scripted sub-resources** (sub-resources whose `script_class` references a `.gd` file) fail to load at parse-time when consumed via `preload`. The const binds to `null`; every test that reads it crashes with "must load as <ResourceClass>" assertion failures.
+**What it is.** Hoisting a `load("res://...zone.tres")` call to a top-of-file `const FOO := preload("res://...zone.tres")` declaration is the canonical `gdlint duplicated-load` fix shape. But it does NOT work uniformly: at least one observed `.tres` file (`resources/level/zones/s1_z1_outer_cloister.tres`) silently binds to `null` when consumed via `preload`. Every test that reads the const crashes with "must load as <ResourceClass>" assertion failures.
 
-**The differentiator.** Flat scripted `.tres` (single root-level `script_class`, no nested-scripted children) hoist cleanly via `preload`. Worked examples that hoisted fine: `resources/items/iron_sword.tres`, `resources/level_chunks/s1_room01.tres`, `resources/content/stat_strings.tres`, `scenes/*.tscn` files, mob scripts.
+**The known-failing case.** `resources/level/zones/s1_z1_outer_cloister.tres` — contains 9 `ZoneAnchor` sub-resources (each with its own `script = ExtResource(...)` pointing to `scripts/level/ZoneAnchor.gd`). When hoisted as `const OUTER_CLOISTER_ZONE := preload(...)`, the const binds to `null`. PR #357 attempted this hoist at `tests/test_zone_def.gd:247` + `tests/test_floor_assembler.gd:493` — 4 GUT tests cascade-failed.
 
-**The trap case.** `resources/level/zones/s1_z1_outer_cloister.tres` contains **9 `ZoneAnchor` sub-resources**, each with its own `script = ExtResource(...)` pointing to `scripts/level/ZoneAnchor.gd`. The outer `ZoneDef` script-class loads fine via `preload`, but the nested `ZoneAnchor` script-classes do NOT — the const binds to `null` instead of a populated `ZoneDef`.
+**The mechanism is NOT well understood.** The intuitive hypothesis ("`preload` fails on `.tres` with nested scripted sub-resources, succeeds on flat scripted `.tres`") does NOT hold empirically — at least `resources/level_chunks/s1_room01.tres` has nested scripted sub-resources but hoists cleanly elsewhere in the test suite. The actual differentiator between hoist-safe and hoist-trapped `.tres` is currently unknown. Candidate factors not yet ruled out: ZoneAnchor's specific script ordering, ExtResource count thresholds, sub-resource-to-script-path mapping shape, Godot 4.3-specific loader-cache state at parse-time. **Treat the trap as empirical-only until / unless a future investigation tickets the mechanism.**
 
-**Hypothesis on the mechanism.** Godot 4.3's `preload` (compile-time) resolves only the root-level `script_class` reference and instantiates the sub-resources eagerly. Nested `script = ExtResource(...)` references inside the sub-resources require the engine's runtime resource-loader path to be active — which `preload` (parse-time) does not have. The sub-resources fail silently; the root Resource's `null` propagation makes it look like the whole load failed. `load("res://...")` (runtime) executes through the full loader pipeline and correctly resolves nested scripted sub-resources.
+**The honest detection signal.** Before committing a `preload(...)` hoist of a `.tres` to a `const`, write a one-line GUT smoke test that asserts the const is non-null:
+
+```gdscript
+func test_const_resolves_at_parse_time() -> void:
+    assert_not_null(MY_RESOURCE_CONST, "Hoist binds to null — use load(...) instead per test-conventions § preload trap")
+```
+
+Run the test once locally. If it passes, the hoist is safe for this file. If it fails, the const binds to null and the hoist must be reverted regardless of why.
 
 **Fix shape — two options.**
 
@@ -439,9 +446,9 @@ Tier 1 (mandatory): target color ≠ rest color (`assert_ne`). Tier 2 (mandatory
 
 **When to choose which.** Per-site opt-out is the minimal-surgery choice. Helper-function wrapper is the right call when the file already has clusters of identical loads (3+ sites) — the helper improves readability anyway. Both are equally valid; pick by surface scope.
 
-**Detection signal.** If a `preload`-hoist sweep CI-regresses with assertions matching the pattern "<file>.tres must load as <ResourceClass>" or "Expected ... to be anything but NULL", the regressing const is almost certainly a nested-scripted `.tres`. Verify by inspecting the `.tres` for `[ext_resource ... type="Script"]` entries inside `[sub_resource]` blocks (vs only at the top-level `[gd_resource]`).
+**CI failure signature.** When the trap triggers, GUT logs `Expected [<null>] to be anything but NULL: <path-to-tres> must load as <ResourceClass>` on tests that read the hoisted const. Cascades to multiple test files if the const is consumed widely. Treat this as the canonical "I hoisted a `.tres` that fails the trap" signal — but do NOT rely on structural inspection of the `.tres` to predict the trap pre-hoist (Priya's PR #358 review empirically refuted the "nested-scripted" predictor).
 
-**Cite shape.** PR #357 (Devon's `duplicated-load` Stage-2 sweep, ticket `86c9y58pf`) attempted to hoist `OUTER_CLOISTER_ZONE := preload(...)` in `tests/test_zone_def.gd:247` + `tests/test_floor_assembler.gd:493`. Drew's PR review caught the GUT regression (4 failing tests, 5 risky-siblings). The `.tres` itself (`s1_z1_outer_cloister.tres`) shipped via PR #344 (W2-T3 S1 procgen retrofit, merge `ed8ae26`). The trap is structural to Godot 4.3's `preload` semantics; not a project-specific bug. Future Stage-2 lint sweeps must check `.tres` candidates for nested scripted sub-resources before hoisting.
+**Cite shape.** PR #357 (Devon's `duplicated-load` Stage-2 sweep, ticket `86c9y58pf`) attempted to hoist `OUTER_CLOISTER_ZONE := preload(...)` in `tests/test_zone_def.gd:247` + `tests/test_floor_assembler.gd:493`. Drew's PR review caught the GUT regression (4 failing tests, 5 risky-siblings). The `.tres` itself (`s1_z1_outer_cloister.tres`) shipped via PR #344 (W2-T3 S1 procgen retrofit, merge `ed8ae26`). The trap appears to be structural to Godot 4.3's `preload` semantics but the exact mechanism is uninvestigated — Priya's PR #358 peer-review empirically refuted the "nested-scripted sub-resources" hypothesis (siblings with same structure hoist fine). Future Stage-2 lint sweeps must run the per-file null-check smoke (above) before committing hoists.
 
 ## Bare-test deferred-fixture auto-fire trap (PR #306 lesson)
 
