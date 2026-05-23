@@ -34,13 +34,13 @@ const SAVE_SLOT: int = 0
 
 var _warn_guard: NoWarningGuard
 
-
 # ---- Test isolation ---------------------------------------------------
 #
 # The boss-room scene + the boss itself fire TimeScaleDirector requests on
 # hit / die / phase-transition (M3 Tier 2 Wave 1 T2/T3). Reset on both
 # ends so tests don't leak Engine.time_scale state. Mirrors the
 # `before_each` / `after_each` in `test_stratum1_boss_room.gd`.
+
 
 func before_each() -> void:
 	_warn_guard = NoWarningGuard.new()
@@ -74,6 +74,7 @@ func after_each() -> void:
 
 # ---- Helpers ----------------------------------------------------------
 
+
 func _save() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("Save")
 
@@ -96,14 +97,16 @@ func _drain_fixture_pass() -> void:
 # Test 1 — First kill NOT skippable (first_boss_kill_seen == false)
 # =====================================================================
 
+
 func test_first_kill_is_not_skippable_when_flag_is_false() -> void:
 	# Fresh-character path: no prior save, _skip_eligible reads false on
 	# room _ready. Movement-key press during the entry sequence is
 	# IGNORED and the natural 1.8 s timing path runs.
 	var room: Stratum1BossRoom = _make_room()
 	await _drain_fixture_pass()
-	assert_false(room.is_skip_eligible(),
-		"fresh character (no save) — _skip_eligible defaults false")
+	assert_false(
+		room.is_skip_eligible(), "fresh character (no save) — _skip_eligible defaults false"
+	)
 	room.trigger_entry_sequence()
 	# Simulate the player pressing 'move_up' during Beat 2. The handler
 	# should ignore this press because the character is not eligible.
@@ -114,15 +117,20 @@ func test_first_kill_is_not_skippable_when_flag_is_false() -> void:
 	# call directly rather than via Input.parse_input_event because the
 	# latter is async — _unhandled_input is the deterministic surface.
 	room._unhandled_input(event)
-	assert_false(room.is_entry_sequence_skipped(),
-		"first kill — movement key during Beat 2 does NOT collapse the intro")
-	assert_true(room.is_entry_sequence_active(),
-		"first kill — sequence stays active after rejected skip attempt")
+	assert_false(
+		room.is_entry_sequence_skipped(),
+		"first kill — movement key during Beat 2 does NOT collapse the intro"
+	)
+	assert_true(
+		room.is_entry_sequence_active(),
+		"first kill — sequence stays active after rejected skip attempt"
+	)
 
 
 # =====================================================================
 # Test 2 — Second kill IS skippable on movement during Beats 2-4
 # =====================================================================
+
 
 func test_second_kill_is_skippable_on_movement_key() -> void:
 	# Veteran-character path: save reports first_boss_kill_seen=true.
@@ -143,15 +151,18 @@ func test_second_kill_is_skippable_on_movement_key() -> void:
 	event.action = "move_left"
 	event.pressed = true
 	room._unhandled_input(event)
-	assert_true(room.is_entry_sequence_skipped(),
-		"veteran character — movement key DOES collapse the intro")
-	assert_signal_emitted(room, "entry_sequence_skipped",
-		"entry_sequence_skipped signal fires on collapse")
+	assert_true(
+		room.is_entry_sequence_skipped(), "veteran character — movement key DOES collapse the intro"
+	)
+	assert_signal_emitted(
+		room, "entry_sequence_skipped", "entry_sequence_skipped signal fires on collapse"
+	)
 
 
 # =====================================================================
 # Test 3 — Save round-trip preserves first_boss_kill_seen across reload
 # =====================================================================
+
 
 func test_save_round_trip_preserves_first_boss_kill_seen() -> void:
 	# Mark the flag via the public API (boss room's `_mark_first_boss_kill_seen`
@@ -166,8 +177,10 @@ func test_save_round_trip_preserves_first_boss_kill_seen() -> void:
 	save_node.save_game(SAVE_SLOT, data)
 	# Reload from disk (simulating quit-and-relaunch).
 	var loaded: Dictionary = save_node.load_game(SAVE_SLOT)
-	assert_true(loaded["character"]["first_boss_kill_seen"],
-		"first_boss_kill_seen=true survives a save → load round trip")
+	assert_true(
+		loaded["character"]["first_boss_kill_seen"],
+		"first_boss_kill_seen=true survives a save → load round trip"
+	)
 	# Adjacent state is also preserved (regression guard against the
 	# save write nuking unrelated fields).
 	assert_eq(loaded["character"]["level"], 3)
@@ -178,6 +191,7 @@ func test_save_round_trip_preserves_first_boss_kill_seen() -> void:
 # Test 4 — Migration v3 → v4 default-false
 # =====================================================================
 
+
 func test_migration_v3_to_v4_default_false() -> void:
 	# Install a hand-authored v3 envelope at SAVE_SLOT and load — the
 	# v3 → v4 step backfills first_boss_kill_seen=false. Save.gd's
@@ -187,17 +201,25 @@ func test_migration_v3_to_v4_default_false() -> void:
 	var v3_envelope: Dictionary = {
 		"schema_version": 3,
 		"saved_at": "2026-05-22T10:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Mid-Knight",
-				"level": 2, "xp": 100, "xp_to_next": 282,
-				"vigor": 0, "focus": 0, "edge": 0,
+				"level": 2,
+				"xp": 100,
+				"xp_to_next": 282,
+				"vigor": 0,
+				"focus": 0,
+				"edge": 0,
 				"stats": {"vigor": 0, "focus": 0, "edge": 0},
 				"unspent_stat_points": 0,
 				"first_level_up_seen": false,
-				"hp_current": 100, "hp_max": 100,
+				"hp_current": 100,
+				"hp_max": 100,
 			},
-			"stash": [], "equipped": {},
+			"stash": [],
+			"equipped": {},
 			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 0.0},
 		},
 	}
@@ -205,15 +227,20 @@ func test_migration_v3_to_v4_default_false() -> void:
 	f.store_string(JSON.stringify(v3_envelope))
 	f.close()
 	var loaded: Dictionary = save_node.load_game(SAVE_SLOT)
-	assert_true(loaded["character"].has("first_boss_kill_seen"),
-		"v3 → v4 migration backfills first_boss_kill_seen")
-	assert_false(bool(loaded["character"]["first_boss_kill_seen"]),
-		"v3 → v4 default-false — migrated v3 character is treated as 'first kill ahead'")
+	assert_true(
+		loaded["character"].has("first_boss_kill_seen"),
+		"v3 → v4 migration backfills first_boss_kill_seen"
+	)
+	assert_false(
+		bool(loaded["character"]["first_boss_kill_seen"]),
+		"v3 → v4 default-false — migrated v3 character is treated as 'first kill ahead'"
+	)
 
 
 # =====================================================================
 # Test 5 — Migration chain v0 → v5 idempotent (W2-T4 extended chain)
 # =====================================================================
+
 
 func test_migration_chain_v0_to_v5_idempotent() -> void:
 	# A v0 envelope migrates through v0 → v1 → v2 → v3 → v4 → v5 in one
@@ -224,7 +251,8 @@ func test_migration_chain_v0_to_v5_idempotent() -> void:
 	# does NOT get re-rolled again on the second load (idempotence).
 	var save_node: Node = _save()
 	var v0_envelope: Dictionary = {
-		"data": {
+		"data":
+		{
 			"character": {"level": 2, "xp": 50},
 		},
 	}
@@ -233,16 +261,21 @@ func test_migration_chain_v0_to_v5_idempotent() -> void:
 	f.close()
 	# First load — full chain migrates in memory.
 	var first_loaded: Dictionary = save_node.load_game(SAVE_SLOT)
-	assert_true(first_loaded["character"].has("first_boss_kill_seen"),
-		"v0 → v5 chain ends with first_boss_kill_seen present")
-	assert_false(bool(first_loaded["character"]["first_boss_kill_seen"]),
-		"v0 → v5 chain ends with first_boss_kill_seen=false default")
+	assert_true(
+		first_loaded["character"].has("first_boss_kill_seen"),
+		"v0 → v5 chain ends with first_boss_kill_seen present"
+	)
+	assert_false(
+		bool(first_loaded["character"]["first_boss_kill_seen"]),
+		"v0 → v5 chain ends with first_boss_kill_seen=false default"
+	)
 	# v4 → v5 step rolls world_seed to a non-zero value.
-	assert_true(first_loaded["character"].has("world_seed"),
-		"v0 → v5 chain ends with world_seed key present (backfilled at v3→v4, re-rolled at v4→v5)")
+	assert_true(
+		first_loaded["character"].has("world_seed"),
+		"v0 → v5 chain ends with world_seed key present (backfilled at v3→v4, re-rolled at v4→v5)"
+	)
 	var first_seed: int = int(first_loaded["character"]["world_seed"])
-	assert_ne(first_seed, 0,
-		"v4 → v5 re-rolled world_seed to non-zero value (W2-T4 promotion)")
+	assert_ne(first_seed, 0, "v4 → v5 re-rolled world_seed to non-zero value (W2-T4 promotion)")
 	# Save back — on-disk envelope is now v5.
 	save_node.save_game(SAVE_SLOT, first_loaded)
 	# Read raw envelope to verify schema_version on disk.
@@ -253,22 +286,34 @@ func test_migration_chain_v0_to_v5_idempotent() -> void:
 	var on_disk: Dictionary = JSON.parse_string(raw)
 	assert_eq(int(on_disk["schema_version"]), 5, "on-disk envelope is v5 after migration + save")
 	# Critically — world_seed survives the double-trip; no second re-roll.
-	assert_eq(int(on_disk["data"]["character"]["world_seed"]), first_seed,
-		"world_seed is stable on already-v5 re-save (no spurious second re-roll)")
+	assert_eq(
+		int(on_disk["data"]["character"]["world_seed"]),
+		first_seed,
+		"world_seed is stable on already-v5 re-save (no spurious second re-roll)"
+	)
 	# Second load — no-op on already-v5. Re-saving + reloading lands on
 	# the same shape; flag value unchanged; world_seed bit-identical.
 	var second_loaded: Dictionary = save_node.load_game(SAVE_SLOT)
-	assert_false(bool(second_loaded["character"]["first_boss_kill_seen"]),
-		"already-v5 load is idempotent — first_boss_kill_seen unchanged")
-	assert_eq(int(second_loaded["character"]["level"]), 2,
-		"v0 level survives the full chain through to second load")
-	assert_eq(int(second_loaded["character"]["world_seed"]), first_seed,
-		"already-v5 load preserves world_seed (no spurious re-roll on idempotent reload)")
+	assert_false(
+		bool(second_loaded["character"]["first_boss_kill_seen"]),
+		"already-v5 load is idempotent — first_boss_kill_seen unchanged"
+	)
+	assert_eq(
+		int(second_loaded["character"]["level"]),
+		2,
+		"v0 level survives the full chain through to second load"
+	)
+	assert_eq(
+		int(second_loaded["character"]["world_seed"]),
+		first_seed,
+		"already-v5 load preserves world_seed (no spurious re-roll on idempotent reload)"
+	)
 
 
 # =====================================================================
 # Test 6 — Skip collapses intro timing to ~0.5 s
 # =====================================================================
+
 
 func test_skip_collapses_intro_timing_to_about_half_a_second() -> void:
 	# When the skip fires, the natural 1.8 s timer is canceled and a
@@ -302,20 +347,24 @@ func test_skip_collapses_intro_timing_to_about_half_a_second() -> void:
 	# scheduling overhead — the natural 1.8 s would NOT have fired by
 	# then, so any completion signal here is the collapsed path.
 	await get_tree().create_timer(0.8).timeout
-	assert_true(room.is_entry_sequence_completed(),
-		"skip-collapsed sequence completes within the 0.8 s wait")
+	assert_true(
+		room.is_entry_sequence_completed(),
+		"skip-collapsed sequence completes within the 0.8 s wait"
+	)
 	var elapsed_ms: int = Time.get_ticks_msec() - trigger_ms
 	# Lower bound: dynamic wake-duration read from Stratum1Boss
 	# (0.417 s). Upper bound: 0.8 s (well below the natural 1.8 s).
 	# Stratum1Boss.WAKE_DURATION + a generous frame-scheduling envelope.
 	assert_gt(elapsed_ms, 300, "collapsed sequence respects the wake-duration runway (>=0.3 s)")
-	assert_lt(elapsed_ms, 800,
-		"collapsed sequence completes well under the natural 1.8 s (target ~0.5 s)")
+	assert_lt(
+		elapsed_ms, 800, "collapsed sequence completes well under the natural 1.8 s (target ~0.5 s)"
+	)
 
 
 # =====================================================================
 # Bonus 7 — Double-skip is a no-op (regression guard)
 # =====================================================================
+
 
 func test_double_skip_press_is_a_no_op() -> void:
 	# A second movement-key press AFTER the skip has already engaged
@@ -336,14 +385,19 @@ func test_double_skip_press_is_a_no_op() -> void:
 	room._unhandled_input(event_a)
 	room._unhandled_input(event_b)
 	# Skip signal emits exactly once even with two presses.
-	assert_signal_emit_count(room, "entry_sequence_skipped", 1,
-		"second skip press is a no-op — entry_sequence_skipped emits exactly once")
+	assert_signal_emit_count(
+		room,
+		"entry_sequence_skipped",
+		1,
+		"second skip press is a no-op — entry_sequence_skipped emits exactly once"
+	)
 
 
 # =====================================================================
 # Bonus 8 — Movement BEFORE trigger (room loaded but sequence inactive)
 # is a no-op
 # =====================================================================
+
 
 func test_movement_before_trigger_does_not_engage_skip() -> void:
 	# If the player presses movement during the brief window between
@@ -372,5 +426,7 @@ func test_movement_before_trigger_does_not_engage_skip() -> void:
 	event.action = "move_up"
 	event.pressed = true
 	room._unhandled_input(event)
-	assert_false(room.is_entry_sequence_skipped(),
-		"pre-trigger movement press is rejected by the skip handler")
+	assert_false(
+		room.is_entry_sequence_skipped(),
+		"pre-trigger movement press is rejected by the skip handler"
+	)

@@ -27,8 +27,8 @@ const ChargerScript: Script = preload("res://scripts/mobs/Charger.gd")
 const ShooterScript: Script = preload("res://scripts/mobs/Shooter.gd")
 const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 
-
 # ---- Helpers --------------------------------------------------------
+
 
 func _make_grunt() -> Grunt:
 	var g: Grunt = GruntScript.new()
@@ -56,6 +56,7 @@ func _make_boss() -> Stratum1Boss:
 
 
 # ---- Hit-flash: starts a tween on damage --------------------------
+
 
 func test_grunt_hit_flash_starts_tween_on_take_damage() -> void:
 	var g: Grunt = _make_grunt()
@@ -89,6 +90,7 @@ func test_boss_hit_flash_starts_tween_on_take_damage() -> void:
 
 # ---- Hit-flash: 80ms total = 20 + 20 + 40 (Uma §2 spec) -----------
 
+
 func test_grunt_hit_flash_constants_match_spec() -> void:
 	# Spec is load-bearing — assert the constants match the design doc's 80ms.
 	assert_almost_eq(Grunt.HIT_FLASH_IN, 0.020, 0.0001, "20ms tween-in")
@@ -114,6 +116,7 @@ func test_all_mobs_have_identical_hit_flash_rule() -> void:
 
 # ---- Hit-flash: zero-damage path is silent -----------------------
 
+
 func test_grunt_zero_damage_does_not_start_flash() -> void:
 	var g: Grunt = _make_grunt()
 	g.take_damage(0, Vector2.ZERO, null)
@@ -123,6 +126,7 @@ func test_grunt_zero_damage_does_not_start_flash() -> void:
 
 
 # ---- Hit-flash: second hit during flash kills + restarts ---------
+
 
 func test_grunt_second_hit_during_flash_restarts_tween() -> void:
 	var g: Grunt = _make_grunt()
@@ -159,6 +163,7 @@ func test_grunt_second_hit_during_flash_restarts_tween() -> void:
 # color (so target ≠ rest by construction), and the bare-instanced path is
 # the legacy modulate fallback (still no-op visually but the test below
 # only fires on the Sprite path which is the production-relevant path).
+
 
 func _make_grunt_with_sprite() -> Grunt:
 	# Build a Grunt with a Sprite ColorRect child that mirrors Grunt.tscn.
@@ -222,8 +227,11 @@ func test_grunt_hit_flash_target_differs_from_rest() -> void:
 	var white: Color = Color(1, 1, 1, 1)
 	var rest: Color = g._sprite_color_at_rest
 	var delta: float = abs(rest.r - white.r) + abs(rest.g - white.g) + abs(rest.b - white.b)
-	assert_gt(delta, 0.20,
-		"Sprite rest color must differ from white target by >= 0.20 (Bug C — no-op flash)")
+	assert_gt(
+		delta,
+		0.20,
+		"Sprite rest color must differ from white target by >= 0.20 (Bug C — no-op flash)"
+	)
 
 
 func test_charger_hit_flash_target_differs_from_rest() -> void:
@@ -282,12 +290,15 @@ func test_all_mobs_use_sprite_path_when_sprite_child_exists() -> void:
 func test_grunt_without_sprite_uses_modulate_fallback() -> void:
 	var g: Grunt = _make_grunt()  # bare — no Sprite child
 	g.take_damage(5, Vector2.ZERO, null)
-	assert_false(g._hit_flash_uses_sprite,
-		"bare-instanced Grunt (no Sprite child) falls back to modulate path")
+	assert_false(
+		g._hit_flash_uses_sprite,
+		"bare-instanced Grunt (no Sprite child) falls back to modulate path"
+	)
 	assert_eq(g._hit_flash_target, g, "fallback target is self")
 
 
 # ---- Death tween: 200ms scale + fade ------------------------------
+
 
 func test_grunt_death_tween_constants_match_spec() -> void:
 	assert_almost_eq(Grunt.DEATH_TWEEN_DURATION, 0.200, 0.0001, "200ms per Uma §3a")
@@ -308,6 +319,7 @@ func test_shooter_death_tween_constants_match_spec() -> void:
 
 
 # ---- Death tween: created at _die() -------------------------------
+
 
 func test_grunt_death_tween_created_on_die() -> void:
 	var g: Grunt = _make_grunt()
@@ -332,6 +344,7 @@ func test_shooter_death_tween_created_on_die() -> void:
 
 
 # ---- Critical contract: mob_died fires at FRAME-1, not after tween ----
+
 
 func test_grunt_mob_died_emits_at_die_start_not_after_tween() -> void:
 	var g: Grunt = _make_grunt()
@@ -369,6 +382,7 @@ func test_boss_boss_died_emits_at_die_start_not_after_tween() -> void:
 
 # ---- Particle burst: parented to room (NOT mob) -------------------
 
+
 func test_grunt_death_particles_parented_to_room_not_self() -> void:
 	# Grunt under a parent (the "room") — death burst goes to the room,
 	# not the grunt, so the burst persists past the mob's queue_free.
@@ -398,8 +412,11 @@ func test_boss_climax_burst_is_sustained_high_particle_count() -> void:
 	# `~0.1` (mostly sustained). Per `tests/test_stratum1_boss_climax_burst.gd`
 	# for the full T16 invariants; this test pins the cross-mob comparative
 	# bar (boss > grunt × N) from a class-level constant comparison.
-	assert_gt(Stratum1Boss.CLIMAX_BURST_PARTICLE_COUNT, Grunt.DEATH_PARTICLE_COUNT * 4,
-		"boss climax particle count > 4× grunt particle count (Uma §3 climax bump, T16 refresh)")
+	assert_gt(
+		Stratum1Boss.CLIMAX_BURST_PARTICLE_COUNT,
+		Grunt.DEATH_PARTICLE_COUNT * 4,
+		"boss climax particle count > 4× grunt particle count (Uma §3 climax bump, T16 refresh)"
+	)
 	var room: Node2D = autofree(Node2D.new())
 	add_child(room)
 	var b: Stratum1Boss = BossScript.new()
@@ -411,24 +428,29 @@ func test_boss_climax_burst_is_sustained_high_particle_count() -> void:
 	# Find the burst and assert its `amount`.
 	var burst: CPUParticles2D = _first_particle_under(room)
 	assert_not_null(burst, "boss spawns a burst under the room")
-	assert_eq(burst.amount, Stratum1Boss.CLIMAX_BURST_PARTICLE_COUNT,
-		"boss burst amount matches CLIMAX_BURST_PARTICLE_COUNT (T16 sustained-emission refactor)")
+	assert_eq(
+		burst.amount,
+		Stratum1Boss.CLIMAX_BURST_PARTICLE_COUNT,
+		"boss burst amount matches CLIMAX_BURST_PARTICLE_COUNT (T16 sustained-emission refactor)"
+	)
 
 
 # ---- Boss climax: shake + 400ms hold + 200ms decay -----------------
 
+
 func test_boss_shake_constants_within_vd09_budget() -> void:
 	# VD-09 budget: max 4 logical px camera shake. Boss climax tunes this
 	# right at the budget ceiling.
-	assert_almost_eq(Stratum1Boss.BOSS_SHAKE_MAGNITUDE, 4.0, 0.0001,
-		"boss shake at VD-09 max (4 logical px)")
-	assert_lt(Stratum1Boss.BOSS_SHAKE_MAGNITUDE, 4.1,
-		"shake never exceeds VD-09 4-px budget")
+	assert_almost_eq(
+		Stratum1Boss.BOSS_SHAKE_MAGNITUDE, 4.0, 0.0001, "boss shake at VD-09 max (4 logical px)"
+	)
+	assert_lt(Stratum1Boss.BOSS_SHAKE_MAGNITUDE, 4.1, "shake never exceeds VD-09 4-px budget")
 
 
 func test_boss_death_hold_is_400ms() -> void:
-	assert_almost_eq(Stratum1Boss.BOSS_DEATH_HOLD, 0.400, 0.0001,
-		"400ms hold per Uma §3 climax addendum")
+	assert_almost_eq(
+		Stratum1Boss.BOSS_DEATH_HOLD, 0.400, 0.0001, "400ms hold per Uma §3 climax addendum"
+	)
 
 
 func test_boss_shake_tween_created_on_die() -> void:
@@ -438,6 +460,7 @@ func test_boss_shake_tween_created_on_die() -> void:
 
 
 # ---- Side-effect inventory: existing signal contract preserved -----
+
 
 func test_grunt_damaged_signal_still_fires_with_payload() -> void:
 	# Sanity check: hit-flash didn't break the existing damaged signal.
@@ -467,6 +490,7 @@ func test_grunt_mob_died_payload_unchanged() -> void:
 
 
 # ---- Helpers: count CPUParticles2D children (recursive) ----------
+
 
 func _count_particles_under(node: Node) -> int:
 	var n: int = 0

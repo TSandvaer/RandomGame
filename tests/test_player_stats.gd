@@ -36,6 +36,7 @@ func after_each() -> void:
 
 # --- Fresh-start defaults ----------------------------------------------
 
+
 func test_default_stats_are_zero() -> void:
 	# Per Uma + decision: 0/0/0 at fresh start, 0 unspent.
 	assert_eq(_ps().get_stat(&"vigor"), 0, "vigor defaults to 0")
@@ -45,6 +46,7 @@ func test_default_stats_are_zero() -> void:
 
 
 # --- add_stat correctness ----------------------------------------------
+
 
 func test_add_stat_increments_correctly() -> void:
 	watch_signals(_ps())
@@ -76,19 +78,18 @@ func test_add_stat_zero_is_silent_noop() -> void:
 	watch_signals(_ps())
 	assert_true(_ps().add_stat(&"vigor", 0))
 	assert_eq(_ps().get_stat(&"vigor"), 0)
-	assert_signal_emit_count(_ps(), "stat_changed", 0,
-		"add_stat(0) must NOT fire stat_changed")
+	assert_signal_emit_count(_ps(), "stat_changed", 0, "add_stat(0) must NOT fire stat_changed")
 
 
 # --- Negative inputs rejected ------------------------------------------
+
 
 func test_negative_add_is_rejected() -> void:
 	watch_signals(_ps())
 	_ps().add_stat(&"vigor", 5)
 	var ok: bool = _ps().add_stat(&"vigor", -3)
 	assert_false(ok, "add_stat with negative returns false")
-	assert_eq(_ps().get_stat(&"vigor"), 5,
-		"negative add must NOT decrement the stat")
+	assert_eq(_ps().get_stat(&"vigor"), 5, "negative add must NOT decrement the stat")
 	# Only the positive add fired stat_changed.
 	assert_signal_emit_count(_ps(), "stat_changed", 1)
 
@@ -101,6 +102,7 @@ func test_unknown_stat_is_rejected() -> void:
 
 
 # --- Unspent points bank -----------------------------------------------
+
 
 func test_add_unspent_points_increments() -> void:
 	watch_signals(_ps())
@@ -118,17 +120,18 @@ func test_spend_unspent_point_decrements_and_gates() -> void:
 	assert_true(_ps().spend_unspent_point())
 	assert_eq(_ps().get_unspent_points(), 0)
 	# Empty bank rejects further spends.
-	assert_false(_ps().spend_unspent_point(),
-		"spend returns false when bank is empty")
+	assert_false(_ps().spend_unspent_point(), "spend returns false when bank is empty")
 
 
 func test_negative_unspent_add_rejected() -> void:
 	_ps().add_unspent_points(-2)
-	assert_eq(_ps().get_unspent_points(), 0,
-		"negative add_unspent_points doesn't subtract from bank")
+	assert_eq(
+		_ps().get_unspent_points(), 0, "negative add_unspent_points doesn't subtract from bank"
+	)
 
 
 # --- Save round-trip ----------------------------------------------------
+
 
 func test_snapshot_to_character_writes_stats_block() -> void:
 	_ps().add_stat(&"vigor", 3)
@@ -177,21 +180,20 @@ func test_save_round_trip_preserves_values() -> void:
 	assert_eq(_ps().get_stat(&"vigor"), 0)
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	_ps().restore_from_character(loaded["character"])
-	assert_eq(_ps().get_stat(&"vigor"), 2,
-		"save round-trip preserves vigor")
-	assert_eq(_ps().get_stat(&"edge"), 7,
-		"save round-trip preserves edge")
-	assert_eq(_ps().get_unspent_points(), 1,
-		"save round-trip preserves banked points")
+	assert_eq(_ps().get_stat(&"vigor"), 2, "save round-trip preserves vigor")
+	assert_eq(_ps().get_stat(&"edge"), 7, "save round-trip preserves edge")
+	assert_eq(_ps().get_unspent_points(), 1, "save round-trip preserves banked points")
 
 
 # --- v2 -> v3 migration -------------------------------------------------
+
 
 func test_v2_to_v3_migration_adds_stats_field_with_defaults() -> void:
 	# Build a v2-shaped character block (no `stats`, no `unspent_stat_points`,
 	# but with the v2 flat vigor/focus/edge fields).
 	var v2_data: Dictionary = {
-		"character": {
+		"character":
+		{
 			"name": "Old-Knight",
 			"level": 3,
 			"xp": 100,
@@ -210,8 +212,7 @@ func test_v2_to_v3_migration_adds_stats_field_with_defaults() -> void:
 	var migrated: Dictionary = _save().migrate(v2_data, 2)
 	# `stats` block must be present, defaults 0/0/0 unless v2 flat fields lift in.
 	assert_true(migrated["character"].has("stats"))
-	assert_eq(migrated["character"]["stats"]["vigor"], 2,
-		"v2 flat vigor lifts into stats.vigor")
+	assert_eq(migrated["character"]["stats"]["vigor"], 2, "v2 flat vigor lifts into stats.vigor")
 	assert_eq(migrated["character"]["stats"]["focus"], 1)
 	assert_eq(migrated["character"]["stats"]["edge"], 0)
 	# Unspent points default to 0.
@@ -225,7 +226,8 @@ func test_v2_to_v3_with_no_flat_fields_defaults_to_zero() -> void:
 	# A v2 save that somehow didn't have the flat vigor/focus/edge (rare;
 	# they were in DEFAULT_PAYLOAD since v0). Migration must default to 0.
 	var v2_data: Dictionary = {
-		"character": {
+		"character":
+		{
 			"name": "Edge-Case-Knight",
 			"level": 1,
 			"xp": 0,
@@ -246,14 +248,24 @@ func test_v0_migration_chains_through_to_v3() -> void:
 	# v0->v1 step backfills meta/equipped/stash/character; v1->v2 backfills
 	# xp_to_next; v2->v3 backfills stats/unspent.
 	var v0_data: Dictionary = {
-		"character": {
-			"name": "Ancient", "level": 2, "xp": 50,
-			"vigor": 1, "focus": 0, "edge": 0,
-			"hp_current": 80, "hp_max": 105},
+		"character":
+		{
+			"name": "Ancient",
+			"level": 2,
+			"xp": 50,
+			"vigor": 1,
+			"focus": 0,
+			"edge": 0,
+			"hp_current": 80,
+			"hp_max": 105
+		},
 	}
 	var migrated: Dictionary = _save().migrate(v0_data, 0)
 	assert_true(migrated.has("meta"), "v0->v1 backfilled meta")
 	assert_true(migrated["character"].has("xp_to_next"), "v1->v2 backfilled xp_to_next")
 	assert_true(migrated["character"].has("stats"), "v2->v3 backfilled stats")
-	assert_eq(migrated["character"]["stats"]["vigor"], 1,
-		"v0 flat vigor=1 chained through to v3 stats.vigor")
+	assert_eq(
+		migrated["character"]["stats"]["vigor"],
+		1,
+		"v0 flat vigor=1 chained through to v3 stats.vigor"
+	)

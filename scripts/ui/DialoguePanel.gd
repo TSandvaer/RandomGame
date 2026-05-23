@@ -45,8 +45,8 @@ extends CanvasLayer
 
 # ---- Signals ---------------------------------------------------------
 
-signal panel_opened()
-signal panel_closed()
+signal panel_opened
+signal panel_closed
 
 # ---- Tuning ----------------------------------------------------------
 
@@ -95,8 +95,8 @@ var _continue_hint: Label = null
 var _response_container: VBoxContainer = null
 var _response_buttons: Array[Button] = []
 
-
 # ---- Lifecycle ------------------------------------------------------
+
 
 func _ready() -> void:
 	layer = PANEL_LAYER
@@ -134,11 +134,13 @@ func _exit_tree() -> void:
 
 # ---- Public API ----------------------------------------------------
 
+
 func is_open() -> bool:
 	return _open
 
 
 # ---- Input ----------------------------------------------------------
+
 
 ## Handled BEFORE the GUI focus system per `.claude/docs/html5-export.md` §
 ## "Godot input handling order". A focused response Button (during the
@@ -204,6 +206,7 @@ func _digit_for_key(physical_keycode: int) -> int:
 
 # ---- DialogueController signal handlers ---------------------------
 
+
 func _on_branch_opened(_npc_id: StringName, _branch_key: StringName) -> void:
 	# First branch_opened fires from open() — that's our "show panel" trigger.
 	# Subsequent branch_opened (from response navigation) keeps the panel
@@ -237,6 +240,7 @@ func _on_dialogue_closed(_npc_id: StringName) -> void:
 
 
 # ---- View refresh --------------------------------------------------
+
 
 func _refresh_header() -> void:
 	var dc: Node = _controller_node()
@@ -300,6 +304,7 @@ func _invoke_response(idx: int) -> void:
 
 # ---- UI build ------------------------------------------------------
 
+
 func _build_ui() -> void:
 	# Background — bottom-anchored panel (Diablo-style dialogue ribbon).
 	_bg_panel = ColorRect.new()
@@ -353,8 +358,7 @@ func _build_ui() -> void:
 	_line_label.add_theme_color_override("default_color", COLOR_BODY)
 	_line_label.add_theme_font_size_override("normal_font_size", 14)
 	_line_label.position = Vector2(16 + PORTRAIT_SIZE.x + 16, 16 + 24 + 8)
-	_line_label.size = Vector2(PANEL_WIDTH - PORTRAIT_SIZE.x - 48,
-			PORTRAIT_SIZE.y + 16 - 24 - 8)
+	_line_label.size = Vector2(PANEL_WIDTH - PORTRAIT_SIZE.x - 48, PORTRAIT_SIZE.y + 16 - 24 - 8)
 	_line_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_bg_panel.add_child(_line_label)
 
@@ -379,14 +383,15 @@ func _build_ui() -> void:
 	_response_container = VBoxContainer.new()
 	_response_container.name = "ResponseContainer"
 	_response_container.add_theme_constant_override("separation", 4)
-	_response_container.position = Vector2(16 + PORTRAIT_SIZE.x + 16,
-			16 + PORTRAIT_SIZE.y + 16)
-	_response_container.size = Vector2(PANEL_WIDTH - PORTRAIT_SIZE.x - 48,
-			PANEL_HEIGHT - PORTRAIT_SIZE.y - 48)
+	_response_container.position = Vector2(16 + PORTRAIT_SIZE.x + 16, 16 + PORTRAIT_SIZE.y + 16)
+	_response_container.size = Vector2(
+		PANEL_WIDTH - PORTRAIT_SIZE.x - 48, PANEL_HEIGHT - PORTRAIT_SIZE.y - 48
+	)
 	_bg_panel.add_child(_response_container)
 
 
 # ---- Helpers --------------------------------------------------------
+
 
 func _controller_node() -> Node:
 	var loop: SceneTree = Engine.get_main_loop() as SceneTree

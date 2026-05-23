@@ -41,7 +41,7 @@ signal mob_died(mob: Grunt, death_position: Vector2, mob_def: MobDef)
 
 ## Heavy-attack telegraph started (the windup). Visual hooks listen for this
 ## to play the rear-back / red-glow animation per Uma's visual-direction.md.
-signal heavy_telegraph_started()
+signal heavy_telegraph_started
 
 ## A swing hitbox spawned. `kind` = &"light" or &"heavy". Useful for tests +
 ## audio hooks.
@@ -49,14 +49,14 @@ signal swing_spawned(kind: StringName, hitbox: Node)
 
 ## Light-attack telegraph started. Visual hooks listen for this to play the
 ## red-glow attack-incoming signal per player-journey.md Beat 6.
-signal light_telegraph_started()
+signal light_telegraph_started
 
 # ---- States ------------------------------------------------------------
 
 const STATE_IDLE: StringName = &"idle"
 const STATE_CHASING: StringName = &"chasing"
-const STATE_TELEGRAPHING_LIGHT: StringName = &"telegraphing_light"   # pre-swing windup (NEW)
-const STATE_ATTACKING: StringName = &"attacking"          # mid-swing recovery
+const STATE_TELEGRAPHING_LIGHT: StringName = &"telegraphing_light"  # pre-swing windup (NEW)
+const STATE_ATTACKING: StringName = &"attacking"  # mid-swing recovery
 const STATE_TELEGRAPHING_HEAVY: StringName = &"telegraphing_heavy"  # low-HP windup
 const STATE_DEAD: StringName = &"dead"
 
@@ -108,7 +108,7 @@ const POST_CONTACT_PUSHBACK_SPEED: float = 60.0
 ## the player swing-flash (PR #137 lesson). Rest color is restored when the
 ## telegraph window ends or the grunt dies.
 const ATTACK_TELEGRAPH_TINT: Color = Color(1.0, 0.30, 0.30, 1.0)  # vivid red, HTML5 safe
-const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.060   # fast ramp to red
+const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.060  # fast ramp to red
 const ATTACK_TELEGRAPH_TWEEN_OUT: float = 0.060  # fast fade back to rest on swing-fire
 
 ## Heavy telegraph windup duration. Player has this long to dodge / get clear.
@@ -127,7 +127,7 @@ const HIT_FLASH_OUT: float = 0.040
 const DEATH_TWEEN_DURATION: float = 0.200
 const DEATH_PARTICLE_COUNT: int = 6
 const DEATH_TARGET_SCALE: float = 0.6
-const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
+const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)  # #FFB066
 const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 
 ## Hit-flash modulate tint for the AnimatedSprite2D path (M3W-1 / M3W-3 convention).
@@ -140,9 +140,9 @@ const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 const HIT_FLASH_TINT: Color = Color(1.0, 0.50, 0.50, 1.0)  # soft red wash, HTML5-safe
 
 ## Layer bits (mirror project.godot).
-const LAYER_WORLD: int = 1 << 0          # bit 1
-const LAYER_PLAYER: int = 1 << 1         # bit 2
-const LAYER_ENEMY: int = 1 << 3          # bit 4
+const LAYER_WORLD: int = 1 << 0  # bit 1
+const LAYER_PLAYER: int = 1 << 1  # bit 2
+const LAYER_ENEMY: int = 1 << 3  # bit 4
 
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
@@ -164,7 +164,7 @@ var move_speed: float = 60.0
 var _state: StringName = STATE_IDLE
 var _attack_recovery_left: float = 0.0
 var _telegraph_time_left: float = 0.0
-var _light_telegraph_left: float = 0.0    # timer for STATE_TELEGRAPHING_LIGHT
+var _light_telegraph_left: float = 0.0  # timer for STATE_TELEGRAPHING_LIGHT
 var _light_telegraph_dir: Vector2 = Vector2.RIGHT  # direction locked at telegraph start
 var _heavy_telegraph_fired: bool = false  # one-shot guard
 var _is_dead: bool = false
@@ -243,6 +243,7 @@ func _ready() -> void:
 
 # ---- Public API -------------------------------------------------------
 
+
 ## Returns the current state. Read-only.
 func get_state() -> StringName:
 	return _state
@@ -292,8 +293,9 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	var clean_amount: int = max(0, amount)
 	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - clean_amount)
-	_combat_trace("Grunt.take_damage",
-		"amount=%d hp=%d->%d" % [clean_amount, hp_before, hp_current])
+	_combat_trace(
+		"Grunt.take_damage", "amount=%d hp=%d->%d" % [clean_amount, hp_before, hp_current]
+	)
 	damaged.emit(clean_amount, hp_current, source)
 	# Visual: red-wash hit-flash + hit anim, kicked off only when actual damage
 	# was dealt (matches Uma `combat-visual-feedback.md` §2 — skip the i-frame /
@@ -314,6 +316,7 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 
 # ---- Physics tick -----------------------------------------------------
 
+
 func _physics_process(delta: float) -> void:
 	if _is_dead:
 		return
@@ -331,10 +334,13 @@ func _physics_process(delta: float) -> void:
 		var dist_to_player: float = -1.0
 		if _player != null:
 			dist_to_player = (_player.global_position - global_position).length()
-		_combat_trace("Grunt.pos",
-			"pos=(%.0f,%.0f) state=%s hp=%d dist_to_player=%.0f" % [
-				global_position.x, global_position.y, _state, hp_current, dist_to_player
-			])
+		_combat_trace(
+			"Grunt.pos",
+			(
+				"pos=(%.0f,%.0f) state=%s hp=%d dist_to_player=%.0f"
+				% [global_position.x, global_position.y, _state, hp_current, dist_to_player]
+			)
+		)
 
 	match _state:
 		STATE_IDLE, STATE_CHASING:
@@ -352,6 +358,7 @@ func _physics_process(delta: float) -> void:
 
 
 # ---- State handlers ---------------------------------------------------
+
 
 func _process_chase(_delta: float) -> void:
 	if _player == null:
@@ -408,6 +415,7 @@ func _process_telegraph(_delta: float) -> void:
 
 # ---- Light-attack telegraph -------------------------------------------
 
+
 func _begin_light_telegraph(dir: Vector2) -> void:
 	# Skip if already telegraphing (re-entry from same or adjacent tick).
 	if _state == STATE_TELEGRAPHING_LIGHT:
@@ -417,8 +425,10 @@ func _begin_light_telegraph(dir: Vector2) -> void:
 	_set_state(STATE_TELEGRAPHING_LIGHT)
 	_play_attack_telegraph()
 	light_telegraph_started.emit()
-	_combat_trace("Grunt._begin_light_telegraph",
-		"dir=(%.2f,%.2f) duration=%.2f" % [dir.x, dir.y, LIGHT_TELEGRAPH_DURATION])
+	_combat_trace(
+		"Grunt._begin_light_telegraph",
+		"dir=(%.2f,%.2f) duration=%.2f" % [dir.x, dir.y, LIGHT_TELEGRAPH_DURATION]
+	)
 
 
 func _finish_light_telegraph() -> void:
@@ -464,17 +474,27 @@ func _play_attack_telegraph() -> void:
 	# Ramp to red, hold for the rest of the telegraph duration, then snap back
 	# at swing-fire time via _cancel_attack_telegraph_tween.
 	_attack_telegraph_tween.tween_property(
-		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN
+	)
 	_attack_telegraph_tween.tween_property(
-		target, prop, ATTACK_TELEGRAPH_TINT,
+		target,
+		prop,
+		ATTACK_TELEGRAPH_TINT,
 		max(0.0, LIGHT_TELEGRAPH_DURATION - ATTACK_TELEGRAPH_TWEEN_IN - ATTACK_TELEGRAPH_TWEEN_OUT)
 	)
 	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_OUT)
-	_combat_trace("Grunt._play_attack_telegraph",
-		"tween_valid=%s tint=(%.2f,%.2f,%.2f)" % [
-			_attack_telegraph_tween.is_valid(),
-			ATTACK_TELEGRAPH_TINT.r, ATTACK_TELEGRAPH_TINT.g, ATTACK_TELEGRAPH_TINT.b
-		])
+	_combat_trace(
+		"Grunt._play_attack_telegraph",
+		(
+			"tween_valid=%s tint=(%.2f,%.2f,%.2f)"
+			% [
+				_attack_telegraph_tween.is_valid(),
+				ATTACK_TELEGRAPH_TINT.r,
+				ATTACK_TELEGRAPH_TINT.g,
+				ATTACK_TELEGRAPH_TINT.b
+			]
+		)
+	)
 
 
 func _cancel_attack_telegraph_tween() -> void:
@@ -485,6 +505,7 @@ func _cancel_attack_telegraph_tween() -> void:
 
 
 # ---- Swings -----------------------------------------------------------
+
 
 func _swing_light(dir: Vector2) -> void:
 	# Damage routed through the formula utility. Reads MobDef.damage_base +
@@ -555,12 +576,7 @@ func _apply_post_contact_pushback(dir: Vector2) -> void:
 
 
 func _spawn_hitbox(
-	dir: Vector2,
-	dmg: int,
-	knockback: Vector2,
-	reach: float,
-	radius: float,
-	lifetime: float
+	dir: Vector2, dmg: int, knockback: Vector2, reach: float, radius: float, lifetime: float
 ) -> Hitbox:
 	var hb: Hitbox = HitboxScript.new()
 	hb.configure(dmg, knockback, lifetime, Hitbox.TEAM_ENEMY, self)
@@ -575,6 +591,7 @@ func _spawn_hitbox(
 
 
 # ---- Heavy telegraph --------------------------------------------------
+
 
 func _maybe_start_heavy_telegraph() -> void:
 	if _heavy_telegraph_fired:
@@ -604,6 +621,7 @@ func _finish_heavy_telegraph() -> void:
 
 
 # ---- Death ------------------------------------------------------------
+
 
 func _die() -> void:
 	if _is_dead:
@@ -639,6 +657,7 @@ func _die() -> void:
 
 
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
+
 
 ## §2 hit-flash. M3W-3 3-branch resolver per `.claude/docs/combat-architecture.md`
 ## § "M3W-1 realized implementation" — production grunt is now AnimatedSprite2D,
@@ -681,33 +700,59 @@ func _play_hit_flash() -> void:
 		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
-		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Grunt._play_hit_flash",
-			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)" % [
-				_hit_flash_tween.is_valid(),
-				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
-				_sprite_modulate_at_rest.r, _sprite_modulate_at_rest.g, _sprite_modulate_at_rest.b
-			])
+		_hit_flash_tween.tween_property(
+			asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT
+		)
+		_combat_trace(
+			"Grunt._play_hit_flash",
+			(
+				"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)"
+				% [
+					_hit_flash_tween.is_valid(),
+					HIT_FLASH_TINT.r,
+					HIT_FLASH_TINT.g,
+					HIT_FLASH_TINT.b,
+					_sprite_modulate_at_rest.r,
+					_sprite_modulate_at_rest.g,
+					_sprite_modulate_at_rest.b
+				]
+			)
+		)
 	elif _hit_flash_uses_sprite:
 		# Branch 2: ColorRect color tween (legacy).
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Grunt._play_hit_flash",
-			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f) target=white" % [
-				_hit_flash_tween.is_valid(),
-				_sprite_color_at_rest.r,
-				_sprite_color_at_rest.g,
-				_sprite_color_at_rest.b])
+		_combat_trace(
+			"Grunt._play_hit_flash",
+			(
+				"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f) target=white"
+				% [
+					_hit_flash_tween.is_valid(),
+					_sprite_color_at_rest.r,
+					_sprite_color_at_rest.g,
+					_sprite_color_at_rest.b
+				]
+			)
+		)
 	else:
 		# Branch 3: self.modulate fallback (bare-instanced tests).
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Grunt._play_hit_flash",
-			"modulate-fallback tween_valid=%s rest=(%.2f,%.2f,%.2f)" %
-			[_hit_flash_tween.is_valid(), _modulate_at_rest.r, _modulate_at_rest.g, _modulate_at_rest.b])
+		_combat_trace(
+			"Grunt._play_hit_flash",
+			(
+				"modulate-fallback tween_valid=%s rest=(%.2f,%.2f,%.2f)"
+				% [
+					_hit_flash_tween.is_valid(),
+					_modulate_at_rest.r,
+					_modulate_at_rest.g,
+					_modulate_at_rest.b
+				]
+			)
+		)
 
 
 ## §3a death tween: 200ms parallel scale 1.0→0.6 + modulate.a 1.0→0.0,
@@ -735,7 +780,8 @@ func _play_death_tween() -> void:
 	_death_tween = create_tween()
 	_death_tween.set_parallel(true)
 	_death_tween.tween_property(
-		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION
+	)
 	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
 	# HTML5 safety-net: parallel timer that fires queue_free even if
@@ -743,8 +789,10 @@ func _play_death_tween() -> void:
 	# the tween (when it works) wins the race and we don't free mid-decay.
 	var timer: SceneTreeTimer = get_tree().create_timer(DEATH_TWEEN_DURATION + 0.2)
 	timer.timeout.connect(_force_queue_free)
-	_combat_trace("Grunt._play_death_tween",
-		"tween_valid=%s timer_armed=%.3fs" % [_death_tween.is_valid(), DEATH_TWEEN_DURATION + 0.2])
+	_combat_trace(
+		"Grunt._play_death_tween",
+		"tween_valid=%s timer_armed=%.3fs" % [_death_tween.is_valid(), DEATH_TWEEN_DURATION + 0.2]
+	)
 
 
 func _on_death_tween_finished() -> void:
@@ -774,6 +822,7 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 
 
 # ---- M3W-7 audio-cue wiring -------------------------------------------
+
 
 ## Connect the existing combat signals to AudioDirector SFX plays.
 ##   damaged(amount>0)           → SFX_MOB_HIT
@@ -834,6 +883,7 @@ func _on_swing_spawned_audio(_kind: StringName, _hitbox: Node) -> void:
 
 # ---- Animation playback (M3W-3) --------------------------------------
 
+
 ## Play an animation on the AnimatedSprite2D child. Resolves the child lazily
 ## on first call so bare-instanced test grunts (no Sprite child or ColorRect
 ## fallback) no-op safely. `state` is the state-key prefix (`walk`, `atk`,
@@ -859,8 +909,9 @@ func _play_anim(state: StringName) -> void:
 	var dir_suffix: String = _compute_facing_dir_suffix()
 	var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
 	if not _animated_sprite.sprite_frames.has_animation(anim_name):
-		_combat_trace("Grunt._play_anim",
-			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		_combat_trace(
+			"Grunt._play_anim", "MISS anim=%s — SpriteFrames lacks this animation key" % anim_name
+		)
 		return
 	# Only restart if a different anim is queued — re-issuing the same anim
 	# on every physics tick (chase loop hits _set_state(CHASING) every tick)
@@ -948,6 +999,7 @@ func _spawn_death_particles() -> void:
 
 
 # ---- Helpers ----------------------------------------------------------
+
 
 func _tick_timers(delta: float) -> void:
 	if _attack_recovery_left > 0.0:

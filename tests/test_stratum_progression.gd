@@ -27,6 +27,7 @@ func after_each() -> void:
 
 # ---- Autoload accessors --------------------------------------------
 
+
 func _sp() -> Node:
 	var sp: Node = Engine.get_main_loop().root.get_node_or_null("StratumProgression")
 	assert_not_null(sp, "StratumProgression autoload must be registered")
@@ -41,6 +42,7 @@ func _save() -> Node:
 
 # ---- 1. Empty progression on fresh start ---------------------------
 
+
 func test_empty_on_fresh_start() -> void:
 	# After before_each().reset(), nothing should be cleared.
 	assert_eq(_sp().call("cleared_count"), 0, "no rooms cleared at start")
@@ -54,6 +56,7 @@ func test_empty_string_room_id_rejected() -> void:
 
 
 # ---- General API behavior -----------------------------------------
+
 
 func test_mark_cleared_records_room() -> void:
 	_sp().call("mark_cleared", &"s1_room02")
@@ -87,6 +90,7 @@ func test_cleared_room_ids_returns_full_set() -> void:
 
 
 # ---- 2. Persistence across save/load (Save.gd round-trip) ----------
+
 
 func test_progression_round_trips_through_save() -> void:
 	# Mark a few rooms in this run.
@@ -130,6 +134,7 @@ func test_restore_from_save_tolerates_garbage() -> void:
 
 # ---- 3. Run reset (player death) clears progression ----------------
 
+
 func test_reset_clears_progression() -> void:
 	_sp().call("mark_cleared", &"s1_room02")
 	_sp().call("mark_cleared", &"s1_room03")
@@ -155,6 +160,7 @@ func test_reset_idempotent() -> void:
 
 
 # ---- 4. Descend preserves progression ------------------------------
+
 
 func test_descend_preserves_progression() -> void:
 	# In M1 there's only one stratum so "descend" is a logical marker rather
@@ -182,6 +188,7 @@ func test_descend_then_reset_distinguishes_correctly() -> void:
 
 
 # ---- Cross-cut: round-trip survives a reset -----------------------
+
 
 func test_save_then_reset_then_load_restores_state() -> void:
 	# Walk the full lifecycle: clear, save, reset (sim death wipe), load

@@ -41,11 +41,11 @@ extends Node2D
 
 ## Fired the first time the player presses interact while in range and the
 ## exit is active. One-shot; after this the exit ignores further input.
-signal descend_triggered()
+signal descend_triggered
 
 ## Fired when `activate()` runs the very first time. Useful for cinematic
 ## hooks that want to play the "exit becomes available" cue.
-signal exit_activated()
+signal exit_activated
 
 # ---- Tuning ------------------------------------------------------------
 
@@ -101,6 +101,7 @@ func _ready() -> void:
 
 
 # ---- Public API -------------------------------------------------------
+
 
 func is_active() -> bool:
 	return _is_active
@@ -180,8 +181,10 @@ func activate() -> void:
 	# in `_arm_interaction_area_after_flush` once the await resolves. We emit a
 	# synchronous marker here so the trace stream shows the activate() entry
 	# point separately from the deferred monitoring flip.
-	_combat_trace("StratumExit.activate",
-		"sync entry — visual flipped, awaiting physics_frame to arm interaction area (double-defer)")
+	_combat_trace(
+		"StratumExit.activate",
+		"sync entry — visual flipped, awaiting physics_frame to arm interaction area (double-defer)"
+	)
 	# Async: arm the Area2D monitoring strictly outside any physics-flush window.
 	# `await get_tree().physics_frame` yields until the next physics tick
 	# boundary, which is by definition AFTER any in-flight `flush_queries()`
@@ -221,9 +224,16 @@ func _arm_interaction_area_after_flush() -> void:
 	# rejected the set, `monitoring` stays at false and `mon_actual=false`
 	# surfaces in the trace. Pre-fix the label was hard-coded "monitoring flipped
 	# ON" regardless of actual state — no signal whether the setter took effect.
-	_combat_trace("StratumExit.activate",
-		("mon_actual=%s mon_req=true — checking pre-existing body overlaps"
-			+ " (knockback-overlap fix)") % str(_interaction_area.monitoring))
+	_combat_trace(
+		"StratumExit.activate",
+		(
+			(
+				"mon_actual=%s mon_req=true — checking pre-existing body overlaps"
+				+ " (knockback-overlap fix)"
+			)
+			% str(_interaction_area.monitoring)
+		)
+	)
 	# Diagnostic-only instrumentation (ticket `86c9uq0ky` — Finding 2 NEW bug
 	# class investigation, 2026-05-16 Sponsor soak of `8e76c74`). Sibling to
 	# `Pickup._activate_diag`. PR #241's double-defer proved `mon_actual=true`
@@ -251,15 +261,25 @@ func _arm_interaction_area_after_flush() -> void:
 	var ap: Node = _interaction_area.get_parent()
 	if ap != null:
 		area_parent_name = String(ap.name)
-	_combat_trace("StratumExit._arm_diag",
-		("overlapping_bodies=%d cs_disabled=%s cs_shape_set=%s monitoring=%s"
-			+ " area_parent=%s area_in_tree=%s area_global_pos=(%.0f,%.0f)") % [
-			_interaction_area.get_overlapping_bodies().size(),
-			cs_disabled, cs_shape_set,
-			str(_interaction_area.monitoring),
-			area_parent_name, str(_interaction_area.is_inside_tree()),
-			_interaction_area.global_position.x, _interaction_area.global_position.y,
-		])
+	_combat_trace(
+		"StratumExit._arm_diag",
+		(
+			(
+				"overlapping_bodies=%d cs_disabled=%s cs_shape_set=%s monitoring=%s"
+				+ " area_parent=%s area_in_tree=%s area_global_pos=(%.0f,%.0f)"
+			)
+			% [
+				_interaction_area.get_overlapping_bodies().size(),
+				cs_disabled,
+				cs_shape_set,
+				str(_interaction_area.monitoring),
+				area_parent_name,
+				str(_interaction_area.is_inside_tree()),
+				_interaction_area.global_position.x,
+				_interaction_area.global_position.y,
+			]
+		)
+	)
 	# **Pre-existing overlap re-check (ticket 86c9un4nh):** if the player was
 	# already inside the interaction area before monitoring turned on, fire the
 	# in-range detection manually. Deferred (via call_deferred on _on_body_entered
@@ -267,8 +287,10 @@ func _arm_interaction_area_after_flush() -> void:
 	# run in.
 	for body in _interaction_area.get_overlapping_bodies():
 		if body is CharacterBody2D:
-			_combat_trace("StratumExit.activate",
-				"player already inside interaction area — firing _on_body_entered deferred")
+			_combat_trace(
+				"StratumExit.activate",
+				"player already inside interaction area — firing _on_body_entered deferred"
+			)
 			call_deferred("_on_body_entered", body)
 			break
 
@@ -303,6 +325,7 @@ func try_interact() -> bool:
 
 # ---- Process loop -----------------------------------------------------
 
+
 func _unhandled_input(event: InputEvent) -> void:
 	# Only respond when the exit is active, player is in range, and we
 	# haven't fired yet. Avoids consuming the E key in unrelated contexts.
@@ -323,14 +346,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # ---- Internal --------------------------------------------------------
 
+
 func _build_portal_visual() -> void:
 	_portal_visual = ColorRect.new()
 	_portal_visual.name = "PortalVisual"
 	# Center the visual on the StratumExit node's origin.
-	_portal_visual.position = Vector2(
-		-portal_visual_size.x * 0.5,
-		-portal_visual_size.y * 0.5
-	)
+	_portal_visual.position = Vector2(-portal_visual_size.x * 0.5, -portal_visual_size.y * 0.5)
 	_portal_visual.size = portal_visual_size
 	_portal_visual.color = PORTAL_COLOR_INACTIVE
 	add_child(_portal_visual)
@@ -418,9 +439,13 @@ func _on_body_entered(body: Node) -> void:
 	var area_mon: String = "<null>"
 	if _interaction_area != null:
 		area_mon = str(_interaction_area.monitoring)
-	_combat_trace("StratumExit._on_body_entered",
-		"body=%s mon_actual=%s player_in_range=true is_active=%s descend_triggered=%s" % [
-			str(body), area_mon, str(_is_active), str(_descend_triggered)])
+	_combat_trace(
+		"StratumExit._on_body_entered",
+		(
+			"body=%s mon_actual=%s player_in_range=true is_active=%s descend_triggered=%s"
+			% [str(body), area_mon, str(_is_active), str(_descend_triggered)]
+		)
+	)
 
 
 func _on_body_exited(_body: Node) -> void:

@@ -91,7 +91,7 @@ const HIT_FLASH_OUT: float = 0.040
 const DEATH_TWEEN_DURATION: float = 0.200
 const DEATH_TARGET_SCALE: float = 0.6
 const DEATH_PARTICLE_COUNT: int = 12  # 2x grunt — Uma "0.4 s ember-poof" reads denser
-const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
+const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)  # #FFB066
 const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 
 ## Hit-flash modulate tint for the AnimatedSprite2D path (M3W-1 convention).
@@ -110,9 +110,9 @@ const HIT_FLASH_TINT: Color = Color(1.0, 0.50, 0.50, 1.0)  # soft red wash, HTML
 const DEFAULT_DIR_SUFFIX: String = "s"
 
 ## Layer bits (mirror project.godot + Grunt convention).
-const LAYER_WORLD: int = 1 << 0          # bit 1
-const LAYER_PLAYER: int = 1 << 1         # bit 2
-const LAYER_ENEMY: int = 1 << 3          # bit 4
+const LAYER_WORLD: int = 1 << 0  # bit 1
+const LAYER_PLAYER: int = 1 << 1  # bit 2
+const LAYER_ENEMY: int = 1 << 3  # bit 4
 
 # ---- Runtime ----------------------------------------------------------
 
@@ -165,6 +165,7 @@ func _ready() -> void:
 
 # ---- Public API ------------------------------------------------------
 
+
 func get_hp() -> int:
 	return hp_current
 
@@ -201,8 +202,9 @@ func take_damage(amount: int, _knockback: Vector2, source: Node) -> void:
 	var clean_amount: int = max(0, amount)
 	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - clean_amount)
-	_combat_trace("PracticeDummy.take_damage",
-		"amount=%d hp=%d->%d" % [clean_amount, hp_before, hp_current])
+	_combat_trace(
+		"PracticeDummy.take_damage", "amount=%d hp=%d->%d" % [clean_amount, hp_before, hp_current]
+	)
 	damaged.emit(clean_amount, hp_current, source)
 	if clean_amount > 0:
 		_play_hit_flash()
@@ -212,6 +214,7 @@ func take_damage(amount: int, _knockback: Vector2, source: Node) -> void:
 
 
 # ---- Death -----------------------------------------------------------
+
 
 func _die() -> void:
 	if _is_dead:
@@ -283,8 +286,10 @@ func _spawn_iron_sword_pickup() -> void:
 			pickup.picked_up.connect(inventory.on_pickup_collected)
 	# Defer add_child — Pickup root is Area2D; sync add panics during physics flush.
 	room.call_deferred("add_child", pickup)
-	_combat_trace("PracticeDummy._spawn_iron_sword_pickup",
-		"deferred-add iron_sword at (%.1f,%.1f)" % [global_position.x, global_position.y])
+	_combat_trace(
+		"PracticeDummy._spawn_iron_sword_pickup",
+		"deferred-add iron_sword at (%.1f,%.1f)" % [global_position.x, global_position.y]
+	)
 
 
 ## Resolve the `Inventory` autoload, or null in a bare-instanced test context
@@ -346,19 +351,24 @@ func _play_death_tween() -> void:
 	_death_tween = create_tween()
 	_death_tween.set_parallel(true)
 	_death_tween.tween_property(
-		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION
+	)
 	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
 	# HTML5 safety-net per Grunt._play_death_tween — parallel SceneTreeTimer
 	# that calls _force_queue_free if the tween's finished signal never lands.
 	var timer: SceneTreeTimer = get_tree().create_timer(DEATH_TWEEN_DURATION + 0.2)
 	timer.timeout.connect(_force_queue_free)
-	_combat_trace("PracticeDummy._play_death_tween",
-		"tween_valid=%s timer_armed=%.3fs" % [_death_tween.is_valid(), DEATH_TWEEN_DURATION + 0.2])
+	_combat_trace(
+		"PracticeDummy._play_death_tween",
+		"tween_valid=%s timer_armed=%.3fs" % [_death_tween.is_valid(), DEATH_TWEEN_DURATION + 0.2]
+	)
 
 
 func _on_death_tween_finished() -> void:
-	_combat_trace("PracticeDummy._on_death_tween_finished", "calling _force_queue_free via tween path")
+	_combat_trace(
+		"PracticeDummy._on_death_tween_finished", "calling _force_queue_free via tween path"
+	)
 	_force_queue_free()
 
 
@@ -372,6 +382,7 @@ func _force_queue_free() -> void:
 
 
 # ---- Hit flash --------------------------------------------------------
+
 
 ## Hit-flash on the Sprite child. M3W-1 introduces a third branch:
 ##
@@ -430,33 +441,53 @@ func _play_hit_flash() -> void:
 		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
-		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
-		_combat_trace("PracticeDummy._play_hit_flash",
-			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)" % [
-				_hit_flash_tween.is_valid(),
-				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
-				_sprite_modulate_at_rest.r, _sprite_modulate_at_rest.g, _sprite_modulate_at_rest.b
-			])
+		_hit_flash_tween.tween_property(
+			asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT
+		)
+		_combat_trace(
+			"PracticeDummy._play_hit_flash",
+			(
+				"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)"
+				% [
+					_hit_flash_tween.is_valid(),
+					HIT_FLASH_TINT.r,
+					HIT_FLASH_TINT.g,
+					HIT_FLASH_TINT.b,
+					_sprite_modulate_at_rest.r,
+					_sprite_modulate_at_rest.g,
+					_sprite_modulate_at_rest.b
+				]
+			)
+		)
 	elif _hit_flash_uses_sprite:
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, HIT_FLASH_OUT)
-		_combat_trace("PracticeDummy._play_hit_flash",
-			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f)" % [
-				_hit_flash_tween.is_valid(),
-				_sprite_color_at_rest.r,
-				_sprite_color_at_rest.g,
-				_sprite_color_at_rest.b])
+		_combat_trace(
+			"PracticeDummy._play_hit_flash",
+			(
+				"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f)"
+				% [
+					_hit_flash_tween.is_valid(),
+					_sprite_color_at_rest.r,
+					_sprite_color_at_rest.g,
+					_sprite_color_at_rest.b
+				]
+			)
+		)
 	else:
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
-		_combat_trace("PracticeDummy._play_hit_flash",
-			"modulate-fallback tween_valid=%s" % _hit_flash_tween.is_valid())
+		_combat_trace(
+			"PracticeDummy._play_hit_flash",
+			"modulate-fallback tween_valid=%s" % _hit_flash_tween.is_valid()
+		)
 
 
 # ---- Animation playback (M3W-1) ---------------------------------------
+
 
 ## Play an animation on the AnimatedSprite2D child. Resolves the child lazily
 ## on first call so bare-instanced test dummies that swap in their own sprite
@@ -482,14 +513,17 @@ func _play_anim(state: String) -> void:
 	if _animated_sprite.sprite_frames == null:
 		return
 	if not _animated_sprite.sprite_frames.has_animation(anim_name):
-		_combat_trace("PracticeDummy._play_anim",
-			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		_combat_trace(
+			"PracticeDummy._play_anim",
+			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name
+		)
 		return
 	_animated_sprite.play(anim_name)
 	_combat_trace("PracticeDummy._play_anim", "PLAY anim=%s" % anim_name)
 
 
 # ---- Helpers ---------------------------------------------------------
+
 
 ## CharacterBody2D motion_mode = FLOATING per `.claude/docs/combat-architecture.md`
 ## § "CharacterBody2D motion_mode rule" — adopt the standard top-down 2D

@@ -54,7 +54,6 @@ extends Node
 ##     lowest-friction payload type.
 signal tutorial_beat_requested(beat_id: StringName, anchor: int)
 
-
 # ---- Beat text dictionary -----------------------------------------
 
 ## Reserved beat IDs for Drew's Stage 2b — text strings copied from Uma's
@@ -74,8 +73,8 @@ const BEAT_TEXTS: Dictionary = {
 	&"rmb_heavy": "RMB for heavy strike.",
 }
 
-
 # ---- Public API ----------------------------------------------
+
 
 ## Fire a tutorial beat. Production trigger surface — Drew's Stage 2b room
 ## script calls this from Room01 entry / first-input / dummy-poof beats.
@@ -91,7 +90,9 @@ const BEAT_TEXTS: Dictionary = {
 ## tutorial beats fire in order on Room01 boot.
 ## Line shape: `[combat-trace] TutorialEventBus.request_beat | beat=<id> anchor=<n>`
 func request_beat(beat_id: StringName, anchor: int = 0) -> void:
-	DebugFlags.combat_trace("TutorialEventBus.request_beat", "beat=%s anchor=%d" % [beat_id, anchor])
+	DebugFlags.combat_trace(
+		"TutorialEventBus.request_beat", "beat=%s anchor=%d" % [beat_id, anchor]
+	)
 	tutorial_beat_requested.emit(beat_id, anchor)
 
 

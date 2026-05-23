@@ -26,11 +26,13 @@ const ProjectileScript: Script = preload("res://scripts/projectiles/Projectile.g
 class FakeTarget:
 	extends Node2D
 	var hits: Array[Dictionary] = []
+
 	func take_damage(amount: int, kb: Vector2, source: Node) -> void:
 		hits.append({"amount": amount, "knockback": kb, "source": source})
 
 
 # ---- 1: configure-then-add-child --------------------------------------
+
 
 func test_configure_before_add_child() -> void:
 	var p: Projectile = ProjectileScript.new()
@@ -41,11 +43,13 @@ func test_configure_before_add_child() -> void:
 	assert_eq(p.team, Projectile.TEAM_ENEMY)
 	assert_eq(p.knockback_strength, 100.0)
 	# Layers applied during _ready.
-	assert_eq(p.collision_layer, Projectile.LAYER_ENEMY_HITBOX,
-		"enemy team -> enemy_hitbox layer (bit 5)")
+	assert_eq(
+		p.collision_layer, Projectile.LAYER_ENEMY_HITBOX, "enemy team -> enemy_hitbox layer (bit 5)"
+	)
 
 
 # ---- 2: enemy team layer routing -----------------------------------
+
 
 func test_enemy_team_layer_routing() -> void:
 	var p: Projectile = ProjectileScript.new()
@@ -59,6 +63,7 @@ func test_enemy_team_layer_routing() -> void:
 
 # ---- 3: player team layer routing -----------------------------------
 
+
 func test_player_team_layer_routing() -> void:
 	var p: Projectile = ProjectileScript.new()
 	p.configure(5, Vector2.RIGHT * 50.0, 0.5, Projectile.TEAM_PLAYER, null)
@@ -68,6 +73,7 @@ func test_player_team_layer_routing() -> void:
 
 
 # ---- 4: single-hit invariant ---------------------------------------
+
 
 func test_target_only_takes_damage_once() -> void:
 	var enemy: FakeTarget = FakeTarget.new()
@@ -86,6 +92,7 @@ func test_target_only_takes_damage_once() -> void:
 
 # ---- 5: source never self-hit -------------------------------------
 
+
 func test_source_never_self_hit() -> void:
 	var source: FakeTarget = FakeTarget.new()
 	add_child_autofree(source)
@@ -97,6 +104,7 @@ func test_source_never_self_hit() -> void:
 
 
 # ---- 6: lifetime expiry --------------------------------------------
+
 
 func test_lifetime_expiry_emits_signal_and_frees() -> void:
 	var p: Projectile = ProjectileScript.new()
@@ -114,6 +122,7 @@ func test_lifetime_expiry_emits_signal_and_frees() -> void:
 
 
 # ---- 7: hit vanishes projectile (no pierce) ----------------------
+
 
 func test_hit_vanishes_projectile() -> void:
 	var enemy: FakeTarget = FakeTarget.new()
@@ -133,6 +142,7 @@ func test_hit_vanishes_projectile() -> void:
 
 # ---- 8: velocity drives translation ------------------------
 
+
 func test_velocity_drives_translation() -> void:
 	var p: Projectile = ProjectileScript.new()
 	p.configure(5, Vector2(100.0, 0.0), 1.0, Projectile.TEAM_ENEMY, null)
@@ -144,6 +154,7 @@ func test_velocity_drives_translation() -> void:
 
 # ---- 9: negative-direction velocity preserved ----------------
 
+
 func test_negative_direction_preserved() -> void:
 	var p: Projectile = ProjectileScript.new()
 	p.configure(5, Vector2(-90.0, 0.0), 1.0, Projectile.TEAM_ENEMY, null)
@@ -154,6 +165,7 @@ func test_negative_direction_preserved() -> void:
 
 
 # ---- 10: damage payload includes knockback derived from direction ---
+
 
 func test_hit_payload_carries_knockback_along_velocity() -> void:
 	var enemy: FakeTarget = FakeTarget.new()
@@ -174,6 +186,7 @@ func test_hit_payload_carries_knockback_along_velocity() -> void:
 
 # ---- 11: hit_target signal payload ---------------------
 
+
 func test_hit_target_signal_carries_payload() -> void:
 	var enemy: FakeTarget = FakeTarget.new()
 	add_child_autofree(enemy)
@@ -188,6 +201,7 @@ func test_hit_target_signal_carries_payload() -> void:
 
 # ---- 12: zero-velocity projectile still expires by lifetime ---------
 
+
 func test_zero_velocity_still_expires() -> void:
 	var p: Projectile = ProjectileScript.new()
 	p.configure(5, Vector2.ZERO, 0.05, Projectile.TEAM_ENEMY, null)
@@ -198,6 +212,7 @@ func test_zero_velocity_still_expires() -> void:
 
 
 # ---- 13: hit on world body (no take_damage method) still vanishes ---
+
 
 func test_hit_world_geometry_vanishes_without_damage() -> void:
 	# A Node2D without a `take_damage` method stands in for a wall body.

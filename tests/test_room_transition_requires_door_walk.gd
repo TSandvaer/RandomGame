@@ -26,12 +26,13 @@ extends GutTest
 
 const RoomGateScript: Script = preload("res://scripts/levels/RoomGate.gd")
 
-
 # ---- Helpers ------------------------------------------------------------
+
 
 class FakeMob:
 	extends Node2D
 	signal mob_died(mob: Variant, position: Vector2, mob_def: Variant)
+
 	func die() -> void:
 		mob_died.emit(self, global_position, null)
 
@@ -47,6 +48,7 @@ class FakePlayer:
 class FakeExitGate:
 	extends RefCounted
 	var times_crossed: int = 0
+
 	func on_player_cross() -> void:
 		times_crossed += 1
 
@@ -71,6 +73,7 @@ func _make_player() -> FakePlayer:
 
 # ---- 1. Killing mobs does NOT immediately advance the room counter ------
 
+
 func test_killing_mobs_does_not_advance_room_counter() -> void:
 	var g: RoomGate = _make_gate()
 	var m1: FakeMob = _make_fake_mob()
@@ -93,6 +96,7 @@ func test_killing_mobs_does_not_advance_room_counter() -> void:
 
 # ---- 2. gate_unlocked fires after death-tween wait; counter still 0 ----
 
+
 func test_gate_unlocks_after_wait_but_counter_still_zero() -> void:
 	var g: RoomGate = _make_gate()
 	var m: FakeMob = _make_fake_mob()
@@ -108,11 +112,15 @@ func test_gate_unlocks_after_wait_but_counter_still_zero() -> void:
 	# the gate falls back to immediate unlock, so we verify the timer guard).
 	# The gate is EITHER still locked (tree-connected, timer pending) OR unlocked
 	# (headless fallback). In both cases the room counter must remain 0.
-	assert_eq(exit.times_crossed, 0,
-		"gate_unlocked has not yet caused room counter to advance — only door-walk does")
+	assert_eq(
+		exit.times_crossed,
+		0,
+		"gate_unlocked has not yet caused room counter to advance — only door-walk does"
+	)
 
 
 # ---- 3. Player walking through door advances counter exactly once -------
+
 
 func test_player_walking_through_door_advances_counter() -> void:
 	var g: RoomGate = _make_gate()
@@ -137,6 +145,7 @@ func test_room_counter_advances_exactly_once_per_room() -> void:
 
 # ---- 4. EDGE: body_entered twice does not double-advance the counter ---
 
+
 func test_double_body_entered_does_not_double_advance() -> void:
 	# gate_unlocked is idempotent (one-shot via _unlocked_emitted guard), so
 	# a re-entry through the door after clear should not fire gate_unlocked again.
@@ -146,11 +155,15 @@ func test_double_body_entered_does_not_double_advance() -> void:
 	# Zero-mob room: trigger twice.
 	g.trigger_for_test(null)  # first crossing — unlocks (and immediately emits gate_unlocked)
 	g.trigger_for_test(null)  # second crossing — MUST be no-op (gate is UNLOCKED, not OPEN)
-	assert_eq(exit.times_crossed, 1,
-		"gate_unlocked is one-shot — second body_entered does not re-advance the counter")
+	assert_eq(
+		exit.times_crossed,
+		1,
+		"gate_unlocked is one-shot — second body_entered does not re-advance the counter"
+	)
 
 
 # ---- 5. EDGE: mob death + door walk in same tick both counted ----------
+
 
 func test_mob_death_and_door_walk_in_same_tick_counted_correctly() -> void:
 	# Simulate the "player at the door while last mob dies" case.
@@ -172,6 +185,7 @@ func test_mob_death_and_door_walk_in_same_tick_counted_correctly() -> void:
 
 # ---- 6. EDGE: gate_unlocked fires after death-tween wait, not immediately --
 
+
 func test_gate_unlocked_not_emitted_immediately_on_mob_death() -> void:
 	# In a bare-instantiated gate (not inside_tree), the fallback is immediate
 	# unlock. This test verifies the GUARDED path: _death_wait_in_flight is
@@ -189,11 +203,16 @@ func test_gate_unlocked_not_emitted_immediately_on_mob_death() -> void:
 	await get_tree().process_frame
 	# gate_unlocked fires once (headless fallback) — the re-entry guard (_death_wait_in_flight)
 	# must prevent a second _unlock call from the second mob death.
-	assert_signal_emit_count(g, "gate_unlocked", 1,
-		"gate_unlocked emits exactly once even when two mobs die back-to-back")
+	assert_signal_emit_count(
+		g,
+		"gate_unlocked",
+		1,
+		"gate_unlocked emits exactly once even when two mobs die back-to-back"
+	)
 
 
 # ---- 7. EDGE: zero-mob room unlocks immediately, counter on door-walk ---
+
 
 func test_zero_mob_room_gate_unlocks_immediately() -> void:
 	var g: RoomGate = _make_gate()
@@ -201,8 +220,12 @@ func test_zero_mob_room_gate_unlocks_immediately() -> void:
 	watch_signals(g)
 	g.trigger_for_test(null)
 	assert_signal_emit_count(g, "gate_locked", 1)
-	assert_signal_emit_count(g, "gate_unlocked", 1,
-		"zero-mob room: gate_unlocked fires immediately after lock (no death-tween wait)")
+	assert_signal_emit_count(
+		g,
+		"gate_unlocked",
+		1,
+		"zero-mob room: gate_unlocked fires immediately after lock (no death-tween wait)"
+	)
 	assert_eq(g.get_state(), RoomGate.STATE_UNLOCKED)
 
 
@@ -214,11 +237,15 @@ func test_zero_mob_room_counter_only_on_door_walk() -> void:
 	g.trigger_for_test(null)
 	# Room counter advances because gate_unlocked fired (simulating the
 	# exit gate being connected to gate_unlocked in this minimal test).
-	assert_eq(exit.times_crossed, 1,
-		"zero-mob room: room counter advances once on gate_unlocked (door-walk simulation)")
+	assert_eq(
+		exit.times_crossed,
+		1,
+		"zero-mob room: room counter advances once on gate_unlocked (door-walk simulation)"
+	)
 
 
 # ---- 8. NEW (Tess re-bounce): wait-then-unlock sequence via Timer ------
+
 
 func test_gate_does_not_unlock_until_death_wait_elapses() -> void:
 	# Verifies the actual delay: with test_skip_death_wait = false, killing
@@ -237,19 +264,22 @@ func test_gate_does_not_unlock_until_death_wait_elapses() -> void:
 	m.die()
 	await get_tree().process_frame
 	# Last mob died — gate_unlocked must NOT fire yet (Timer is pending).
-	assert_signal_emit_count(g, "gate_unlocked", 0,
-		"gate_unlocked must NOT emit until DEATH_TWEEN_WAIT_SECS elapses")
-	assert_true(g._death_wait_in_flight,
-		"_death_wait_in_flight set — guard active during the wait window")
-	assert_eq(g.get_state(), RoomGate.STATE_LOCKED,
-		"gate stays LOCKED until the death-tween wait elapses")
+	assert_signal_emit_count(
+		g, "gate_unlocked", 0, "gate_unlocked must NOT emit until DEATH_TWEEN_WAIT_SECS elapses"
+	)
+	assert_true(
+		g._death_wait_in_flight, "_death_wait_in_flight set — guard active during the wait window"
+	)
+	assert_eq(
+		g.get_state(), RoomGate.STATE_LOCKED, "gate stays LOCKED until the death-tween wait elapses"
+	)
 
 	# Simulate the timer expiring.
 	g.advance_death_wait_for_test()
-	assert_signal_emit_count(g, "gate_unlocked", 1,
-		"gate_unlocked emits exactly once after the wait elapses")
-	assert_eq(g.get_state(), RoomGate.STATE_UNLOCKED,
-		"gate transitions to UNLOCKED after the wait")
+	assert_signal_emit_count(
+		g, "gate_unlocked", 1, "gate_unlocked emits exactly once after the wait elapses"
+	)
+	assert_eq(g.get_state(), RoomGate.STATE_UNLOCKED, "gate transitions to UNLOCKED after the wait")
 
 
 func test_second_mob_death_during_wait_does_not_double_unlock() -> void:
@@ -268,18 +298,17 @@ func test_second_mob_death_during_wait_does_not_double_unlock() -> void:
 	m1.die()
 	await get_tree().process_frame
 	# m1 dying alone does not start the wait (m2 still alive).
-	assert_false(g._death_wait_in_flight,
-		"wait not started while m2 still alive")
+	assert_false(g._death_wait_in_flight, "wait not started while m2 still alive")
 	m2.die()
 	await get_tree().process_frame
 	# Now wait is in-flight.
 	assert_true(g._death_wait_in_flight, "wait started after last mob death")
-	assert_signal_emit_count(g, "gate_unlocked", 0,
-		"no unlock emitted yet — wait still pending")
+	assert_signal_emit_count(g, "gate_unlocked", 0, "no unlock emitted yet — wait still pending")
 	# Advance — exactly one unlock.
 	g.advance_death_wait_for_test()
-	assert_signal_emit_count(g, "gate_unlocked", 1,
-		"gate_unlocked emits exactly once after wait elapses")
+	assert_signal_emit_count(
+		g, "gate_unlocked", 1, "gate_unlocked emits exactly once after wait elapses"
+	)
 
 
 func test_death_wait_secs_constant_sized_for_boss() -> void:
@@ -292,10 +321,14 @@ func test_death_wait_secs_constant_sized_for_boss() -> void:
 	var boss_total: float = BossScript.BOSS_DEATH_HOLD + BossScript.DEATH_TWEEN_DURATION
 	# Strict >: wait must EXCEED boss total so the door open lands cleanly
 	# AFTER the death animation finishes (not at the same instant).
-	assert_gt(RoomGate.DEATH_TWEEN_WAIT_SECS, boss_total,
-		"DEATH_TWEEN_WAIT_SECS (%.3f) must exceed boss total death visual (%.3f) with slack" % [
-			RoomGate.DEATH_TWEEN_WAIT_SECS, boss_total
-		])
+	assert_gt(
+		RoomGate.DEATH_TWEEN_WAIT_SECS,
+		boss_total,
+		(
+			"DEATH_TWEEN_WAIT_SECS (%.3f) must exceed boss total death visual (%.3f) with slack"
+			% [RoomGate.DEATH_TWEEN_WAIT_SECS, boss_total]
+		)
+	)
 
 
 # ===========================================================================
@@ -311,12 +344,14 @@ func test_death_wait_secs_constant_sized_for_boss() -> void:
 # pre-existing FakeExitGate above.
 # ===========================================================================
 
+
 ## RefCounted counter helper — lambdas mutate via method call rather than
 ## binding a local int (which doesn't capture-by-ref reliably across the
 ## signal-emit boundary in GDScript 2.0).
 class Counter:
 	extends RefCounted
 	var n: int = 0
+
 	func bump() -> void:
 		n += 1
 
@@ -325,6 +360,7 @@ class Counter:
 class EventLog:
 	extends RefCounted
 	var events: Array[String] = []
+
 	func record(e: String) -> void:
 		events.append(e)
 
@@ -336,14 +372,18 @@ func test_p0_gate_unlocked_does_not_fire_gate_traversed() -> void:
 	var m: FakeMob = _make_fake_mob()
 	g.register_mob(m)
 	watch_signals(g)
-	g.trigger_for_test(null)   # lock; test_skip_death_wait=true sets immediate unlock
-	m.die()                     # gate_unlocked fires
+	g.trigger_for_test(null)  # lock; test_skip_death_wait=true sets immediate unlock
+	m.die()  # gate_unlocked fires
 	# Ticket 86c9qcf9z: drain one frame for CONNECT_DEFERRED dispatch.
 	await get_tree().process_frame
-	assert_signal_emitted(g, "gate_unlocked",
-		"gate_unlocked fires after all mobs die (sanity check)")
-	assert_signal_not_emitted(g, "gate_traversed",
-		"REGRESSION CHECK: gate_traversed must NOT fire on gate_unlocked — requires explicit door-walk")
+	assert_signal_emitted(
+		g, "gate_unlocked", "gate_unlocked fires after all mobs die (sanity check)"
+	)
+	assert_signal_not_emitted(
+		g,
+		"gate_traversed",
+		"REGRESSION CHECK: gate_traversed must NOT fire on gate_unlocked — requires explicit door-walk"
+	)
 
 
 ## P0 #1 wiring invariant: room_cleared (connected to gate_traversed) does NOT
@@ -363,9 +403,14 @@ func test_p0_room_cleared_not_emitted_on_gate_unlocked() -> void:
 	m.die()
 	await get_tree().process_frame
 	assert_signal_not_emitted(g, "gate_traversed")
-	assert_eq(counter.n, 0,
-		"REGRESSION CHECK: room_cleared count must be 0 after gate_unlocked —"
-			+ " player has not walked through the door")
+	assert_eq(
+		counter.n,
+		0,
+		(
+			"REGRESSION CHECK: room_cleared count must be 0 after gate_unlocked —"
+			+ " player has not walked through the door"
+		)
+	)
 
 
 ## P0 #1 full flow: mob die → gate_unlocked → player walks → gate_traversed → room_cleared.
@@ -388,10 +433,12 @@ func test_p0_full_position_b_flow() -> void:
 	assert_eq(counter.n, 0, "room counter unchanged after gate_unlocked")
 	# Step 3: player walks through the open door → gate_traversed fires → room_cleared.
 	g.traverse_for_test()
-	assert_eq(log.events, ["gate_unlocked", "gate_traversed"],
-		"gate_traversed fires after door-walk, gate_unlocked fires before it")
-	assert_eq(counter.n, 1,
-		"room_cleared fires exactly once after player door-walk")
+	assert_eq(
+		log.events,
+		["gate_unlocked", "gate_traversed"],
+		"gate_traversed fires after door-walk, gate_unlocked fires before it"
+	)
+	assert_eq(counter.n, 1, "room_cleared fires exactly once after player door-walk")
 
 
 ## P0 #1 death-tween wait: with the timer active, gate_unlocked fires AFTER the
@@ -416,10 +463,17 @@ func test_p0_death_tween_wait_then_door_walk_sequence() -> void:
 	g.advance_death_wait_for_test()
 	assert_true(g.is_unlocked(), "gate UNLOCKED after timer elapses")
 	assert_signal_emitted(g, "gate_unlocked", "gate_unlocked fired after wait")
-	assert_signal_not_emitted(g, "gate_traversed", "gate_traversed still not fired — player must walk")
-	assert_eq(counter.n, 0,
-		"REGRESSION CHECK: room counter still 0 after gate_unlocked — death-tween"
-			+ " wait + gate_unlocked are NOT sufficient; door-walk required")
+	assert_signal_not_emitted(
+		g, "gate_traversed", "gate_traversed still not fired — player must walk"
+	)
+	assert_eq(
+		counter.n,
+		0,
+		(
+			"REGRESSION CHECK: room counter still 0 after gate_unlocked — death-tween"
+			+ " wait + gate_unlocked are NOT sufficient; door-walk required"
+		)
+	)
 	# Player walks through.
 	g.traverse_for_test()
 	assert_eq(counter.n, 1, "room counter = 1 after door-walk")
@@ -438,5 +492,8 @@ func test_p0_gate_traversed_idempotent_no_double_advance() -> void:
 	g.traverse_for_test()
 	g.traverse_for_test()
 	g.traverse_for_test()
-	assert_eq(counter.n, 1,
-		"gate_traversed idempotent — room_cleared fires exactly once regardless of re-entries")
+	assert_eq(
+		counter.n,
+		1,
+		"gate_traversed idempotent — room_cleared fires exactly once regardless of re-entries"
+	)

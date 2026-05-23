@@ -26,8 +26,8 @@ const BOSS_SCENE_PATH: String = "res://scenes/levels/Stratum1BossRoom.tscn"
 # while still catching a flat-out missing wall.
 const EDGE_COVERAGE_RATIO: float = 0.9
 
-
 # ---- Helpers ---------------------------------------------------------
+
 
 # Returns the world-space Rect2 of a CollisionShape2D's RectangleShape2D
 # under its parent StaticBody2D, accounting for the body's position.
@@ -80,11 +80,17 @@ func _edge_coverage_px(walls: Array, bounds: Rect2, edge: StringName) -> float:
 			&"north":
 				on_edge = absf(r.position.y - bounds.position.y) <= TOUCH_EPS
 			&"south":
-				on_edge = absf((r.position.y + r.size.y) - (bounds.position.y + bounds.size.y)) <= TOUCH_EPS
+				on_edge = (
+					absf((r.position.y + r.size.y) - (bounds.position.y + bounds.size.y))
+					<= TOUCH_EPS
+				)
 			&"west":
 				on_edge = absf(r.position.x - bounds.position.x) <= TOUCH_EPS
 			&"east":
-				on_edge = absf((r.position.x + r.size.x) - (bounds.position.x + bounds.size.x)) <= TOUCH_EPS
+				on_edge = (
+					absf((r.position.x + r.size.x) - (bounds.position.x + bounds.size.x))
+					<= TOUCH_EPS
+				)
 		if not on_edge:
 			continue
 		var a: float = 0.0
@@ -142,13 +148,17 @@ func _instantiate(scene_path: String) -> Node:
 
 # ---- 1. Chunk scene (Rooms 01..08) ---------------------------------
 
+
 func test_chunk_scene_has_static_body_walls() -> void:
 	var inst: Node = _instantiate(CHUNK_SCENE_PATH)
 	var walls: Array = _collect_walls(inst)
 	# At least four perimeter walls — N/S/E/W. Authors are free to add more
 	# (e.g. interior pillars in M2) so we assert a floor, not exact equality.
-	assert_gte(walls.size(), 4,
-		"chunk scene must carry >=4 StaticBody2D walls (N/S/E/W); got %d" % walls.size())
+	assert_gte(
+		walls.size(),
+		4,
+		"chunk scene must carry >=4 StaticBody2D walls (N/S/E/W); got %d" % walls.size()
+	)
 
 
 func test_chunk_scene_covers_all_four_edges() -> void:
@@ -157,15 +167,23 @@ func test_chunk_scene_covers_all_four_edges() -> void:
 	var walls: Array = _collect_walls(inst)
 	var bounds: Rect2 = Rect2(0, 0, 480, 256)
 	for edge: StringName in [&"north", &"south", &"east", &"west"]:
-		var axis_len: float = bounds.size.x if (edge == &"north" or edge == &"south") else bounds.size.y
+		var axis_len: float = (
+			bounds.size.x if (edge == &"north" or edge == &"south") else bounds.size.y
+		)
 		var covered: float = _edge_coverage_px(walls, bounds, edge)
 		var ratio: float = covered / axis_len
-		assert_gte(ratio, EDGE_COVERAGE_RATIO,
-			"chunk %s edge coverage %.2f < %.2f (covered %.0f / %.0f px)" %
-				[String(edge), ratio, EDGE_COVERAGE_RATIO, covered, axis_len])
+		assert_gte(
+			ratio,
+			EDGE_COVERAGE_RATIO,
+			(
+				"chunk %s edge coverage %.2f < %.2f (covered %.0f / %.0f px)"
+				% [String(edge), ratio, EDGE_COVERAGE_RATIO, covered, axis_len]
+			)
+		)
 
 
 # ---- 2. Boss arena ------------------------------------------------
+
 
 func test_boss_room_has_static_body_walls() -> void:
 	var inst: Node = _instantiate(BOSS_SCENE_PATH)
@@ -173,8 +191,11 @@ func test_boss_room_has_static_body_walls() -> void:
 	# Boss room script also spawns Area2D triggers (door + StratumExit) — those
 	# are NOT StaticBody2D so they don't enter `walls`. We only count the four
 	# perimeter walls authored in the .tscn.
-	assert_gte(walls.size(), 4,
-		"boss room scene must carry >=4 StaticBody2D walls (N/S/E/W); got %d" % walls.size())
+	assert_gte(
+		walls.size(),
+		4,
+		"boss room scene must carry >=4 StaticBody2D walls (N/S/E/W); got %d" % walls.size()
+	)
 
 
 func test_boss_room_covers_all_four_edges() -> void:
@@ -183,15 +204,23 @@ func test_boss_room_covers_all_four_edges() -> void:
 	var walls: Array = _collect_walls(inst)
 	var bounds: Rect2 = Rect2(0, 0, 480, 270)
 	for edge: StringName in [&"north", &"south", &"east", &"west"]:
-		var axis_len: float = bounds.size.x if (edge == &"north" or edge == &"south") else bounds.size.y
+		var axis_len: float = (
+			bounds.size.x if (edge == &"north" or edge == &"south") else bounds.size.y
+		)
 		var covered: float = _edge_coverage_px(walls, bounds, edge)
 		var ratio: float = covered / axis_len
-		assert_gte(ratio, EDGE_COVERAGE_RATIO,
-			"boss room %s edge coverage %.2f < %.2f (covered %.0f / %.0f px)" %
-				[String(edge), ratio, EDGE_COVERAGE_RATIO, covered, axis_len])
+		assert_gte(
+			ratio,
+			EDGE_COVERAGE_RATIO,
+			(
+				"boss room %s edge coverage %.2f < %.2f (covered %.0f / %.0f px)"
+				% [String(edge), ratio, EDGE_COVERAGE_RATIO, covered, axis_len]
+			)
+		)
 
 
 # ---- 3. Door trigger preserved (BB-3 invariant) -------------------
+
 
 func test_boss_room_door_trigger_still_reachable() -> void:
 	# Walls must not occlude the boss-room door trigger. The trigger is at
@@ -230,13 +259,21 @@ func test_boss_room_door_trigger_still_reachable() -> void:
 	# Trigger's NORTH edge is y=242 — south wall's top must sit at or south
 	# of that so the player overlaps the trigger before being stopped.
 	const TRIGGER_NORTH_EDGE_Y: float = 242.0
-	assert_gte(south_wall_top, TRIGGER_NORTH_EDGE_Y,
-		("south wall top is y=%.1f — must be >= %.1f (trigger north edge)"
-			+ " to leave the door trigger reachable")
-			% [south_wall_top, TRIGGER_NORTH_EDGE_Y])
+	assert_gte(
+		south_wall_top,
+		TRIGGER_NORTH_EDGE_Y,
+		(
+			(
+				"south wall top is y=%.1f — must be >= %.1f (trigger north edge)"
+				+ " to leave the door trigger reachable"
+			)
+			% [south_wall_top, TRIGGER_NORTH_EDGE_Y]
+		)
+	)
 
 
 # ---- 4. Room scene smoke (each scene loads with walls present) ----
+
 
 func test_each_stratum1_room_scene_has_walls_at_runtime() -> void:
 	# Rooms 01..08 instantiate via LevelAssembler which (post-BB-3 fix) loads
@@ -253,14 +290,23 @@ func test_each_stratum1_room_scene_has_walls_at_runtime() -> void:
 	for p: String in room_paths:
 		var inst: Node = _instantiate(p)
 		var walls: Array = _collect_walls(inst)
-		assert_gte(walls.size(), 4,
-			"%s must surface >=4 boundary StaticBody2D walls at runtime; got %d"
-				% [p, walls.size()])
+		assert_gte(
+			walls.size(),
+			4,
+			"%s must surface >=4 boundary StaticBody2D walls at runtime; got %d" % [p, walls.size()]
+		)
 		var bounds: Rect2 = Rect2(0, 0, 480, 256)
 		for edge: StringName in [&"north", &"south", &"east", &"west"]:
-			var axis_len: float = bounds.size.x if (edge == &"north" or edge == &"south") else bounds.size.y
+			var axis_len: float = (
+				bounds.size.x if (edge == &"north" or edge == &"south") else bounds.size.y
+			)
 			var covered: float = _edge_coverage_px(walls, bounds, edge)
 			var ratio: float = covered / axis_len
-			assert_gte(ratio, EDGE_COVERAGE_RATIO,
-				"%s %s edge runtime coverage %.2f < %.2f"
-					% [p, String(edge), ratio, EDGE_COVERAGE_RATIO])
+			assert_gte(
+				ratio,
+				EDGE_COVERAGE_RATIO,
+				(
+					"%s %s edge runtime coverage %.2f < %.2f"
+					% [p, String(edge), ratio, EDGE_COVERAGE_RATIO]
+				)
+			)

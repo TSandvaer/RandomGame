@@ -23,7 +23,7 @@ signal consumed(amount: int, recipient: Node)
 # ---- Layer bits -----------------------------------------------------
 
 const LAYER_PICKUPS: int = 1 << 5  # bit 6 (reuse pickups layer)
-const LAYER_PLAYER: int = 1 << 1   # bit 2
+const LAYER_PLAYER: int = 1 << 1  # bit 2
 
 # ---- Inspector -----------------------------------------------------
 
@@ -51,11 +51,13 @@ func _ready() -> void:
 
 # ---- Public API ----------------------------------------------------
 
+
 func is_consumed() -> bool:
 	return _consumed
 
 
 # ---- Internal ------------------------------------------------------
+
 
 func _on_body_entered(body: Node) -> void:
 	if _consumed:

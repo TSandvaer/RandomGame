@@ -41,11 +41,11 @@ const BossRoomScript: Script = preload("res://scripts/levels/Stratum1BossRoom.gd
 
 const PHYS_DELTA: float = 1.0 / 60.0
 
-
 # ---- Test isolation ---------------------------------------------------
 # M3 Tier 2 Wave 1 T2/T3 — Stratum1Boss now fires TimeScaleDirector requests
 # on hit / die / phase-transition. Reset director state on both ends so this
 # suite doesn't leak Engine.time_scale into others.
+
 
 func before_each() -> void:
 	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
@@ -62,6 +62,7 @@ func after_each() -> void:
 
 
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_room() -> Stratum1BossRoom:
 	var packed: PackedScene = load("res://scenes/levels/Stratum1BossRoom.tscn")
@@ -109,6 +110,7 @@ func _await_physics_settles() -> void:
 
 # ---- AC1: boss room auto-triggers entry sequence on _ready ------------
 
+
 func test_boss_room_auto_triggers_entry_sequence_on_ready() -> void:
 	## REGRESSION-86c9q96fv + 86c9q96ht: pre-fix the boss room only triggered
 	## the entry sequence via the door-trigger body_entered signal. Production
@@ -117,8 +119,10 @@ func test_boss_room_auto_triggers_entry_sequence_on_ready() -> void:
 	var room: Stratum1BossRoom = _make_room()
 	# `call_deferred` from `_ready` lands on the next idle frame.
 	await get_tree().process_frame
-	assert_true(room.is_entry_sequence_active() or room.is_entry_sequence_completed(),
-		"REGRESSION: boss-room entry sequence must auto-fire on _ready (no door overlap needed)")
+	assert_true(
+		room.is_entry_sequence_active() or room.is_entry_sequence_completed(),
+		"REGRESSION: boss-room entry sequence must auto-fire on _ready (no door overlap needed)"
+	)
 
 
 func test_boss_wakes_without_door_trigger_overlap() -> void:
@@ -130,16 +134,21 @@ func test_boss_wakes_without_door_trigger_overlap() -> void:
 	var boss: Stratum1Boss = room.get_boss()
 	# Confirm the deferred trigger fired.
 	await get_tree().process_frame
-	assert_true(room.is_entry_sequence_active(),
-		"entry sequence must be active after the deferred trigger lands")
+	assert_true(
+		room.is_entry_sequence_active(),
+		"entry sequence must be active after the deferred trigger lands"
+	)
 	# Fast-forward to completion.
 	room.complete_entry_sequence_for_test()
-	assert_false(boss.is_dormant(),
-		"REGRESSION: boss must be awake after entry sequence completes — production was stuck dormant")
+	assert_false(
+		boss.is_dormant(),
+		"REGRESSION: boss must be awake after entry sequence completes — production was stuck dormant"
+	)
 	assert_eq(boss.get_state(), Stratum1Boss.STATE_IDLE)
 
 
 # ---- AC2: boss takes damage from a real Hitbox spawn ------------------
+
 
 func test_boss_takes_damage_from_real_hitbox_spawn() -> void:
 	## Highest-fidelity damage-path test for `86c9q96fv`. Spawns a
@@ -162,11 +171,15 @@ func test_boss_takes_damage_from_real_hitbox_spawn() -> void:
 	# pre-existing overlaps, applying damage to the boss.
 	var hb: Hitbox = _make_player_team_hitbox_at(boss.global_position, 6, 24.0)
 	await _await_physics_settles()
-	assert_lt(boss.get_hp(), hp_before,
-		"REGRESSION-86c9q96fv: boss must take damage from a real Hitbox spawn (hp %d -> %d)"
-			% [hp_before, boss.get_hp()])
-	assert_eq(boss.get_hp(), hp_before - hb.damage,
-		"hit lands with the configured damage payload")
+	assert_lt(
+		boss.get_hp(),
+		hp_before,
+		(
+			"REGRESSION-86c9q96fv: boss must take damage from a real Hitbox spawn (hp %d -> %d)"
+			% [hp_before, boss.get_hp()]
+		)
+	)
+	assert_eq(boss.get_hp(), hp_before - hb.damage, "hit lands with the configured damage payload")
 
 
 func test_boss_hit_target_signal_fires_for_real_hitbox() -> void:
@@ -182,11 +195,16 @@ func test_boss_hit_target_signal_fires_for_real_hitbox() -> void:
 	var hb: Hitbox = _make_player_team_hitbox_at(boss.global_position, 6, 24.0)
 	watch_signals(hb)
 	await _await_physics_settles()
-	assert_signal_emit_count(hb, "hit_target", 1,
-		"REGRESSION-86c9q96fv: hit_target fires exactly once on the real boss collision body")
+	assert_signal_emit_count(
+		hb,
+		"hit_target",
+		1,
+		"REGRESSION-86c9q96fv: hit_target fires exactly once on the real boss collision body"
+	)
 
 
 # ---- AC3: boss attack lands on real Player body -----------------------
+
 
 func test_boss_in_chase_initiates_swing_against_real_player() -> void:
 	## REGRESSION-86c9q96ht: pre-fix the boss was DORMANT and skipped all AI
@@ -210,16 +228,19 @@ func test_boss_in_chase_initiates_swing_against_real_player() -> void:
 	watch_signals(b)
 	# Tick 1: chase → telegraph begins (player in MELEE_RANGE).
 	b._physics_process(PHYS_DELTA)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
-		"REGRESSION-86c9q96ht: awake boss must enter melee telegraph when player is in range")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_TELEGRAPHING_MELEE,
+		"REGRESSION-86c9q96ht: awake boss must enter melee telegraph when player is in range"
+	)
 	# Tick 2: telegraph expires → swing fires.
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.01)
 	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING)
-	assert_signal_emitted(b, "swing_spawned",
-		"REGRESSION-86c9q96ht: boss must fire a swing hitbox against the player")
+	assert_signal_emitted(
+		b, "swing_spawned", "REGRESSION-86c9q96ht: boss must fire a swing hitbox against the player"
+	)
 	var params: Array = get_signal_parameters(b, "swing_spawned", 0)
-	assert_eq(params[0], Stratum1Boss.SWING_KIND_MELEE,
-		"first swing is a melee in phase 1")
+	assert_eq(params[0], Stratum1Boss.SWING_KIND_MELEE, "first swing is a melee in phase 1")
 
 
 func test_boss_swing_hitbox_carries_damage_payload_against_real_player() -> void:
@@ -251,31 +272,41 @@ func test_boss_swing_hitbox_carries_damage_payload_against_real_player() -> void
 
 	# Capture the spawned hitbox via the swing_spawned signal.
 	var spawned_hb: Array = [null]
-	b.swing_spawned.connect(func(_kind: StringName, hb: Node) -> void:
-		spawned_hb[0] = hb
-	)
+	b.swing_spawned.connect(func(_kind: StringName, hb: Node) -> void: spawned_hb[0] = hb)
 
 	# Tick 1: chase → telegraph.
 	b._physics_process(PHYS_DELTA)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
-		"precondition: boss enters melee telegraph (dist %.1f < MELEE_RANGE %.1f)"
-		% [(p.global_position - b.global_position).length(), Stratum1Boss.MELEE_RANGE])
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_TELEGRAPHING_MELEE,
+		(
+			"precondition: boss enters melee telegraph (dist %.1f < MELEE_RANGE %.1f)"
+			% [(p.global_position - b.global_position).length(), Stratum1Boss.MELEE_RANGE]
+		)
+	)
 	# Tick 2: telegraph expires → swing fires.
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.01)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING,
-		"precondition: boss has fired its swing")
+	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING, "precondition: boss has fired its swing")
 
 	# Assert the spawned hitbox is configured to damage the player.
 	# REGRESSION-86c9q96ht: pre-fix the boss never reached this state at all.
-	assert_not_null(spawned_hb[0],
-		"REGRESSION-86c9q96ht: boss must spawn a Hitbox when firing a melee swing")
+	assert_not_null(
+		spawned_hb[0], "REGRESSION-86c9q96ht: boss must spawn a Hitbox when firing a melee swing"
+	)
 	var hb: Hitbox = spawned_hb[0]
-	assert_eq(hb.team, Hitbox.TEAM_ENEMY,
-		"boss swing hitbox is on enemy team (will damage player on overlap)")
-	assert_eq(hb.collision_mask, Hitbox.LAYER_PLAYER,
-		"boss swing hitbox masks player layer — engine signal flow targets player on overlap")
-	assert_gt(hb.damage, 0,
-		"boss swing hitbox carries non-zero damage payload (dmg=%d)" % hb.damage)
+	assert_eq(
+		hb.team,
+		Hitbox.TEAM_ENEMY,
+		"boss swing hitbox is on enemy team (will damage player on overlap)"
+	)
+	assert_eq(
+		hb.collision_mask,
+		Hitbox.LAYER_PLAYER,
+		"boss swing hitbox masks player layer — engine signal flow targets player on overlap"
+	)
+	assert_gt(
+		hb.damage, 0, "boss swing hitbox carries non-zero damage payload (dmg=%d)" % hb.damage
+	)
 
 
 func test_boss_take_damage_from_real_hitbox_emits_combat_trace_dormant_when_dormant() -> void:
@@ -304,8 +335,9 @@ func test_boss_take_damage_from_real_hitbox_emits_combat_trace_dormant_when_dorm
 	# subsequent attempt runs).
 	# The robust assertion: dormant guard rejects damage when called directly.
 	boss.take_damage(50, Vector2.ZERO, null)
-	assert_eq(boss.get_hp(), hp_before,
-		"DORMANT boss rejects damage even from realistic damage payload")
+	assert_eq(
+		boss.get_hp(), hp_before, "DORMANT boss rejects damage even from realistic damage payload"
+	)
 
 	# Cleanup: the hitbox is autofree'd; suppressing unused-var warning.
 	assert_not_null(hb)

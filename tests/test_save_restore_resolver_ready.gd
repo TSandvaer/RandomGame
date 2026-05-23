@@ -45,7 +45,6 @@ extends GutTest
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
 
-
 # ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
 ##
 ## This whole file's purpose is pinning the no-warning posture for save-
@@ -79,6 +78,7 @@ func after_each() -> void:
 # AC1 — registry resolves iron_sword regardless of DirAccess behavior
 # =======================================================================
 
+
 func test_load_all_resolves_iron_sword_via_starter_paths() -> void:
 	# This is the load-bearing assertion. If iron_sword is NOT in `_items`
 	# after load_all(), the production save-restore will push_warning on
@@ -89,9 +89,13 @@ func test_load_all_resolves_iron_sword_via_starter_paths() -> void:
 	var reg: ContentRegistry = ContentRegistry.new()
 	reg.load_all()
 	var def: ItemDef = reg.resolve_item(&"iron_sword")
-	assert_not_null(def,
-		"iron_sword MUST resolve via ContentRegistry after load_all() — " +
-		"if null, save-restore will push_warning on F5 reload (ticket 86c9qah1f)")
+	assert_not_null(
+		def,
+		(
+			"iron_sword MUST resolve via ContentRegistry after load_all() — "
+			+ "if null, save-restore will push_warning on F5 reload (ticket 86c9qah1f)"
+		)
+	)
 	assert_eq(def.id, &"iron_sword", "resolved item id matches lookup key")
 
 
@@ -104,9 +108,12 @@ func test_load_all_starter_paths_register_even_if_diraccess_fails() -> void:
 	# DirAccess scan covers it, this fails and surfaces the regression.
 	assert_true(
 		ContentRegistry.STARTER_ITEM_PATHS.has("res://resources/items/weapons/iron_sword.tres"),
-		"STARTER_ITEM_PATHS must include iron_sword.tres — load-bearing for " +
-		"HTML5 save-restore (ticket 86c9qah1f). Do NOT remove without testing " +
-		"in HTML5 build that DirAccess subdir recursion now works.")
+		(
+			"STARTER_ITEM_PATHS must include iron_sword.tres — load-bearing for "
+			+ "HTML5 save-restore (ticket 86c9qah1f). Do NOT remove without testing "
+			+ "in HTML5 build that DirAccess subdir recursion now works."
+		)
+	)
 
 
 # =======================================================================
@@ -122,13 +129,18 @@ func test_load_all_starter_paths_register_even_if_diraccess_fails() -> void:
 # `grunt_drops.tres` (0.30 cumulative weight) — so once it lands in a save,
 # every subsequent boot push_warnings unless the registry direct-loads it.
 
+
 func test_load_all_resolves_leather_vest_via_starter_paths() -> void:
 	var reg: ContentRegistry = ContentRegistry.new()
 	reg.load_all()
 	var def: ItemDef = reg.resolve_item(&"leather_vest")
-	assert_not_null(def,
-		"REGRESSION-86c9uemdg: leather_vest MUST resolve via ContentRegistry after load_all() — " +
-		"if null, save-restore push_warnings on every boot of a save containing leather_vest")
+	assert_not_null(
+		def,
+		(
+			"REGRESSION-86c9uemdg: leather_vest MUST resolve via ContentRegistry after load_all() — "
+			+ "if null, save-restore push_warnings on every boot of a save containing leather_vest"
+		)
+	)
 	assert_eq(def.id, &"leather_vest", "resolved item id matches lookup key")
 
 
@@ -140,9 +152,12 @@ func test_starter_item_paths_includes_leather_vest_drift_detector() -> void:
 	# rule in ContentRegistry.STARTER_ITEM_PATHS docstring.
 	assert_true(
 		ContentRegistry.STARTER_ITEM_PATHS.has("res://resources/items/armors/leather_vest.tres"),
-		"REGRESSION-86c9uemdg: STARTER_ITEM_PATHS must include leather_vest.tres — " +
-		"load-bearing for HTML5 save-restore of saves containing leather_vest. " +
-		"Do NOT remove without verifying DirAccess subdir-recursion works for armors/ in HTML5.")
+		(
+			"REGRESSION-86c9uemdg: STARTER_ITEM_PATHS must include leather_vest.tres — "
+			+ "load-bearing for HTML5 save-restore of saves containing leather_vest. "
+			+ "Do NOT remove without verifying DirAccess subdir-recursion works for armors/ in HTML5."
+		)
+	)
 
 
 func test_restore_from_save_leather_vest_in_stash_resolves_silently() -> void:
@@ -151,7 +166,8 @@ func test_restore_from_save_leather_vest_in_stash_resolves_silently() -> void:
 	# Inventory must contain the resolved ItemInstance.
 	var save_data: Dictionary = {
 		"equipped": {},
-		"stash": [
+		"stash":
+		[
 			{
 				"id": "leather_vest",
 				"tier": 1,  # boss_drops.tres ships leather_vest at tier_modifier=1 (T2)
@@ -161,50 +177,62 @@ func test_restore_from_save_leather_vest_in_stash_resolves_silently() -> void:
 		],
 	}
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	_inv().restore_from_save(
-		save_data,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		_inv()
+		. restore_from_save(
+			save_data,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 	var items: Array = _inv().get_items()
-	assert_eq(items.size(), 1,
-		"REGRESSION-86c9uemdg: stash with one leather_vest must produce one ItemInstance after restore")
+	assert_eq(
+		items.size(),
+		1,
+		"REGRESSION-86c9uemdg: stash with one leather_vest must produce one ItemInstance after restore"
+	)
 	var inst: ItemInstance = items[0] as ItemInstance
-	assert_not_null(inst.def,
-		"restored leather_vest ItemInstance has non-null def (resolver returned non-null)")
-	assert_eq(inst.def.id, &"leather_vest",
-		"restored stash item is the leather_vest from the save dict")
+	assert_not_null(
+		inst.def, "restored leather_vest ItemInstance has non-null def (resolver returned non-null)"
+	)
+	assert_eq(
+		inst.def.id, &"leather_vest", "restored stash item is the leather_vest from the save dict"
+	)
 
 
 # =======================================================================
 # AC2 — is_resolved() flips false → true across load_all()
 # =======================================================================
 
+
 func test_is_resolved_starts_false() -> void:
 	var reg: ContentRegistry = ContentRegistry.new()
-	assert_false(reg.is_resolved(),
-		"is_resolved() must be false before load_all() — gates async awaiters")
+	assert_false(
+		reg.is_resolved(), "is_resolved() must be false before load_all() — gates async awaiters"
+	)
 
 
 func test_is_resolved_flips_true_after_load_all() -> void:
 	var reg: ContentRegistry = ContentRegistry.new()
 	reg.load_all()
-	assert_true(reg.is_resolved(),
-		"is_resolved() must be true after load_all() completes")
+	assert_true(reg.is_resolved(), "is_resolved() must be true after load_all() completes")
 
 
 # =======================================================================
 # AC3 — items_resolved signal fires exactly once on load_all()
 # =======================================================================
 
+
 func test_items_resolved_signal_fires_on_load_all() -> void:
 	var reg: ContentRegistry = ContentRegistry.new()
 	watch_signals(reg)
 	reg.load_all()
-	assert_signal_emitted(reg, "items_resolved",
-		"items_resolved signal must fire when load_all() completes")
-	assert_signal_emit_count(reg, "items_resolved", 1,
-		"items_resolved must fire exactly once per load_all() call")
+	assert_signal_emitted(
+		reg, "items_resolved", "items_resolved signal must fire when load_all() completes"
+	)
+	assert_signal_emit_count(
+		reg, "items_resolved", 1, "items_resolved must fire exactly once per load_all() call"
+	)
 
 
 # =======================================================================
@@ -216,6 +244,7 @@ func test_items_resolved_signal_fires_on_load_all() -> void:
 # AND returned null, leaving _equipped[weapon] empty. Asserting the
 # equipped slot is populated post-restore is the structural proof that
 # zero warnings fired during the resolver chain.
+
 
 func test_restore_from_save_iron_sword_equipped_resolves_silently() -> void:
 	var inv: Node = _inv()
@@ -229,8 +258,10 @@ func test_restore_from_save_iron_sword_equipped_resolves_silently() -> void:
 	# Build a production-shaped save dict matching what the running game
 	# would have written: iron_sword equipped in the weapon slot, no stash.
 	var save_data: Dictionary = {
-		"equipped": {
-			"weapon": {
+		"equipped":
+		{
+			"weapon":
+			{
 				"id": "iron_sword",
 				"tier": 0,  # ItemDef.Tier.T1
 				"rolled_affixes": [],
@@ -245,30 +276,45 @@ func test_restore_from_save_iron_sword_equipped_resolves_silently() -> void:
 	# (and thus push_warning'd via from_save_dict). With the three-pronged
 	# load_all() this resolves cleanly on every platform.
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	inv.restore_from_save(
-		save_data,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		inv
+		. restore_from_save(
+			save_data,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 
 	# Equipped slot must be populated post-restore — the structural proof
 	# that the resolver returned non-null for iron_sword.
 	var equipped: ItemInstance = inv.get_equipped(&"weapon") as ItemInstance
-	assert_not_null(equipped,
-		"equipped weapon slot must be populated after restore_from_save — " +
-		"if null, the resolver returned null and from_save_dict push_warning'd " +
-		"(ticket 86c9qah1f symptom: 'unknown item id iron_sword' on F5 reload)")
+	assert_not_null(
+		equipped,
+		(
+			"equipped weapon slot must be populated after restore_from_save — "
+			+ "if null, the resolver returned null and from_save_dict push_warning'd "
+			+ "(ticket 86c9qah1f symptom: 'unknown item id iron_sword' on F5 reload)"
+		)
+	)
 	assert_not_null(equipped.def, "restored ItemInstance has non-null def")
-	assert_eq(equipped.def.id, &"iron_sword",
-		"restored equipped weapon is the iron_sword from the save dict")
+	assert_eq(
+		equipped.def.id,
+		&"iron_sword",
+		"restored equipped weapon is the iron_sword from the save dict"
+	)
 	# Dual-surface assertion (per combat-architecture.md): _apply_equip_to_player
 	# must have been called, propagating the equip onto the Player surface.
 	var weapon_on_player: ItemDef = player.get_equipped_weapon() as ItemDef
-	assert_not_null(weapon_on_player,
-		"Player._equipped_weapon must be set after restore_from_save — " +
-		"the dual-surface rule (combat-architecture.md) requires both surfaces in lockstep")
-	assert_eq(weapon_on_player.id, &"iron_sword",
-		"Player surface holds the iron_sword post-restore")
+	assert_not_null(
+		weapon_on_player,
+		(
+			"Player._equipped_weapon must be set after restore_from_save — "
+			+ "the dual-surface rule (combat-architecture.md) requires both surfaces in lockstep"
+		)
+	)
+	assert_eq(
+		weapon_on_player.id, &"iron_sword", "Player surface holds the iron_sword post-restore"
+	)
 
 
 func test_restore_from_save_iron_sword_in_stash_resolves_silently() -> void:
@@ -278,7 +324,8 @@ func test_restore_from_save_iron_sword_in_stash_resolves_silently() -> void:
 	# any future divergence between the two paths.
 	var save_data: Dictionary = {
 		"equipped": {},
-		"stash": [
+		"stash":
+		[
 			{
 				"id": "iron_sword",
 				"tier": 0,
@@ -288,25 +335,32 @@ func test_restore_from_save_iron_sword_in_stash_resolves_silently() -> void:
 		],
 	}
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	_inv().restore_from_save(
-		save_data,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		_inv()
+		. restore_from_save(
+			save_data,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 	var items: Array = _inv().get_items()
-	assert_eq(items.size(), 1,
-		"stash with one iron_sword must produce one ItemInstance after restore")
+	assert_eq(
+		items.size(), 1, "stash with one iron_sword must produce one ItemInstance after restore"
+	)
 	var inst: ItemInstance = items[0] as ItemInstance
-	assert_not_null(inst.def,
-		"restored stash ItemInstance has non-null def (resolver returned non-null)")
-	assert_eq(inst.def.id, &"iron_sword",
-		"restored stash item is the iron_sword from the save dict")
+	assert_not_null(
+		inst.def, "restored stash ItemInstance has non-null def (resolver returned non-null)"
+	)
+	assert_eq(
+		inst.def.id, &"iron_sword", "restored stash item is the iron_sword from the save dict"
+	)
 
 
 # =======================================================================
 # AC5 — load_all() is idempotent: re-running on the same instance does
 #        NOT push_warning even though the same item is registered twice
 # =======================================================================
+
 
 func test_load_all_is_idempotent_across_two_calls() -> void:
 	var reg: ContentRegistry = ContentRegistry.new()
@@ -322,13 +376,13 @@ func test_load_all_is_idempotent_across_two_calls() -> void:
 	assert_not_null(iron_second, "second load_all still resolves iron_sword")
 	# Resource cache hands out the same instance for the same path, so
 	# instance equality holds across both registrations.
-	assert_eq(iron_first, iron_second,
-		"load_all is idempotent — same instance returned on re-scan")
+	assert_eq(iron_first, iron_second, "load_all is idempotent — same instance returned on re-scan")
 
 
 # =======================================================================
 # AC6 — affixes still resolve (no regression from the items-only fix)
 # =======================================================================
+
 
 func test_load_all_still_resolves_affixes() -> void:
 	var reg: ContentRegistry = ContentRegistry.new()
@@ -336,8 +390,9 @@ func test_load_all_still_resolves_affixes() -> void:
 	# `swift.tres` is one of the iron_sword's affix pool — exercised on
 	# F5-reload of a save where iron_sword has a swift roll.
 	var swift: AffixDef = reg.resolve_affix(&"swift")
-	assert_not_null(swift,
-		"swift affix must still resolve — items-only fix must not regress affixes")
+	assert_not_null(
+		swift, "swift affix must still resolve — items-only fix must not regress affixes"
+	)
 
 
 func test_load_all_iron_sword_with_affix_round_trips_through_restore() -> void:
@@ -348,8 +403,10 @@ func test_load_all_iron_sword_with_affix_round_trips_through_restore() -> void:
 	# a non-null ItemInstance with the affix attached, not on the dual-
 	# surface propagation (covered by the equipped-slot test above).
 	var save_data: Dictionary = {
-		"equipped": {
-			"weapon": {
+		"equipped":
+		{
+			"weapon":
+			{
 				"id": "iron_sword",
 				"tier": 0,
 				"rolled_affixes": [{"affix_id": "swift", "value": 0.08}],
@@ -359,14 +416,19 @@ func test_load_all_iron_sword_with_affix_round_trips_through_restore() -> void:
 		"stash": [],
 	}
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	_inv().restore_from_save(
-		save_data,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		_inv()
+		. restore_from_save(
+			save_data,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 	var equipped: ItemInstance = _inv().get_equipped(&"weapon") as ItemInstance
 	assert_not_null(equipped, "iron_sword + swift round-trips cleanly")
-	assert_eq(equipped.rolled_affixes.size(), 1,
-		"swift affix attached to restored iron_sword")
-	assert_eq(equipped.rolled_affixes[0].def.id, &"swift",
-		"affix def resolved correctly via affix_resolver_callable")
+	assert_eq(equipped.rolled_affixes.size(), 1, "swift affix attached to restored iron_sword")
+	assert_eq(
+		equipped.rolled_affixes[0].def.id,
+		&"swift",
+		"affix def resolved correctly via affix_resolver_callable"
+	)

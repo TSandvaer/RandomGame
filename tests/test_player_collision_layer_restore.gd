@@ -39,18 +39,24 @@ func _make_player_in_tree() -> Player:
 
 # ---- Baseline: layer bit is non-zero at rest --------------------------
 
+
 func test_player_collision_layer_nonzero_at_rest() -> void:
 	# Pre-condition for the whole bug class. Player.gd::_ready seeds the
 	# player layer bit if the bare CharacterBody2D defaults dropped to 0.
 	var p: Player = _make_player_in_tree()
-	assert_eq(p.collision_layer, EXPECTED_PLAYER_LAYER,
-		"player must be on the player layer bit at rest (value 2 = bit 2). " +
-		"This is the contract Pickup.mask=2 + StratumExit.mask=2 rely on.")
-	assert_false(p.is_invulnerable(),
-		"sanity: player not invulnerable at rest")
+	assert_eq(
+		p.collision_layer,
+		EXPECTED_PLAYER_LAYER,
+		(
+			"player must be on the player layer bit at rest (value 2 = bit 2). "
+			+ "This is the contract Pickup.mask=2 + StratumExit.mask=2 rely on."
+		)
+	)
+	assert_false(p.is_invulnerable(), "sanity: player not invulnerable at rest")
 
 
 # ---- Single-cycle iframe round-trip restores layer --------------------
+
 
 func test_single_enter_exit_iframes_round_trip_restores_layer() -> void:
 	var p: Player = _make_player_in_tree()
@@ -58,15 +64,20 @@ func test_single_enter_exit_iframes_round_trip_restores_layer() -> void:
 	assert_eq(layer_before, EXPECTED_PLAYER_LAYER, "sanity: starting layer is 2")
 	p._enter_iframes()
 	assert_true(p.is_invulnerable(), "iframes active after _enter_iframes")
-	assert_eq(p.collision_layer, 0,
-		"iframes clear collision_layer to 0 — enemy hitboxes (mask=2) miss us")
+	assert_eq(
+		p.collision_layer, 0, "iframes clear collision_layer to 0 — enemy hitboxes (mask=2) miss us"
+	)
 	p._exit_iframes()
 	assert_false(p.is_invulnerable(), "iframes cleared after _exit_iframes")
-	assert_eq(p.collision_layer, layer_before,
-		"single cycle restores the original layer cleanly (existing contract)")
+	assert_eq(
+		p.collision_layer,
+		layer_before,
+		"single cycle restores the original layer cleanly (existing contract)"
+	)
 
 
 # ---- REGRESSION GUARD: re-entry must not clobber saved layer ----------
+
 
 func test_reentry_into_iframes_does_not_clobber_saved_layer() -> void:
 	# THE CORE PIN. Two back-to-back `_enter_iframes` calls without an
@@ -87,15 +98,21 @@ func test_reentry_into_iframes_does_not_clobber_saved_layer() -> void:
 	# not 0. Pre-fix this assertion FAILS — restored to 0.
 	p._exit_iframes()
 	assert_false(p.is_invulnerable(), "iframes cleared after exit")
-	assert_eq(p.collision_layer, EXPECTED_PLAYER_LAYER,
-		"REGRESSION GUARD (ticket 86c9uq0ky): after re-entry → exit, the player " +
-		"MUST be restored to the ORIGINAL layer (2), NOT the cleared value (0). " +
-		"If this fails, the boss-room Pickup-collectability bug class has " +
-		"re-opened — Pickup.mask=2 + StratumExit.mask=2 will not detect the " +
-		"Player CharacterBody2D at layer=0.")
+	assert_eq(
+		p.collision_layer,
+		EXPECTED_PLAYER_LAYER,
+		(
+			"REGRESSION GUARD (ticket 86c9uq0ky): after re-entry → exit, the player "
+			+ "MUST be restored to the ORIGINAL layer (2), NOT the cleared value (0). "
+			+ "If this fails, the boss-room Pickup-collectability bug class has "
+			+ "re-opened — Pickup.mask=2 + StratumExit.mask=2 will not detect the "
+			+ "Player CharacterBody2D at layer=0."
+		)
+	)
 
 
 # ---- Realistic chain: hit → dodge-during-iframes → dodge-end restores --
+
 
 func test_take_damage_then_dodge_during_iframes_then_dodge_end_restores_layer() -> void:
 	# Reproduces the exact Sponsor-soak failure chain (`83267fd` diag).
@@ -129,16 +146,22 @@ func test_take_damage_then_dodge_during_iframes_then_dodge_end_restores_layer() 
 
 	# 4. The proof. Pre-fix this assertion FAILS with collision_layer == 0
 	#    because the second _enter_iframes (in try_dodge) saved 0.
-	assert_eq(p.collision_layer, layer_before,
-		"REGRESSION GUARD (ticket 86c9uq0ky, Sponsor 2026-05-16 boss-room): " +
-		"after the chain `take_damage → dodge-during-iframes → dodge-end`, " +
-		"Player.collision_layer MUST be restored to the original value (2). " +
-		"This is the EXACT chain Sponsor's diag-build `83267fd` traced ending " +
-		"at `layer=0 mask=1` — the root cause of Pickup + StratumExit " +
-		"body_entered never firing in the boss room.")
+	assert_eq(
+		p.collision_layer,
+		layer_before,
+		(
+			"REGRESSION GUARD (ticket 86c9uq0ky, Sponsor 2026-05-16 boss-room): "
+			+ "after the chain `take_damage → dodge-during-iframes → dodge-end`, "
+			+ "Player.collision_layer MUST be restored to the original value (2). "
+			+ "This is the EXACT chain Sponsor's diag-build `83267fd` traced ending "
+			+ "at `layer=0 mask=1` — the root cause of Pickup + StratumExit "
+			+ "body_entered never firing in the boss room."
+		)
+	)
 
 
 # ---- Realistic chain — N=3 nested re-entries (paranoia pin) -----------
+
 
 func test_triple_reentry_then_exit_restores_layer() -> void:
 	# Three back-to-back _enter_iframes calls (e.g. hit → dodge → another
@@ -151,6 +174,11 @@ func test_triple_reentry_then_exit_restores_layer() -> void:
 	p._enter_iframes()
 	assert_eq(p.collision_layer, 0, "still cleared after triple re-entry")
 	p._exit_iframes()
-	assert_eq(p.collision_layer, layer_before,
-		"N=3 re-entries followed by a single exit must restore the " +
-		"original layer — idempotency is general, not just N=2.")
+	assert_eq(
+		p.collision_layer,
+		layer_before,
+		(
+			"N=3 re-entries followed by a single exit must restore the "
+			+ "original layer — idempotency is general, not just N=2."
+		)
+	)

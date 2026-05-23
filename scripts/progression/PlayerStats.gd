@@ -111,6 +111,7 @@ func _ready() -> void:
 
 # ---- Public API -------------------------------------------------------
 
+
 ## Read a single stat with affix modifiers applied. Unknown stat IDs return
 ## 0 with a warning.
 ##
@@ -192,6 +193,7 @@ func spend_unspent_point() -> bool:
 
 # ---- Affix modifier API -----------------------------------------------
 
+
 ## Apply an affix-driven modifier to a stat. `mode` is `MODE_ADD` (0) or
 ## `MODE_MUL` (1) — matches `AffixDef.ApplyMode`. Returns true on success;
 ## false if the stat is unknown or the mode is unrecognised.
@@ -260,6 +262,7 @@ func get_mul_modifier(stat_id: StringName) -> float:
 
 # ---- Save / load ------------------------------------------------------
 
+
 ## Convenience snapshot for save-time. Mutates the passed `character`
 ## dict in place; returns it for chaining (mirrors Levels.snapshot_to_character).
 ##
@@ -309,6 +312,7 @@ func reset() -> void:
 
 
 # ---- Internal ---------------------------------------------------------
+
 
 func _get_base_internal(stat_id: StringName) -> int:
 	match stat_id:

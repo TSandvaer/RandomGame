@@ -35,6 +35,7 @@ func _make_player() -> Player:
 
 # ---- 1: static helper — deadzone behaviour --------------------------------
 
+
 func test_mouse_inside_deadzone_keeps_last_facing() -> void:
 	# Mouse on top of player (zero delta) → keep last_facing exactly.
 	var last: Vector2 = Vector2.UP
@@ -70,6 +71,7 @@ func test_mouse_at_deadzone_boundary_keeps_last_facing() -> void:
 
 
 # ---- 2: static helper — normalisation outside deadzone -------------------
+
 
 func test_mouse_outside_deadzone_returns_unit_vector_toward_mouse() -> void:
 	# Mouse 100 px east of player.
@@ -109,6 +111,7 @@ func test_mouse_large_distance_normalises_correctly() -> void:
 
 # ---- 3: state gate — STATE_ATTACK suppresses mouse-facing update ---------
 
+
 func test_mouse_facing_update_suppressed_during_attack() -> void:
 	var p: Player = _make_player()
 	# Set facing to a known direction.
@@ -117,9 +120,14 @@ func test_mouse_facing_update_suppressed_during_attack() -> void:
 	p.set_state(Player.STATE_ATTACK)
 	# Call the update — it MUST early-return without touching _facing.
 	p._update_mouse_facing()
-	assert_eq(p._facing, Vector2.LEFT,
-		"STATE_ATTACK suppresses facing update — swing direction snapshots at spawn"
-			+ " (ticket edge case 3)")
+	assert_eq(
+		p._facing,
+		Vector2.LEFT,
+		(
+			"STATE_ATTACK suppresses facing update — swing direction snapshots at spawn"
+			+ " (ticket edge case 3)"
+		)
+	)
 	p.free()
 
 
@@ -136,6 +144,7 @@ func test_mouse_facing_update_suppressed_during_dodge() -> void:
 
 
 # ---- 4: bare-instantiated player (no tree) doesn't crash -----------------
+
 
 func test_mouse_facing_update_safe_outside_tree() -> void:
 	# Player constructed without add_child — not inside tree. The update
@@ -161,6 +170,7 @@ func test_mouse_facing_update_safe_outside_tree() -> void:
 # carries direction via per-frame art, so node rotation must be pinned to 0.
 # See `.claude/docs/combat-architecture.md` §"Sprite-node topology, Seam 2".
 
+
 func test_sprite_rotation_stays_zero_across_facing() -> void:
 	# The sprite-node `rotation` must stay 0.0 for ALL facing angles —
 	# directional frames carry orientation, node transform must not.
@@ -172,21 +182,30 @@ func test_sprite_rotation_stays_zero_across_facing() -> void:
 	# would assign `_facing.angle()` to `sprite.rotation` and fail at least
 	# one of these.
 	var test_angles: Array = [
-		0.0,            # RIGHT (east)
-		PI / 4.0,       # SE
-		PI / 2.0,       # DOWN (south, Godot +Y)
-		3.0 * PI / 4.0, # SW
-		PI,             # LEFT (west)
-		-3.0 * PI / 4.0,# NW
-		-PI / 2.0,      # UP (north)
-		-PI / 4.0,      # NE
+		0.0,  # RIGHT (east)
+		PI / 4.0,  # SE
+		PI / 2.0,  # DOWN (south, Godot +Y)
+		3.0 * PI / 4.0,  # SW
+		PI,  # LEFT (west)
+		-3.0 * PI / 4.0,  # NW
+		-PI / 2.0,  # UP (north)
+		-PI / 4.0,  # NE
 	]
 	for ang in test_angles:
 		p._facing = Vector2.from_angle(ang)
 		p._update_sprite_rotation()
-		assert_almost_eq(sprite.rotation, 0.0, 0.001,
-			("Sprite rotation pinned to 0 across _facing angle %.3f rad"
-				+ " (directional frames carry orientation)") % ang)
+		assert_almost_eq(
+			sprite.rotation,
+			0.0,
+			0.001,
+			(
+				(
+					"Sprite rotation pinned to 0 across _facing angle %.3f rad"
+					+ " (directional frames carry orientation)"
+				)
+				% ang
+			)
+		)
 	# Cleanup handled by autofree.
 
 
@@ -207,26 +226,32 @@ func test_sprite_rotation_noop_when_sprite_missing() -> void:
 #     it's a separate node with its own `rotation` assignment, scoped to
 #     `_spawn_swing_wedge`, NOT touched by the Sprite-node pin.
 
+
 func test_resolve_anim_dir_still_uses_facing_for_attack() -> void:
 	# After the rotation pin, `_facing` MUST still drive animation NAME
 	# selection for attack states. Regression guard against accidentally
 	# decoupling `_facing` from the anim resolver too.
 	var p: Player = _make_player()
 	p._facing = Vector2.RIGHT  # east cursor
-	assert_eq(p._resolve_anim_dir(Player.ANIM_PREFIX_ATTACK_LIGHT), "e",
-		"attack_light + _facing east → 'e' suffix (anim NAME still uses _facing)")
+	assert_eq(
+		p._resolve_anim_dir(Player.ANIM_PREFIX_ATTACK_LIGHT),
+		"e",
+		"attack_light + _facing east → 'e' suffix (anim NAME still uses _facing)"
+	)
 	p._facing = Vector2.UP
-	assert_eq(p._resolve_anim_dir(Player.ANIM_PREFIX_ATTACK_HEAVY), "n",
-		"attack_heavy + _facing up → 'n' suffix")
+	assert_eq(
+		p._resolve_anim_dir(Player.ANIM_PREFIX_ATTACK_HEAVY),
+		"n",
+		"attack_heavy + _facing up → 'n' suffix"
+	)
 	p._facing = Vector2.LEFT
-	assert_eq(p._resolve_anim_dir(Player.ANIM_PREFIX_DODGE), "w",
-		"dodge + _facing left → 'w' suffix")
+	assert_eq(
+		p._resolve_anim_dir(Player.ANIM_PREFIX_DODGE), "w", "dodge + _facing left → 'w' suffix"
+	)
 	p._facing = Vector2.DOWN
-	assert_eq(p._resolve_anim_dir(Player.ANIM_PREFIX_HIT), "s",
-		"hit + _facing down → 's' suffix")
+	assert_eq(p._resolve_anim_dir(Player.ANIM_PREFIX_HIT), "s", "hit + _facing down → 's' suffix")
 	p._facing = Vector2.UP
-	assert_eq(p._resolve_anim_dir(Player.ANIM_PREFIX_DIE), "n",
-		"die + _facing up → 'n' suffix")
+	assert_eq(p._resolve_anim_dir(Player.ANIM_PREFIX_DIE), "n", "die + _facing up → 'n' suffix")
 	p.free()
 
 
@@ -243,25 +268,39 @@ func test_swing_wedge_still_rotates_independently_of_sprite_pin() -> void:
 	p._ready()
 	# Spawn a wedge facing east; expect rotation == 0 (east = 0 rad).
 	var east_wedge: ColorRect = p._spawn_swing_wedge(
-		Player.ATTACK_LIGHT, Vector2.RIGHT, 30.0, 12.0, 0.18)
+		Player.ATTACK_LIGHT, Vector2.RIGHT, 30.0, 12.0, 0.18
+	)
 	assert_not_null(east_wedge, "wedge spawned")
-	assert_almost_eq(east_wedge.rotation, 0.0, 0.001,
-		"swing-wedge rotation = dir.angle() = 0 for east — independent of Sprite-node pin")
+	assert_almost_eq(
+		east_wedge.rotation,
+		0.0,
+		0.001,
+		"swing-wedge rotation = dir.angle() = 0 for east — independent of Sprite-node pin"
+	)
 	# Spawn another wedge facing north; expect rotation == -PI/2.
 	# (This kills the prior east wedge — `_active_swing_wedge` kill-and-restart
 	# semantics. We just want to verify the rotation pre-fade.)
 	var north_wedge: ColorRect = p._spawn_swing_wedge(
-		Player.ATTACK_HEAVY, Vector2.UP, 30.0, 12.0, 0.18)
+		Player.ATTACK_HEAVY, Vector2.UP, 30.0, 12.0, 0.18
+	)
 	assert_not_null(north_wedge, "north wedge spawned")
-	assert_almost_eq(north_wedge.rotation, -PI / 2.0, 0.001,
-		"swing-wedge rotation = dir.angle() = -PI/2 for north — pin doesn't suppress it")
+	assert_almost_eq(
+		north_wedge.rotation,
+		-PI / 2.0,
+		0.001,
+		"swing-wedge rotation = dir.angle() = -PI/2 for north — pin doesn't suppress it"
+	)
 
 
 # ---- 6: facing constant (regression guard on deadzone tunable) -----------
+
 
 func test_deadzone_constant_is_8_px() -> void:
 	# The ticket spec pins 8 px. A future refactor that tweaks this constant
 	# should land paired with a re-justification — pin the current value so
 	# the diff is visible.
-	assert_eq(Player.MOUSE_FACING_DEADZONE_PX, 8.0,
-		"MOUSE_FACING_DEADZONE_PX pinned at 8.0 per ticket 86c9uthf0 design")
+	assert_eq(
+		Player.MOUSE_FACING_DEADZONE_PX,
+		8.0,
+		"MOUSE_FACING_DEADZONE_PX pinned at 8.0 per ticket 86c9uthf0 design"
+	)

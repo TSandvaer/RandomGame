@@ -47,8 +47,8 @@ const TEST_SLOT: int = 994
 # enough for the full 3-phase fight + slam cooldowns + transition windows.
 const BOSS_KILL_BUDGET_TICKS: int = 1800
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _instantiate_main() -> Node:
 	var packed: PackedScene = load("res://scenes/Main.tscn")
@@ -138,7 +138,9 @@ func _walk_in_and_kill(p: Player, target_node: Node, room: Node) -> void:
 		var to_target: Vector2 = target.global_position - p.global_position
 		var dist: float = to_target.length()
 		if dist > Player.LIGHT_REACH * 0.5:
-			p.global_position = p.global_position + to_target.normalized() * Player.WALK_SPEED * PHYS_DELTA
+			p.global_position = (
+				p.global_position + to_target.normalized() * Player.WALK_SPEED * PHYS_DELTA
+			)
 		# Tick mob physics so they react / take_damage / die paths fire.
 		if room.has_method("get_spawned_mobs"):
 			for m: Node in room.get_spawned_mobs():
@@ -181,6 +183,7 @@ func _await_frames(count: int) -> void:
 
 # ---- AC1: Room01 loads with Player + tutorial entity ----------------
 
+
 func test_main_scene_boots_room01_with_player_and_grunts() -> void:
 	# AC1 invariant: Main boots into Room01 with the Player parented under
 	# the room and at least one mob spawned from the chunk_def. Stage 2b
@@ -216,6 +219,7 @@ func test_main_scene_boots_room01_with_player_and_grunts() -> void:
 
 # ---- AC2: HUD CanvasLayer mounts with vitals + build SHA -------------
 
+
 func test_hud_canvas_mounts_with_required_widgets() -> void:
 	var main: Main = _instantiate_main() as Main
 	await get_tree().process_frame
@@ -225,11 +229,11 @@ func test_hud_canvas_mounts_with_required_widgets() -> void:
 	# Look for the required HUD children by name.
 	var required: Array[String] = ["TopLeftVitals", "BuildLabel", "TopRightContext"]
 	for n: String in required:
-		assert_true(hud.find_child(n, true, false) != null,
-			"AC2: HUD has '%s' widget mounted" % n)
+		assert_true(hud.find_child(n, true, false) != null, "AC2: HUD has '%s' widget mounted" % n)
 
 
 # ---- M3-T2-W2-T12: vignette CanvasLayer mounts at layer 5 ------------
+
 
 func test_vignette_canvas_mounts_below_hud_above_world() -> void:
 	# Vignette must mount via Main._build_vignette before HUD; layer 5 sits
@@ -243,16 +247,19 @@ func test_vignette_canvas_mounts_below_hud_above_world() -> void:
 	assert_true(vignette.is_inside_tree(), "T12: Vignette in tree")
 	var hud: CanvasLayer = main.get_hud()
 	assert_not_null(hud, "HUD also present")
-	assert_true(vignette.layer < hud.layer,
-		"T12: vignette layer < HUD layer (HUD reads through at every opacity)")
-	assert_true(vignette.layer > 0,
-		"T12: vignette layer > 0 (above world)")
+	assert_true(
+		vignette.layer < hud.layer,
+		"T12: vignette layer < HUD layer (HUD reads through at every opacity)"
+	)
+	assert_true(vignette.layer > 0, "T12: vignette layer > 0 (above world)")
 	# Default boot opacity matches Uma S1 baseline 30%.
-	assert_almost_eq(vignette.get_current_opacity(), 0.30, 0.001,
-		"T12: vignette boots at S1 baseline 30%%")
+	assert_almost_eq(
+		vignette.get_current_opacity(), 0.30, 0.001, "T12: vignette boots at S1 baseline 30%%"
+	)
 
 
 # ---- AC3: InventoryPanel mounts hidden + Tab toggles --------------
+
 
 func test_inventory_panel_mounts_hidden_and_toggles_with_time_slow() -> void:
 	var main: Main = _instantiate_main() as Main
@@ -260,21 +267,24 @@ func test_inventory_panel_mounts_hidden_and_toggles_with_time_slow() -> void:
 	var panel: CanvasLayer = main.get_inventory_panel()
 	assert_not_null(panel, "AC3: InventoryPanel mounted")
 	assert_true(panel.is_inside_tree(), "AC3: InventoryPanel in tree")
-	assert_false((panel as InventoryPanel).is_open(),
-		"AC3: InventoryPanel hidden by default")
+	assert_false((panel as InventoryPanel).is_open(), "AC3: InventoryPanel hidden by default")
 	# Reset the engine time scale so any leaked previous-test state doesn't fool the assertion.
 	Engine.time_scale = 1.0
 	(panel as InventoryPanel).open()
 	assert_true((panel as InventoryPanel).is_open(), "AC3: panel opens on demand")
-	assert_almost_eq(Engine.time_scale, 0.10, 0.001,
-		"AC3: world time slows to 10%% per Uma `inventory-stats-panel.md`")
+	assert_almost_eq(
+		Engine.time_scale,
+		0.10,
+		0.001,
+		"AC3: world time slows to 10%% per Uma `inventory-stats-panel.md`"
+	)
 	(panel as InventoryPanel).close()
 	assert_false((panel as InventoryPanel).is_open(), "AC3: panel closes")
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001,
-		"AC3: time scale restored on close")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "AC3: time scale restored on close")
 
 
 # ---- AC4: kill grunt -> XP gain + loot pickup -> Inventory ----------
+
 
 func test_first_kill_grants_xp_and_loot_into_inventory() -> void:
 	# Stage 2b: Room01 spawns a PracticeDummy now (no XP, no loot table —
@@ -311,13 +321,22 @@ func test_first_kill_grants_xp_and_loot_into_inventory() -> void:
 	var xp_after: int = int(_levels().current_xp())
 	var level_after: int = int(_levels().current_level())
 	var xp_credited: bool = (xp_after > xp_before) or (level_after > level_before)
-	assert_true(xp_credited,
-		"AC4: kill grants XP via Levels.subscribe_to_mob (xp %d -> %d, level %d -> %d)" % [
-			xp_before, xp_after, level_before, level_after,
-		])
+	assert_true(
+		xp_credited,
+		(
+			"AC4: kill grants XP via Levels.subscribe_to_mob (xp %d -> %d, level %d -> %d)"
+			% [
+				xp_before,
+				xp_after,
+				level_before,
+				level_after,
+			]
+		)
+	)
 
 
 # ---- AC4b: Sponsor's "click-while-touching-grunt" repro (#86c9m36zh) -
+
 
 func test_attack_while_overlapping_grunt_damages_grunt_via_signal_flow() -> void:
 	# Sponsor's interactive soak repro: spam-clicking left mouse with a grunt
@@ -363,14 +382,24 @@ func test_attack_while_overlapping_grunt_damages_grunt_via_signal_flow() -> void
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	assert_lt(grunt.get_hp(), hp_before,
-		("AC4b/86c9m36zh: clicking attack while overlapping grunt must damage"
-			+ " grunt via signal flow (hp %d -> %d)") % [
-			hp_before, grunt.get_hp(),
-		])
+	assert_lt(
+		grunt.get_hp(),
+		hp_before,
+		(
+			(
+				"AC4b/86c9m36zh: clicking attack while overlapping grunt must damage"
+				+ " grunt via signal flow (hp %d -> %d)"
+			)
+			% [
+				hp_before,
+				grunt.get_hp(),
+			]
+		)
+	)
 
 
 # ---- AC5: Levels.level_up auto-opens StatAllocationPanel ------------
+
 
 func test_level_up_opens_stat_panel_and_allocation_works() -> void:
 	var main: Main = _instantiate_main() as Main
@@ -396,6 +425,7 @@ func test_level_up_opens_stat_panel_and_allocation_works() -> void:
 
 # ---- AC6: death rule applied on player_died -------------------------
 
+
 func test_player_death_applies_m1_death_rule() -> void:
 	var main: Main = _instantiate_main() as Main
 	await get_tree().process_frame
@@ -416,11 +446,13 @@ func test_player_death_applies_m1_death_rule() -> void:
 	assert_eq(_stratum().cleared_count(), 0, "AC6: cleared rooms reset on death")
 	# Player back at Room01 with full HP.
 	assert_eq(main.get_current_room_index(), 0, "AC6: player respawns at Room01")
-	assert_eq(main.get_player().hp_current, main.get_player().hp_max,
-		"AC6: respawned player has full HP")
+	assert_eq(
+		main.get_player().hp_current, main.get_player().hp_max, "AC6: respawned player has full HP"
+	)
 
 
 # ---- AC7: room transitions chain Room01 -> Room02 -> ... ------------
+
 
 func test_room_clear_advances_to_next_room() -> void:
 	var main: Main = _instantiate_main() as Main
@@ -459,6 +491,7 @@ func test_full_room_chain_room01_through_boss_room() -> void:
 
 # ---- AC8: boss room intro + 3-phase fight + descend -----------------
 
+
 func test_boss_fight_phases_and_descend_signal_chain() -> void:
 	# Drive: load boss room -> fast-forward intro -> kill boss -> verify
 	# boss_died fires + stratum exit unlocks + descend handoff opens screen.
@@ -475,8 +508,9 @@ func test_boss_fight_phases_and_descend_signal_chain() -> void:
 	await get_tree().process_frame
 	# After wake(), boss state goes IDLE; during the next physics tick the
 	# AI transitions to CHASING (player is in aggro range). Either is "awake."
-	assert_false(boss.is_dormant(),
-		"AC8: boss wakes after entry sequence (state=%s)" % str(boss.get_state()))
+	assert_false(
+		boss.is_dormant(), "AC8: boss wakes after entry sequence (state=%s)" % str(boss.get_state())
+	)
 	# Watch boss_died + stratum_exit_unlocked.
 	watch_signals(boss_room)
 	# Walk the boss down through phase transitions — same pattern as
@@ -491,10 +525,8 @@ func test_boss_fight_phases_and_descend_signal_chain() -> void:
 	boss._physics_process(Stratum1Boss.PHASE_TRANSITION_DURATION + 0.01)
 	boss.take_damage(198, Vector2.ZERO, null)  # 198 -> 0 (death)
 	assert_true(boss.is_dead(), "AC8: boss dies after 3-phase walk-down")
-	assert_signal_emitted(boss_room, "boss_defeated",
-		"AC8: boss_defeated signal fires")
-	assert_signal_emitted(boss_room, "stratum_exit_unlocked",
-		"AC8: stratum exit unlocks")
+	assert_signal_emitted(boss_room, "boss_defeated", "AC8: boss_defeated signal fires")
+	assert_signal_emitted(boss_room, "stratum_exit_unlocked", "AC8: stratum exit unlocks")
 	# REGRESSION-86c9ujq8d: StratumExit.activate() is now deferred via
 	# call_deferred() to clear the physics flush. Drain one process frame
 	# so the deferred activate() lands before asserting is_active().
@@ -511,6 +543,7 @@ func test_boss_fight_phases_and_descend_signal_chain() -> void:
 
 
 # ---- AC9: save on quit + load on boot --------------------------
+
 
 func test_save_now_persists_full_state_for_load() -> void:
 	# This is the autoload-path end-to-end. We mutate state, call save_now,
@@ -577,11 +610,15 @@ func test_save_load_round_trips_inventory_items_via_production_resolvers() -> vo
 	var prod_item_resolver: Callable = main.get_item_resolver()
 	var prod_affix_resolver: Callable = main.get_affix_resolver()
 	assert_eq(
-		prod_item_resolver.call(&"iron_sword"), iron,
-		"AC9/BB-2: production item resolver returns the real ItemDef")
+		prod_item_resolver.call(&"iron_sword"),
+		iron,
+		"AC9/BB-2: production item resolver returns the real ItemDef"
+	)
 	assert_eq(
-		prod_affix_resolver.call(&"swift"), swift,
-		"AC9/BB-2: production affix resolver returns the real AffixDef")
+		prod_affix_resolver.call(&"swift"),
+		swift,
+		"AC9/BB-2: production affix resolver returns the real AffixDef"
+	)
 	# Build an item with one rolled affix; put one copy in the inventory and
 	# one in the equipped weapon slot. Build typed arrays explicitly because
 	# `rolled_affixes` is `Array[AffixRoll]`.
@@ -603,9 +640,14 @@ func test_save_load_round_trips_inventory_items_via_production_resolvers() -> vo
 	# below preserves it and the count is 1.
 	inventory.equip(eq_item, &"weapon")
 	# Sanity pre-state.
-	assert_eq(inventory.get_items().size(), 1,
-		"pre-save: 1 item in inventory (inv_item) — eq_item moved into the " +
-		"empty weapon slot; no starter sword to push back (boot-equip bandaid retired)")
+	assert_eq(
+		inventory.get_items().size(),
+		1,
+		(
+			"pre-save: 1 item in inventory (inv_item) — eq_item moved into the "
+			+ "empty weapon slot; no starter sword to push back (boot-equip bandaid retired)"
+		)
+	)
 	assert_not_null(inventory.get_equipped(&"weapon"), "pre-save: weapon equipped")
 	# Save through the production path.
 	assert_true(main.save_now(0), "production save_now succeeds")
@@ -627,14 +669,23 @@ func test_save_load_round_trips_inventory_items_via_production_resolvers() -> vo
 	# equip-swap above, the grid holds exactly ONE item: inv_item (T2,
 	# swift=0.075). The save round-trip must preserve it.
 	var items: Array = inventory.get_items()
-	assert_eq(items.size(), 1,
-		"BB-2: 1 inventory item survives round-trip — inv_item (no starter " +
-		"sword in the grid; the boot-equip bandaid that seeded one is retired)")
+	assert_eq(
+		items.size(),
+		1,
+		(
+			"BB-2: 1 inventory item survives round-trip — inv_item (no starter "
+			+ "sword in the grid; the boot-equip bandaid that seeded one is retired)"
+		)
+	)
 	# inv_item is identified by its T2 + swift @ 0.075 signature.
 	var restored_inv: ItemInstance = items[0] as ItemInstance
-	assert_not_null(restored_inv,
-		"BB-2: inv_item must be present after round-trip — " +
-		"if null, the round-trip dropped the inventory item")
+	assert_not_null(
+		restored_inv,
+		(
+			"BB-2: inv_item must be present after round-trip — "
+			+ "if null, the round-trip dropped the inventory item"
+		)
+	)
 	assert_not_null(restored_inv.def, "BB-2: restored ItemInstance has resolved ItemDef")
 	assert_eq(restored_inv.def.id, &"iron_sword", "BB-2: id round-trips")
 	assert_eq(int(restored_inv.rolled_tier), int(ItemDef.Tier.T2), "BB-2: tier round-trips")
@@ -649,8 +700,11 @@ func test_save_load_round_trips_inventory_items_via_production_resolvers() -> vo
 	assert_eq(restored_eq.rolled_affixes.size(), 1, "BB-2: equipped weapon affix count round-trips")
 	assert_eq(restored_eq.rolled_affixes[0].def.id, &"swift", "BB-2: equipped affix id round-trips")
 	assert_almost_eq(
-		restored_eq.rolled_affixes[0].rolled_value, 0.040, 1e-6,
-		"BB-2: equipped affix value round-trips")
+		restored_eq.rolled_affixes[0].rolled_value,
+		0.040,
+		1e-6,
+		"BB-2: equipped affix value round-trips"
+	)
 	# Cleanup.
 	_save().delete_save(0)
 
@@ -669,19 +723,33 @@ func test_main_get_resolvers_match_resolvers_used_by_load() -> void:
 	assert_not_null(swift)
 	var registry: ContentRegistry = main.get_content_registry()
 	assert_not_null(registry, "BB-2: Main exposes a populated ContentRegistry")
-	assert_eq(registry.resolve_item(&"iron_sword"), iron,
-		"BB-2: registry resolves iron_sword to the real ItemDef")
-	assert_eq(registry.resolve_affix(&"swift"), swift,
-		"BB-2: registry resolves swift to the real AffixDef")
+	assert_eq(
+		registry.resolve_item(&"iron_sword"),
+		iron,
+		"BB-2: registry resolves iron_sword to the real ItemDef"
+	)
+	assert_eq(
+		registry.resolve_affix(&"swift"),
+		swift,
+		"BB-2: registry resolves swift to the real AffixDef"
+	)
 	# Resolver-Callable parity: must yield the same resource as direct lookup.
-	assert_eq(main.get_item_resolver().call(&"iron_sword"), iron,
-		"BB-2: production item resolver matches direct registry resolve")
-	assert_eq(main.get_affix_resolver().call(&"swift"), swift,
-		"BB-2: production affix resolver matches direct registry resolve")
+	assert_eq(
+		main.get_item_resolver().call(&"iron_sword"),
+		iron,
+		"BB-2: production item resolver matches direct registry resolve"
+	)
+	assert_eq(
+		main.get_affix_resolver().call(&"swift"),
+		swift,
+		"BB-2: production affix resolver matches direct registry resolve"
+	)
 	# Unknown id resolves to null (defensive — saves with stale ids load
 	# without crashing).
-	assert_null(main.get_item_resolver().call(&"definitely_not_a_real_item_id"),
-		"BB-2: unknown item id resolves to null without crashing")
+	assert_null(
+		main.get_item_resolver().call(&"definitely_not_a_real_item_id"),
+		"BB-2: unknown item id resolves to null without crashing"
+	)
 
 
 func test_load_on_boot_restores_state() -> void:
@@ -722,6 +790,7 @@ func test_load_on_boot_restores_state() -> void:
 
 
 # ---- AC10: no push_error on the integration boot path -----------
+
 
 func test_main_boot_emits_no_unexpected_warnings_or_errors() -> void:
 	# We don't have a clean way to capture push_error/push_warning in GUT

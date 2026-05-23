@@ -71,6 +71,7 @@ func after_each() -> void:
 # Spec test 1: panel auto-opens on first-ever level-up (LU-05 / BI-7)
 # =======================================================================
 
+
 func test_panel_auto_opens_on_first_level_up() -> void:
 	var panel: StatAllocationPanel = _make_panel()
 	# Sanity: hidden by default.
@@ -78,10 +79,8 @@ func test_panel_auto_opens_on_first_level_up() -> void:
 	# Drive the player past L1 -> L2 (100 XP needed).
 	_levels().gain_xp(100)
 	# Panel should have opened automatically.
-	assert_true(panel.is_open(),
-		"panel auto-opens on first level-up (LU-05)")
-	assert_eq(_ps().get_unspent_points(), 1,
-		"first level-up grants 1 unspent stat point")
+	assert_true(panel.is_open(), "panel auto-opens on first level-up (LU-05)")
+	assert_eq(_ps().get_unspent_points(), 1, "first level-up grants 1 unspent stat point")
 
 
 func test_panel_does_not_auto_open_on_subsequent_level_ups() -> void:
@@ -92,8 +91,7 @@ func test_panel_does_not_auto_open_on_subsequent_level_ups() -> void:
 	_save().save_game(0, data)
 	var panel: StatAllocationPanel = _make_panel()
 	_levels().gain_xp(100)  # crosses L1 -> L2
-	assert_false(panel.is_open(),
-		"panel does NOT auto-open on subsequent level-ups (LU-06)")
+	assert_false(panel.is_open(), "panel does NOT auto-open on subsequent level-ups (LU-06)")
 	# The point is still banked.
 	assert_eq(_ps().get_unspent_points(), 1)
 
@@ -102,13 +100,13 @@ func test_panel_does_not_auto_open_on_subsequent_level_ups() -> void:
 # Spec test 2: pressing 1 increments vigor, leaves focus/edge alone
 # =======================================================================
 
+
 func test_press_1_allocates_to_vigor_only() -> void:
 	var panel: StatAllocationPanel = _make_panel()
 	_ps().add_unspent_points(1)
 	panel.open(false)
 	panel.force_press_for_test(&"1")
-	assert_eq(_ps().get_stat(&"vigor"), 1,
-		"pressing 1 incremented vigor")
+	assert_eq(_ps().get_stat(&"vigor"), 1, "pressing 1 incremented vigor")
 	assert_eq(_ps().get_stat(&"focus"), 0, "focus unchanged")
 	assert_eq(_ps().get_stat(&"edge"), 0, "edge unchanged")
 
@@ -137,6 +135,7 @@ func test_press_3_allocates_to_edge_only() -> void:
 # Spec test 3: Enter saves and closes
 # =======================================================================
 
+
 func test_enter_closes_panel() -> void:
 	var panel: StatAllocationPanel = _make_panel()
 	_ps().add_unspent_points(2)
@@ -159,13 +158,13 @@ func test_allocation_persists_to_save_immediately() -> void:
 	# made it to disk.
 	var loaded: Dictionary = _save().load_game(0)
 	assert_false(loaded.is_empty(), "save was written")
-	assert_eq(loaded["character"]["stats"]["edge"], 1,
-		"edge=1 persisted to save")
+	assert_eq(loaded["character"]["stats"]["edge"], 1, "edge=1 persisted to save")
 
 
 # =======================================================================
 # Spec test 4: Esc banks the unspent point(s)
 # =======================================================================
+
 
 func test_esc_closes_and_banks_remaining_points() -> void:
 	var panel: StatAllocationPanel = _make_panel()
@@ -176,8 +175,7 @@ func test_esc_closes_and_banks_remaining_points() -> void:
 	assert_eq(_ps().get_unspent_points(), 2, "2 banked after 1 spend of 3")
 	panel.force_press_for_test(&"esc")
 	assert_false(panel.is_open(), "Esc closes the panel")
-	assert_eq(_ps().get_unspent_points(), 2,
-		"Esc preserves banked points (no auto-spend)")
+	assert_eq(_ps().get_unspent_points(), 2, "Esc preserves banked points (no auto-spend)")
 
 
 func test_banked_points_carry_via_save() -> void:
@@ -190,8 +188,11 @@ func test_banked_points_carry_via_save() -> void:
 	# disk-side state should already reflect 1 banked.
 	var loaded: Dictionary = _save().load_game(0)
 	assert_false(loaded.is_empty())
-	assert_eq(loaded["character"]["unspent_stat_points"], 1,
-		"banked points written to save during allocate")
+	assert_eq(
+		loaded["character"]["unspent_stat_points"],
+		1,
+		"banked points written to save during allocate"
+	)
 
 
 # =======================================================================
@@ -204,25 +205,31 @@ func test_banked_points_carry_via_save() -> void:
 # TIME_SLOW_FACTOR constant is retained (API compat) but never applied.
 # =======================================================================
 
+
 func test_time_slow_factor_constant_is_retained() -> void:
 	# Constant retained for API compat — records the original spec value.
 	# The panel does NOT apply it to Engine.time_scale.
-	assert_almost_eq(StatAllocationPanel.TIME_SLOW_FACTOR, 0.10, 0.001,
-		"TIME_SLOW_FACTOR constant exists and is 0.10 (historical record)")
+	assert_almost_eq(
+		StatAllocationPanel.TIME_SLOW_FACTOR,
+		0.10,
+		0.001,
+		"TIME_SLOW_FACTOR constant exists and is 0.10 (historical record)"
+	)
 
 
 func test_engine_time_scale_unchanged_while_panel_open() -> void:
 	# Non-modal fix: the panel must NOT touch Engine.time_scale.
 	# time_scale must be exactly 1.0 through the full open→allocate→close cycle.
 	var panel: StatAllocationPanel = _make_panel()
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001,
-		"time scale starts at 1.0")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "time scale starts at 1.0")
 	panel.open(false)
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001,
-		"LU-09: opening panel does NOT change Engine.time_scale")
+	assert_almost_eq(
+		Engine.time_scale, 1.0, 0.001, "LU-09: opening panel does NOT change Engine.time_scale"
+	)
 	panel.close()
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001,
-		"LU-09: closing panel leaves Engine.time_scale at 1.0")
+	assert_almost_eq(
+		Engine.time_scale, 1.0, 0.001, "LU-09: closing panel leaves Engine.time_scale at 1.0"
+	)
 
 
 func test_player_process_mode_unchanged_while_panel_open() -> void:
@@ -233,15 +240,22 @@ func test_player_process_mode_unchanged_while_panel_open() -> void:
 	var player: Player = player_scene.instantiate()
 	add_child_autofree(player)
 	# Baseline — default authored process_mode is INHERIT.
-	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT,
-		"player process_mode is INHERIT by default")
+	assert_eq(
+		player.process_mode, Node.PROCESS_MODE_INHERIT, "player process_mode is INHERIT by default"
+	)
 	var panel: StatAllocationPanel = _make_panel()
 	panel.open(false)
-	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT,
-		"LU-09 non-modal: panel open does NOT change Player.process_mode")
+	assert_eq(
+		player.process_mode,
+		Node.PROCESS_MODE_INHERIT,
+		"LU-09 non-modal: panel open does NOT change Player.process_mode"
+	)
 	panel.close()
-	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT,
-		"LU-09 non-modal: panel close does NOT change Player.process_mode")
+	assert_eq(
+		player.process_mode,
+		Node.PROCESS_MODE_INHERIT,
+		"LU-09 non-modal: panel close does NOT change Player.process_mode"
+	)
 
 
 func test_player_can_move_while_panel_open() -> void:
@@ -257,18 +271,20 @@ func test_player_can_move_while_panel_open() -> void:
 	player.velocity = Vector2(120, 0)  # simulate mid-sprint
 	var panel: StatAllocationPanel = _make_panel()
 	panel.open(false)
-	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT,
-		"player process_mode is INHERIT mid-sprint with panel open — can still move")
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001,
-		"time scale is 1.0 — no slowdown")
+	assert_eq(
+		player.process_mode,
+		Node.PROCESS_MODE_INHERIT,
+		"player process_mode is INHERIT mid-sprint with panel open — can still move"
+	)
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "time scale is 1.0 — no slowdown")
 	panel.close()
-	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT,
-		"process_mode unchanged after close")
+	assert_eq(player.process_mode, Node.PROCESS_MODE_INHERIT, "process_mode unchanged after close")
 
 
 # =======================================================================
 # Spec test 6: 12 tooltip strings load from stat_strings.tres
 # =======================================================================
+
 
 func test_stat_strings_resource_loads_with_12_strings() -> void:
 	var ss: Resource = load("res://content/ui/stat_strings.tres")
@@ -276,8 +292,11 @@ func test_stat_strings_resource_loads_with_12_strings() -> void:
 	assert_true(ss is StatStrings, "loaded resource is StatStrings")
 	var statstrings: StatStrings = ss
 	var d: Dictionary = statstrings.to_dict()
-	assert_eq(d.size(), 12,
-		"resource exposes exactly 12 canonical strings (Uma's tooltip language standard)")
+	assert_eq(
+		d.size(),
+		12,
+		"resource exposes exactly 12 canonical strings (Uma's tooltip language standard)"
+	)
 	# Spot-check each stat has all 4 keys (header / sub_header / body / flavor).
 	for stat: String in ["vigor", "focus", "edge"]:
 		assert_true(d.has(stat + "_header"))
@@ -298,23 +317,27 @@ func test_stat_strings_lookup_api_returns_uma_canonical_strings() -> void:
 	assert_eq(ss.get_header(&"edge"), "EDGE")
 	assert_eq(ss.get_sub_header(&"vigor"), "toughness · health pool · stamina")
 	# Body lines start with a "+" prefix per Uma's affix-style numerics.
-	assert_true(ss.get_body(&"vigor").begins_with("+"),
-		"vigor body starts with '+' per Uma's affix-style numerics")
+	assert_true(
+		ss.get_body(&"vigor").begins_with("+"),
+		"vigor body starts with '+' per Uma's affix-style numerics"
+	)
 	# Flavor uses second-person "you" or quoted second-person voice.
 	var flavor: String = ss.get_flavor(&"vigor")
-	assert_true(flavor.contains("you") or flavor.contains("You") or flavor.contains("\""),
-		"vigor flavor uses second-person voice")
+	assert_true(
+		flavor.contains("you") or flavor.contains("You") or flavor.contains('"'),
+		"vigor flavor uses second-person voice"
+	)
 
 
 func test_unknown_stat_id_returns_empty_string() -> void:
 	var ss: StatStrings = load("res://content/ui/stat_strings.tres")
-	assert_eq(ss.get_header(&"unknown_stat"), "",
-		"unknown stat id returns empty string (no crash)")
+	assert_eq(ss.get_header(&"unknown_stat"), "", "unknown stat id returns empty string (no crash)")
 
 
 # =======================================================================
 # Edge probes
 # =======================================================================
+
 
 func test_press_with_empty_bank_is_noop() -> void:
 	# Edge probe — pressing 1/2/3 with no banked points is a silent no-op.
@@ -322,8 +345,7 @@ func test_press_with_empty_bank_is_noop() -> void:
 	panel.open(false)
 	# Bank is empty.
 	panel.force_press_for_test(&"1")
-	assert_eq(_ps().get_stat(&"vigor"), 0,
-		"pressing 1 with empty bank does NOT increment")
+	assert_eq(_ps().get_stat(&"vigor"), 0, "pressing 1 with empty bank does NOT increment")
 
 
 func test_panel_auto_dismisses_when_bank_empties() -> void:
@@ -333,8 +355,7 @@ func test_panel_auto_dismisses_when_bank_empties() -> void:
 	panel.open(false)
 	assert_true(panel.is_open())
 	panel.force_press_for_test(&"1")
-	assert_false(panel.is_open(),
-		"panel auto-dismisses after spending the last point")
+	assert_false(panel.is_open(), "panel auto-dismisses after spending the last point")
 
 
 func test_multi_level_catch_up_keeps_panel_open() -> void:
@@ -349,8 +370,7 @@ func test_multi_level_catch_up_keeps_panel_open() -> void:
 	assert_true(panel.is_open(), "still open after 2 spends with 3 in bank")
 	panel.force_press_for_test(&"3")
 	# 3 -> 0 — should auto-dismiss now.
-	assert_false(panel.is_open(),
-		"panel auto-dismisses on spending the final banked point")
+	assert_false(panel.is_open(), "panel auto-dismisses on spending the final banked point")
 
 
 # =======================================================================
@@ -367,6 +387,7 @@ func test_multi_level_catch_up_keeps_panel_open() -> void:
 #      Tess's "verification gate" in `m1-bugbash-4484196.md` §BB-4).
 #   4. Live `_unhandled_input` path raised via Input.parse_input_event so
 #      we cover the wiring in production, not just `force_p_keypress_for_test`.
+
 
 func _send_p_key_event() -> void:
 	var ev: InputEventKey = InputEventKey.new()
@@ -387,12 +408,10 @@ func test_p_key_reopens_panel_after_close_with_banked_points() -> void:
 	assert_true(panel.is_open(), "panel opened (auto-open simulation)")
 	panel.close()
 	assert_false(panel.is_open(), "panel closed (bank with 1 point left)")
-	assert_eq(_ps().get_unspent_points(), 1,
-		"point still banked after close")
+	assert_eq(_ps().get_unspent_points(), 1, "point still banked after close")
 	# This is the load-bearing assertion — pre-fix this would stay false.
 	panel.force_p_keypress_for_test()
-	assert_true(panel.is_open(),
-		"BB-4: P-key reopens panel after close with banked points")
+	assert_true(panel.is_open(), "BB-4: P-key reopens panel after close with banked points")
 
 
 func test_p_key_toggles_closed_when_panel_already_open() -> void:
@@ -402,11 +421,13 @@ func test_p_key_toggles_closed_when_panel_already_open() -> void:
 	panel.open(false)
 	assert_true(panel.is_open(), "open before toggle")
 	panel.force_p_keypress_for_test()
-	assert_false(panel.is_open(),
-		"BB-4: P toggles closed when already open")
+	assert_false(panel.is_open(), "BB-4: P toggles closed when already open")
 	# And points are NOT auto-spent on the toggle-close.
-	assert_eq(_ps().get_unspent_points(), 2,
-		"toggle-close preserves banked points (Esc-equivalent semantics)")
+	assert_eq(
+		_ps().get_unspent_points(),
+		2,
+		"toggle-close preserves banked points (Esc-equivalent semantics)"
+	)
 
 
 func test_p_key_is_noop_when_bank_empty() -> void:
@@ -417,8 +438,7 @@ func test_p_key_is_noop_when_bank_empty() -> void:
 	assert_false(panel.is_open(), "starts closed")
 	assert_eq(_ps().get_unspent_points(), 0, "bank empty before press")
 	panel.force_p_keypress_for_test()
-	assert_false(panel.is_open(),
-		"BB-4: P with empty bank does NOT open (don't open empty panel)")
+	assert_false(panel.is_open(), "BB-4: P with empty bank does NOT open (don't open empty panel)")
 
 
 func test_p_key_full_cycle_open_close_reopen_close() -> void:
@@ -436,8 +456,7 @@ func test_p_key_full_cycle_open_close_reopen_close() -> void:
 	panel.force_p_keypress_for_test()
 	assert_false(panel.is_open(), "step 4: P closes again")
 	# Bank is intact across the whole cycle (no toggle ate a point).
-	assert_eq(_ps().get_unspent_points(), 2,
-		"full toggle cycle preserves the 2 banked points")
+	assert_eq(_ps().get_unspent_points(), 2, "full toggle cycle preserves the 2 banked points")
 
 
 func test_p_key_via_live_input_event_reopens_panel() -> void:
@@ -453,5 +472,4 @@ func test_p_key_via_live_input_event_reopens_panel() -> void:
 	_send_p_key_event()
 	# _unhandled_input runs at end-of-frame; one process tick is enough.
 	await get_tree().process_frame
-	assert_true(panel.is_open(),
-		"BB-4: live P keypress through _unhandled_input reopens the panel")
+	assert_true(panel.is_open(), "BB-4: live P keypress through _unhandled_input reopens the panel")

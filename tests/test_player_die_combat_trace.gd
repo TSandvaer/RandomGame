@@ -26,19 +26,22 @@ extends GutTest
 
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
-
 # ---- CombatTraceSpy infra (mirrors test_grunt.gd / test_charger.gd) ----
+
 
 class CombatTraceSpy:
 	extends Node
 	var calls: Array = []  # Array of [tag, msg]
+
 	func combat_trace(tag: String, msg: String = "") -> void:
 		calls.append([tag, msg])
+
 	func has_tag(tag: String) -> bool:
 		for c: Array in calls:
 			if c[0] == tag:
 				return true
 		return false
+
 	func msg_for(tag: String) -> String:
 		for c: Array in calls:
 			if c[0] == tag:
@@ -74,6 +77,7 @@ func _make_player_in_tree() -> Player:
 
 # ---- 1: Player._die emits the diagnostic trace line --------------------
 
+
 func test_player_die_emits_combat_trace_line() -> void:
 	# Player taking damage equal to max HP (lethal) must fire the
 	# `[combat-trace] Player._die` line so any future "mobs froze" investigation
@@ -86,21 +90,36 @@ func test_player_die_emits_combat_trace_line() -> void:
 	var emitted: bool = spy.has_tag("Player._die")
 	var msg: String = spy.msg_for("Player._die")
 	_restore_debug_flags(spy)
-	assert_true(emitted,
-		"REGRESSION-86c9u397c: Player._die must emit a [combat-trace] line. " +
-		"Without it, a Player-death + M1-death-rule room reload presents the " +
-		"exact same trace shape as a sibling-mob _physics_process freeze, and " +
-		"investigations chase the wrong root cause (the 86c9u397c brief is the " +
-		"cautionary tale).")
-	assert_string_contains(msg, "hp=0",
-		"Player._die payload must include 'hp=0' so the trace pinpoints the " +
-		"lethal-damage moment unambiguously")
-	assert_string_contains(msg, "pos=(123,456)",
-		"Player._die payload must carry the death position so investigations " +
-		"can correlate against the room geometry")
+	assert_true(
+		emitted,
+		(
+			"REGRESSION-86c9u397c: Player._die must emit a [combat-trace] line. "
+			+ "Without it, a Player-death + M1-death-rule room reload presents the "
+			+ "exact same trace shape as a sibling-mob _physics_process freeze, and "
+			+ "investigations chase the wrong root cause (the 86c9u397c brief is the "
+			+ "cautionary tale)."
+		)
+	)
+	assert_string_contains(
+		msg,
+		"hp=0",
+		(
+			"Player._die payload must include 'hp=0' so the trace pinpoints the "
+			+ "lethal-damage moment unambiguously"
+		)
+	)
+	assert_string_contains(
+		msg,
+		"pos=(123,456)",
+		(
+			"Player._die payload must carry the death position so investigations "
+			+ "can correlate against the room geometry"
+		)
+	)
 
 
 # ---- 2: Player._die is one-shot per life (mirrors player_died signal) --
+
 
 func test_player_die_combat_trace_is_one_shot_per_life() -> void:
 	# Player.gd already guards `player_died.emit` with `_is_dead` so multi-hit
@@ -118,12 +137,18 @@ func test_player_die_combat_trace_is_one_shot_per_life() -> void:
 		if c[0] == "Player._die":
 			die_count += 1
 	_restore_debug_flags(spy)
-	assert_eq(die_count, 1,
-		"Player._die [combat-trace] must emit exactly once per life — same " +
-		"one-shot semantics as the player_died signal it pairs with")
+	assert_eq(
+		die_count,
+		1,
+		(
+			"Player._die [combat-trace] must emit exactly once per life — same "
+			+ "one-shot semantics as the player_died signal it pairs with"
+		)
+	)
 
 
 # ---- 3: trace fires BEFORE player_died.emit --------------------------
+
 
 func test_player_die_trace_precedes_player_died_signal() -> void:
 	# Trace ordering matters: the `[combat-trace] Player._die` line must hit the
@@ -136,9 +161,7 @@ func test_player_die_trace_precedes_player_died_signal() -> void:
 	var spy: CombatTraceSpy = _install_combat_trace_spy()
 	# Listener that records the call order (relative to spy.calls.size()).
 	var listener_die_index: Array[int] = [-1]
-	p.player_died.connect(func(_pos: Vector2) -> void:
-		listener_die_index[0] = spy.calls.size()
-	)
+	p.player_died.connect(func(_pos: Vector2) -> void: listener_die_index[0] = spy.calls.size())
 	p.take_damage(p.hp_max, Vector2.ZERO, null)
 	# By the time the listener fired, the trace must already be in spy.calls.
 	# (spy.calls.size() at the listener-call moment == 1 means: exactly one
@@ -150,6 +173,11 @@ func test_player_die_trace_precedes_player_died_signal() -> void:
 			break
 	_restore_debug_flags(spy)
 	assert_ne(trace_idx, -1, "Player._die trace was emitted")
-	assert_lt(trace_idx, listener_die_index[0],
-		"Player._die [combat-trace] line must precede player_died signal " +
-		"emission — chronological trace readers expect cause before effect")
+	assert_lt(
+		trace_idx,
+		listener_die_index[0],
+		(
+			"Player._die [combat-trace] line must precede player_died signal "
+			+ "emission — chronological trace readers expect cause before effect"
+		)
+	)

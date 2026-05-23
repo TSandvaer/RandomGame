@@ -79,6 +79,7 @@ func force_right_click_for_test(index: int) -> void:
 
 # ---- Internals ---------------------------------------------------
 
+
 func _on_cell_pressed(index: int) -> void:
 	# Default Button.pressed only fires on left mouse.
 	_emit_click(index, MOUSE_BUTTON_LEFT)

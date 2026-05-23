@@ -78,7 +78,6 @@ extends Node
 ##     this bus's signal)
 ##   - `.claude/docs/test-conventions.md` § "Warning gate (GUT)"
 
-
 signal warning_emitted(text: String, category: String)
 signal error_emitted(text: String, category: String)
 

@@ -79,6 +79,7 @@ func after_each() -> void:
 # Save.gd backfill
 # =====================================================================
 
+
 # Devon's existing test_save.gd asserts slot interpolation in path strings,
 # but does NOT exercise that two distinct slots remain independent on disk.
 # This is a regression-shape test: a future "single global save" refactor
@@ -97,8 +98,11 @@ func test_save_two_distinct_slots_remain_independent() -> void:
 	var loaded_b: Dictionary = _save().load_game(TEST_SLOT_B)
 	assert_eq(loaded_a["character"]["level"], 7, "slot A keeps its level")
 	assert_eq(loaded_b["character"]["level"], 12, "slot B keeps its level")
-	assert_ne(loaded_a["character"]["xp"], loaded_b["character"]["xp"],
-		"slot A and slot B have different xp — no cross-slot bleed")
+	assert_ne(
+		loaded_a["character"]["xp"],
+		loaded_b["character"]["xp"],
+		"slot A and slot B have different xp — no cross-slot bleed"
+	)
 
 
 func test_save_path_handles_negative_and_large_slots() -> void:
@@ -128,6 +132,7 @@ func test_delete_save_does_not_remove_readme() -> void:
 # LootRoller.gd backfill — affix_count_for_tier T4/T5/T6 + pool cap
 # =====================================================================
 
+
 func test_affix_count_for_tier_t4_returns_two_or_three() -> void:
 	var r: LootRoller = LootRollerScript.new()
 	r.seed_rng(0xBADF00D)
@@ -137,9 +142,12 @@ func test_affix_count_for_tier_t4_returns_two_or_three() -> void:
 	var seen_other: bool = false
 	for _i in 200:
 		var n: int = r.affix_count_for_tier(ItemDef.Tier.T4)
-		if n == 2: seen_two = true
-		elif n == 3: seen_three = true
-		else: seen_other = true
+		if n == 2:
+			seen_two = true
+		elif n == 3:
+			seen_three = true
+		else:
+			seen_other = true
 	assert_true(seen_two, "T4 produces 2 affixes")
 	assert_true(seen_three, "T4 produces 3 affixes")
 	assert_false(seen_other, "T4 ONLY produces 2 or 3 affixes")
@@ -170,8 +178,7 @@ func test_roll_affixes_caps_at_pool_size_when_pool_smaller_than_want() -> void:
 	var pool: Array[AffixDef] = [ContentFactory.make_affix_def({"id": &"only_one"})]
 	for _i in 30:
 		var rolls: Array[AffixRoll] = r.roll_affixes_for_item(pool, ItemDef.Tier.T3)
-		assert_eq(rolls.size(), 1,
-			"pool-of-1 caps roll to 1 affix even when T3 wanted 1-or-2")
+		assert_eq(rolls.size(), 1, "pool-of-1 caps roll to 1 affix even when T3 wanted 1-or-2")
 
 
 func test_roll_affixes_empty_pool_returns_empty_at_any_tier() -> void:
@@ -187,6 +194,7 @@ func test_roll_affixes_empty_pool_returns_empty_at_any_tier() -> void:
 # Grunt.gd backfill — telegraph re-entry guards + dead no-op
 # =====================================================================
 
+
 func test_telegraph_does_not_re_enter_during_active_telegraph() -> void:
 	# A second hit landing during the windup must NOT restart the telegraph
 	# timer or fire a second `heavy_telegraph_started`. The guard is there
@@ -200,10 +208,14 @@ func test_telegraph_does_not_re_enter_during_active_telegraph() -> void:
 	watch_signals(g)
 	# Hit again WHILE telegraphing — must not re-fire the signal.
 	g.take_damage(5, Vector2.ZERO, null)
-	assert_signal_not_emitted(g, "heavy_telegraph_started",
-		"telegraph guard rejects re-entry while already telegraphing")
-	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_HEAVY,
-		"state stays TELEGRAPHING_HEAVY after non-fatal in-windup hit")
+	assert_signal_not_emitted(
+		g, "heavy_telegraph_started", "telegraph guard rejects re-entry while already telegraphing"
+	)
+	assert_eq(
+		g.get_state(),
+		Grunt.STATE_TELEGRAPHING_HEAVY,
+		"state stays TELEGRAPHING_HEAVY after non-fatal in-windup hit"
+	)
 
 
 func test_dead_grunt_physics_process_is_a_noop() -> void:
@@ -243,9 +255,11 @@ func test_zero_damage_hit_is_a_noop_event() -> void:
 # Hitbox.gd backfill — multi-target + duck-type contract
 # =====================================================================
 
+
 class _FakeTarget:
 	extends Node2D
 	var hits: Array[Dictionary] = []
+
 	func take_damage(amount: int, kb: Vector2, source: Node) -> void:
 		hits.append({"amount": amount, "kb": kb, "source": source})
 
@@ -290,8 +304,9 @@ func test_target_without_take_damage_method_does_not_crash() -> void:
 	# Should not crash.
 	hb._try_apply_hit(passive)
 	# Signal STILL emits — observers (VFX, analytics) get the event.
-	assert_signal_emitted(hb, "hit_target",
-		"hit_target signal emits even when target has no take_damage method")
+	assert_signal_emitted(
+		hb, "hit_target", "hit_target signal emits even when target has no take_damage method"
+	)
 	# And the target ends up in _hit_already so a duplicate overlap is filtered.
 	assert_true(hb.has_already_hit(passive))
 
@@ -310,6 +325,7 @@ func test_unknown_team_leaves_layers_empty() -> void:
 # Player.gd i-frame backfill
 # =====================================================================
 
+
 func test_iframes_idempotent_when_re_entering_dodge_during_invulnerable_window() -> void:
 	# can_dodge is the gate, but if a state-machine bug ever let try_dodge
 	# fire during an active dodge, _enter_iframes would clobber
@@ -327,8 +343,11 @@ func test_iframes_idempotent_when_re_entering_dodge_during_invulnerable_window()
 	# After dodge ends, layer must restore to the original.
 	p._tick_timers(Player.DODGE_DURATION + 0.01)
 	p._process_dodge(0.0)
-	assert_eq(p.collision_layer, layer_before,
-		"layer restored exactly to pre-dodge value (saved-layer not clobbered by aborted re-dodge)")
+	assert_eq(
+		p.collision_layer,
+		layer_before,
+		"layer restored exactly to pre-dodge value (saved-layer not clobbered by aborted re-dodge)"
+	)
 
 
 func test_iframes_signal_count_per_dodge_is_one_each() -> void:
@@ -349,6 +368,7 @@ func test_iframes_signal_count_per_dodge_is_one_each() -> void:
 # LevelAssembler backfill — port handling + mob-id resilience
 # =====================================================================
 
+
 func test_multiple_entry_ports_uses_first_one_only() -> void:
 	# Architecture decision: chunks should declare exactly one entry port,
 	# but the API tolerates multiple — first-tagged-entry wins. This locks
@@ -360,14 +380,22 @@ func test_multiple_entry_ports_uses_first_one_only() -> void:
 	c.size_tiles = Vector2i(10, 10)
 	c.tile_size_px = 32
 	var p1: ChunkPort = ChunkPortScript.new()
-	p1.position_tiles = Vector2i(2, 4); p1.direction = ChunkPort.Direction.WEST; p1.tag = &"entry"
+	p1.position_tiles = Vector2i(2, 4)
+	p1.direction = ChunkPort.Direction.WEST
+	p1.tag = &"entry"
 	var p2: ChunkPort = ChunkPortScript.new()
-	p2.position_tiles = Vector2i(8, 4); p2.direction = ChunkPort.Direction.EAST; p2.tag = &"entry"
+	p2.position_tiles = Vector2i(8, 4)
+	p2.direction = ChunkPort.Direction.EAST
+	p2.tag = &"entry"
 	c.ports = [p1, p2]
 	var result: LevelAssembler.AssemblyResult = asm.assemble_single(c, Callable())
 	# First entry port at tile (2,4) -> world center (2*32+16, 4*32+16) = (80, 144).
-	assert_almost_eq(result.entry_world_pos.x, 80.0, 0.001,
-		"first entry port wins (deterministic — author second entry as exit)")
+	assert_almost_eq(
+		result.entry_world_pos.x,
+		80.0,
+		0.001,
+		"first entry port wins (deterministic — author second entry as exit)"
+	)
 	assert_almost_eq(result.entry_world_pos.y, 144.0, 0.001)
 	result.root.queue_free()
 
@@ -379,11 +407,14 @@ func test_factory_receives_correct_mob_id_for_each_spawn() -> void:
 	var asm: LevelAssembler = LevelAssemblerScript.new()
 	var c: LevelChunkDef = LevelChunkDefScript.new()
 	c.id = &"id_check"
-	c.size_tiles = Vector2i(15, 8); c.tile_size_px = 32
+	c.size_tiles = Vector2i(15, 8)
+	c.tile_size_px = 32
 	var s_grunt: MobSpawnPoint = MobSpawnPointScript.new()
-	s_grunt.position_tiles = Vector2i(3, 3); s_grunt.mob_id = &"grunt"
+	s_grunt.position_tiles = Vector2i(3, 3)
+	s_grunt.mob_id = &"grunt"
 	var s_charger: MobSpawnPoint = MobSpawnPointScript.new()
-	s_charger.position_tiles = Vector2i(5, 5); s_charger.mob_id = &"charger"
+	s_charger.position_tiles = Vector2i(5, 5)
+	s_charger.mob_id = &"charger"
 	# NOTE: schema validate() rejects empty mob_id only — distinct ids are fine.
 	c.mob_spawns = [s_grunt, s_charger]
 	var seen_ids: Array[StringName] = []
@@ -393,8 +424,10 @@ func test_factory_receives_correct_mob_id_for_each_spawn() -> void:
 	var result: LevelAssembler.AssemblyResult = asm.assemble_single(c, fact)
 	assert_eq(seen_ids.size(), 2)
 	assert_true(seen_ids.has(&"grunt"))
-	assert_true(seen_ids.has(&"charger"),
-		"factory receives each distinct mob_id verbatim — no id-translation in assembler")
+	assert_true(
+		seen_ids.has(&"charger"),
+		"factory receives each distinct mob_id verbatim — no id-translation in assembler"
+	)
 	result.root.queue_free()
 
 
@@ -405,7 +438,8 @@ func test_chunk_with_zero_mob_spawns_assembles_cleanly() -> void:
 	var asm: LevelAssembler = LevelAssemblerScript.new()
 	var c: LevelChunkDef = LevelChunkDefScript.new()
 	c.id = &"empty_room"
-	c.size_tiles = Vector2i(15, 8); c.tile_size_px = 32
+	c.size_tiles = Vector2i(15, 8)
+	c.tile_size_px = 32
 	c.mob_spawns = []  # explicit empty
 	var rec_calls: Array = []
 	var fact: Callable = func(mob_id: StringName, pos: Vector2) -> Node:

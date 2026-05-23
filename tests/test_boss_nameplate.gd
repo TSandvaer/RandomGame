@@ -32,8 +32,8 @@ const NAMEPLATE_SCENE_PATH: String = "res://scenes/ui/BossNameplate.tscn"
 
 var _warn_guard: NoWarningGuard
 
-
 # ---- Lifecycle --------------------------------------------------------
+
 
 func before_each() -> void:
 	_warn_guard = NoWarningGuard.new()
@@ -47,6 +47,7 @@ func after_each() -> void:
 
 
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_nameplate() -> BossNameplate:
 	var packed: PackedScene = load(NAMEPLATE_SCENE_PATH) as PackedScene
@@ -62,7 +63,8 @@ class FakeMobDef:
 	var display_name: String
 
 
-class FakeBoss extends Node:
+class FakeBoss:
+	extends Node
 	signal damaged(amount: int, hp_remaining: int, source: Node)
 	signal phase_changed(new_phase: int)
 	signal boss_died(mob, death_position: Vector2, mob_def)
@@ -79,8 +81,8 @@ class FakeBoss extends Node:
 
 
 func _make_fake_boss(
-		display_name: String = "Warden of the Outer Cloister",
-		hp_max: int = 600) -> FakeBoss:
+	display_name: String = "Warden of the Outer Cloister", hp_max: int = 600
+) -> FakeBoss:
 	var fb: FakeBoss = FakeBoss.new()
 	var fd: FakeMobDef = FakeMobDef.new()
 	fd.display_name = display_name
@@ -94,6 +96,7 @@ func _make_fake_boss(
 
 # ---- Test 1: scene loads + composition primitives ---------------------
 
+
 func test_nameplate_scene_loads() -> void:
 	# Catches: scene file missing or script path drift.
 	var packed: PackedScene = load(NAMEPLATE_SCENE_PATH)
@@ -106,6 +109,7 @@ func test_nameplate_scene_loads() -> void:
 
 # ---- Test 2: CanvasLayer layer (HUD band) -----------------------------
 
+
 func test_canvas_layer_in_hud_band() -> void:
 	# BI-08-adjacent: layer 10 == HUD band per brief. Below
 	# BossDefeatedTitleCard (50) + InventoryPanel (80) + DescendScreen
@@ -116,6 +120,7 @@ func test_canvas_layer_in_hud_band() -> void:
 
 # ---- Test 3: composition primitives all exist (3 fg + 3 ghost + 2 sep + 3 pulse) -----
 
+
 func test_composition_primitives_count() -> void:
 	var np: BossNameplate = _make_nameplate()
 	assert_not_null(np.get_root_control(), "root Control exists")
@@ -125,20 +130,16 @@ func test_composition_primitives_count() -> void:
 	assert_not_null(np.get_threat_glyph_label(), "threat glyph exists")
 	# 3 segments × {fg, ghost, pulse}; 2 separators between 3 segments.
 	for p in range(1, BossNameplateScript.SEGMENT_COUNT + 1):
-		assert_not_null(np.get_segment_fg(p),
-				"segment %d foreground exists" % p)
-		assert_not_null(np.get_segment_ghost(p),
-				"segment %d ghost exists" % p)
-		assert_not_null(np.get_pulse_outline(p),
-				"segment %d pulse outline exists" % p)
-		assert_not_null(np.get_phase_label(p),
-				"phase label %d exists" % p)
+		assert_not_null(np.get_segment_fg(p), "segment %d foreground exists" % p)
+		assert_not_null(np.get_segment_ghost(p), "segment %d ghost exists" % p)
+		assert_not_null(np.get_pulse_outline(p), "segment %d pulse outline exists" % p)
+		assert_not_null(np.get_phase_label(p), "phase label %d exists" % p)
 	for i in range(2):
-		assert_not_null(np.get_segment_separator(i),
-				"segment separator %d exists" % i)
+		assert_not_null(np.get_segment_separator(i), "segment separator %d exists" % i)
 
 
 # ---- Test 4: HDR-clamp safety on every locked color -------------------
+
 
 func test_all_colors_are_html5_safe_sub_one() -> void:
 	# `.claude/docs/html5-export.md` HDR-clamp: every RGB channel must be
@@ -167,42 +168,56 @@ func test_all_colors_are_html5_safe_sub_one() -> void:
 
 # ---- Test 5: spec dimensions locked -----------------------------------
 
+
 func test_dimensions_locked_from_uma_spec() -> void:
 	# BI-08 — 480×56. If a future PR adjusts the size the layout drifts.
-	assert_almost_eq(BossNameplateScript.PANEL_WIDTH, 480.0, 0.001,
-			"panel width is 480 px")
-	assert_almost_eq(BossNameplateScript.PANEL_HEIGHT, 56.0, 0.001,
-			"panel height is 56 px")
-	assert_almost_eq(BossNameplateScript.TOP_MARGIN, 12.0, 0.001,
-			"top margin is 12 px (BI-07)")
+	assert_almost_eq(BossNameplateScript.PANEL_WIDTH, 480.0, 0.001, "panel width is 480 px")
+	assert_almost_eq(BossNameplateScript.PANEL_HEIGHT, 56.0, 0.001, "panel height is 56 px")
+	assert_almost_eq(BossNameplateScript.TOP_MARGIN, 12.0, 0.001, "top margin is 12 px (BI-07)")
 	# BI-11 — 3 visually-equal segments + 2 px separators between.
-	assert_eq(BossNameplateScript.SEGMENT_COUNT, 3,
-			"3 segments per Uma BI-11")
-	assert_almost_eq(BossNameplateScript.SEGMENT_SEPARATOR_WIDTH, 2.0, 0.001,
-			"separators are 2 px ember-orange")
+	assert_eq(BossNameplateScript.SEGMENT_COUNT, 3, "3 segments per Uma BI-11")
+	assert_almost_eq(
+		BossNameplateScript.SEGMENT_SEPARATOR_WIDTH, 2.0, 0.001, "separators are 2 px ember-orange"
+	)
 	# BI-07 — slide-in 0.4 s.
-	assert_almost_eq(BossNameplateScript.SLIDE_IN_DURATION, 0.4, 0.001,
-			"slide-in duration locked at 0.4 s (BI-07)")
+	assert_almost_eq(
+		BossNameplateScript.SLIDE_IN_DURATION,
+		0.4,
+		0.001,
+		"slide-in duration locked at 0.4 s (BI-07)"
+	)
 	# BI-13 — ghost-drain 0.6 s.
-	assert_almost_eq(BossNameplateScript.GHOST_DRAIN_DURATION, 0.6, 0.001,
-			"ghost-drain duration locked at 0.6 s (BI-13)")
+	assert_almost_eq(
+		BossNameplateScript.GHOST_DRAIN_DURATION,
+		0.6,
+		0.001,
+		"ghost-drain duration locked at 0.6 s (BI-13)"
+	)
 
 
 # ---- Test 6: phase-threshold parity with boss controller --------------
+
 
 func test_phase_thresholds_match_boss_controller() -> void:
 	# Drift-detector — if Stratum1Boss.PHASE_2_HP_FRAC / PHASE_3_HP_FRAC
 	# diverge from the nameplate's local constants, the active-segment
 	# fill math collapses to nonsense. Pin both sides to 0.66 / 0.33.
-	assert_almost_eq(BossNameplateScript.PHASE_2_HP_FRAC,
-			Stratum1BossScript.PHASE_2_HP_FRAC, 0.001,
-			"PHASE_2_HP_FRAC matches Stratum1Boss")
-	assert_almost_eq(BossNameplateScript.PHASE_3_HP_FRAC,
-			Stratum1BossScript.PHASE_3_HP_FRAC, 0.001,
-			"PHASE_3_HP_FRAC matches Stratum1Boss")
+	assert_almost_eq(
+		BossNameplateScript.PHASE_2_HP_FRAC,
+		Stratum1BossScript.PHASE_2_HP_FRAC,
+		0.001,
+		"PHASE_2_HP_FRAC matches Stratum1Boss"
+	)
+	assert_almost_eq(
+		BossNameplateScript.PHASE_3_HP_FRAC,
+		Stratum1BossScript.PHASE_3_HP_FRAC,
+		0.001,
+		"PHASE_3_HP_FRAC matches Stratum1Boss"
+	)
 
 
 # ---- Test 7: show_for uppercases boss display_name --------------------
+
 
 func test_show_for_uppercases_display_name() -> void:
 	# Per Uma §"Boss name (top-center, 16 px caps)" — the rendered label
@@ -212,8 +227,9 @@ func test_show_for_uppercases_display_name() -> void:
 	var np: BossNameplate = _make_nameplate()
 	var fb: FakeBoss = _make_fake_boss("Warden of the Outer Cloister")
 	np.show_for(fb)
-	assert_eq(np.get_name_label().text, "WARDEN OF THE OUTER CLOISTER",
-			"display_name rendered uppercase")
+	assert_eq(
+		np.get_name_label().text, "WARDEN OF THE OUTER CLOISTER", "display_name rendered uppercase"
+	)
 
 
 func test_show_for_handles_empty_display_name() -> void:
@@ -221,8 +237,11 @@ func test_show_for_handles_empty_display_name() -> void:
 	var np: BossNameplate = _make_nameplate()
 	var fb: FakeBoss = _make_fake_boss("")
 	np.show_for(fb)
-	assert_eq(np.get_name_label().text, BossNameplateScript.FALLBACK_BOSS_NAME,
-			"empty display_name → fallback")
+	assert_eq(
+		np.get_name_label().text,
+		BossNameplateScript.FALLBACK_BOSS_NAME,
+		"empty display_name → fallback"
+	)
 
 
 func test_show_for_is_idempotent() -> void:
@@ -236,11 +255,15 @@ func test_show_for_is_idempotent() -> void:
 	assert_true(np.is_shown(), "first show_for marks shown")
 	var fb_b: FakeBoss = _make_fake_boss("Vorgath")
 	np.show_for(fb_b)
-	assert_eq(np.get_name_label().text, "WARDEN OF THE OUTER CLOISTER",
-			"second show_for is a no-op — name not overwritten")
+	assert_eq(
+		np.get_name_label().text,
+		"WARDEN OF THE OUTER CLOISTER",
+		"second show_for is a no-op — name not overwritten"
+	)
 
 
 # ---- Test 8: phase-label color state ---------------------------------
+
 
 func test_phase_label_colors_match_active_completed_future_states() -> void:
 	# BI-12 + Uma §"Phase label": active = off-white, completed = muted
@@ -249,29 +272,42 @@ func test_phase_label_colors_match_active_completed_future_states() -> void:
 	var fb: FakeBoss = _make_fake_boss()
 	np.show_for(fb)
 	# Phase 1 active; phases 2 & 3 future.
-	assert_eq(np.get_phase_label(1).get_theme_color("font_color"),
-			BossNameplateScript.HUD_OFF_WHITE,
-			"phase 1 (active) label is off-white")
-	assert_eq(np.get_phase_label(2).get_theme_color("font_color"),
-			BossNameplateScript.HUD_DISABLED,
-			"phase 2 (future) label is HUD disabled")
-	assert_eq(np.get_phase_label(3).get_theme_color("font_color"),
-			BossNameplateScript.HUD_DISABLED,
-			"phase 3 (future) label is HUD disabled")
+	assert_eq(
+		np.get_phase_label(1).get_theme_color("font_color"),
+		BossNameplateScript.HUD_OFF_WHITE,
+		"phase 1 (active) label is off-white"
+	)
+	assert_eq(
+		np.get_phase_label(2).get_theme_color("font_color"),
+		BossNameplateScript.HUD_DISABLED,
+		"phase 2 (future) label is HUD disabled"
+	)
+	assert_eq(
+		np.get_phase_label(3).get_theme_color("font_color"),
+		BossNameplateScript.HUD_DISABLED,
+		"phase 3 (future) label is HUD disabled"
+	)
 	# Transition to phase 2 → labels re-color.
 	np._on_boss_phase_changed(2)
-	assert_eq(np.get_phase_label(1).get_theme_color("font_color"),
-			BossNameplateScript.MUTED_PARCHMENT,
-			"phase 1 (completed) label is muted parchment")
-	assert_eq(np.get_phase_label(2).get_theme_color("font_color"),
-			BossNameplateScript.HUD_OFF_WHITE,
-			"phase 2 (active) label is off-white")
-	assert_eq(np.get_phase_label(3).get_theme_color("font_color"),
-			BossNameplateScript.HUD_DISABLED,
-			"phase 3 (future) label is HUD disabled")
+	assert_eq(
+		np.get_phase_label(1).get_theme_color("font_color"),
+		BossNameplateScript.MUTED_PARCHMENT,
+		"phase 1 (completed) label is muted parchment"
+	)
+	assert_eq(
+		np.get_phase_label(2).get_theme_color("font_color"),
+		BossNameplateScript.HUD_OFF_WHITE,
+		"phase 2 (active) label is off-white"
+	)
+	assert_eq(
+		np.get_phase_label(3).get_theme_color("font_color"),
+		BossNameplateScript.HUD_DISABLED,
+		"phase 3 (future) label is HUD disabled"
+	)
 
 
 # ---- Test 9: ghost-drain tween kill-restarts on hit-spam --------------
+
 
 func test_ghost_drain_tween_restarts_on_repeated_hits() -> void:
 	# Idempotence — a second `damaged` event mid-ghost-drain must kill
@@ -290,11 +326,13 @@ func test_ghost_drain_tween_restarts_on_repeated_hits() -> void:
 	fb.hp_current = 400
 	fb.damaged.emit(100, 400, null)
 	var second_tween: Tween = np.get_ghost_tween(1)
-	assert_ne(first_tween, second_tween,
-			"second hit replaces ghost tween reference (Tier 1 corollary)")
+	assert_ne(
+		first_tween, second_tween, "second hit replaces ghost tween reference (Tier 1 corollary)"
+	)
 
 
 # ---- Test 10: phase-transition idempotence ---------------------------
+
 
 func test_phase_changed_is_idempotent_on_replay() -> void:
 	# Per `Stratum1Boss._check_phase_boundaries` idempotent latch — the
@@ -320,6 +358,7 @@ func test_phase_changed_is_idempotent_on_replay() -> void:
 
 # ---- Test 11: T18 pulse engages at <10% threshold ---------------------
 
+
 func test_pulse_engages_below_10pct_of_active_segment() -> void:
 	# T18 / BI-15 — active-segment pulse at 1.5 Hz when HP drops below 10%
 	# of the active phase's HP allocation. With hp_max=600, phase 1 spans
@@ -333,8 +372,7 @@ func test_pulse_engages_below_10pct_of_active_segment() -> void:
 	# Hit to 410 → fraction ≈ (410-396)/(600-396) ≈ 0.0686 → below 10%.
 	fb.hp_current = 410
 	fb.damaged.emit(190, 410, null)
-	assert_true(np.is_pulse_active(),
-			"pulse engages when active-segment fill < 10%")
+	assert_true(np.is_pulse_active(), "pulse engages when active-segment fill < 10%")
 
 
 func test_pulse_stops_on_phase_transition() -> void:
@@ -350,11 +388,11 @@ func test_pulse_stops_on_phase_transition() -> void:
 	assert_true(np.is_pulse_active(), "pulse engaged in phase 1 <10%")
 	# Phase transition to 2.
 	np._on_boss_phase_changed(2)
-	assert_false(np.is_pulse_active(),
-			"pulse stops on phase transition (new segment starts full)")
+	assert_false(np.is_pulse_active(), "pulse stops on phase transition (new segment starts full)")
 
 
 # ---- Test 12: boss_died handler dismisses tweens ---------------------
+
 
 func test_boss_died_dismisses_pulse_and_ghost_tweens() -> void:
 	# On boss_died, the title card takes over and the nameplate should
@@ -370,12 +408,10 @@ func test_boss_died_dismisses_pulse_and_ghost_tweens() -> void:
 	assert_true(np.is_pulse_active(), "precondition: pulse active")
 	# Emit boss_died — handler should kill pulse + ghost tweens.
 	fb.boss_died.emit(fb, Vector2.ZERO, null)
-	assert_false(np.is_pulse_active(),
-			"boss_died kills pulse tween")
+	assert_false(np.is_pulse_active(), "boss_died kills pulse tween")
 	# Further damaged() events should be ignored (dismissed state).
 	fb.hp_current = 0
 	fb.damaged.emit(400, 0, null)
 	# Re-emitting boss_died is also a no-op (no crash, no resurrection).
 	fb.boss_died.emit(fb, Vector2.ZERO, null)
-	assert_false(np.is_pulse_active(),
-			"second boss_died is idempotent — still no pulse")
+	assert_false(np.is_pulse_active(), "second boss_died is idempotent — still no pulse")

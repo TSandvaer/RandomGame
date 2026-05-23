@@ -26,8 +26,10 @@ func test_export_presets_file_is_present() -> void:
 	# FileAccess.file_exists works on res:// in --headless mode iff the
 	# file is registered with the project. export_presets.cfg lives at the
 	# project root, so it's accessible via res://.
-	assert_true(FileAccess.file_exists(PRESET_PATH),
-		"export_presets.cfg must be committed at repo root — see team/devon-dev/m1-rc-build.md")
+	assert_true(
+		FileAccess.file_exists(PRESET_PATH),
+		"export_presets.cfg must be committed at repo root — see team/devon-dev/m1-rc-build.md"
+	)
 
 
 func test_export_presets_declare_required_names() -> void:
@@ -44,9 +46,13 @@ func test_export_presets_declare_required_names() -> void:
 		var key: String = String(preset_name)
 		var needle: String = 'name="%s"' % key
 		var found: bool = contents.find(needle) != -1
-		assert_true(found,
-			"Preset name=\"%s\" missing from export_presets.cfg — referenced by %s"
-				% [key, REQUIRED_PRESETS[preset_name]])
+		assert_true(
+			found,
+			(
+				'Preset name="%s" missing from export_presets.cfg — referenced by %s'
+				% [key, REQUIRED_PRESETS[preset_name]]
+			)
+		)
 
 
 func test_release_github_workflow_present() -> void:
@@ -61,5 +67,7 @@ func test_release_github_workflow_present() -> void:
 	# launched with that path inside its res:// root (true for headless CI).
 	# We accept either path resolution — both indicate the file is committed.
 	var found: bool = FileAccess.file_exists(path) or FileAccess.file_exists(sys_path)
-	assert_true(found,
-		"release-github.yml must be committed at .github/workflows/ — see team/devon-dev/m1-rc-build.md")
+	assert_true(
+		found,
+		"release-github.yml must be committed at .github/workflows/ — see team/devon-dev/m1-rc-build.md"
+	)

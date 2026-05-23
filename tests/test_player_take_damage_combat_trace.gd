@@ -30,25 +30,29 @@ extends GutTest
 
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
-
 # ---- CombatTraceSpy infra (mirrors test_player_die_combat_trace.gd) ----
+
 
 class CombatTraceSpy:
 	extends Node
 	var calls: Array = []  # Array of [tag, msg]
+
 	func combat_trace(tag: String, msg: String = "") -> void:
 		calls.append([tag, msg])
+
 	func has_tag(tag: String) -> bool:
 		for c: Array in calls:
 			if c[0] == tag:
 				return true
 		return false
+
 	func count_tag(tag: String) -> int:
 		var n: int = 0
 		for c: Array in calls:
 			if c[0] == tag:
 				n += 1
 		return n
+
 	func msgs_for(tag: String) -> Array[String]:
 		var out: Array[String] = []
 		for c: Array in calls:
@@ -85,6 +89,7 @@ func _make_player_in_tree() -> Player:
 
 # ---- 1: Player.take_damage emits the HP curve trace -------------------
 
+
 func test_player_take_damage_emits_combat_trace_with_hp_curve() -> void:
 	# A non-lethal hit must emit a `[combat-trace] Player.take_damage` line
 	# with the HP-curve payload (`amount=N hp=before->after`). Without it,
@@ -97,27 +102,47 @@ func test_player_take_damage_emits_combat_trace_with_hp_curve() -> void:
 	var emitted: bool = spy.has_tag("Player.take_damage")
 	var msgs: Array[String] = spy.msgs_for("Player.take_damage")
 	_restore_debug_flags(spy)
-	assert_true(emitted,
-		"DIAG-86c9uf1x8: Player.take_damage must emit a [combat-trace] line " +
-		"on every non-lethal hit. Without it, post-mortem of a Room 05 multi-" +
-		"chaser death cannot reconstruct the HP curve and the fix-shape " +
-		"decision (harness retreat vs. game-side iframe extend vs. balance " +
-		"tweak) is blind.")
+	assert_true(
+		emitted,
+		(
+			"DIAG-86c9uf1x8: Player.take_damage must emit a [combat-trace] line "
+			+ "on every non-lethal hit. Without it, post-mortem of a Room 05 multi-"
+			+ "chaser death cannot reconstruct the HP curve and the fix-shape "
+			+ "decision (harness retreat vs. game-side iframe extend vs. balance "
+			+ "tweak) is blind."
+		)
+	)
 	assert_eq(msgs.size(), 1, "Exactly one trace line per damage tick")
 	var msg: String = msgs[0]
-	assert_string_contains(msg, "amount=4",
-		"Payload must carry the post-clean damage amount so the trace " +
-		"correlates with mob-side damage values")
-	assert_string_contains(msg, "hp=100->96",
-		"Payload must carry the HP curve (before->after) so the post-mortem " +
-		"can reconstruct exactly when each hit landed and by how much")
-	assert_string_contains(msg, "pos=(174,200)",
-		"Payload must carry the player position at hit time so the trace " +
-		"correlates with room geometry (Sponsor's empirical Room 05 death " +
-		"position is (174,200) — 66px west of DEFAULT_PLAYER_SPAWN)")
+	assert_string_contains(
+		msg,
+		"amount=4",
+		(
+			"Payload must carry the post-clean damage amount so the trace "
+			+ "correlates with mob-side damage values"
+		)
+	)
+	assert_string_contains(
+		msg,
+		"hp=100->96",
+		(
+			"Payload must carry the HP curve (before->after) so the post-mortem "
+			+ "can reconstruct exactly when each hit landed and by how much"
+		)
+	)
+	assert_string_contains(
+		msg,
+		"pos=(174,200)",
+		(
+			"Payload must carry the player position at hit time so the trace "
+			+ "correlates with room geometry (Sponsor's empirical Room 05 death "
+			+ "position is (174,200) — 66px west of DEFAULT_PLAYER_SPAWN)"
+		)
+	)
 
 
 # ---- 2: invulnerable-skip does NOT emit a trace -----------------------
+
 
 func test_player_take_damage_does_not_trace_when_invulnerable() -> void:
 	# When the player is in i-frames (dodge or post-hit-iframes), take_damage
@@ -128,21 +153,26 @@ func test_player_take_damage_does_not_trace_when_invulnerable() -> void:
 	var p: Player = _make_player_in_tree()
 	# Force iframes on via the public dodge path.
 	p.try_dodge(Vector2.RIGHT)
-	assert_true(p.is_invulnerable(),
-		"Precondition: dodge must enter iframes")
+	assert_true(p.is_invulnerable(), "Precondition: dodge must enter iframes")
 	var spy: CombatTraceSpy = _install_combat_trace_spy()
 	p.take_damage(10, Vector2.ZERO, null)
 	var emitted: bool = spy.has_tag("Player.take_damage")
 	_restore_debug_flags(spy)
-	assert_false(emitted,
-		"Player.take_damage trace must NOT fire while invulnerable — an " +
-		"iframe-blocked hit produced no HP change, so emitting a curve " +
-		"line would inflate the apparent damage rate in post-mortem")
-	assert_eq(p.hp_current, p.hp_max,
-		"HP must remain unchanged when invulnerable — guard precondition")
+	assert_false(
+		emitted,
+		(
+			"Player.take_damage trace must NOT fire while invulnerable — an "
+			+ "iframe-blocked hit produced no HP change, so emitting a curve "
+			+ "line would inflate the apparent damage rate in post-mortem"
+		)
+	)
+	assert_eq(
+		p.hp_current, p.hp_max, "HP must remain unchanged when invulnerable — guard precondition"
+	)
 
 
 # ---- 3: dead-state-skip does NOT emit a trace --------------------------
+
 
 func test_player_take_damage_does_not_trace_when_dead() -> void:
 	# Once the player is dead, subsequent take_damage calls early-return
@@ -151,19 +181,23 @@ func test_player_take_damage_does_not_trace_when_dead() -> void:
 	var p: Player = _make_player_in_tree()
 	# Kill the player.
 	p.take_damage(p.hp_max, Vector2.ZERO, null)
-	assert_true(p.is_dead(),
-		"Precondition: lethal hit puts player in dead state")
+	assert_true(p.is_dead(), "Precondition: lethal hit puts player in dead state")
 	var spy: CombatTraceSpy = _install_combat_trace_spy()
 	p.take_damage(10, Vector2.ZERO, null)
 	var emitted: bool = spy.has_tag("Player.take_damage")
 	_restore_debug_flags(spy)
-	assert_false(emitted,
-		"Player.take_damage trace must NOT fire on a dead player — the " +
-		"_is_dead guard rejects the hit before HP mutation, and a trace " +
-		"line would mislead post-mortem analysis")
+	assert_false(
+		emitted,
+		(
+			"Player.take_damage trace must NOT fire on a dead player — the "
+			+ "_is_dead guard rejects the hit before HP mutation, and a trace "
+			+ "line would mislead post-mortem analysis"
+		)
+	)
 
 
 # ---- 4: lethal hit traces BEFORE Player._die ---------------------------
+
 
 func test_player_take_damage_trace_precedes_player_die_trace() -> void:
 	# Ordering matters: on a lethal hit, the HP-curve trace must hit the log
@@ -184,13 +218,19 @@ func test_player_take_damage_trace_precedes_player_die_trace() -> void:
 	_restore_debug_flags(spy)
 	assert_ne(take_dmg_idx, -1, "Player.take_damage trace must fire on lethal hit")
 	assert_ne(die_idx, -1, "Player._die trace must fire on lethal hit")
-	assert_lt(take_dmg_idx, die_idx,
-		"Player.take_damage trace must precede Player._die trace — a " +
-		"chronological reader sees 'amount=N hp=N->0' before 'Player._die', " +
-		"so the lethal damage amount is visible at the death-line moment")
+	assert_lt(
+		take_dmg_idx,
+		die_idx,
+		(
+			"Player.take_damage trace must precede Player._die trace — a "
+			+ "chronological reader sees 'amount=N hp=N->0' before 'Player._die', "
+			+ "so the lethal damage amount is visible at the death-line moment"
+		)
+	)
 
 
 # ---- 5: source name is carried in the payload --------------------------
+
 
 func test_player_take_damage_trace_carries_source_name() -> void:
 	# The source node's name (Charger / Grunt / etc.) is the load-bearing
@@ -206,13 +246,19 @@ func test_player_take_damage_trace_carries_source_name() -> void:
 	p.take_damage(4, Vector2.ZERO, src)
 	var msg: String = spy.msgs_for("Player.take_damage")[0]
 	_restore_debug_flags(spy)
-	assert_string_contains(msg, "src=CharlieTheCharger",
-		"Payload must carry the source node's name so the post-mortem can " +
-		"attribute each hit to a specific mob class (Charger vs. Grunt — " +
-		"different fix shapes for each)")
+	assert_string_contains(
+		msg,
+		"src=CharlieTheCharger",
+		(
+			"Payload must carry the source node's name so the post-mortem can "
+			+ "attribute each hit to a specific mob class (Charger vs. Grunt — "
+			+ "different fix shapes for each)"
+		)
+	)
 
 
 # ---- 6: null-source case doesn't crash ---------------------------------
+
 
 func test_player_take_damage_trace_handles_null_source() -> void:
 	# Some `take_damage` call sites pass `null` for source (test paths,
@@ -225,10 +271,19 @@ func test_player_take_damage_trace_handles_null_source() -> void:
 	var emitted: bool = spy.has_tag("Player.take_damage")
 	var msg: String = spy.msgs_for("Player.take_damage")[0]
 	_restore_debug_flags(spy)
-	assert_true(emitted,
-		"Trace must fire even when source is null — the HP curve is " +
-		"the load-bearing signal, source is metadata")
-	assert_string_contains(msg, "src=",
-		"Payload must still include a src= tag (e.g. 'src=Unknown') so " +
-		"the field count is uniform across all damage events — a missing " +
-		"field would break greppable parsing")
+	assert_true(
+		emitted,
+		(
+			"Trace must fire even when source is null — the HP curve is "
+			+ "the load-bearing signal, source is metadata"
+		)
+	)
+	assert_string_contains(
+		msg,
+		"src=",
+		(
+			"Payload must still include a src= tag (e.g. 'src=Unknown') so "
+			+ "the field count is uniform across all damage events — a missing "
+			+ "field would break greppable parsing"
+		)
+	)

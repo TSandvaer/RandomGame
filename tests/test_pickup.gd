@@ -32,6 +32,7 @@ const PickupScene: PackedScene = preload("res://scenes/loot/Pickup.tscn")
 # `is_in_group("player")` to return true.
 class FakePlayerBody:
 	extends CharacterBody2D
+
 	func _init() -> void:
 		add_to_group("player")
 
@@ -62,6 +63,7 @@ func _make_item() -> ItemInstance:
 
 # --- 1: listener-consumed pickup is queue_freed ---------------------------
 
+
 func test_consumed_pickup_is_queue_freed_on_success() -> void:
 	# Success path: listener calls consume_after_pickup → pickup queue_freed.
 	# Pre-fix the Pickup queue_freed itself unconditionally; post-fix it waits
@@ -79,11 +81,14 @@ func test_consumed_pickup_is_queue_freed_on_success() -> void:
 	pickup._on_body_entered(body)
 	assert_eq(listener.collected_items.size(), 1, "listener received the pickup")
 	# queue_free schedules deletion at end of frame; assert via the queued flag.
-	assert_true(pickup.is_queued_for_deletion(),
-		"Pickup is queue_freed on success (consume_after_pickup ran)")
+	assert_true(
+		pickup.is_queued_for_deletion(),
+		"Pickup is queue_freed on success (consume_after_pickup ran)"
+	)
 
 
 # --- 2: listener-rejected pickup is NOT queue_freed (the bug 86c9u33h1) ---
+
 
 func test_rejected_pickup_is_NOT_destroyed_silent_drop_bug_fixed() -> void:
 	# THE LOAD-BEARING TEST for ticket 86c9u33h1. Pre-fix, the Pickup
@@ -102,14 +107,20 @@ func test_rejected_pickup_is_NOT_destroyed_silent_drop_bug_fixed() -> void:
 	# Listener was notified.
 	assert_eq(listener.collected_items.size(), 1, "listener received the pickup")
 	# THE INVARIANT: pickup must NOT be queue_freed on rejection.
-	assert_false(pickup.is_queued_for_deletion(),
-		"Pickup must NOT be queue_freed when listener rejects — " +
-		"the silent-drop bug ticket 86c9u33h1 fixes")
-	assert_true(is_instance_valid(pickup),
-		"Pickup is still a valid instance after rejected collection")
+	assert_false(
+		pickup.is_queued_for_deletion(),
+		(
+			"Pickup must NOT be queue_freed when listener rejects — "
+			+ "the silent-drop bug ticket 86c9u33h1 fixes"
+		)
+	)
+	assert_true(
+		is_instance_valid(pickup), "Pickup is still a valid instance after rejected collection"
+	)
 
 
 # --- 3: latch re-arm — rejected pickup can be re-collected next frame -----
+
 
 func test_rejected_pickup_latch_clears_for_re_collection() -> void:
 	# Edge probe — after a rejected collection, the `_collected` latch must
@@ -133,20 +144,27 @@ func test_rejected_pickup_latch_clears_for_re_collection() -> void:
 	assert_true(is_instance_valid(pickup), "round 1: pickup still alive")
 	# Drain the deferred call (`_clear_collected_latch_if_alive`).
 	await get_tree().process_frame
-	assert_false(pickup._collected,
-		"round 1 → next frame: latch cleared by _clear_collected_latch_if_alive " +
-		"(Pickup re-armed for a future re-attempt)")
+	assert_false(
+		pickup._collected,
+		(
+			"round 1 → next frame: latch cleared by _clear_collected_latch_if_alive "
+			+ "(Pickup re-armed for a future re-attempt)"
+		)
+	)
 
 	# Round 2 — re-emit body_entered with the listener now accepting.
 	listener.should_accept = true
 	pickup._on_body_entered(body)
-	assert_eq(listener.collected_items.size(), 2,
-		"round 2: pickup re-emitted picked_up after walk-off + walk-back-on")
-	assert_true(pickup.is_queued_for_deletion(),
-		"round 2: pickup consumed on accepting listener")
+	assert_eq(
+		listener.collected_items.size(),
+		2,
+		"round 2: pickup re-emitted picked_up after walk-off + walk-back-on"
+	)
+	assert_true(pickup.is_queued_for_deletion(), "round 2: pickup consumed on accepting listener")
 
 
 # --- 4: mob bodies are filtered ------------------------------------------
+
 
 func test_mob_body_does_not_trigger_pickup() -> void:
 	# Belt-and-suspenders: collision_mask = LAYER_PLAYER (bit 2), so the
@@ -162,13 +180,12 @@ func test_mob_body_does_not_trigger_pickup() -> void:
 	var mob_body: CharacterBody2D = CharacterBody2D.new()
 	add_child_autofree(mob_body)
 	pickup._on_body_entered(mob_body)
-	assert_eq(listener.collected_items.size(), 0,
-		"mob body is filtered — no picked_up emission")
-	assert_false(pickup.is_queued_for_deletion(),
-		"mob body does not trigger queue_free either")
+	assert_eq(listener.collected_items.size(), 0, "mob body is filtered — no picked_up emission")
+	assert_false(pickup.is_queued_for_deletion(), "mob body does not trigger queue_free either")
 
 
 # --- 5: null-item Pickup self-frees defensively --------------------------
+
 
 func test_null_item_pickup_self_frees_defensively() -> void:
 	# Defensive code path: a Pickup with null item still self-frees on body
@@ -183,10 +200,10 @@ func test_null_item_pickup_self_frees_defensively() -> void:
 	var body: FakePlayerBody = FakePlayerBody.new()
 	add_child_autofree(body)
 	pickup._on_body_entered(body)
-	assert_eq(listener.collected_items.size(), 0,
-		"null-item pickup does not emit picked_up")
-	assert_true(pickup.is_queued_for_deletion(),
-		"null-item pickup still self-frees (no orphan on ground)")
+	assert_eq(listener.collected_items.size(), 0, "null-item pickup does not emit picked_up")
+	assert_true(
+		pickup.is_queued_for_deletion(), "null-item pickup still self-frees (no orphan on ground)"
+	)
 
 
 # --- 6: REGRESSION-86c9unkr2 — double-defer for HTML5 physics-flush ------
@@ -201,6 +218,7 @@ func test_null_item_pickup_self_frees_defensively() -> void:
 # at the top before flipping monitoring. This guarantees the mutation lands
 # strictly outside any in-flight `flush_queries()` window.
 
+
 func test_activate_monitoring_flips_after_physics_frame_not_synchronously() -> void:
 	# REGRESSION-86c9unkr2: monitoring stays false synchronously after _ready;
 	# the await get_tree().physics_frame inside _activate_and_check_initial_overlap
@@ -213,9 +231,13 @@ func test_activate_monitoring_flips_after_physics_frame_not_synchronously() -> v
 	# call_deferred("_activate_and_check_initial_overlap"). Monitoring STILL
 	# off because the deferred call hasn't drained yet.
 	add_child_autofree(pickup)
-	assert_false(pickup.monitoring,
-		"REGRESSION-86c9unkr2: monitoring stays false synchronously after add_child — " +
-		"_ready's call_deferred hasn't drained yet, and the deferred call itself awaits a physics_frame")
+	assert_false(
+		pickup.monitoring,
+		(
+			"REGRESSION-86c9unkr2: monitoring stays false synchronously after add_child — "
+			+ "_ready's call_deferred hasn't drained yet, and the deferred call itself awaits a physics_frame"
+		)
+	)
 	# Drain one process_frame for the deferred call to land + run up to the await.
 	await get_tree().process_frame
 	# Monitoring is still false because the await physics_frame hasn't resolved.
@@ -224,9 +246,13 @@ func test_activate_monitoring_flips_after_physics_frame_not_synchronously() -> v
 	# write lands.)
 	await get_tree().physics_frame
 	await get_tree().process_frame
-	assert_true(pickup.monitoring,
-		"REGRESSION-86c9unkr2: monitoring flips ON after the double-defer"
-			+ " (call_deferred + await physics_frame)")
+	assert_true(
+		pickup.monitoring,
+		(
+			"REGRESSION-86c9unkr2: monitoring flips ON after the double-defer"
+			+ " (call_deferred + await physics_frame)"
+		)
+	)
 	assert_true(pickup.monitorable, "monitorable parity preserved post-await")
 
 

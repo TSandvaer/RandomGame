@@ -96,7 +96,6 @@ extends RefCounted
 ##   - Mob-spawn variance per character within chunks (M4-class).
 ##   - Loot-pickup variance per character within chunks (M4-class).
 
-
 ## Open-port tag set — port tags the assembler treats as a valid
 ## connection point. Adjacent chunks' ports must BOTH have tags in this
 ## set (per-tag pair compatibility is symmetric — see `_check_port_mating`).
@@ -109,12 +108,10 @@ const OPEN_PORT_TAGS: Array[StringName] = [
 	&"boss_door",
 ]
 
-
 ## Default chunk root for loading `LevelChunkDef.tres` by chunk_id. Tests
 ## may override via `assemble_floor`'s `chunks_by_id` override to inject
 ## fixture chunks (avoiding disk I/O + isolating from production content).
 const DEFAULT_CHUNK_ROOT: String = "res://resources/level_chunks/"
-
 
 # -----------------------------------------------------------------------
 # Public API
@@ -134,21 +131,14 @@ const DEFAULT_CHUNK_ROOT: String = "res://resources/level_chunks/"
 ## When null, the assembler resolves chunk ids via `load()` against
 ## `DEFAULT_CHUNK_ROOT`. Tests inject this to isolate from production
 ## chunk content + avoid load() overhead in pure-determinism tests.
-func assemble_floor(
-	zone_def: ZoneDef,
-	seed: int,
-	chunks_by_id: Dictionary = {}
-) -> AssembledFloor:
+func assemble_floor(zone_def: ZoneDef, seed: int, chunks_by_id: Dictionary = {}) -> AssembledFloor:
 	if zone_def == null:
 		push_error("FloorAssembler.assemble_floor: zone_def is null")
 		return AssembledFloor.new()
 
 	var validate_errors: Array[String] = zone_def.validate()
 	if not validate_errors.is_empty():
-		push_error(
-			"FloorAssembler.assemble_floor: zone_def invalid: %s"
-			% str(validate_errors)
-		)
+		push_error("FloorAssembler.assemble_floor: zone_def invalid: %s" % str(validate_errors))
 		return AssembledFloor.new()
 
 	var result: AssembledFloor = AssembledFloor.new()
@@ -169,10 +159,7 @@ func assemble_floor(
 	var resolved: Dictionary = _resolve_chunks(needed_ids, chunks_by_id)
 	for cid: StringName in needed_ids:
 		if not resolved.has(cid):
-			push_error(
-				"FloorAssembler.assemble_floor: failed to resolve chunk_id %s"
-				% str(cid)
-			)
+			push_error("FloorAssembler.assemble_floor: failed to resolve chunk_id %s" % str(cid))
 			return AssembledFloor.new()
 
 	# Seeded RNG drives BOTH slot-counts and chunk picks. Single RNG
@@ -194,8 +181,7 @@ func assemble_floor(
 		# (no fill after the final anchor).
 		if i < anchor_count - 1:
 			var slot_count: int = rng.randi_range(
-				zone_def.min_slots_between_anchors,
-				zone_def.max_slots_between_anchors
+				zone_def.min_slots_between_anchors, zone_def.max_slots_between_anchors
 			)
 			for s: int in range(slot_count):
 				var pool: Array[StringName] = zone_def.procedural_slot_pool
@@ -258,10 +244,7 @@ static func derive_zone_seed(stratum_seed: int, zone_id: StringName) -> int:
 ##
 ## Returns a Dictionary mapping resolved ids -> LevelChunkDef. Unresolved
 ## ids are simply absent; the caller treats a missing key as failure.
-func _resolve_chunks(
-	needed_ids: Array[StringName],
-	override: Dictionary
-) -> Dictionary:
+func _resolve_chunks(needed_ids: Array[StringName], override: Dictionary) -> Dictionary:
 	var out: Dictionary = {}
 	for cid: StringName in needed_ids:
 		if override.has(cid):
@@ -271,8 +254,7 @@ func _resolve_chunks(
 				continue
 			# Type mismatch in override — log and fall through to load().
 			push_warning(
-				"FloorAssembler._resolve_chunks: override entry %s is not LevelChunkDef"
-				% str(cid)
+				"FloorAssembler._resolve_chunks: override entry %s is not LevelChunkDef" % str(cid)
 			)
 		var path: String = "%s%s.tres" % [DEFAULT_CHUNK_ROOT, String(cid)]
 		var res: Resource = load(path)
@@ -284,10 +266,7 @@ func _resolve_chunks(
 ## Build a `PlacedChunk` for an anchor placement. Position is filled in
 ## by the layout sweep — this just stamps the chunk_id + kind + size +
 ## anchor_room_id.
-func _place_anchor(
-	anchor: ZoneAnchor,
-	chunk: LevelChunkDef
-) -> PlacedChunk:
+func _place_anchor(anchor: ZoneAnchor, chunk: LevelChunkDef) -> PlacedChunk:
 	var pc: PlacedChunk = PlacedChunk.new()
 	pc.chunk_id = chunk.id
 	pc.size_px = chunk.size_px()
@@ -298,10 +277,7 @@ func _place_anchor(
 
 
 ## Build a `PlacedChunk` for a procedural placement.
-func _place_procedural(
-	chunk_id: StringName,
-	chunk: LevelChunkDef
-) -> PlacedChunk:
+func _place_procedural(chunk_id: StringName, chunk: LevelChunkDef) -> PlacedChunk:
 	var pc: PlacedChunk = PlacedChunk.new()
 	pc.chunk_id = chunk.id
 	pc.size_px = chunk.size_px()
@@ -329,10 +305,7 @@ func _compute_bounds(placements: Array[PlacedChunk]) -> Rect2:
 
 ## Sweep every adjacent (left, right) pair in the placement list, check
 ## port compatibility, and accumulate violation strings.
-func _sweep_port_mating(
-	placements: Array[PlacedChunk],
-	resolved: Dictionary
-) -> Array[String]:
+func _sweep_port_mating(placements: Array[PlacedChunk], resolved: Dictionary) -> Array[String]:
 	var errors: Array[String] = []
 	if placements.size() < 2:
 		return errors
@@ -351,8 +324,10 @@ func _sweep_port_mating(
 			# string in its amber-error HUD label — empirically caught
 			# during the M3 Tier 3 W1 author-self-soak (commit ff67d0c).
 			errors.append(
-				"chunks[%d]=%s <-> chunks[%d]=%s: %s"
-				% [i, str(left_pc.chunk_id), i + 1, str(right_pc.chunk_id), pair_err]
+				(
+					"chunks[%d]=%s <-> chunks[%d]=%s: %s"
+					% [i, str(left_pc.chunk_id), i + 1, str(right_pc.chunk_id), pair_err]
+				)
 			)
 	return errors
 
@@ -378,9 +353,7 @@ func _check_port_mating(left: LevelChunkDef, right: LevelChunkDef) -> String:
 		for rw: ChunkPort in right_west:
 			if le.position_tiles.y == rw.position_tiles.y:
 				return ""
-	return (
-		"no shared seam row between left EAST port(s) and right WEST port(s)"
-	)
+	return "no shared seam row between left EAST port(s) and right WEST port(s)"
 
 
 ## Return ports on the given chunk whose `direction == edge` AND whose

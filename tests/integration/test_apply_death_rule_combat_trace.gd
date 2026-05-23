@@ -14,19 +14,22 @@ extends GutTest
 const PHYS_DELTA: float = 1.0 / 60.0
 const TEST_SLOT: int = 989
 
-
 # ---- CombatTraceSpy infra (mirrors test_grunt.gd) ---------------------
+
 
 class CombatTraceSpy:
 	extends Node
 	var calls: Array = []  # Array of [tag, msg]
+
 	func combat_trace(tag: String, msg: String = "") -> void:
 		calls.append([tag, msg])
+
 	func has_tag(tag: String) -> bool:
 		for c: Array in calls:
 			if c[0] == tag:
 				return true
 		return false
+
 	func msg_for(tag: String) -> String:
 		for c: Array in calls:
 			if c[0] == tag:
@@ -55,6 +58,7 @@ func _restore_debug_flags(spy: CombatTraceSpy) -> void:
 
 
 # ---- Main scaffolding -------------------------------------------------
+
 
 func _instantiate_main() -> Node:
 	var packed: PackedScene = load("res://scenes/Main.tscn")
@@ -98,6 +102,7 @@ func _inventory() -> Node:
 
 # ---- Test --------------------------------------------------------------
 
+
 func test_apply_death_rule_emits_combat_trace_line() -> void:
 	# Mirror what `Main._on_player_died → call_deferred("apply_death_rule")`
 	# does in production: call apply_death_rule directly on a real Main, assert
@@ -111,13 +116,22 @@ func test_apply_death_rule_emits_combat_trace_line() -> void:
 	var emitted: bool = spy.has_tag("Main.apply_death_rule")
 	var msg: String = spy.msg_for("Main.apply_death_rule")
 	_restore_debug_flags(spy)
-	assert_true(emitted,
-		"REGRESSION-86c9u397c: Main.apply_death_rule must emit a [combat-trace] " +
-		"line. Pairs with Player._die trace — together they disambiguate a " +
-		"Player-death-driven mob disappearance from a sibling-mob _physics_process " +
-		"freeze in the harness trace stream. Without both, the 86c9u397c-class " +
-		"misdiagnosis re-occurs.")
-	assert_string_contains(msg, "Room 01",
-		"Main.apply_death_rule payload must mention 'Room 01' so the trace " +
-		"reader knows the room target of the respawn (the room counter wraps " +
-		"to 0 on every Player death per the M1 death rule)")
+	assert_true(
+		emitted,
+		(
+			"REGRESSION-86c9u397c: Main.apply_death_rule must emit a [combat-trace] "
+			+ "line. Pairs with Player._die trace — together they disambiguate a "
+			+ "Player-death-driven mob disappearance from a sibling-mob _physics_process "
+			+ "freeze in the harness trace stream. Without both, the 86c9u397c-class "
+			+ "misdiagnosis re-occurs."
+		)
+	)
+	assert_string_contains(
+		msg,
+		"Room 01",
+		(
+			"Main.apply_death_rule payload must mention 'Room 01' so the trace "
+			+ "reader knows the room target of the respawn (the room counter wraps "
+			+ "to 0 on every Player death per the M1 death rule)"
+		)
+	)

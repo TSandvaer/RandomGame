@@ -20,12 +20,13 @@ extends GutTest
 
 const RoomGateScript: Script = preload("res://scripts/levels/RoomGate.gd")
 
-
 # ---- Helpers --------------------------------------------------------
+
 
 class FakeMob:
 	extends Node2D
 	signal mob_died(mob: Variant, position: Vector2, mob_def: Variant)
+
 	func die() -> void:
 		mob_died.emit(self, global_position, null)
 
@@ -57,6 +58,7 @@ func _await_frame() -> void:
 
 
 # ---- 1. Gate locks when player enters room --------------------------
+
 
 func test_gate_starts_open() -> void:
 	var g: RoomGate = _make_gate()
@@ -90,6 +92,7 @@ func test_re_entry_does_not_re_lock() -> void:
 
 
 # ---- 2. Gate unlocks when all mobs in room are dead -----------------
+
 
 func test_gate_unlocks_when_all_mobs_die() -> void:
 	var g: RoomGate = _make_gate()
@@ -149,6 +152,7 @@ func test_register_null_is_safe() -> void:
 
 # ---- 3. Edge: zero mobs -> immediately unlocked --------------------
 
+
 func test_zero_mob_room_unlocks_immediately_on_lock() -> void:
 	var g: RoomGate = _make_gate()
 	# No register_mob calls — mobs_alive starts at zero.
@@ -171,6 +175,7 @@ func test_explicit_lock_with_zero_mobs_auto_unlocks() -> void:
 
 # ---- 4. Edge: mob death from off-screen attacks counts --------------
 
+
 func test_offscreen_mob_death_still_counts() -> void:
 	# The gate listens to `mob_died` signals — it doesn't poll for visibility
 	# or distance. This test pins that behavior by parking a mob far outside
@@ -183,11 +188,13 @@ func test_offscreen_mob_death_still_counts() -> void:
 	assert_true(g.is_locked())
 	m.die()
 	await _await_frame()
-	assert_true(g.is_unlocked(),
-		"mob dying off-screen still counts toward the gate's clear condition")
+	assert_true(
+		g.is_unlocked(), "mob dying off-screen still counts toward the gate's clear condition"
+	)
 
 
 # ---- 5. Edge: rapid mob deaths in same frame counted correctly ------
+
 
 func test_rapid_same_frame_deaths_all_counted() -> void:
 	# Simulate three mobs dying back-to-back without yielding to the engine
@@ -318,6 +325,7 @@ func test_layer_mask_targets_player_only() -> void:
 # the deferred helper emits `gate_traversed` exactly once, even without a real
 # physics overlap, by calling it directly after `_unlock`.
 
+
 func test_fire_traversal_if_unlocked_emits_gate_traversed() -> void:
 	# `_fire_traversal_if_unlocked` fires `gate_traversed` when the gate is
 	# UNLOCKED and `_traversed_emitted` is false. Simulates the knockback-overlap
@@ -326,18 +334,22 @@ func test_fire_traversal_if_unlocked_emits_gate_traversed() -> void:
 	var g: RoomGate = _make_gate()
 	var m: FakeMob = _make_fake_mob()
 	g.register_mob(m)
-	g.trigger_for_test(null)   # sets test_skip_death_wait + locks
+	g.trigger_for_test(null)  # sets test_skip_death_wait + locks
 	m.die()
-	await _await_frame()       # CONNECT_DEFERRED decrement runs
+	await _await_frame()  # CONNECT_DEFERRED decrement runs
 	# Gate is now UNLOCKED (test_skip_death_wait=true → _unlock fires synchronously).
 	assert_true(g.is_unlocked(), "gate must be UNLOCKED before testing the overlap path")
 	watch_signals(g)
 	# Simulate the deferred call from _unlock: player was overlapping at unlock time.
 	g._fire_traversal_if_unlocked()
-	assert_signal_emitted(g, "gate_traversed",
-		"gate_traversed emits when _fire_traversal_if_unlocked is called on UNLOCKED gate")
-	assert_signal_emit_count(g, "gate_traversed", 1,
-		"gate_traversed emits exactly once (idempotency guard)")
+	assert_signal_emitted(
+		g,
+		"gate_traversed",
+		"gate_traversed emits when _fire_traversal_if_unlocked is called on UNLOCKED gate"
+	)
+	assert_signal_emit_count(
+		g, "gate_traversed", 1, "gate_traversed emits exactly once (idempotency guard)"
+	)
 
 
 func test_fire_traversal_if_unlocked_is_idempotent() -> void:
@@ -354,8 +366,12 @@ func test_fire_traversal_if_unlocked_is_idempotent() -> void:
 	watch_signals(g)
 	g._fire_traversal_if_unlocked()
 	g._fire_traversal_if_unlocked()  # second call — must no-op
-	assert_signal_emit_count(g, "gate_traversed", 1,
-		"second _fire_traversal_if_unlocked is a no-op (_traversed_emitted guard)")
+	assert_signal_emit_count(
+		g,
+		"gate_traversed",
+		1,
+		"second _fire_traversal_if_unlocked is a no-op (_traversed_emitted guard)"
+	)
 
 
 func test_fire_traversal_if_unlocked_noop_when_not_unlocked() -> void:
@@ -369,8 +385,11 @@ func test_fire_traversal_if_unlocked_noop_when_not_unlocked() -> void:
 	assert_true(g.is_locked(), "gate is LOCKED precondition")
 	watch_signals(g)
 	g._fire_traversal_if_unlocked()  # must be a no-op (gate not UNLOCKED yet)
-	assert_signal_not_emitted(g, "gate_traversed",
-		"_fire_traversal_if_unlocked is a no-op when gate is LOCKED (not UNLOCKED)")
+	assert_signal_not_emitted(
+		g,
+		"gate_traversed",
+		"_fire_traversal_if_unlocked is a no-op when gate is LOCKED (not UNLOCKED)"
+	)
 
 
 # ---- B-OUTSIDE harness contract — ticket 86c9utcb7 ------------------------
@@ -396,6 +415,7 @@ func test_fire_traversal_if_unlocked_noop_when_not_unlocked() -> void:
 # harness's B-OUTSIDE walk has a chance to surface the regression — and the
 # harness would then be silently masking a behavioural change.
 
+
 func test_unlock_with_no_overlap_emits_gate_unlocked_only() -> void:
 	# `_unlock()` invoked with no body overlapping the trigger emits
 	# `gate_unlocked` but NOT `gate_traversed`. The B-OUTSIDE harness path
@@ -419,13 +439,16 @@ func test_unlock_with_no_overlap_emits_gate_unlocked_only() -> void:
 	# decrement handler.
 	await _await_frame()
 	assert_true(g.is_unlocked(), "gate UNLOCKED after final mob dies")
-	assert_signal_emitted(g, "gate_unlocked",
-		"gate_unlocked emits when last mob dies")
-	assert_signal_emit_count(g, "gate_unlocked", 1,
-		"gate_unlocked emits exactly once")
+	assert_signal_emitted(g, "gate_unlocked", "gate_unlocked emits when last mob dies")
+	assert_signal_emit_count(g, "gate_unlocked", 1, "gate_unlocked emits exactly once")
 	# Critical: no auto-traversal. The B-OUTSIDE harness path REQUIRES that
 	# `gate_traversed` is NOT auto-emitted when no body overlaps at unlock.
-	assert_signal_not_emitted(g, "gate_traversed",
-		"gate_traversed must NOT auto-emit when no body overlaps at " +
-		"unlock — harness B-OUTSIDE path (ticket 86c9utcb7) requires the " +
-		"player to walk back into the trigger to fire gate_traversed.")
+	assert_signal_not_emitted(
+		g,
+		"gate_traversed",
+		(
+			"gate_traversed must NOT auto-emit when no body overlaps at "
+			+ "unlock — harness B-OUTSIDE path (ticket 86c9utcb7) requires the "
+			+ "player to walk back into the trigger to fire gate_traversed."
+		)
+	)

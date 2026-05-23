@@ -33,11 +33,16 @@ func _make_weapon_item(id: StringName = &"test_weapon") -> ItemInstance:
 
 
 func _make_armor_item(id: StringName = &"test_armor") -> ItemInstance:
-	var def: ItemDef = ContentFactory.make_item_def({
-		"id": id,
-		"slot": ItemDef.Slot.ARMOR,
-		"base_stats": ContentFactory.make_item_base_stats({"armor": 4}),
-	})
+	var def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": id,
+				"slot": ItemDef.Slot.ARMOR,
+				"base_stats": ContentFactory.make_item_base_stats({"armor": 4}),
+			}
+		)
+	)
 	return ItemInstance.new(def, ItemDef.Tier.T1)
 
 
@@ -57,6 +62,7 @@ func after_each() -> void:
 # Test 1 — Empty inventory at fresh start
 # =======================================================================
 
+
 func test_empty_at_fresh_start() -> void:
 	assert_eq(_inv().get_items().size(), 0, "no carried items at start")
 	assert_false(_inv().is_full(), "fresh inventory not full")
@@ -68,6 +74,7 @@ func test_empty_at_fresh_start() -> void:
 # =======================================================================
 # Test 2 — add(item) increments count, visible at index 0
 # =======================================================================
+
 
 func test_add_increments_and_visible_at_index_0() -> void:
 	var item: ItemInstance = _make_weapon_item()
@@ -83,6 +90,7 @@ func test_add_increments_and_visible_at_index_0() -> void:
 # Test 3 — equip(item, "weapon") equips and removes from grid
 # =======================================================================
 
+
 func test_equip_moves_from_inventory_to_slot() -> void:
 	var item: ItemInstance = _make_weapon_item()
 	_inv().add(item)
@@ -96,6 +104,7 @@ func test_equip_moves_from_inventory_to_slot() -> void:
 # =======================================================================
 # Test 4 — unequip(slot) returns item to inventory
 # =======================================================================
+
 
 func test_unequip_returns_item_to_inventory() -> void:
 	var item: ItemInstance = _make_weapon_item()
@@ -114,6 +123,7 @@ func test_unequip_returns_item_to_inventory() -> void:
 # Test 5 — equipping the same item twice -> second is no-op
 # =======================================================================
 
+
 func test_equip_same_item_twice_is_noop() -> void:
 	var item: ItemInstance = _make_weapon_item()
 	_inv().add(item)
@@ -121,16 +131,15 @@ func test_equip_same_item_twice_is_noop() -> void:
 	# Second call: item is no longer in inventory (it's in the slot), so
 	# equip should reject. But even if it weren't, the same-instance idempotency
 	# rule handles it.
-	assert_false(_inv().equip(item, &"weapon"),
-		"second equip of the same instance is a no-op")
+	assert_false(_inv().equip(item, &"weapon"), "second equip of the same instance is a no-op")
 	# Slot still occupied with the same item.
-	assert_eq(_inv().get_equipped(&"weapon"), item,
-		"slot still has the original item after no-op")
+	assert_eq(_inv().get_equipped(&"weapon"), item, "slot still has the original item after no-op")
 
 
 # =======================================================================
 # Test 6 — Capacity respected, overflow rejected with warning
 # =======================================================================
+
 
 func test_capacity_overflow_rejected() -> void:
 	for i in 24:
@@ -148,6 +157,7 @@ func test_capacity_overflow_rejected() -> void:
 # =======================================================================
 # Test 7 — Save round-trip preserves inventory + equipped state
 # =======================================================================
+
 
 func test_save_round_trip_preserves_state() -> void:
 	var weapon: ItemInstance = _make_weapon_item(&"sword_a")
@@ -178,25 +188,33 @@ func test_save_round_trip_preserves_state() -> void:
 		StringName(armor.def.id): armor.def,
 		StringName(backup.def.id): backup.def,
 	}
-	var item_resolver: Callable = func(id: StringName) -> Resource:
-		return by_id.get(id, null)
-	var affix_resolver: Callable = func(_id: StringName) -> Resource:
-		return null
+	var item_resolver: Callable = func(id: StringName) -> Resource: return by_id.get(id, null)
+	var affix_resolver: Callable = func(_id: StringName) -> Resource: return null
 	# Reset Inventory then restore from the reloaded save.
 	_inv().reset()
 	_inv().restore_from_save(reloaded, item_resolver, affix_resolver)
 	assert_eq(_inv().get_items().size(), 1, "1 unequipped item restored")
-	assert_eq((_inv().get_items()[0] as ItemInstance).def.id, backup.def.id,
-		"backup sword restored to inventory")
-	assert_eq((_inv().get_equipped(&"weapon") as ItemInstance).def.id, weapon.def.id,
-		"weapon equipped state preserved")
-	assert_eq((_inv().get_equipped(&"armor") as ItemInstance).def.id, armor.def.id,
-		"armor equipped state preserved")
+	assert_eq(
+		(_inv().get_items()[0] as ItemInstance).def.id,
+		backup.def.id,
+		"backup sword restored to inventory"
+	)
+	assert_eq(
+		(_inv().get_equipped(&"weapon") as ItemInstance).def.id,
+		weapon.def.id,
+		"weapon equipped state preserved"
+	)
+	assert_eq(
+		(_inv().get_equipped(&"armor") as ItemInstance).def.id,
+		armor.def.id,
+		"armor equipped state preserved"
+	)
 
 
 # =======================================================================
 # Test 8 — M1 death rule: clear_unequipped wipes inventory but keeps slots
 # =======================================================================
+
 
 func test_m1_death_rule_clears_unequipped_only() -> void:
 	var weapon: ItemInstance = _make_weapon_item(&"sword_x")
@@ -213,13 +231,15 @@ func test_m1_death_rule_clears_unequipped_only() -> void:
 	_inv().clear_unequipped()
 	# Inventory wiped; equipped preserved.
 	assert_eq(_inv().get_items().size(), 0, "unequipped cleared on death")
-	assert_eq(_inv().get_equipped(&"weapon"), weapon,
-		"equipped weapon preserved through death (M1 rule)")
+	assert_eq(
+		_inv().get_equipped(&"weapon"), weapon, "equipped weapon preserved through death (M1 rule)"
+	)
 
 
 # =======================================================================
 # Bonus probe — non-M1 slots are non-interactive (defensive)
 # =======================================================================
+
 
 func test_off_hand_slot_rejected_in_m1() -> void:
 	var item: ItemInstance = _make_weapon_item()
@@ -244,6 +264,7 @@ func test_off_hand_slot_rejected_in_m1() -> void:
 # This test must pass with either order of operations as long as the
 # load-bearing invariant holds: NO item is silently lost on swap.
 
+
 func test_equip_swap_preserves_previously_equipped_item() -> void:
 	# Pre-equip sword A.
 	var sword_a: ItemInstance = _make_weapon_item(&"sword_a_swap")
@@ -260,14 +281,21 @@ func test_equip_swap_preserves_previously_equipped_item() -> void:
 	# Now swap: equip sword B. Sword A must end up in the grid, NOT lost.
 	watch_signals(_inv())
 	assert_true(_inv().equip(sword_b, &"weapon"), "swap equip succeeds")
-	assert_eq(_inv().get_equipped(&"weapon"), sword_b,
-		"sword B is now equipped")
-	assert_eq(_inv().get_items().size(), 1,
-		"grid still has 1 item (sword A pushed back from equipped slot)")
-	assert_eq(_inv().get_items()[0], sword_a,
-		"the item in the grid is the previously-equipped sword A — equip-swap " +
-		"P0 86c9q96m8 fix: pre-fix this assertion failed because sword A " +
-		"was silently dropped on the floor by _unequip_internal(slot, false)")
+	assert_eq(_inv().get_equipped(&"weapon"), sword_b, "sword B is now equipped")
+	assert_eq(
+		_inv().get_items().size(),
+		1,
+		"grid still has 1 item (sword A pushed back from equipped slot)"
+	)
+	assert_eq(
+		_inv().get_items()[0],
+		sword_a,
+		(
+			"the item in the grid is the previously-equipped sword A — equip-swap "
+			+ "P0 86c9q96m8 fix: pre-fix this assertion failed because sword A "
+			+ "was silently dropped on the floor by _unequip_internal(slot, false)"
+		)
+	)
 	# Both sides of the swap must be observable via signals.
 	assert_signal_emitted(_inv(), "item_unequipped")
 	assert_signal_emitted(_inv(), "item_equipped")
@@ -290,17 +318,22 @@ func test_equip_swap_with_full_grid_preserves_item() -> void:
 	assert_true(_inv().is_full(), "grid is full at 24")
 	# Pick the last filler as the swap target.
 	var new_weapon: ItemInstance = _inv().get_items()[23] as ItemInstance
-	assert_true(_inv().equip(new_weapon, &"weapon"),
-		"swap equip from a full grid must succeed (new item erased first frees a slot)")
+	assert_true(
+		_inv().equip(new_weapon, &"weapon"),
+		"swap equip from a full grid must succeed (new item erased first frees a slot)"
+	)
 	# Old weapon now in grid where the new weapon was.
-	assert_eq(_inv().get_equipped(&"weapon"), new_weapon,
-		"new_weapon now equipped")
-	assert_eq(_inv().get_items().size(), 24,
-		"grid still at 24 — new item slot is now occupied by previously-equipped weapon")
-	assert_true(_inv().get_items().has(equipped_weapon),
-		"previously-equipped weapon lands back in the grid even when full at swap time")
-	assert_false(_inv().get_items().has(new_weapon),
-		"new weapon no longer in grid (it's equipped)")
+	assert_eq(_inv().get_equipped(&"weapon"), new_weapon, "new_weapon now equipped")
+	assert_eq(
+		_inv().get_items().size(),
+		24,
+		"grid still at 24 — new item slot is now occupied by previously-equipped weapon"
+	)
+	assert_true(
+		_inv().get_items().has(equipped_weapon),
+		"previously-equipped weapon lands back in the grid even when full at swap time"
+	)
+	assert_false(_inv().get_items().has(new_weapon), "new weapon no longer in grid (it's equipped)")
 
 
 # =======================================================================
@@ -308,6 +341,7 @@ func test_equip_swap_with_full_grid_preserves_item() -> void:
 # (real Player instance — paired test per combat-architecture.md
 # §"Equipped-weapon dual-surface rule" Tier 1)
 # =======================================================================
+
 
 func test_equip_swap_updates_both_inventory_and_player_surfaces() -> void:
 	# Per combat-architecture.md "Equipped-weapon dual-surface rule":
@@ -329,27 +363,43 @@ func test_equip_swap_updates_both_inventory_and_player_surfaces() -> void:
 
 	# Build sword A with a known damage stat via ContentFactory so we can
 	# distinguish it from sword B in the Player surface check.
-	var sword_a_def: ItemDef = ContentFactory.make_item_def({
-		"id": &"sword_a_dual",
-		"slot": ItemDef.Slot.WEAPON,
-		"base_stats": ContentFactory.make_item_base_stats({"damage": 4}),
-	})
+	var sword_a_def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": &"sword_a_dual",
+				"slot": ItemDef.Slot.WEAPON,
+				"base_stats": ContentFactory.make_item_base_stats({"damage": 4}),
+			}
+		)
+	)
 	var sword_a: ItemInstance = ItemInstance.new(sword_a_def, ItemDef.Tier.T1)
-	var sword_b_def: ItemDef = ContentFactory.make_item_def({
-		"id": &"sword_b_dual",
-		"slot": ItemDef.Slot.WEAPON,
-		"base_stats": ContentFactory.make_item_base_stats({"damage": 9}),
-	})
+	var sword_b_def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": &"sword_b_dual",
+				"slot": ItemDef.Slot.WEAPON,
+				"base_stats": ContentFactory.make_item_base_stats({"damage": 9}),
+			}
+		)
+	)
 	var sword_b: ItemInstance = ItemInstance.new(sword_b_def, ItemDef.Tier.T1)
 
 	# Equip sword A first.
 	_inv().add(sword_a)
 	assert_true(_inv().equip(sword_a, &"weapon"))
 	# BOTH surfaces post-equip-A:
-	assert_eq((_inv().get_equipped(&"weapon") as ItemInstance).def.id, &"sword_a_dual",
-		"Inventory surface: sword A in weapon slot")
-	assert_eq((player.get_equipped_weapon() as ItemDef).id, &"sword_a_dual",
-		"Player surface: _equipped_weapon points to sword A — dual-surface invariant")
+	assert_eq(
+		(_inv().get_equipped(&"weapon") as ItemInstance).def.id,
+		&"sword_a_dual",
+		"Inventory surface: sword A in weapon slot"
+	)
+	assert_eq(
+		(player.get_equipped_weapon() as ItemDef).id,
+		&"sword_a_dual",
+		"Player surface: _equipped_weapon points to sword A — dual-surface invariant"
+	)
 
 	# Now swap to sword B (the failure case from Sponsor soak attempt 5).
 	_inv().add(sword_b)
@@ -360,15 +410,26 @@ func test_equip_swap_updates_both_inventory_and_player_surfaces() -> void:
 	# equip-swap path could leak surfaces (one updated, one stale), producing
 	# Sponsor's "subsequent swings still register the previous weapon's
 	# damage" symptom.
-	assert_eq((_inv().get_equipped(&"weapon") as ItemInstance).def.id, &"sword_b_dual",
-		"Inventory surface: sword B in weapon slot post-swap")
-	assert_eq((player.get_equipped_weapon() as ItemDef).id, &"sword_b_dual",
-		"Player surface: _equipped_weapon points to sword B post-swap (the bug class — " +
-		"if this fails, Inventory updated but Player.equip_item didn't fire / Player " +
-		"didn't hear the swap; Sponsor would see: grid empties, but swing damage stays " +
-		"the OLD weapon's value)")
+	assert_eq(
+		(_inv().get_equipped(&"weapon") as ItemInstance).def.id,
+		&"sword_b_dual",
+		"Inventory surface: sword B in weapon slot post-swap"
+	)
+	assert_eq(
+		(player.get_equipped_weapon() as ItemDef).id,
+		&"sword_b_dual",
+		(
+			"Player surface: _equipped_weapon points to sword B post-swap (the bug class — "
+			+ "if this fails, Inventory updated but Player.equip_item didn't fire / Player "
+			+ "didn't hear the swap; Sponsor would see: grid empties, but swing damage stays "
+			+ "the OLD weapon's value)"
+		)
+	)
 
 	# Sword A must be back in the grid (not lost on swap — equip-swap leak fix).
 	assert_eq(_inv().get_items().size(), 1, "grid has 1 item post-swap")
-	assert_eq((_inv().get_items()[0] as ItemInstance).def.id, &"sword_a_dual",
-		"sword A pushed back to grid on swap (equip-swap leak fix — pre-fix this was lost)")
+	assert_eq(
+		(_inv().get_items()[0] as ItemInstance).def.id,
+		&"sword_a_dual",
+		"sword A pushed back to grid on swap (equip-swap leak fix — pre-fix this was lost)"
+	)

@@ -83,15 +83,18 @@ const _STRATUM_SCALING: Dictionary = {
 ## the W3-T3 retint / W3-T4 boss-room work, register here so MultiMobRoom can
 ## simply spawn `&"stoker"`).
 const _REGISTRATIONS: Dictionary = {
-	&"grunt": {
+	&"grunt":
+	{
 		"def": "res://resources/mobs/grunt.tres",
 		"scene": "res://scenes/mobs/Grunt.tscn",
 	},
-	&"charger": {
+	&"charger":
+	{
 		"def": "res://resources/mobs/charger.tres",
 		"scene": "res://scenes/mobs/Charger.tscn",
 	},
-	&"shooter": {
+	&"shooter":
+	{
 		"def": "res://resources/mobs/shooter.tres",
 		"scene": "res://scenes/mobs/Shooter.tscn",
 	},
@@ -102,11 +105,11 @@ const _REGISTRATIONS: Dictionary = {
 ## Lazy-loaded per id. `load()` reads from the resource cache, so repeated
 ## lookups are O(1) hash + dict access. Caching here keeps the spawn-hot-path
 ## allocation-free past the first lookup per mob_id per run.
-var _def_cache: Dictionary = {}     # StringName -> MobDef
-var _scene_cache: Dictionary = {}   # StringName -> PackedScene
-
+var _def_cache: Dictionary = {}  # StringName -> MobDef
+var _scene_cache: Dictionary = {}  # StringName -> PackedScene
 
 # ---- Public API -----------------------------------------------------
+
 
 ## Returns the registered MobDef for `mob_id`. `null` on unknown id (caller
 ## logs / pushes warning).
@@ -117,8 +120,10 @@ func get_mob_def(mob_id: StringName) -> MobDef:
 		var path: String = _REGISTRATIONS[mob_id]["def"]
 		var def: MobDef = load(path) as MobDef
 		if def == null:
-			_emit_warning("[MobRegistry] failed to load MobDef at %s for id '%s'" % [path, String(mob_id)],
-				"load_failure")
+			_emit_warning(
+				"[MobRegistry] failed to load MobDef at %s for id '%s'" % [path, String(mob_id)],
+				"load_failure"
+			)
 			return null
 		_def_cache[mob_id] = def
 	return _def_cache[mob_id]
@@ -133,9 +138,12 @@ func get_mob_scene(mob_id: StringName) -> PackedScene:
 		var scene: PackedScene = load(path) as PackedScene
 		if scene == null:
 			_emit_warning(
-				"[MobRegistry] failed to load PackedScene at %s for id '%s'"
-					% [path, String(mob_id)],
-				"load_failure")
+				(
+					"[MobRegistry] failed to load PackedScene at %s for id '%s'"
+					% [path, String(mob_id)]
+				),
+				"load_failure"
+			)
 			return null
 		_scene_cache[mob_id] = scene
 	return _scene_cache[mob_id]
@@ -155,15 +163,16 @@ func has_mob(mob_id: StringName) -> bool:
 ## so a typo'd id surfaces in console.
 func apply_stratum_scaling(mob_def: MobDef, stratum_id: StringName) -> MobDef:
 	if mob_def == null:
-		_emit_warning("[MobRegistry] apply_stratum_scaling called with null mob_def",
-			"null_mob_def")
+		_emit_warning(
+			"[MobRegistry] apply_stratum_scaling called with null mob_def", "null_mob_def"
+		)
 		return null
 	var multipliers: Dictionary = _STRATUM_SCALING.get(stratum_id, {"hp": 1.0, "damage": 1.0})
 	if not _STRATUM_SCALING.has(stratum_id):
 		_emit_warning(
-			"[MobRegistry] unknown stratum_id '%s' — using baseline 1.0/1.0"
-				% String(stratum_id),
-			"unknown_stratum_id")
+			"[MobRegistry] unknown stratum_id '%s' — using baseline 1.0/1.0" % String(stratum_id),
+			"unknown_stratum_id"
+		)
 	# Allocate a fresh MobDef and copy every field from the source. We do NOT
 	# mutate `mob_def` itself — calling this twice on the same source returns
 	# a new def with the SAME scaled values, NOT compounded values. Tess's
@@ -193,8 +202,7 @@ func apply_stratum_scaling(mob_def: MobDef, stratum_id: StringName) -> MobDef:
 func spawn(mob_id: StringName, world_position: Vector2, room_node: Node) -> Node:
 	var scene: PackedScene = get_mob_scene(mob_id)
 	if scene == null:
-		_emit_warning("[MobRegistry] spawn: unknown mob_id '%s'" % String(mob_id),
-			"unknown_mob_id")
+		_emit_warning("[MobRegistry] spawn: unknown mob_id '%s'" % String(mob_id), "unknown_mob_id")
 		return null
 	var def: MobDef = get_mob_def(mob_id)
 	var node: Node = scene.instantiate()

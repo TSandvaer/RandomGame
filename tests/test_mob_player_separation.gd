@@ -46,8 +46,8 @@ const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
 const PHYS_DELTA: float = 1.0 / 60.0
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_charger() -> Charger:
 	var c: Charger = ChargerScript.new()
@@ -80,12 +80,13 @@ func _make_player() -> Player:
 
 ## Drive the charger from IDLE through telegraph into CHARGING state.
 func _drive_charger_to_charging(c: Charger) -> void:
-	c._physics_process(PHYS_DELTA)                              # idle -> spotted
-	c._physics_process(Charger.SPOTTED_HOLD + 0.001)           # spotted -> telegraphing
-	c._physics_process(Charger.TELEGRAPH_DURATION + 0.001)     # telegraphing -> charging
+	c._physics_process(PHYS_DELTA)  # idle -> spotted
+	c._physics_process(Charger.SPOTTED_HOLD + 0.001)  # spotted -> telegraphing
+	c._physics_process(Charger.TELEGRAPH_DURATION + 0.001)  # telegraphing -> charging
 
 
 # ---- 1: Charger pushback velocity is non-zero on contact-attack tick ------
+
 
 func test_charger_has_nonzero_pushback_velocity_after_contact() -> void:
 	var p: Player = _make_player()
@@ -108,14 +109,17 @@ func test_charger_has_nonzero_pushback_velocity_after_contact() -> void:
 	c._physics_process(PHYS_DELTA)
 
 	# After contact the charger must be in RECOVERING.
-	assert_eq(c.get_state(), Charger.STATE_RECOVERING,
-		"charger enters recovery after player contact")
+	assert_eq(
+		c.get_state(), Charger.STATE_RECOVERING, "charger enters recovery after player contact"
+	)
 	# Pushback velocity must be non-zero so move_and_slide ejects the mob.
-	assert_gt(c.velocity.length(), 0.0,
-		"charger has non-zero pushback velocity on contact-recovery tick")
+	assert_gt(
+		c.velocity.length(), 0.0, "charger has non-zero pushback velocity on contact-recovery tick"
+	)
 
 
 # ---- 2: Charger position diverges from player after one physics step ------
+
 
 func test_charger_is_not_overlapping_player_after_contact_recovery() -> void:
 	var p: Player = _make_player()
@@ -148,15 +152,14 @@ func test_charger_is_not_overlapping_player_after_contact_recovery() -> void:
 	var away_dir: Vector2 = (c.global_position - p.global_position).normalized()
 	if away_dir.length_squared() > 0.001:
 		var dot: float = pushback_dir.dot(away_dir)
-		assert_gt(dot, 0.0,
-			"charger pushback velocity points away from player (dot=%.3f)" % dot)
+		assert_gt(dot, 0.0, "charger pushback velocity points away from player (dot=%.3f)" % dot)
 	else:
 		# Charger and player at exactly the same point — fallback check.
-		assert_gt(c.velocity.length(), 0.0,
-			"charger has non-zero velocity to escape overlap")
+		assert_gt(c.velocity.length(), 0.0, "charger has non-zero velocity to escape overlap")
 
 
 # ---- 3: Boss push-back velocity is non-zero on swing-fire tick ------------
+
 
 func test_boss_has_nonzero_pushback_velocity_after_melee_swing() -> void:
 	var p: Player = _make_player()
@@ -168,20 +171,24 @@ func test_boss_has_nonzero_pushback_velocity_after_melee_swing() -> void:
 
 	# Tick 1 — chase -> begin_melee_telegraph.
 	b._physics_process(PHYS_DELTA)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
-		"boss enters melee telegraph when player in range")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_TELEGRAPHING_MELEE,
+		"boss enters melee telegraph when player in range"
+	)
 
 	# Tick 2 — tick past telegraph windup -> _fire_melee_swing.
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.001)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING,
-		"boss enters attack-recovery after swing fires")
+	assert_eq(
+		b.get_state(), Stratum1Boss.STATE_ATTACKING, "boss enters attack-recovery after swing fires"
+	)
 
 	# Pushback velocity must be non-zero.
-	assert_gt(b.velocity.length(), 0.0,
-		"boss has non-zero pushback velocity on swing-fire tick")
+	assert_gt(b.velocity.length(), 0.0, "boss has non-zero pushback velocity on swing-fire tick")
 
 
 # ---- 4: Boss position diverges from player after swing-fire ---------------
+
 
 func test_boss_pushback_velocity_points_away_from_player() -> void:
 	var p: Player = _make_player()
@@ -200,11 +207,11 @@ func test_boss_pushback_velocity_points_away_from_player() -> void:
 	var pushback_dir: Vector2 = b.velocity.normalized()
 	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
 	var dot: float = pushback_dir.dot(away_dir)
-	assert_gt(dot, 0.0,
-		"boss pushback velocity points away from player (dot=%.3f)" % dot)
+	assert_gt(dot, 0.0, "boss pushback velocity points away from player (dot=%.3f)" % dot)
 
 
 # ---- 5: EDGE — wall-stop recovery does NOT apply pushback -----------------
+
 
 func test_charger_wall_stop_recovery_velocity_is_zero_when_player_far() -> void:
 	# When the charger hits a wall (not the player), it also calls _enter_recovery
@@ -226,11 +233,13 @@ func test_charger_wall_stop_recovery_velocity_is_zero_when_player_far() -> void:
 	c._end_charge_into_wall()
 
 	# Player is far (> 4x envelope) so no pushback is needed; velocity = 0.
-	assert_eq(c.velocity, Vector2.ZERO,
-		"no pushback when player is far at wall-stop recovery entry")
+	assert_eq(
+		c.velocity, Vector2.ZERO, "no pushback when player is far at wall-stop recovery entry"
+	)
 
 
 # ---- 6: EDGE — recovery handler zeros velocity on SUBSEQUENT tick ---------
+
 
 func test_charger_recovery_handler_zeros_velocity_on_subsequent_tick() -> void:
 	# After the push-back tick, _process_recover must zero velocity so the
@@ -253,8 +262,11 @@ func test_charger_recovery_handler_zeros_velocity_on_subsequent_tick() -> void:
 
 	# SUBSEQUENT tick — _process_recover runs, sets velocity = ZERO.
 	c._physics_process(PHYS_DELTA)
-	assert_eq(c.velocity, Vector2.ZERO,
-		"charger velocity zeroed on tick after pushback (rooted during recovery)")
+	assert_eq(
+		c.velocity,
+		Vector2.ZERO,
+		"charger velocity zeroed on tick after pushback (rooted during recovery)"
+	)
 
 
 func test_boss_recovery_handler_zeros_velocity_on_subsequent_tick() -> void:
@@ -271,11 +283,15 @@ func test_boss_recovery_handler_zeros_velocity_on_subsequent_tick() -> void:
 
 	# SUBSEQUENT tick — _process_attack_recovery sets velocity = ZERO.
 	b._physics_process(PHYS_DELTA)
-	assert_eq(b.velocity, Vector2.ZERO,
-		"boss velocity zeroed on tick after pushback (rooted during attack recovery)")
+	assert_eq(
+		b.velocity,
+		Vector2.ZERO,
+		"boss velocity zeroed on tick after pushback (rooted during attack recovery)"
+	)
 
 
 # ---- M2 W1 P1 polish: Grunt mob-stick fix (ticket 86c9q96kk) -------------
+
 
 ## Drive a Grunt from IDLE through the light-attack telegraph into the swing.
 ## Mirrors `_drive_charger_to_charging` but for the Grunt's IDLE → CHASE →
@@ -283,15 +299,22 @@ func test_boss_recovery_handler_zeros_velocity_on_subsequent_tick() -> void:
 func _drive_grunt_to_swing_fire(g: Grunt) -> void:
 	# Tick 1: chase handler sees player in melee range → enters telegraph.
 	g._physics_process(PHYS_DELTA)
-	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_LIGHT,
-		"precondition: grunt enters light telegraph when player in melee range")
+	assert_eq(
+		g.get_state(),
+		Grunt.STATE_TELEGRAPHING_LIGHT,
+		"precondition: grunt enters light telegraph when player in melee range"
+	)
 	# Tick 2: tick past the telegraph window → swing fires → STATE_ATTACKING.
 	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.001)
-	assert_eq(g.get_state(), Grunt.STATE_ATTACKING,
-		"precondition: grunt enters attack-recovery after light swing fires")
+	assert_eq(
+		g.get_state(),
+		Grunt.STATE_ATTACKING,
+		"precondition: grunt enters attack-recovery after light swing fires"
+	)
 
 
 # ---- 7: Grunt has nonzero pushback velocity after light-swing fires ------
+
 
 func test_grunt_has_nonzero_pushback_velocity_after_light_swing() -> void:
 	# Sponsor symptom (M1 RC re-soak attempt 5): when player moves through a
@@ -316,11 +339,13 @@ func test_grunt_has_nonzero_pushback_velocity_after_light_swing() -> void:
 
 	# PRE-FIX: velocity was Vector2.ZERO — no separation, mob sticks.
 	# POST-FIX: velocity is non-zero (pushback applied at swing-fire time).
-	assert_gt(g.velocity.length(), 0.0,
-		"grunt has non-zero pushback velocity on light-swing fire tick")
+	assert_gt(
+		g.velocity.length(), 0.0, "grunt has non-zero pushback velocity on light-swing fire tick"
+	)
 
 
 # ---- 8: Grunt pushback velocity points away from player ------------------
+
 
 func test_grunt_pushback_velocity_points_away_from_player_after_light_swing() -> void:
 	# The pushback must be DIRECTIONALLY away from the player, not just any
@@ -341,11 +366,11 @@ func test_grunt_pushback_velocity_points_away_from_player_after_light_swing() ->
 	var pushback_dir: Vector2 = g.velocity.normalized()
 	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
 	var dot: float = pushback_dir.dot(away_dir)
-	assert_gt(dot, 0.0,
-		"grunt pushback must point away from player (dot=%.3f)" % dot)
+	assert_gt(dot, 0.0, "grunt pushback must point away from player (dot=%.3f)" % dot)
 
 
 # ---- 9: Grunt heavy-swing also applies pushback --------------------------
+
 
 func test_grunt_has_nonzero_pushback_velocity_after_heavy_swing() -> void:
 	# Heavy swing fires from STATE_TELEGRAPHING_HEAVY (low-HP one-shot).
@@ -362,19 +387,27 @@ func test_grunt_has_nonzero_pushback_velocity_after_heavy_swing() -> void:
 	# Default hp_max = 50, so 30% threshold = ceil(15) = 15. Hitting for 35
 	# leaves 15, which is at the threshold (heavy fires).
 	g.take_damage(35, Vector2.ZERO, null)
-	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_HEAVY,
-		"precondition: grunt in heavy telegraph after low-HP hit")
+	assert_eq(
+		g.get_state(),
+		Grunt.STATE_TELEGRAPHING_HEAVY,
+		"precondition: grunt in heavy telegraph after low-HP hit"
+	)
 
 	# Tick past heavy telegraph window — heavy swing fires.
 	g._physics_process(Grunt.HEAVY_TELEGRAPH_DURATION + 0.001)
-	assert_eq(g.get_state(), Grunt.STATE_ATTACKING,
-		"precondition: grunt enters attack recovery after heavy swing")
+	assert_eq(
+		g.get_state(),
+		Grunt.STATE_ATTACKING,
+		"precondition: grunt enters attack recovery after heavy swing"
+	)
 
-	assert_gt(g.velocity.length(), 0.0,
-		"grunt has non-zero pushback velocity on heavy-swing fire tick")
+	assert_gt(
+		g.velocity.length(), 0.0, "grunt has non-zero pushback velocity on heavy-swing fire tick"
+	)
 
 
 # ---- 10: Grunt recovery handler zeros velocity on SUBSEQUENT tick --------
+
 
 func test_grunt_recovery_handler_zeros_velocity_on_subsequent_tick() -> void:
 	# After the swing-fire pushback tick, _process_recover must zero velocity
@@ -394,11 +427,15 @@ func test_grunt_recovery_handler_zeros_velocity_on_subsequent_tick() -> void:
 
 	# SUBSEQUENT tick — _process_recover must zero velocity.
 	g._physics_process(PHYS_DELTA)
-	assert_eq(g.velocity, Vector2.ZERO,
-		"grunt velocity zeroed on tick after pushback (rooted during recovery)")
+	assert_eq(
+		g.velocity,
+		Vector2.ZERO,
+		"grunt velocity zeroed on tick after pushback (rooted during recovery)"
+	)
 
 
 # ---- 11: EDGE — Grunt stays rooted while player escapes during recovery --
+
 
 func test_grunt_does_not_chase_player_during_recovery() -> void:
 	# Sponsor's exact scenario reframed for Grunt: player moves AWAY from
@@ -422,10 +459,16 @@ func test_grunt_does_not_chase_player_during_recovery() -> void:
 	# inside the recovery window so we stay in STATE_ATTACKING throughout.
 	for _i: int in range(5):
 		g._physics_process(PHYS_DELTA)
-		assert_eq(g.velocity, Vector2.ZERO,
-			"grunt stays rooted (no chase) while player escapes during recovery")
-		assert_eq(g.get_state(), Grunt.STATE_ATTACKING,
-			"grunt remains in STATE_ATTACKING while recovery timer counts down")
+		assert_eq(
+			g.velocity,
+			Vector2.ZERO,
+			"grunt stays rooted (no chase) while player escapes during recovery"
+		)
+		assert_eq(
+			g.get_state(),
+			Grunt.STATE_ATTACKING,
+			"grunt remains in STATE_ATTACKING while recovery timer counts down"
+		)
 
 
 # ---- M2 W1 universal-bug-class generalization: motion_mode = FLOATING ----
@@ -457,16 +500,21 @@ func test_grunt_does_not_chase_player_during_recovery() -> void:
 
 # ---- 12: Grunt motion_mode is FLOATING after _ready (regression guard) ---
 
+
 func test_grunt_motion_mode_is_floating_after_ready() -> void:
 	## Direct property assertion: the canonical Godot 4 top-down 2D
 	## CharacterBody2D motion_mode is FLOATING. GROUNDED is the engine
 	## default and would re-introduce the south-approach floor-snap bug.
 	var g: Grunt = _make_grunt()
-	assert_eq(g.motion_mode, CharacterBody2D.MOTION_MODE_FLOATING,
-		"grunt motion_mode must be FLOATING after _ready() so move_and_slide treats every axis equally")
+	assert_eq(
+		g.motion_mode,
+		CharacterBody2D.MOTION_MODE_FLOATING,
+		"grunt motion_mode must be FLOATING after _ready() so move_and_slide treats every axis equally"
+	)
 
 
 # ---- 13: Grunt separates from player on south approach (the latent bug) ---
+
 
 func test_grunt_separates_from_player_approached_from_south() -> void:
 	## The previously-latent bug: player below grunt → collision normal aligns
@@ -486,21 +534,31 @@ func test_grunt_separates_from_player_approached_from_south() -> void:
 
 	_drive_grunt_to_swing_fire(g)
 
-	assert_gt(g.velocity.length(), 0.0,
-		"south-approach: grunt velocity must be non-zero after swing-fire (separation from player)")
+	assert_gt(
+		g.velocity.length(),
+		0.0,
+		"south-approach: grunt velocity must be non-zero after swing-fire (separation from player)"
+	)
 	# Pushback must point NORTH (away from player below). i.e. velocity.y < 0.
-	assert_lt(g.velocity.y, 0.0,
-		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)"
-			% [g.velocity.x, g.velocity.y])
+	assert_lt(
+		g.velocity.y,
+		0.0,
+		(
+			"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)"
+			% [g.velocity.x, g.velocity.y]
+		)
+	)
 
 	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
 	var pushback_dir: Vector2 = g.velocity.normalized()
 	var dot: float = pushback_dir.dot(away_dir)
-	assert_gt(dot, 0.0,
-		"south-approach: pushback aligned with away-from-player vector (dot=%.3f)" % dot)
+	assert_gt(
+		dot, 0.0, "south-approach: pushback aligned with away-from-player vector (dot=%.3f)" % dot
+	)
 
 
 # ---- 14: Grunt north-approach baseline (was always working) -------------
+
 
 func test_grunt_separates_from_player_approached_from_north() -> void:
 	## Baseline regression test: north approach was reported working pre-fix.
@@ -516,11 +574,17 @@ func test_grunt_separates_from_player_approached_from_north() -> void:
 
 	_drive_grunt_to_swing_fire(g)
 
-	assert_gt(g.velocity.length(), 0.0,
-		"north-approach: grunt velocity must be non-zero after swing-fire")
-	assert_gt(g.velocity.y, 0.0,
-		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)"
-			% [g.velocity.x, g.velocity.y])
+	assert_gt(
+		g.velocity.length(), 0.0, "north-approach: grunt velocity must be non-zero after swing-fire"
+	)
+	assert_gt(
+		g.velocity.y,
+		0.0,
+		(
+			"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)"
+			% [g.velocity.x, g.velocity.y]
+		)
+	)
 
 	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
 	var dot: float = g.velocity.normalized().dot(away_dir)
@@ -528,6 +592,7 @@ func test_grunt_separates_from_player_approached_from_north() -> void:
 
 
 # ---- 15: Grunt west-approach baseline ------------------------------------
+
 
 func test_grunt_separates_from_player_approached_from_west() -> void:
 	## Baseline regression: west approach. Post-fix pushback points EAST (+X).
@@ -540,11 +605,17 @@ func test_grunt_separates_from_player_approached_from_west() -> void:
 
 	_drive_grunt_to_swing_fire(g)
 
-	assert_gt(g.velocity.length(), 0.0,
-		"west-approach: grunt velocity must be non-zero after swing-fire")
-	assert_gt(g.velocity.x, 0.0,
-		"west-approach: pushback must point EAST (positive X) — got velocity=(%.2f,%.2f)"
-			% [g.velocity.x, g.velocity.y])
+	assert_gt(
+		g.velocity.length(), 0.0, "west-approach: grunt velocity must be non-zero after swing-fire"
+	)
+	assert_gt(
+		g.velocity.x,
+		0.0,
+		(
+			"west-approach: pushback must point EAST (positive X) — got velocity=(%.2f,%.2f)"
+			% [g.velocity.x, g.velocity.y]
+		)
+	)
 
 	var away_dir: Vector2 = (g.global_position - p.global_position).normalized()
 	var dot: float = g.velocity.normalized().dot(away_dir)
@@ -555,17 +626,21 @@ func test_grunt_separates_from_player_approached_from_west() -> void:
 # relative to grunt at origin). Together with #13 / #14 / #15, all four
 # cardinal approach angles are now covered.
 
-
 # ---- 16: Charger motion_mode is FLOATING after _ready (regression guard) -
+
 
 func test_charger_motion_mode_is_floating_after_ready() -> void:
 	## Direct property assertion. Same rationale as the grunt + boss tests.
 	var c: Charger = _make_charger()
-	assert_eq(c.motion_mode, CharacterBody2D.MOTION_MODE_FLOATING,
-		"charger motion_mode must be FLOATING after _ready() so move_and_slide treats every axis equally")
+	assert_eq(
+		c.motion_mode,
+		CharacterBody2D.MOTION_MODE_FLOATING,
+		"charger motion_mode must be FLOATING after _ready() so move_and_slide treats every axis equally"
+	)
 
 
 # ---- 17: Charger separates from player on south approach ----------------
+
 
 func test_charger_separates_from_player_approached_from_south() -> void:
 	## Player below charger → collision normal aligns with up_direction →
@@ -591,24 +666,39 @@ func test_charger_separates_from_player_approached_from_south() -> void:
 	p.global_position = Vector2.ZERO
 
 	c._physics_process(PHYS_DELTA)
-	assert_eq(c.get_state(), Charger.STATE_RECOVERING,
-		"charger enters recovery on south-approach contact (no direction-asymmetry in trigger logic)")
+	assert_eq(
+		c.get_state(),
+		Charger.STATE_RECOVERING,
+		"charger enters recovery on south-approach contact (no direction-asymmetry in trigger logic)"
+	)
 
-	assert_gt(c.velocity.length(), 0.0,
-		"south-approach: charger velocity must be non-zero on contact tick")
+	assert_gt(
+		c.velocity.length(),
+		0.0,
+		"south-approach: charger velocity must be non-zero on contact tick"
+	)
 	# Pushback must point NORTH (away from player below). i.e. velocity.y < 0.
-	assert_lt(c.velocity.y, 0.0,
-		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)"
-			% [c.velocity.x, c.velocity.y])
+	assert_lt(
+		c.velocity.y,
+		0.0,
+		(
+			"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)"
+			% [c.velocity.x, c.velocity.y]
+		)
+	)
 
 	var away_dir: Vector2 = (c.global_position - p.global_position).normalized()
 	var pushback_dir: Vector2 = c.velocity.normalized()
 	var dot: float = pushback_dir.dot(away_dir)
-	assert_gt(dot, 0.0,
-		"south-approach: charger pushback aligned with away-from-player vector (dot=%.3f)" % dot)
+	assert_gt(
+		dot,
+		0.0,
+		"south-approach: charger pushback aligned with away-from-player vector (dot=%.3f)" % dot
+	)
 
 
 # ---- 18: Charger north-approach baseline --------------------------------
+
 
 func test_charger_separates_from_player_approached_from_north() -> void:
 	## Baseline regression: north approach. Post-fix pushback points SOUTH (+Y).
@@ -626,16 +716,23 @@ func test_charger_separates_from_player_approached_from_north() -> void:
 	c._physics_process(PHYS_DELTA)
 	assert_eq(c.get_state(), Charger.STATE_RECOVERING)
 
-	assert_gt(c.velocity.length(), 0.0,
-		"north-approach: charger velocity must be non-zero on contact tick")
-	assert_gt(c.velocity.y, 0.0,
-		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)"
-			% [c.velocity.x, c.velocity.y])
+	assert_gt(
+		c.velocity.length(),
+		0.0,
+		"north-approach: charger velocity must be non-zero on contact tick"
+	)
+	assert_gt(
+		c.velocity.y,
+		0.0,
+		(
+			"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)"
+			% [c.velocity.x, c.velocity.y]
+		)
+	)
 
 	var away_dir: Vector2 = (c.global_position - p.global_position).normalized()
 	var dot: float = c.velocity.normalized().dot(away_dir)
 	assert_gt(dot, 0.0, "north-approach: charger pushback aligned with away-axis (dot=%.3f)" % dot)
-
 
 # Note: existing tests #1 / #2 / #6 cover the WEST approach (charger at -X
 # of player). The boss test file covers all four cardinal directions for

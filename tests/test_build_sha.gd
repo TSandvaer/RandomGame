@@ -42,6 +42,7 @@ func after_each() -> void:
 
 # --- Source priority -----------------------------------------------------
 
+
 func test_dev_local_when_no_file_no_env() -> void:
 	_build_info().reload_for_test()
 	assert_eq(_build_info().sha, "dev-local")
@@ -94,6 +95,7 @@ func test_file_takes_priority_over_env() -> void:
 
 # --- Display formatting --------------------------------------------------
 
+
 func test_short_sha_left_alone_if_already_under_7() -> void:
 	# Defensive: a hand-written short SHA shouldn't be re-truncated.
 	var f: FileAccess = FileAccess.open(FIXTURE_PATH, FileAccess.WRITE)
@@ -118,6 +120,7 @@ func test_empty_file_falls_through_to_dev_local() -> void:
 
 
 # --- Main scene wiring ---------------------------------------------------
+
 
 func test_main_scene_mounts_build_label_at_runtime() -> void:
 	# Per `feat(integration)` run-013: Main.tscn no longer carries authored

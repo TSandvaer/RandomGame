@@ -23,17 +23,20 @@ func before_each() -> void:
 
 # --- Curve shape -------------------------------------------------------
 
+
 func test_curve_is_monotonic_increasing_until_cap() -> void:
 	# xp_required_for(level) must be strictly increasing for 1 <= L < MAX,
 	# then 0 at MAX_LEVEL (no further levels).
 	var prev: int = -1
 	for L: int in range(MIN_LEVEL, MAX_LEVEL):
 		var cost: int = Levels.xp_required_for(L)
-		assert_gt(cost, prev,
-			"xp_required_for(%d) = %d must exceed previous %d" % [L, cost, prev])
+		assert_gt(cost, prev, "xp_required_for(%d) = %d must exceed previous %d" % [L, cost, prev])
 		prev = cost
-	assert_eq(Levels.xp_required_for(MAX_LEVEL), 0,
-		"xp_required_for(MAX_LEVEL) must be 0 (no further levels)")
+	assert_eq(
+		Levels.xp_required_for(MAX_LEVEL),
+		0,
+		"xp_required_for(MAX_LEVEL) must be 0 (no further levels)"
+	)
 
 
 func test_curve_matches_expected_table() -> void:
@@ -43,16 +46,17 @@ func test_curve_matches_expected_table() -> void:
 	#
 	# Formula: floor(100 * L^1.5)
 	var expected: Dictionary = {
-		1: 100,   # 100 * 1^1.5 = 100
-		2: 282,   # 100 * 2^1.5 ~ 282.842 -> floor 282
-		3: 519,   # 100 * 3^1.5 ~ 519.615 -> floor 519
-		4: 800,   # 100 * 4^1.5 = 800.0
-		5: 0,     # MAX_LEVEL — no further
+		1: 100,  # 100 * 1^1.5 = 100
+		2: 282,  # 100 * 2^1.5 ~ 282.842 -> floor 282
+		3: 519,  # 100 * 3^1.5 ~ 519.615 -> floor 519
+		4: 800,  # 100 * 4^1.5 = 800.0
+		5: 0,  # MAX_LEVEL — no further
 	}
 	for L: int in expected.keys():
 		var got: int = Levels.xp_required_for(L)
-		assert_eq(got, expected[L],
-			"xp_required_for(%d) expected=%d got=%d" % [L, expected[L], got])
+		assert_eq(
+			got, expected[L], "xp_required_for(%d) expected=%d got=%d" % [L, expected[L], got]
+		)
 
 
 func test_curve_handles_negative_or_zero_level_input() -> void:
@@ -63,6 +67,7 @@ func test_curve_handles_negative_or_zero_level_input() -> void:
 
 
 # --- Level-up timing ---------------------------------------------------
+
 
 func test_level_up_fires_at_exact_threshold() -> void:
 	watch_signals(_levels())
@@ -89,6 +94,7 @@ func test_xp_gained_signal_emits_with_actual_amount() -> void:
 
 
 # --- Multi-level overflow ----------------------------------------------
+
 
 func test_single_gain_crosses_multiple_levels() -> void:
 	# Big gain at L1 — costs are 100 / 282 / 519 / 800.
@@ -133,13 +139,13 @@ func test_huge_gain_clamps_at_max_level() -> void:
 
 # --- Edge cases -------------------------------------------------------
 
+
 func test_gain_zero_xp_is_noop() -> void:
 	watch_signals(_levels())
 	_levels().gain_xp(0)
 	assert_eq(_levels().current_level(), 1)
 	assert_eq(_levels().current_xp(), 0)
-	assert_signal_emit_count(_levels(), "xp_gained", 0,
-		"gain_xp(0) must NOT fire xp_gained")
+	assert_signal_emit_count(_levels(), "xp_gained", 0, "gain_xp(0) must NOT fire xp_gained")
 	assert_signal_emit_count(_levels(), "level_up", 0)
 
 
@@ -148,10 +154,8 @@ func test_gain_negative_xp_is_rejected() -> void:
 	watch_signals(_levels())
 	_levels().gain_xp(50)
 	_levels().gain_xp(-9999)
-	assert_eq(_levels().current_xp(), 50,
-		"negative gain must not subtract from current XP")
-	assert_signal_emit_count(_levels(), "xp_gained", 1,
-		"only the positive gain fires xp_gained")
+	assert_eq(_levels().current_xp(), 50, "negative gain must not subtract from current XP")
+	assert_signal_emit_count(_levels(), "xp_gained", 1, "only the positive gain fires xp_gained")
 	assert_signal_emit_count(_levels(), "level_up", 0)
 
 
@@ -170,6 +174,7 @@ func test_gain_at_max_level_is_silent_clamp() -> void:
 
 # --- Save round-trip ---------------------------------------------------
 
+
 func test_set_state_round_trips_in_range() -> void:
 	_levels().set_state(3, 200)
 	assert_eq(_levels().current_level(), 3)
@@ -179,21 +184,19 @@ func test_set_state_round_trips_in_range() -> void:
 
 func test_set_state_clamps_out_of_range_level() -> void:
 	_levels().set_state(99, 0)
-	assert_eq(_levels().current_level(), MAX_LEVEL,
-		"level > MAX clamps to MAX")
-	assert_eq(_levels().current_xp(), 0,
-		"max-level XP must be 0 by contract (no carry past cap)")
+	assert_eq(_levels().current_level(), MAX_LEVEL, "level > MAX clamps to MAX")
+	assert_eq(_levels().current_xp(), 0, "max-level XP must be 0 by contract (no carry past cap)")
 
 	_levels().set_state(-3, 50)
-	assert_eq(_levels().current_level(), MIN_LEVEL,
-		"level < MIN clamps to MIN")
+	assert_eq(_levels().current_level(), MIN_LEVEL, "level < MIN clamps to MIN")
 
 
 func test_set_state_clamps_xp_to_below_threshold() -> void:
 	# At L2 with cost 282, set xp=999 — must not auto-level-up on load.
 	_levels().set_state(2, 999)
-	assert_eq(_levels().current_level(), 2,
-		"set_state must NOT auto-level-up — it's pure deserialization")
+	assert_eq(
+		_levels().current_level(), 2, "set_state must NOT auto-level-up — it's pure deserialization"
+	)
 	assert_lt(_levels().current_xp(), Levels.xp_required_for(2))
 
 
@@ -208,6 +211,7 @@ func test_snapshot_writes_level_xp_xp_to_next() -> void:
 
 # --- mob_died subscription --------------------------------------------
 
+
 func test_subscribe_to_mob_grants_xp_on_death() -> void:
 	# Build a fake mob object that emits the same signal shape as Grunt.
 	# We don't need a real Grunt — we just need a Node with the signal and
@@ -220,8 +224,7 @@ func test_subscribe_to_mob_grants_xp_on_death() -> void:
 	assert_eq(_levels().current_xp(), 0)
 	# Emit the signal as the spawner / Grunt would on death.
 	fake_mob.emit_signal("mob_died", fake_mob, Vector2(10, 20), fake_def)
-	assert_eq(_levels().current_xp(), 75,
-		"subscribe_to_mob applies mob_def.xp_reward on mob_died")
+	assert_eq(_levels().current_xp(), 75, "subscribe_to_mob applies mob_def.xp_reward on mob_died")
 
 
 func test_subscribe_to_mob_tolerates_null_def() -> void:
@@ -235,14 +238,21 @@ func test_subscribe_to_mob_tolerates_null_def() -> void:
 
 # --- Test helpers -----------------------------------------------------
 
+
 func _make_fake_mob() -> Node:
 	# Plain Node with a user-added signal matching Grunt.mob_died's shape.
 	var n: Node = Node.new()
-	n.add_user_signal("mob_died", [
-		{"name": "mob", "type": TYPE_OBJECT},
-		{"name": "death_position", "type": TYPE_VECTOR2},
-		{"name": "mob_def", "type": TYPE_OBJECT},
-	])
+	(
+		n
+		. add_user_signal(
+			"mob_died",
+			[
+				{"name": "mob", "type": TYPE_OBJECT},
+				{"name": "death_position", "type": TYPE_VECTOR2},
+				{"name": "mob_def", "type": TYPE_OBJECT},
+			]
+		)
+	)
 	return n
 
 
@@ -255,7 +265,9 @@ func _make_fake_mob_def(reward: int) -> Resource:
 
 
 # Minimal stub matching the duck-typed contract Levels._on_mob_died uses.
-class _FakeMobDef extends Resource:
+class _FakeMobDef:
+	extends Resource
 	@export var xp_reward: int = 0
+
 	func _init(reward: int = 0) -> void:
 		xp_reward = reward

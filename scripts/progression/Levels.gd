@@ -62,19 +62,25 @@ signal level_up(new_level: int)
 
 var _level: int = MIN_LEVEL
 var _xp: int = 0  # XP accumulated INTO the current level (resets on each
-                  # level_up — overflow carries via the loop in gain_xp).
+# level_up — overflow carries via the loop in gain_xp).
 
 
 func _ready() -> void:
 	# Single boot-time line so Tess can grep the smoke log.
-	print("[Levels] autoload ready (curve=%d*L^%.2f, max_level=%d)" % [
-		BASE_XP,
-		EXP_POWER,
-		MAX_LEVEL,
-	])
+	print(
+		(
+			"[Levels] autoload ready (curve=%d*L^%.2f, max_level=%d)"
+			% [
+				BASE_XP,
+				EXP_POWER,
+				MAX_LEVEL,
+			]
+		)
+	)
 
 
 # ---- Public API -------------------------------------------------------
+
 
 ## XP needed to advance from `level` to `level + 1`. Pure function — no
 ## runtime state. Returns 0 for `level >= MAX_LEVEL` (no further levels).
@@ -229,6 +235,7 @@ func _on_mob_died(_mob: Node, _death_position: Vector2, mob_def: Resource) -> vo
 
 
 # ---- Internals ----------------------------------------------------------
+
 
 func _debug_flags() -> Node:
 	# Engine.get_main_loop() can be null during very early init; tolerate.

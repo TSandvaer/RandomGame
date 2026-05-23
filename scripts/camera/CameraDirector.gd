@@ -143,7 +143,6 @@ extends Node
 ##   - `.claude/docs/camera-layer.md` — full reference (updated with continuous-scroll §
 ##     by W2 impl PR)
 
-
 # ---- Constants -------------------------------------------------------
 
 ## Viewport base zoom — matches `1280/480 = 2.6667` so a normalized 1.0×
@@ -172,7 +171,6 @@ const MAX_NORMALIZED_ZOOM: float = 4.0
 ## is provided.
 const DEFAULT_RESET_DURATION: float = 0.2
 
-
 # ---- Signals ---------------------------------------------------------
 
 ## Emitted whenever the live normalized zoom changes (after a tween step
@@ -193,7 +191,6 @@ signal follow_target_changed(engaged: bool)
 ## Emitted when the world-bounds clamp engages, changes, or clears.
 ## Payload is the new clamp rect; `Rect2()` (zero size) means cleared.
 signal world_bounds_changed(bounds: Rect2)
-
 
 # ---- State -----------------------------------------------------------
 
@@ -262,8 +259,8 @@ var _world_bounds: Rect2 = Rect2()
 ## that pre-T9 rendering assumed.
 const LOGICAL_VIEWPORT_BASE: Vector2 = Vector2(1280.0, 720.0)
 
-
 # ---- Lifecycle -------------------------------------------------------
+
 
 func _ready() -> void:
 	# Create the Camera2D puppet. Parented to the autoload (which is itself
@@ -279,8 +276,12 @@ func _ready() -> void:
 	# Defer player resolution one frame so the boot scene (Main) has time
 	# to spawn + register the player in the "player" group.
 	call_deferred("_resolve_player_target")
-	print("[CameraDirector] ready normalized_zoom=%.3f baseline=(%.4f,%.4f)" % [
-		DEFAULT_NORMALIZED_ZOOM, BASELINE_ZOOM.x, BASELINE_ZOOM.y])
+	print(
+		(
+			"[CameraDirector] ready normalized_zoom=%.3f baseline=(%.4f,%.4f)"
+			% [DEFAULT_NORMALIZED_ZOOM, BASELINE_ZOOM.x, BASELINE_ZOOM.y]
+		)
+	)
 
 
 func _process(delta: float) -> void:
@@ -300,7 +301,8 @@ func _process(delta: float) -> void:
 	elif _follow_target != null and is_instance_valid(_follow_target):
 		# Continuous-scroll mode — deadzone follow.
 		var candidate: Vector2 = _compute_deadzone_follow_position(
-			_camera.global_position, _follow_target.global_position, _follow_deadzone)
+			_camera.global_position, _follow_target.global_position, _follow_deadzone
+		)
 		if _world_bounds.size != Vector2.ZERO:
 			candidate = _clamp_to_world_bounds(candidate, _world_bounds)
 		_camera.global_position = candidate
@@ -333,12 +335,17 @@ func _emit_state_trace() -> void:
 		return
 	var df: Node = get_tree().root.get_node_or_null("DebugFlags") if is_inside_tree() else null
 	if df != null and df.has_method("combat_trace"):
-		df.combat_trace("CameraDirector.state",
-			"zoom=%.4f pos=(%.0f,%.0f)" % [
-				_camera.zoom.x, _camera.global_position.x, _camera.global_position.y])
+		df.combat_trace(
+			"CameraDirector.state",
+			(
+				"zoom=%.4f pos=(%.0f,%.0f)"
+				% [_camera.zoom.x, _camera.global_position.x, _camera.global_position.y]
+			)
+		)
 
 
 # ---- Public API ------------------------------------------------------
+
 
 ## Request a zoom change. See class docstring for semantics.
 ##
@@ -357,27 +364,37 @@ func _emit_state_trace() -> void:
 ## recent in-flight request, this is a no-op. Different params kill the
 ## in-flight tween + start a new one (most-recent-call-wins).
 func request_zoom(
-		target_normalized_scale: float,
-		duration: float,
-		anchor: Vector2 = Vector2.ZERO) -> void:
+	target_normalized_scale: float, duration: float, anchor: Vector2 = Vector2.ZERO
+) -> void:
 	# Validate scale.
 	if is_nan(target_normalized_scale) or is_inf(target_normalized_scale):
-		_warn(("CameraDirector.request_zoom: non-finite scale (%s) — refusing"
-			% str(target_normalized_scale)), "camera_director")
+		_warn(
+			(
+				"CameraDirector.request_zoom: non-finite scale (%s) — refusing"
+				% str(target_normalized_scale)
+			),
+			"camera_director"
+		)
 		return
 	var clamped: float = clampf(target_normalized_scale, MIN_NORMALIZED_ZOOM, MAX_NORMALIZED_ZOOM)
 	if not is_equal_approx(clamped, target_normalized_scale):
-		_warn(("CameraDirector.request_zoom: scale %.3f clamped to %.3f (range [%.2f, %.2f])"
-			% [target_normalized_scale, clamped, MIN_NORMALIZED_ZOOM, MAX_NORMALIZED_ZOOM]),
-			"camera_director")
+		_warn(
+			(
+				"CameraDirector.request_zoom: scale %.3f clamped to %.3f (range [%.2f, %.2f])"
+				% [target_normalized_scale, clamped, MIN_NORMALIZED_ZOOM, MAX_NORMALIZED_ZOOM]
+			),
+			"camera_director"
+		)
 	var clamped_duration: float = maxf(duration, 0.0)
 
 	# Idempotence: same target + same anchor as the live request, and we're
 	# already at the target → no-op. The threshold tolerates float drift.
-	if (is_equal_approx(clamped, _last_request_target_normalized)
-			and _last_request_anchor == anchor
-			and is_equal_approx(_current_normalized_zoom, clamped)
-			and (_zoom_tween == null or not _zoom_tween.is_valid())):
+	if (
+		is_equal_approx(clamped, _last_request_target_normalized)
+		and _last_request_anchor == anchor
+		and is_equal_approx(_current_normalized_zoom, clamped)
+		and (_zoom_tween == null or not _zoom_tween.is_valid())
+	):
 		# Already at the requested state; no-op.
 		return
 
@@ -390,9 +407,13 @@ func request_zoom(
 	# poking at GDScript internals.
 	var df: Node = get_tree().root.get_node_or_null("DebugFlags") if is_inside_tree() else null
 	if df != null and df.has_method("combat_trace"):
-		df.combat_trace("CameraDirector.request_zoom",
-			"target=%.3f duration=%.3f anchor=(%.1f,%.1f)" % [
-				clamped, clamped_duration, anchor.x, anchor.y])
+		df.combat_trace(
+			"CameraDirector.request_zoom",
+			(
+				"target=%.3f duration=%.3f anchor=(%.1f,%.1f)"
+				% [clamped, clamped_duration, anchor.x, anchor.y]
+			)
+		)
 
 	# Kill in-flight tweens — most-recent call wins.
 	if _zoom_tween != null and _zoom_tween.is_valid():
@@ -420,7 +441,8 @@ func request_zoom(
 		# parallel value-tween of our own state so subscribers see smooth
 		# updates each frame.
 		_zoom_tween.parallel().tween_method(
-			_on_zoom_tween_step, _current_normalized_zoom, clamped, clamped_duration)
+			_on_zoom_tween_step, _current_normalized_zoom, clamped, clamped_duration
+		)
 		_zoom_tween.tween_callback(_on_zoom_tween_done.bind(clamped))
 
 	# Apply anchor.
@@ -470,6 +492,7 @@ func get_camera() -> Camera2D:
 
 # ---- M3 Tier 3 W1 — continuous-scroll API -----------------------------
 
+
 ## Engage continuous-scroll follow mode against `target`. The camera moves
 ## smoothly within a deadzone so small target motions don't shake the view;
 ## crossings of the deadzone edge cause the camera to catch up to maintain
@@ -492,29 +515,42 @@ func follow_target(target: Node2D, deadzone_px: Vector2 = Vector2.ZERO) -> void:
 		clear_follow_target()
 		return
 	# Validate + clamp deadzone.
-	if (is_nan(deadzone_px.x) or is_nan(deadzone_px.y)
-			or is_inf(deadzone_px.x) or is_inf(deadzone_px.y)):
-		_warn(("CameraDirector.follow_target: non-finite deadzone (%s) — refusing"
-			% str(deadzone_px)), "camera_director")
+	if (
+		is_nan(deadzone_px.x)
+		or is_nan(deadzone_px.y)
+		or is_inf(deadzone_px.x)
+		or is_inf(deadzone_px.y)
+	):
+		_warn(
+			"CameraDirector.follow_target: non-finite deadzone (%s) — refusing" % str(deadzone_px),
+			"camera_director"
+		)
 		return
 	var clamped_dz: Vector2 = Vector2(maxf(deadzone_px.x, 0.0), maxf(deadzone_px.y, 0.0))
 	if clamped_dz != deadzone_px:
-		_warn(("CameraDirector.follow_target: deadzone %s clamped to %s "
-			+ "(negative components → 0)") % [str(deadzone_px), str(clamped_dz)],
-			"camera_director")
+		_warn(
+			(
+				(
+					"CameraDirector.follow_target: deadzone %s clamped to %s "
+					+ "(negative components → 0)"
+				)
+				% [str(deadzone_px), str(clamped_dz)]
+			),
+			"camera_director"
+		)
 
 	# HTML5-only Playwright-observable trace.
 	var df: Node = get_tree().root.get_node_or_null("DebugFlags") if is_inside_tree() else null
 	if df != null and df.has_method("combat_trace"):
-		df.combat_trace("CameraDirector.follow_target",
-			"target=%s deadzone=(%.1f,%.1f)" % [
-				target.name, clamped_dz.x, clamped_dz.y])
+		df.combat_trace(
+			"CameraDirector.follow_target",
+			"target=%s deadzone=(%.1f,%.1f)" % [target.name, clamped_dz.x, clamped_dz.y]
+		)
 
 	var was_engaged: bool = _follow_target != null and is_instance_valid(_follow_target)
 	var changed: bool = (
-		(_follow_target != target)
-		or (clamped_dz != _follow_deadzone)
-		or not was_engaged)
+		(_follow_target != target) or (clamped_dz != _follow_deadzone) or not was_engaged
+	)
 	_follow_target = target
 	_follow_deadzone = clamped_dz
 	if changed:
@@ -543,17 +579,23 @@ func clear_follow_target() -> void:
 ## `set_world_bounds(Rect2(0, 0, 1440, 270))`.
 func set_world_bounds(bounds: Rect2) -> void:
 	if bounds.size.x < 0.0 or bounds.size.y < 0.0:
-		_warn(("CameraDirector.set_world_bounds: negative size %s — refusing"
-			% str(bounds)), "camera_director")
+		_warn(
+			"CameraDirector.set_world_bounds: negative size %s — refusing" % str(bounds),
+			"camera_director"
+		)
 		return
 	if _world_bounds == bounds:
 		return
 	_world_bounds = bounds
 	var df: Node = get_tree().root.get_node_or_null("DebugFlags") if is_inside_tree() else null
 	if df != null and df.has_method("combat_trace"):
-		df.combat_trace("CameraDirector.set_world_bounds",
-			"pos=(%.0f,%.0f) size=(%.0f,%.0f)" % [
-				bounds.position.x, bounds.position.y, bounds.size.x, bounds.size.y])
+		df.combat_trace(
+			"CameraDirector.set_world_bounds",
+			(
+				"pos=(%.0f,%.0f) size=(%.0f,%.0f)"
+				% [bounds.position.x, bounds.position.y, bounds.size.x, bounds.size.y]
+			)
+		)
 	world_bounds_changed.emit(bounds)
 
 
@@ -589,6 +631,7 @@ func get_follow_deadzone() -> Vector2:
 
 
 # ---- Internals -------------------------------------------------------
+
 
 func _resolve_player_target() -> void:
 	if not is_inside_tree():
@@ -629,9 +672,8 @@ func _on_zoom_tween_done(final_normalized: float) -> void:
 ##
 ## Static-like: no member access except via params. Test-callable.
 func _compute_deadzone_follow_position(
-		camera_pos: Vector2,
-		target_pos: Vector2,
-		deadzone: Vector2) -> Vector2:
+	camera_pos: Vector2, target_pos: Vector2, deadzone: Vector2
+) -> Vector2:
 	var result: Vector2 = camera_pos
 	# X axis.
 	var dx: float = target_pos.x - camera_pos.x
@@ -670,8 +712,8 @@ func _clamp_to_world_bounds(camera_pos: Vector2, bounds: Rect2) -> Vector2:
 	var safe_zoom_x: float = zoom.x if zoom.x > 0.001 else BASELINE_ZOOM.x
 	var safe_zoom_y: float = zoom.y if zoom.y > 0.001 else BASELINE_ZOOM.y
 	var viewport_world: Vector2 = Vector2(
-		LOGICAL_VIEWPORT_BASE.x / safe_zoom_x,
-		LOGICAL_VIEWPORT_BASE.y / safe_zoom_y)
+		LOGICAL_VIEWPORT_BASE.x / safe_zoom_x, LOGICAL_VIEWPORT_BASE.y / safe_zoom_y
+	)
 	var half_vp: Vector2 = viewport_world * 0.5
 
 	var result: Vector2 = camera_pos
@@ -680,16 +722,20 @@ func _clamp_to_world_bounds(camera_pos: Vector2, bounds: Rect2) -> Vector2:
 		# Bounds narrower than viewport → center on bounds.
 		result.x = bounds.position.x + bounds.size.x * 0.5
 	else:
-		result.x = clampf(camera_pos.x,
+		result.x = clampf(
+			camera_pos.x,
 			bounds.position.x + half_vp.x,
-			bounds.position.x + bounds.size.x - half_vp.x)
+			bounds.position.x + bounds.size.x - half_vp.x
+		)
 	# Y axis.
 	if bounds.size.y <= viewport_world.y:
 		result.y = bounds.position.y + bounds.size.y * 0.5
 	else:
-		result.y = clampf(camera_pos.y,
+		result.y = clampf(
+			camera_pos.y,
 			bounds.position.y + half_vp.y,
-			bounds.position.y + bounds.size.y - half_vp.y)
+			bounds.position.y + bounds.size.y - half_vp.y
+		)
 	return result
 
 

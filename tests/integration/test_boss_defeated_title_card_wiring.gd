@@ -62,6 +62,7 @@ func _save() -> Node:
 
 # ---- Spec test: Main wires boss_defeated → card instantiation --------
 
+
 func test_boss_defeated_spawns_title_card_under_main() -> void:
 	# Loads Main, advances to the boss room, then synthetically emits the
 	# room's `boss_defeated(boss, pos)` signal — proving the wiring from
@@ -103,20 +104,26 @@ func test_boss_defeated_spawns_title_card_under_main() -> void:
 	await get_tree().process_frame
 
 	var post_card_count: int = _count_cards_under(main)
-	assert_eq(post_card_count, pre_card_count + 1,
-		"exactly one BossDefeatedTitleCard must be added under Main when boss_defeated fires")
+	assert_eq(
+		post_card_count,
+		pre_card_count + 1,
+		"exactly one BossDefeatedTitleCard must be added under Main when boss_defeated fires"
+	)
 
 	var card: BossDefeatedTitleCard = _find_card_under(main)
 	assert_not_null(card, "the spawned card must be discoverable under Main")
 	# Title text must template from the boss's MobDef.display_name —
 	# "Warden of the Outer Cloister" → "Warden" → "The Warden falls."
-	assert_eq(card.get_title_label().text, "The Warden falls.",
-		"title text templated from boss.mob_def.display_name first-word")
-	assert_eq(card.get_subtitle_label().text, "STRATUM 1 CLEARED",
-		"subtitle hard-coded for M1")
+	assert_eq(
+		card.get_title_label().text,
+		"The Warden falls.",
+		"title text templated from boss.mob_def.display_name first-word"
+	)
+	assert_eq(card.get_subtitle_label().text, "STRATUM 1 CLEARED", "subtitle hard-coded for M1")
 
 
 # ---- Helpers ----------------------------------------------------------
+
 
 func _count_cards_under(main: Node) -> int:
 	var n: int = 0

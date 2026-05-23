@@ -51,8 +51,8 @@ const STREAM_PATH_S2_AMBIENT: String = "res://audio/ambient/stratum2/amb-stratum
 const RESUME_DB: float = -4.4  # 60% nominal — Uma s1-ambient.md §"Volume / loudness targets"
 const RESUME_DB_EPSILON: float = 0.05
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _audio_director() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("AudioDirector")
@@ -74,23 +74,30 @@ func before_each() -> void:
 
 # ---- AudioDirector S1 ambient API contract ----------------------------
 
+
 func test_audio_director_exposes_play_stratum1_ambient() -> void:
 	var ad: Node = _audio_director()
 	assert_not_null(ad, "AudioDirector autoload must be registered")
-	assert_true(ad.has_method("play_stratum1_ambient"),
-		"AudioDirector must expose play_stratum1_ambient() — T10 wiring contract")
+	assert_true(
+		ad.has_method("play_stratum1_ambient"),
+		"AudioDirector must expose play_stratum1_ambient() — T10 wiring contract"
+	)
 
 
 func test_audio_director_exposes_stop_stratum1_ambient() -> void:
 	var ad: Node = _audio_director()
-	assert_true(ad.has_method("stop_stratum1_ambient"),
-		"AudioDirector must expose stop_stratum1_ambient() — BI-03 wiring contract")
+	assert_true(
+		ad.has_method("stop_stratum1_ambient"),
+		"AudioDirector must expose stop_stratum1_ambient() — BI-03 wiring contract"
+	)
 
 
 func test_audio_director_exposes_resume_stratum1_ambient_at_60_percent() -> void:
 	var ad: Node = _audio_director()
-	assert_true(ad.has_method("resume_stratum1_ambient_at_60_percent"),
-		"AudioDirector must expose resume_stratum1_ambient_at_60_percent() — F4 wiring contract")
+	assert_true(
+		ad.has_method("resume_stratum1_ambient_at_60_percent"),
+		"AudioDirector must expose resume_stratum1_ambient_at_60_percent() — F4 wiring contract"
+	)
 
 
 func test_amb_stratum1_room_asset_loads() -> void:
@@ -100,11 +107,11 @@ func test_amb_stratum1_room_asset_loads() -> void:
 	# headless). Same HTML5-safety analog as test_s1_boss_audio_triggers.gd
 	# uses for the S1 boss OGG.
 	var stream: Resource = load(STREAM_PATH_S1_AMBIENT)
-	assert_not_null(stream,
-		"amb-stratum1-room.ogg must load at %s" % STREAM_PATH_S1_AMBIENT)
-	assert_true(stream is AudioStream,
-		"amb-stratum1-room.ogg must be an AudioStream subclass (got %s)" %
-		stream.get_class())
+	assert_not_null(stream, "amb-stratum1-room.ogg must load at %s" % STREAM_PATH_S1_AMBIENT)
+	assert_true(
+		stream is AudioStream,
+		"amb-stratum1-room.ogg must be an AudioStream subclass (got %s)" % stream.get_class()
+	)
 
 
 func test_play_stratum1_ambient_loads_correct_stream_on_ambient_bus() -> void:
@@ -114,11 +121,13 @@ func test_play_stratum1_ambient_loads_correct_stream_on_ambient_bus() -> void:
 	ad.complete_pending_fades_for_test()
 	var player: AudioStreamPlayer = ad.get_ambient_player()
 	assert_not_null(player, "Ambient AudioStreamPlayer must exist")
-	assert_eq(player.bus, "Ambient",
-		"Ambient player must route to the Ambient bus")
+	assert_eq(player.bus, "Ambient", "Ambient player must route to the Ambient bus")
 	assert_not_null(player.stream)
-	assert_eq(player.stream.resource_path, STREAM_PATH_S1_AMBIENT,
-		"play_stratum1_ambient must load amb-stratum1-room.ogg")
+	assert_eq(
+		player.stream.resource_path,
+		STREAM_PATH_S1_AMBIENT,
+		"play_stratum1_ambient must load amb-stratum1-room.ogg"
+	)
 	assert_eq(ad.get_last_ambient_path(), STREAM_PATH_S1_AMBIENT)
 
 
@@ -129,12 +138,16 @@ func test_play_stratum1_ambient_distinct_from_s2_ambient() -> void:
 	var ad: Node = _audio_director()
 	ad.play_stratum1_ambient(1, 0.0)
 	ad.complete_pending_fades_for_test()
-	assert_ne(ad.get_last_ambient_path(), STREAM_PATH_S2_AMBIENT,
-		"S1 ambient must NOT be the S2 ambient asset (cross-stratum-distinct policy)")
+	assert_ne(
+		ad.get_last_ambient_path(),
+		STREAM_PATH_S2_AMBIENT,
+		"S1 ambient must NOT be the S2 ambient asset (cross-stratum-distinct policy)"
+	)
 	assert_eq(ad.get_last_ambient_path(), STREAM_PATH_S1_AMBIENT)
 
 
 # ---- Volume targets ---------------------------------------------------
+
 
 func test_play_stratum1_ambient_default_target_is_full_db() -> void:
 	# Default call (no target_gain_db) should aim at 0 dB nominal on the
@@ -144,8 +157,12 @@ func test_play_stratum1_ambient_default_target_is_full_db() -> void:
 	ad.play_stratum1_ambient(1)
 	ad.complete_pending_fades_for_test()
 	var player: AudioStreamPlayer = ad.get_ambient_player()
-	assert_almost_eq(player.volume_db, 0.0, RESUME_DB_EPSILON,
-		"play_stratum1_ambient() default target is 0 dB (full nominal)")
+	assert_almost_eq(
+		player.volume_db,
+		0.0,
+		RESUME_DB_EPSILON,
+		"play_stratum1_ambient() default target is 0 dB (full nominal)"
+	)
 
 
 func test_resume_stratum1_ambient_at_60_percent_targets_minus_4_4_db() -> void:
@@ -157,8 +174,12 @@ func test_resume_stratum1_ambient_at_60_percent_targets_minus_4_4_db() -> void:
 	ad.resume_stratum1_ambient_at_60_percent(1)
 	ad.complete_pending_fades_for_test()
 	var player: AudioStreamPlayer = ad.get_ambient_player()
-	assert_almost_eq(player.volume_db, RESUME_DB, RESUME_DB_EPSILON,
-		"F4 resume must target -4.4 dB (60%% of nominal) — got %.2f" % player.volume_db)
+	assert_almost_eq(
+		player.volume_db,
+		RESUME_DB,
+		RESUME_DB_EPSILON,
+		"F4 resume must target -4.4 dB (60%% of nominal) — got %.2f" % player.volume_db
+	)
 
 
 func test_resume_targets_minus_4_4_db_via_target_introspection() -> void:
@@ -169,12 +190,16 @@ func test_resume_targets_minus_4_4_db_via_target_introspection() -> void:
 	ad.resume_stratum1_ambient_at_60_percent(50)
 	# Don't snap-complete — directly read the target the tween was built
 	# against.
-	assert_almost_eq(ad.get_ambient_target_db_for_test(), RESUME_DB,
+	assert_almost_eq(
+		ad.get_ambient_target_db_for_test(),
+		RESUME_DB,
 		RESUME_DB_EPSILON,
-		"Resume tween must be built against -4.4 dB target")
+		"Resume tween must be built against -4.4 dB target"
+	)
 
 
 # ---- Idempotence ------------------------------------------------------
+
 
 func test_play_stratum1_ambient_is_idempotent_when_same_gain() -> void:
 	# Room-cycle case: R1→R2→R1 re-fires play_stratum1_ambient. The second
@@ -189,10 +214,15 @@ func test_play_stratum1_ambient_is_idempotent_when_same_gain() -> void:
 	# Re-call with the same args — must NOT re-seed.
 	ad.play_stratum1_ambient(1, 0.0)
 	var stream_after: AudioStream = ad.get_ambient_player().stream
-	assert_eq(stream_before, stream_after,
-		"Repeated play_stratum1_ambient calls (same gain) must not swap stream")
-	assert_true(playing_before and ad.get_ambient_player().playing,
-		"Stream stays playing across the idempotent call")
+	assert_eq(
+		stream_before,
+		stream_after,
+		"Repeated play_stratum1_ambient calls (same gain) must not swap stream"
+	)
+	assert_true(
+		playing_before and ad.get_ambient_player().playing,
+		"Stream stays playing across the idempotent call"
+	)
 
 
 func test_play_stratum1_ambient_retargets_when_different_gain() -> void:
@@ -207,12 +237,16 @@ func test_play_stratum1_ambient_retargets_when_different_gain() -> void:
 	# Re-call with a DIFFERENT gain — must re-target, not no-op.
 	ad.play_stratum1_ambient(1, RESUME_DB)
 	ad.complete_pending_fades_for_test()
-	assert_almost_eq(ad.get_ambient_player().volume_db, RESUME_DB,
+	assert_almost_eq(
+		ad.get_ambient_player().volume_db,
+		RESUME_DB,
 		RESUME_DB_EPSILON,
-		"Different-gain call must re-target the volume tween")
+		"Different-gain call must re-target the volume tween"
+	)
 
 
 # ---- BI-03 fade-out path ----------------------------------------------
+
 
 func test_stop_stratum1_ambient_drives_player_to_silence_and_stops() -> void:
 	# After the fade-out, the player must be stopped (`playing == false`)
@@ -228,10 +262,15 @@ func test_stop_stratum1_ambient_drives_player_to_silence_and_stops() -> void:
 	# stop() after the tween completes. Wait two frames so the tween's
 	# `finished` lands.
 	await wait_frames(3)
-	assert_false(ad.get_ambient_player().playing,
-		"Ambient player must stop after stop_stratum1_ambient fade-out")
-	assert_eq(ad.get_last_ambient_path(), "",
-		"_last_ambient_path must clear so future play_stratum1_ambient is not idempotence-blocked")
+	assert_false(
+		ad.get_ambient_player().playing,
+		"Ambient player must stop after stop_stratum1_ambient fade-out"
+	)
+	assert_eq(
+		ad.get_last_ambient_path(),
+		"",
+		"_last_ambient_path must clear so future play_stratum1_ambient is not idempotence-blocked"
+	)
 
 
 func test_play_stratum1_ambient_re_fires_cleanly_after_stop() -> void:
@@ -246,12 +285,15 @@ func test_play_stratum1_ambient_re_fires_cleanly_after_stop() -> void:
 	# Now re-play — must succeed (not idempotence-blocked).
 	ad.play_stratum1_ambient(1, 0.0)
 	ad.complete_pending_fades_for_test()
-	assert_true(ad.get_ambient_player().playing,
-		"play_stratum1_ambient post-stop must successfully restart the bed")
+	assert_true(
+		ad.get_ambient_player().playing,
+		"play_stratum1_ambient post-stop must successfully restart the bed"
+	)
 	assert_eq(ad.get_last_ambient_path(), STREAM_PATH_S1_AMBIENT)
 
 
 # ---- Stratum1BossRoom wiring ------------------------------------------
+
 
 func _make_boss_room() -> Stratum1BossRoom:
 	# Same shape as test_s1_boss_audio_triggers.gd's helper.
@@ -276,9 +318,14 @@ func test_stratum1_boss_room_wires_entry_sequence_started_to_ambient_stop() -> v
 	for c in connections:
 		if c.has("callable") and c["callable"].get_method() == "_on_entry_sequence_started_audio":
 			ambient_handler_count += 1
-	assert_eq(ambient_handler_count, 1,
-		"_on_entry_sequence_started_audio must be connected exactly once " +
-		"after _ready (got %d connections)" % ambient_handler_count)
+	assert_eq(
+		ambient_handler_count,
+		1,
+		(
+			"_on_entry_sequence_started_audio must be connected exactly once "
+			+ "after _ready (got %d connections)" % ambient_handler_count
+		)
+	)
 
 
 func test_stratum1_boss_room_ambient_wiring_is_idempotent() -> void:
@@ -294,9 +341,14 @@ func test_stratum1_boss_room_ambient_wiring_is_idempotent() -> void:
 	for c in connections:
 		if c.has("callable") and c["callable"].get_method() == "_on_entry_sequence_started_audio":
 			ambient_handler_count += 1
-	assert_eq(ambient_handler_count, 1,
-		"_on_entry_sequence_started_audio must remain connected exactly " +
-		"once after triple-wire (got %d connections)" % ambient_handler_count)
+	assert_eq(
+		ambient_handler_count,
+		1,
+		(
+			"_on_entry_sequence_started_audio must remain connected exactly "
+			+ "once after triple-wire (got %d connections)" % ambient_handler_count
+		)
+	)
 
 
 func test_entry_sequence_started_drives_ambient_to_silence() -> void:
@@ -322,12 +374,18 @@ func test_entry_sequence_started_drives_ambient_to_silence() -> void:
 	# is SILENCE_DB after stop_stratum1_ambient, so this works.
 	await wait_frames(3)
 	# After the fade the player should be stopped + last_ambient_path empty.
-	assert_eq(ad.get_last_ambient_path(), "",
-		"After entry_sequence_started, the ambient path must clear " +
-		"(the bed is stopping). got=%s" % ad.get_last_ambient_path())
+	assert_eq(
+		ad.get_last_ambient_path(),
+		"",
+		(
+			"After entry_sequence_started, the ambient path must clear "
+			+ "(the bed is stopping). got=%s" % ad.get_last_ambient_path()
+		)
+	)
 
 
 # ---- Cross-stratum-distinct policy (Uma binding decision) -------------
+
 
 func test_s1_and_s2_ambient_assets_are_different_files() -> void:
 	# The cross-stratum-distinct ambient policy from Uma's s1-ambient.md
@@ -335,16 +393,25 @@ func test_s1_and_s2_ambient_assets_are_different_files() -> void:
 	# distinct ambient (mus + amb both unique); T10 IS the second instance.
 	# This test pins the file-level distinction (mirrors the
 	# test_crossfade_to_boss_stratum1_is_unique_not_s2_reuse pattern).
-	assert_ne(STREAM_PATH_S1_AMBIENT, STREAM_PATH_S2_AMBIENT,
-		"S1 ambient must be a distinct file from S2 ambient " +
-		"(cross-stratum-distinct policy; Uma s1-ambient.md §Tonal anchor)")
+	assert_ne(
+		STREAM_PATH_S1_AMBIENT,
+		STREAM_PATH_S2_AMBIENT,
+		(
+			"S1 ambient must be a distinct file from S2 ambient "
+			+ "(cross-stratum-distinct policy; Uma s1-ambient.md §Tonal anchor)"
+		)
+	)
 	var s1: Resource = load(STREAM_PATH_S1_AMBIENT)
 	var s2: Resource = load(STREAM_PATH_S2_AMBIENT)
-	assert_ne(s1.resource_path, s2.resource_path,
-		"S1 and S2 ambient resources must have distinct resource paths")
+	assert_ne(
+		s1.resource_path,
+		s2.resource_path,
+		"S1 and S2 ambient resources must have distinct resource paths"
+	)
 
 
 # ---- Main.gd room-load wiring -----------------------------------------
+
 
 func test_main_load_room_at_index_fires_play_stratum1_ambient_for_non_boss_rooms() -> void:
 	# Drive Main's load-room handler for a non-boss room index (Room01,
@@ -368,9 +435,14 @@ func test_main_load_room_at_index_fires_play_stratum1_ambient_for_non_boss_rooms
 	main.load_room_index(0)
 	await wait_frames(3)
 	ad.complete_pending_fades_for_test()
-	assert_eq(ad.get_last_ambient_path(), STREAM_PATH_S1_AMBIENT,
-		"Main._load_room_at_index must fire play_stratum1_ambient for " +
-		"non-boss S1 rooms (got %s)" % ad.get_last_ambient_path())
+	assert_eq(
+		ad.get_last_ambient_path(),
+		STREAM_PATH_S1_AMBIENT,
+		(
+			"Main._load_room_at_index must fire play_stratum1_ambient for "
+			+ "non-boss S1 rooms (got %s)" % ad.get_last_ambient_path()
+		)
+	)
 
 
 func test_main_load_room_at_index_skips_ambient_for_boss_room() -> void:
@@ -388,14 +460,18 @@ func test_main_load_room_at_index_skips_ambient_for_boss_room() -> void:
 	ad.stop_all_music(1)
 	ad.complete_pending_fades_for_test()
 	# Pre-condition: ambient path is empty.
-	assert_eq(ad.get_last_ambient_path(), "",
-		"sanity: ambient path cleared pre-load")
+	assert_eq(ad.get_last_ambient_path(), "", "sanity: ambient path cleared pre-load")
 	# Load the boss room directly.
 	main.load_room_index(8)
 	await wait_frames(3)
 	# Assert ambient was NOT fired by Main.gd's load handler. (The handler
 	# checks `index != BOSS_ROOM_INDEX` before calling.)
-	assert_ne(ad.get_last_ambient_path(), STREAM_PATH_S1_AMBIENT,
-		"Boss room load must NOT fire play_stratum1_ambient — the " +
-		"entry_sequence_started handler is the only ambient-control " +
-		"path inside the boss room. got=%s" % ad.get_last_ambient_path())
+	assert_ne(
+		ad.get_last_ambient_path(),
+		STREAM_PATH_S1_AMBIENT,
+		(
+			"Boss room load must NOT fire play_stratum1_ambient — the "
+			+ "entry_sequence_started handler is the only ambient-control "
+			+ "path inside the boss room. got=%s" % ad.get_last_ambient_path()
+		)
+	)

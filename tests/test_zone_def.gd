@@ -15,8 +15,8 @@ extends GutTest
 const ZoneDefScript: Script = preload("res://resources/level/ZoneDef.gd")
 const ZoneAnchorScript: Script = preload("res://resources/level/ZoneAnchor.gd")
 
-
 # ---- Helpers ---------------------------------------------------------
+
 
 func _make_anchor(
 	room_id: StringName,
@@ -33,9 +33,7 @@ func _make_anchor(
 
 
 func _make_zone(
-	zone_id: StringName = &"s1_z1_test",
-	display_name: String = "Test Zone",
-	stratum_id: int = 1
+	zone_id: StringName = &"s1_z1_test", display_name: String = "Test Zone", stratum_id: int = 1
 ) -> ZoneDef:
 	var z: ZoneDef = ZoneDefScript.new()
 	z.zone_id = zone_id
@@ -55,17 +53,16 @@ func _well_formed_anchors() -> Array[ZoneAnchor]:
 
 # ---- ZoneAnchor shape -----------------------------------------------
 
+
 func test_anchor_known_kinds_round_trip() -> void:
 	# Class-doc taxonomy is exhaustive — pin every kind round-trips.
 	for kind: StringName in ZoneAnchorScript.KINDS:
 		assert_true(
-			ZoneAnchorScript.is_known_kind(kind),
-			"%s must be in ZoneAnchor.KINDS" % str(kind)
+			ZoneAnchorScript.is_known_kind(kind), "%s must be in ZoneAnchor.KINDS" % str(kind)
 		)
 	# Random unknown kind rejected.
 	assert_false(
-		ZoneAnchorScript.is_known_kind(&"not_a_real_kind"),
-		"unknown kind must be rejected"
+		ZoneAnchorScript.is_known_kind(&"not_a_real_kind"), "unknown kind must be rejected"
 	)
 
 
@@ -102,6 +99,7 @@ func test_anchor_validate_catches_target_zone_on_non_exit() -> void:
 
 
 # ---- ZoneDef shape --------------------------------------------------
+
 
 func test_zone_validate_passes_on_well_formed() -> void:
 	var z: ZoneDef = _make_zone()
@@ -208,6 +206,7 @@ func test_zone_validate_accepts_empty_pool_when_max_zero() -> void:
 
 # ---- ZoneDef helpers ------------------------------------------------
 
+
 func test_zone_get_anchors_of_kind_filters() -> void:
 	var z: ZoneDef = _make_zone()
 	z.anchors = [
@@ -238,6 +237,7 @@ func test_zone_has_anchor_finds_by_room_id() -> void:
 
 # ---- Worked-example .tres round-trip -------------------------------
 
+
 func test_authored_s1_z1_outer_cloister_loads() -> void:
 	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
 	assert_not_null(z, "s1_z1_outer_cloister.tres must load as ZoneDef")
@@ -249,11 +249,7 @@ func test_authored_s1_z1_outer_cloister_loads() -> void:
 func test_authored_s1_z1_outer_cloister_validates() -> void:
 	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
 	var errors: Array[String] = z.validate()
-	assert_eq(
-		errors.size(),
-		0,
-		"s1_z1_outer_cloister.tres must validate cleanly: %s" % str(errors)
-	)
+	assert_eq(errors.size(), 0, "s1_z1_outer_cloister.tres must validate cleanly: %s" % str(errors))
 
 
 func test_authored_s1_z1_outer_cloister_has_nine_anchors() -> void:
@@ -262,12 +258,26 @@ func test_authored_s1_z1_outer_cloister_has_nine_anchors() -> void:
 	# of 9 anchors. The spike's original 5-anchor count is preserved in
 	# git history as the pre-retrofit shape.
 	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
-	assert_eq(z.anchors.size(), 9, "W2-T3 retrofit pins 9 anchors (8 unique chunks; room08 used for boss + exit)")
+	assert_eq(
+		z.anchors.size(),
+		9,
+		"W2-T3 retrofit pins 9 anchors (8 unique chunks; room08 used for boss + exit)"
+	)
 	# Kind tallies per the (b)-lock narrative arc.
 	assert_eq(z.get_anchors_of_kind(&"entry").size(), 1, "exactly 1 entry anchor")
-	assert_eq(z.get_anchors_of_kind(&"npc_room").size(), 2, "2 npc_room anchors (Antechamber + Hallowed Spring)")
-	assert_eq(z.get_anchors_of_kind(&"story_beat").size(), 3, "3 story_beat anchors (Charger's Run / Crossfire / Pincer)")
-	assert_eq(z.get_anchors_of_kind(&"quest_target").size(), 1, "1 quest_target anchor (Marksman's Perch)")
+	assert_eq(
+		z.get_anchors_of_kind(&"npc_room").size(),
+		2,
+		"2 npc_room anchors (Antechamber + Hallowed Spring)"
+	)
+	assert_eq(
+		z.get_anchors_of_kind(&"story_beat").size(),
+		3,
+		"3 story_beat anchors (Charger's Run / Crossfire / Pincer)"
+	)
+	assert_eq(
+		z.get_anchors_of_kind(&"quest_target").size(), 1, "1 quest_target anchor (Marksman's Perch)"
+	)
 	assert_eq(z.get_anchors_of_kind(&"boss_room").size(), 1, "1 boss_room anchor")
 	assert_eq(z.get_anchors_of_kind(&"exit").size(), 1, "1 exit anchor")
 
@@ -282,8 +292,7 @@ func test_authored_s1_z1_outer_cloister_anchor_chunks_resolve() -> void:
 		var chunk: Resource = load(path)
 		assert_not_null(
 			chunk,
-			"anchor %s chunk_id %s must resolve to %s"
-			% [str(a.room_id), str(a.chunk_id), path]
+			"anchor %s chunk_id %s must resolve to %s" % [str(a.room_id), str(a.chunk_id), path]
 		)
 
 
@@ -293,14 +302,16 @@ func test_authored_s1_z1_outer_cloister_pool_chunks_resolve() -> void:
 	# (b) "light procedural fill" commitment (smaller pool + slot range
 	# [0,1] vs spike's [1,3]).
 	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
-	assert_eq(z.procedural_slot_pool.size(), 3, "W2-T3 retrofit pins 3-chunk procedural pool (rooms 03/05/07)")
+	assert_eq(
+		z.procedural_slot_pool.size(),
+		3,
+		"W2-T3 retrofit pins 3-chunk procedural pool (rooms 03/05/07)"
+	)
 	for chunk_id: StringName in z.procedural_slot_pool:
 		var path: String = "res://resources/level_chunks/%s.tres" % str(chunk_id)
 		var chunk: Resource = load(path)
 		assert_not_null(
-			chunk,
-			"procedural_slot_pool entry %s must resolve to %s"
-			% [str(chunk_id), path]
+			chunk, "procedural_slot_pool entry %s must resolve to %s" % [str(chunk_id), path]
 		)
 
 

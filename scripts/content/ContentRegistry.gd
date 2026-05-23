@@ -100,10 +100,9 @@ const STARTER_ITEM_PATHS: Array[String] = [
 	"res://resources/items/armors/leather_vest.tres",
 ]
 
-var _items: Dictionary = {}    # StringName -> ItemDef
+var _items: Dictionary = {}  # StringName -> ItemDef
 var _affixes: Dictionary = {}  # StringName -> AffixDef
 var _resolved: bool = false
-
 
 ## Emitted once at the end of a successful `load_all()` after all content
 ## maps are populated. Currently fires synchronously inside `load_all()` —
@@ -113,7 +112,7 @@ var _resolved: bool = false
 ##   (b) `await registry.items_resolved` for the deferred case.
 ##
 ## Past-participle naming matches `Save.save_completed` / `Inventory.item_equipped`.
-signal items_resolved()
+signal items_resolved
 
 
 ## Scan both content directories and populate the registry. Idempotent —
@@ -201,6 +200,7 @@ func affix_resolver_callable() -> Callable:
 
 # ---- Internals ---------------------------------------------------------
 
+
 ## Scan `root` for .tres / .res files, recursing into subdirs.
 ##
 ## `quiet_on_open_fail` suppresses the push_warning when DirAccess can't open
@@ -208,16 +208,15 @@ func affix_resolver_callable() -> Callable:
 ## where a missing subdir is expected (the recursive scan already covered
 ## the same files on platforms where DirAccess works correctly).
 func _scan_dir_recursive(
-		root: String,
-		on_resource: Callable,
-		quiet_on_open_fail: bool = false) -> void:
+	root: String, on_resource: Callable, quiet_on_open_fail: bool = false
+) -> void:
 	var dir: DirAccess = DirAccess.open(root)
 	if dir == null:
 		if not quiet_on_open_fail:
 			# Not fatal — content dir is optional in tests / minimal builds.
 			push_warning(
-				"[ContentRegistry] cannot open dir %s (err %d)"
-					% [root, DirAccess.get_open_error()])
+				"[ContentRegistry] cannot open dir %s (err %d)" % [root, DirAccess.get_open_error()]
+			)
 		return
 	dir.list_dir_begin()
 	var entry: String = dir.get_next()
@@ -252,8 +251,8 @@ func _on_item_resource_found(res: Resource, path: String) -> void:
 	# id-collision warrants a warning.
 	if _items.has(def.id) and _items[def.id] != def:
 		push_warning(
-			"[ContentRegistry] duplicate ItemDef id '%s' at %s (overrides earlier)"
-				% [def.id, path])
+			"[ContentRegistry] duplicate ItemDef id '%s' at %s (overrides earlier)" % [def.id, path]
+		)
 	_items[def.id] = def
 
 
@@ -266,6 +265,9 @@ func _on_affix_resource_found(res: Resource, path: String) -> void:
 		return
 	if _affixes.has(def.id) and _affixes[def.id] != def:
 		push_warning(
-			"[ContentRegistry] duplicate AffixDef id '%s' at %s (overrides earlier)"
-				% [def.id, path])
+			(
+				"[ContentRegistry] duplicate AffixDef id '%s' at %s (overrides earlier)"
+				% [def.id, path]
+			)
+		)
 	_affixes[def.id] = def

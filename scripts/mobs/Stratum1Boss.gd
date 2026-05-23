@@ -66,7 +66,7 @@ signal swing_spawned(kind: StringName, hitbox: Node)
 ## Entry sequence completed — boss is awake and combat begins. Fired by
 ## `wake()` (the BossRoomTrigger's entry-sequence completion handler calls
 ## this).
-signal boss_woke()
+signal boss_woke
 
 ## HP hit zero. Emitted exactly once per life. Carries (mob, position, def)
 ## — same payload shape as Grunt/Charger so MobLootSpawner reuses unchanged.
@@ -77,12 +77,12 @@ signal boss_died(mob: Stratum1Boss, death_position: Vector2, mob_def: MobDef)
 
 # ---- States ------------------------------------------------------------
 
-const STATE_DORMANT: StringName = &"dormant"            # pre-wake (intro)
-const STATE_WAKING: StringName = &"waking"              # mid-wake-anim (damage-immune)
-const STATE_IDLE: StringName = &"idle"                  # awake, no target
+const STATE_DORMANT: StringName = &"dormant"  # pre-wake (intro)
+const STATE_WAKING: StringName = &"waking"  # mid-wake-anim (damage-immune)
+const STATE_IDLE: StringName = &"idle"  # awake, no target
 const STATE_CHASING: StringName = &"chasing"
 const STATE_TELEGRAPHING_MELEE: StringName = &"telegraphing_melee"
-const STATE_ATTACKING: StringName = &"attacking"        # melee swing recovery
+const STATE_ATTACKING: StringName = &"attacking"  # melee swing recovery
 const STATE_TELEGRAPHING_SLAM: StringName = &"telegraphing_slam"
 const STATE_SLAM_RECOVERY: StringName = &"slam_recovery"
 const STATE_PHASE_TRANSITION: StringName = &"phase_transition"
@@ -221,9 +221,9 @@ const HIT_FLASH_OUT: float = 0.040
 const DEATH_TWEEN_DURATION: float = 0.200
 const DEATH_TARGET_SCALE: float = 0.6
 const BOSS_DEATH_HOLD: float = 0.400
-const BOSS_SHAKE_MAGNITUDE: float = 4.0   # logical px (VD-09 max budget)
+const BOSS_SHAKE_MAGNITUDE: float = 4.0  # logical px (VD-09 max budget)
 const BOSS_SHAKE_DURATION: float = 0.150
-const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
+const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)  # #FFB066
 const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 
 ## T16 climax burst — sustained 0.9 s ember-rise emitter that replaces the
@@ -301,9 +301,9 @@ const CLIMAX_BURST_IMPACT_FLASH: Color = Color(1.0, 0.949, 0.749, 1.0)  # #FFF2B
 const HIT_FLASH_TINT: Color = Color(1.0, 0.50, 0.50, 1.0)  # soft red wash, HTML5-safe
 
 ## Layer bits (mirror project.godot — same as Grunt/Charger).
-const LAYER_WORLD: int = 1 << 0          # bit 1
-const LAYER_PLAYER: int = 1 << 1         # bit 2
-const LAYER_ENEMY: int = 1 << 3          # bit 4
+const LAYER_WORLD: int = 1 << 0  # bit 1
+const LAYER_PLAYER: int = 1 << 1  # bit 2
+const LAYER_ENEMY: int = 1 << 3  # bit 4
 
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
@@ -454,8 +454,8 @@ const SLAM_INDICATOR_ARC_POINTS: int = 32
 ## during the 420 ms hold (a static circle reads as decoration); strobing
 ## restores the "imminent" read without lengthening combat-timing windows.
 const SLAM_INDICATOR_STROBE_HZ: float = 5.0
-const SLAM_INDICATOR_STROBE_HIGH: float = 1.0   # perceived peak alpha = 1.0 × 0.5 = 0.5
-const SLAM_INDICATOR_STROBE_LOW: float = 0.25   # perceived trough     = 0.25 × 0.5 = 0.125
+const SLAM_INDICATOR_STROBE_HIGH: float = 1.0  # perceived peak alpha = 1.0 × 0.5 = 0.5
+const SLAM_INDICATOR_STROBE_LOW: float = 0.25  # perceived trough     = 0.25 × 0.5 = 0.125
 
 ## T6 slam aftershock burst — v7 "make it unmissable" intensity stack (PR #291,
 ## Sponsor 2026-05-21 v6 soak: "cannot see the sparkles you captured in your
@@ -572,6 +572,7 @@ func _ready() -> void:
 
 # ---- Public API -------------------------------------------------------
 
+
 func get_state() -> StringName:
 	return _state
 
@@ -659,8 +660,13 @@ func wake() -> void:
 	# If this line never appears in the soak stream, the entry sequence timer
 	# did not fire — look for `trigger_entry_sequence` call (auto-fire in
 	# `_assemble_room_fixtures`) and the SceneTreeTimer creation path.
-	_combat_trace("Stratum1Boss.wake",
-		"exiting STATE_DORMANT -> STATE_WAKING (damage-immune wake-anim window, %.3fs)" % WAKE_DURATION)
+	_combat_trace(
+		"Stratum1Boss.wake",
+		(
+			"exiting STATE_DORMANT -> STATE_WAKING (damage-immune wake-anim window, %.3fs)"
+			% WAKE_DURATION
+		)
+	)
 	_wake_left = WAKE_DURATION
 	_set_state(STATE_WAKING)
 	boss_woke.emit()
@@ -686,8 +692,10 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 		# Trace this case explicitly so soak-debugging can distinguish "hit didn't
 		# register" (Hitbox layer/mask issue) from "hit was rejected" (boss still
 		# dormant — the M2 W1 P0 root cause). Wired against `86c9q96fv`.
-		_combat_trace("Stratum1Boss.take_damage",
-			"IGNORED dormant amount=%d hp=%d (boss still in entry sequence)" % [amount, hp_current])
+		_combat_trace(
+			"Stratum1Boss.take_damage",
+			"IGNORED dormant amount=%d hp=%d (boss still in entry sequence)" % [amount, hp_current]
+		)
 		return
 	if _state == STATE_WAKING:
 		# M3-T2-W1-T8 (ticket 86c9wjyp9): extends the intro-fairness rule through
@@ -696,19 +704,30 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 		# closes (~417 ms after `wake()`). Mirrors the DORMANT trace shape so a
 		# soak diagnostician can discriminate "wake-window rejection" from
 		# "dormant rejection" by a single trace-line read.
-		_combat_trace("Stratum1Boss.take_damage",
-			"IGNORED waking amount=%d hp=%d wake_left=%.3f (wake-anim window)"
-				% [amount, hp_current, _wake_left])
+		_combat_trace(
+			"Stratum1Boss.take_damage",
+			(
+				"IGNORED waking amount=%d hp=%d wake_left=%.3f (wake-anim window)"
+				% [amount, hp_current, _wake_left]
+			)
+		)
 		return
 	if _state == STATE_PHASE_TRANSITION:
-		_combat_trace("Stratum1Boss.take_damage",
-			"IGNORED phase_transition amount=%d hp=%d (stagger-immune window)" % [amount, hp_current])
+		_combat_trace(
+			"Stratum1Boss.take_damage",
+			(
+				"IGNORED phase_transition amount=%d hp=%d (stagger-immune window)"
+				% [amount, hp_current]
+			)
+		)
 		return  # stagger-immune during the 0.6 s phase break (Uma)
 	var clean_amount: int = max(0, amount)
 	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - clean_amount)
-	_combat_trace("Stratum1Boss.take_damage",
-		"amount=%d hp=%d->%d phase=%d" % [clean_amount, hp_before, hp_current, phase])
+	_combat_trace(
+		"Stratum1Boss.take_damage",
+		"amount=%d hp=%d->%d phase=%d" % [clean_amount, hp_before, hp_current, phase]
+	)
 	damaged.emit(clean_amount, hp_current, source)
 	# Visual: red-wash hit-flash + hit anim on every actual-damage take_damage
 	# (Uma §2 — same rule across all mob types). M3W-4: also play `hit_<dir>` on
@@ -749,6 +768,7 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 
 # ---- M3 Tier 2 Wave 1 T2 — hit-pause helper ----------------------------
 
+
 ## Fire a hit-pause `freeze()` request on a damage-landing player swing. The
 ## duration depends on the swing kind (light=60 ms, heavy=100 ms per Priya AC).
 ## Source-kind is discovered via duck-typed dispatch on `Player.get_current_attack_kind()`
@@ -774,9 +794,13 @@ func _request_hit_pause_for(source: Node) -> void:
 	# Re-requesting "boss_hit_pause" REPLACES the prior request (idempotent
 	# refresh — a rapid-fire hit-spam in the same window just resets the clock).
 	director.freeze(duration, TSD_REASON_HIT_PAUSE)
-	_combat_trace("Stratum1Boss.hit_pause",
-		"freeze=%.3f reason=%s source=%s" % [duration, TSD_REASON_HIT_PAUSE,
-			"player" if source != null else "null"])
+	_combat_trace(
+		"Stratum1Boss.hit_pause",
+		(
+			"freeze=%.3f reason=%s source=%s"
+			% [duration, TSD_REASON_HIT_PAUSE, "player" if source != null else "null"]
+		)
+	)
 
 
 ## Resolve the `TimeScaleDirector` autoload, or null in a bare-instanced test
@@ -789,6 +813,7 @@ func _resolve_time_scale_director() -> Node:
 
 
 # ---- Physics tick -----------------------------------------------------
+
 
 func _physics_process(delta: float) -> void:
 	if _is_dead:
@@ -806,8 +831,10 @@ func _physics_process(delta: float) -> void:
 	if _state == STATE_WAKING:
 		velocity = Vector2.ZERO
 		if _wake_left <= 0.0:
-			_combat_trace("Stratum1Boss._process_waking",
-				"wake-anim complete -> STATE_IDLE (damage-immunity ends)")
+			_combat_trace(
+				"Stratum1Boss._process_waking",
+				"wake-anim complete -> STATE_IDLE (damage-immunity ends)"
+			)
 			_set_state(STATE_IDLE)
 		move_and_slide()
 		return
@@ -838,6 +865,7 @@ func _physics_process(delta: float) -> void:
 
 
 # ---- State handlers ---------------------------------------------------
+
 
 func _process_chase(_delta: float) -> void:
 	if _player == null:
@@ -894,6 +922,7 @@ func _process_slam_recovery(_delta: float) -> void:
 
 # ---- Melee attack -----------------------------------------------------
 
+
 func _begin_melee_telegraph(dir: Vector2) -> void:
 	# Scale telegraph and recovery by enrage modifier in phase 3.
 	var t_mult: float = ENRAGE_RECOVERY_MULT if phase == PHASE_3 else 1.0
@@ -938,11 +967,22 @@ func _fire_melee_swing() -> void:
 	var player_dist: float = -1.0
 	if _player != null:
 		player_dist = global_position.distance_to(_player.global_position)
-	_combat_trace("Stratum1Boss._fire_melee_swing",
-		"dir=(%.2f,%.2f) dmg=%d reach=%.0f radius=%.0f lifetime=%.2f player_dist=%.1f phase=%d" % [
-			dir.x, dir.y, dmg, MELEE_HITBOX_REACH, MELEE_HITBOX_RADIUS,
-			MELEE_HITBOX_LIFETIME, player_dist, phase
-		])
+	_combat_trace(
+		"Stratum1Boss._fire_melee_swing",
+		(
+			"dir=(%.2f,%.2f) dmg=%d reach=%.0f radius=%.0f lifetime=%.2f player_dist=%.1f phase=%d"
+			% [
+				dir.x,
+				dir.y,
+				dmg,
+				MELEE_HITBOX_REACH,
+				MELEE_HITBOX_RADIUS,
+				MELEE_HITBOX_LIFETIME,
+				player_dist,
+				phase
+			]
+		)
+	)
 	var hb: Hitbox = _spawn_hitbox(
 		dir,
 		dmg,
@@ -970,6 +1010,7 @@ func _fire_melee_swing() -> void:
 
 
 # ---- Slam attack ------------------------------------------------------
+
 
 func _begin_slam_telegraph() -> void:
 	var t_mult: float = ENRAGE_RECOVERY_MULT if phase == PHASE_3 else 1.0
@@ -1019,11 +1060,21 @@ func _fire_slam_hit() -> void:
 	var player_dist: float = -1.0
 	if _player != null:
 		player_dist = global_position.distance_to(_player.global_position)
-	_combat_trace("Stratum1Boss._fire_slam_hit",
-		"dmg=%d radius=%.0f lifetime=%.2f kb_dir=(%.2f,%.2f) player_dist=%.1f phase=%d" % [
-			dmg, SLAM_HITBOX_RADIUS, SLAM_HITBOX_LIFETIME,
-			kb_dir.x, kb_dir.y, player_dist, phase
-		])
+	_combat_trace(
+		"Stratum1Boss._fire_slam_hit",
+		(
+			"dmg=%d radius=%.0f lifetime=%.2f kb_dir=(%.2f,%.2f) player_dist=%.1f phase=%d"
+			% [
+				dmg,
+				SLAM_HITBOX_RADIUS,
+				SLAM_HITBOX_LIFETIME,
+				kb_dir.x,
+				kb_dir.y,
+				player_dist,
+				phase
+			]
+		)
+	)
 	var hb: Hitbox = _spawn_hitbox(
 		Vector2.ZERO,
 		dmg,
@@ -1057,13 +1108,9 @@ func _fire_slam_hit() -> void:
 
 # ---- Hitbox spawn helper ---------------------------------------------
 
+
 func _spawn_hitbox(
-	dir: Vector2,
-	dmg: int,
-	knockback: Vector2,
-	reach: float,
-	radius: float,
-	lifetime: float
+	dir: Vector2, dmg: int, knockback: Vector2, reach: float, radius: float, lifetime: float
 ) -> Hitbox:
 	var hb: Hitbox = HitboxScript.new()
 	hb.configure(dmg, knockback, lifetime, Hitbox.TEAM_ENEMY, self)
@@ -1082,16 +1129,28 @@ func _spawn_hitbox(
 	# tree with the correct TEAM_ENEMY layer config and that monitoring=false
 	# pre-defer is intentional.
 	# Expected: layer=16 (enemy_hitbox, bit 5), mask=2 (player, bit 2).
-	_combat_trace("Stratum1Boss._spawn_hitbox",
-		"id=%d pos=(%.0f,%.0f) layer=%d mask=%d monitoring=%s dmg=%d radius=%.0f lifetime=%.2f" % [
-			hb.get_instance_id(), hb.global_position.x, hb.global_position.y,
-			hb.collision_layer, hb.collision_mask, str(hb.monitoring),
-			dmg, radius, lifetime
-		])
+	_combat_trace(
+		"Stratum1Boss._spawn_hitbox",
+		(
+			"id=%d pos=(%.0f,%.0f) layer=%d mask=%d monitoring=%s dmg=%d radius=%.0f lifetime=%.2f"
+			% [
+				hb.get_instance_id(),
+				hb.global_position.x,
+				hb.global_position.y,
+				hb.collision_layer,
+				hb.collision_mask,
+				str(hb.monitoring),
+				dmg,
+				radius,
+				lifetime
+			]
+		)
+	)
 	return hb
 
 
 # ---- Phase transitions ------------------------------------------------
+
 
 func _check_phase_boundaries() -> void:
 	# Idempotent latches: once latched, never re-fire even if HP fluctuates
@@ -1142,11 +1201,20 @@ func _begin_phase_transition(target_phase: int) -> void:
 			TSD_REASON_PHASE_TRANSITION,
 			PHASE_TRANSITION_SCALE,
 			PHASE_TRANSITION_SLOW_MO_DURATION,
-			director.PRIORITY_NARRATIVE)
-		_combat_trace("Stratum1Boss.phase_transition_slow_mo",
-			"scale=%.2f duration=%.2f reason=%s target_phase=%d" % [
-				PHASE_TRANSITION_SCALE, PHASE_TRANSITION_SLOW_MO_DURATION,
-				TSD_REASON_PHASE_TRANSITION, target_phase])
+			director.PRIORITY_NARRATIVE
+		)
+		_combat_trace(
+			"Stratum1Boss.phase_transition_slow_mo",
+			(
+				"scale=%.2f duration=%.2f reason=%s target_phase=%d"
+				% [
+					PHASE_TRANSITION_SCALE,
+					PHASE_TRANSITION_SLOW_MO_DURATION,
+					TSD_REASON_PHASE_TRANSITION,
+					target_phase
+				]
+			)
+		)
 
 
 func _finish_phase_transition() -> void:
@@ -1165,13 +1233,14 @@ func _finish_phase_transition() -> void:
 
 # ---- Death ------------------------------------------------------------
 
+
 func _die() -> void:
 	if _is_dead:
 		return
 	_is_dead = true
 	_combat_trace(
-		"Stratum1Boss._die",
-		"starting death sequence at hp=%d phase=%d" % [hp_current, phase])
+		"Stratum1Boss._die", "starting death sequence at hp=%d phase=%d" % [hp_current, phase]
+	)
 	# Cancel every pending action so a death-mid-attack doesn't fire from
 	# the corpse. Same defensive pattern as Grunt/Charger.
 	_melee_telegraph_left = 0.0
@@ -1203,8 +1272,10 @@ func _die() -> void:
 	var director: Node = _resolve_time_scale_director()
 	if director != null:
 		director.freeze(FINAL_FREEZE_DURATION, TSD_REASON_FINAL_FREEZE)
-		_combat_trace("Stratum1Boss.final_freeze",
-			"freeze=%.3f reason=%s" % [FINAL_FREEZE_DURATION, TSD_REASON_FINAL_FREEZE])
+		_combat_trace(
+			"Stratum1Boss.final_freeze",
+			"freeze=%.3f reason=%s" % [FINAL_FREEZE_DURATION, TSD_REASON_FINAL_FREEZE]
+		)
 	# M3W-4 anim: play `die_<dir>` (falling-backward). Plays concurrently with
 	# the boss-climax scale/alpha death tween — the AnimatedSprite2D advances its
 	# 7-frame die anim while the parent fades + scales. Loop=false on `die_*` in
@@ -1219,6 +1290,7 @@ func _die() -> void:
 
 
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
+
 
 ## Attack-telegraph visual (player-journey.md Beat 6 + M1 RC soak-4):
 ## tween the Sprite child to red for the melee/slam telegraph window.
@@ -1258,16 +1330,24 @@ func _play_attack_telegraph(telegraph_duration: float) -> void:
 	_attack_telegraph_tween = create_tween()
 	var hold_dur: float = max(0.0, telegraph_duration - ATTACK_TELEGRAPH_TWEEN_IN * 2.0)
 	_attack_telegraph_tween.tween_property(
-		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN
+	)
 	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, hold_dur)
-	_attack_telegraph_tween.tween_property(
-		target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
-	_combat_trace("Stratum1Boss._play_attack_telegraph",
-		"tween_valid=%s duration=%.2f tint=(%.2f,%.2f,%.2f) prop=%s" % [
-			_attack_telegraph_tween.is_valid(), telegraph_duration,
-			ATTACK_TELEGRAPH_TINT.r, ATTACK_TELEGRAPH_TINT.g, ATTACK_TELEGRAPH_TINT.b,
-			prop
-		])
+	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
+	_combat_trace(
+		"Stratum1Boss._play_attack_telegraph",
+		(
+			"tween_valid=%s duration=%.2f tint=(%.2f,%.2f,%.2f) prop=%s"
+			% [
+				_attack_telegraph_tween.is_valid(),
+				telegraph_duration,
+				ATTACK_TELEGRAPH_TINT.r,
+				ATTACK_TELEGRAPH_TINT.g,
+				ATTACK_TELEGRAPH_TINT.b,
+				prop
+			]
+		)
+	)
 
 
 func _cancel_attack_telegraph_tween() -> void:
@@ -1277,6 +1357,7 @@ func _cancel_attack_telegraph_tween() -> void:
 
 
 # ---- T5 slam-telegraph indicator (ticket 86c9wjyrc) -------------------
+
 
 ## Spawn the slam-telegraph danger-zone circle indicator as a child of the boss.
 ## Parent-relative so the indicator follows the boss if it moves during telegraph.
@@ -1309,7 +1390,8 @@ func _spawn_slam_indicator(telegraph_duration: float) -> void:
 	# `_fade_out_slam_indicator()` — it kills this tween and owns the channel.
 	_slam_indicator_tween = create_tween()
 	_slam_indicator_tween.tween_property(
-		indicator, "modulate:a", SLAM_INDICATOR_STROBE_HIGH, SLAM_INDICATOR_FADE)
+		indicator, "modulate:a", SLAM_INDICATOR_STROBE_HIGH, SLAM_INDICATOR_FADE
+	)
 	# Strobe across the remaining window. tween_method drives a custom callback
 	# every frame across `hold_dur` seconds; the callback writes modulate.a
 	# from a sine wave. tween_interval would only delay; we want continuous
@@ -1324,18 +1406,29 @@ func _spawn_slam_indicator(telegraph_duration: float) -> void:
 			# sin() output is [-1, 1]; remap to [LOW, HIGH].
 			var phase: float = t * SLAM_INDICATOR_STROBE_HZ * TAU
 			var s: float = (sin(phase) + 1.0) * 0.5  # [0, 1]
-			indicator.modulate.a = lerp(
-				SLAM_INDICATOR_STROBE_LOW, SLAM_INDICATOR_STROBE_HIGH, s)
+			indicator.modulate.a = lerp(SLAM_INDICATOR_STROBE_LOW, SLAM_INDICATOR_STROBE_HIGH, s)
 		_slam_indicator_tween.tween_method(strobe_cb, 0.0, hold_dur, hold_dur)
-	_combat_trace("Stratum1Boss._spawn_slam_indicator",
-		("radius=%.0f color=(%.2f,%.2f,%.2f,%.2f) telegraph_duration=%.2f " +
-		 "fade=%.3f strobe_hz=%.1f strobe=[%.2f..%.2f]") % [
-			SLAM_HITBOX_RADIUS,
-			SLAM_INDICATOR_COLOR.r, SLAM_INDICATOR_COLOR.g,
-			SLAM_INDICATOR_COLOR.b, SLAM_INDICATOR_COLOR.a,
-			telegraph_duration, SLAM_INDICATOR_FADE,
-			SLAM_INDICATOR_STROBE_HZ,
-			SLAM_INDICATOR_STROBE_LOW, SLAM_INDICATOR_STROBE_HIGH])
+	_combat_trace(
+		"Stratum1Boss._spawn_slam_indicator",
+		(
+			(
+				"radius=%.0f color=(%.2f,%.2f,%.2f,%.2f) telegraph_duration=%.2f "
+				+ "fade=%.3f strobe_hz=%.1f strobe=[%.2f..%.2f]"
+			)
+			% [
+				SLAM_HITBOX_RADIUS,
+				SLAM_INDICATOR_COLOR.r,
+				SLAM_INDICATOR_COLOR.g,
+				SLAM_INDICATOR_COLOR.b,
+				SLAM_INDICATOR_COLOR.a,
+				telegraph_duration,
+				SLAM_INDICATOR_FADE,
+				SLAM_INDICATOR_STROBE_HZ,
+				SLAM_INDICATOR_STROBE_LOW,
+				SLAM_INDICATOR_STROBE_HIGH
+			]
+		)
+	)
 
 
 ## Trigger fade-out on the slam-telegraph indicator (called from `_fire_slam_hit`).
@@ -1355,11 +1448,12 @@ func _fade_out_slam_indicator() -> void:
 	var indicator: Node2D = _slam_indicator
 	_slam_indicator = null
 	_slam_indicator_tween = create_tween()
-	_slam_indicator_tween.tween_property(
-		indicator, "modulate:a", 0.0, SLAM_INDICATOR_FADE)
-	_slam_indicator_tween.finished.connect(func() -> void:
-		if is_instance_valid(indicator):
-			indicator.queue_free())
+	_slam_indicator_tween.tween_property(indicator, "modulate:a", 0.0, SLAM_INDICATOR_FADE)
+	_slam_indicator_tween.finished.connect(
+		func() -> void:
+			if is_instance_valid(indicator):
+				indicator.queue_free()
+	)
 
 
 ## Immediate free of the slam-telegraph indicator without fade-out. Used by
@@ -1377,6 +1471,7 @@ func _force_free_slam_indicator() -> void:
 
 
 # ---- T6 slam aftershock burst (ticket 86c9wjyuv) ---------------------
+
 
 ## Spawn a 12-particle ember aftershock at the slam origin. Half-volume mirror
 ## of `_spawn_death_particles` (12 vs 24 particles), parented to the room (not
@@ -1446,17 +1541,31 @@ func _spawn_slam_aftershock() -> void:
 	# scene-tree-parent / z-order / scale regressions without re-instrumenting.
 	# Per `diagnostic-traces-before-hypothesized-fixes` — these stay in the code
 	# permanently so the next regression diagnoses itself.
-	_combat_trace("Stratum1Boss._spawn_slam_aftershock",
-		("particles=%d lifetime=%.2f vel=[%.0f..%.0f] gravity=(%.0f,%.0f) " +
-		 "scale=%.2f z_index=%d origin=(%.0f,%.0f) " +
-		 "ramp_hold=[0..%.2f]=white decay=%.2f parent_path=%s") % [
-			SLAM_AFTERSHOCK_PARTICLE_COUNT, SLAM_AFTERSHOCK_LIFETIME,
-			SLAM_AFTERSHOCK_VELOCITY_MIN, SLAM_AFTERSHOCK_VELOCITY_MAX,
-			SLAM_AFTERSHOCK_GRAVITY.x, SLAM_AFTERSHOCK_GRAVITY.y,
-			SLAM_AFTERSHOCK_SCALE, SLAM_AFTERSHOCK_Z_INDEX,
-			global_position.x, global_position.y,
-			AFTERSHOCK_FLASH_HOLD_OFFSET, AFTERSHOCK_FLASH_DECAY_OFFSET,
-			String(room.get_path()) if room.is_inside_tree() else "<not-in-tree>"])
+	_combat_trace(
+		"Stratum1Boss._spawn_slam_aftershock",
+		(
+			(
+				"particles=%d lifetime=%.2f vel=[%.0f..%.0f] gravity=(%.0f,%.0f) "
+				+ "scale=%.2f z_index=%d origin=(%.0f,%.0f) "
+				+ "ramp_hold=[0..%.2f]=white decay=%.2f parent_path=%s"
+			)
+			% [
+				SLAM_AFTERSHOCK_PARTICLE_COUNT,
+				SLAM_AFTERSHOCK_LIFETIME,
+				SLAM_AFTERSHOCK_VELOCITY_MIN,
+				SLAM_AFTERSHOCK_VELOCITY_MAX,
+				SLAM_AFTERSHOCK_GRAVITY.x,
+				SLAM_AFTERSHOCK_GRAVITY.y,
+				SLAM_AFTERSHOCK_SCALE,
+				SLAM_AFTERSHOCK_Z_INDEX,
+				global_position.x,
+				global_position.y,
+				AFTERSHOCK_FLASH_HOLD_OFFSET,
+				AFTERSHOCK_FLASH_DECAY_OFFSET,
+				String(room.get_path()) if room.is_inside_tree() else "<not-in-tree>"
+			]
+		)
+	)
 
 
 ## v7 slam-impact sprite flash (PR #291 v7, ticket 86c9wjyuv) — secondary
@@ -1511,26 +1620,35 @@ func _play_slam_impact_flash() -> void:
 	if _hit_flash_uses_animated_sprite:
 		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
 		_slam_impact_flash_tween.tween_property(
-			asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+			asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN
+		)
 		_slam_impact_flash_tween.tween_property(
-			asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+			asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD
+		)
 		_slam_impact_flash_tween.tween_property(
-			asprite, "modulate", _sprite_modulate_at_rest, SLAM_IMPACT_FLASH_OUT)
+			asprite, "modulate", _sprite_modulate_at_rest, SLAM_IMPACT_FLASH_OUT
+		)
 	elif _hit_flash_uses_sprite:
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_slam_impact_flash_tween.tween_property(
-			sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+			sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN
+		)
 		_slam_impact_flash_tween.tween_property(
-			sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+			sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD
+		)
 		_slam_impact_flash_tween.tween_property(
-			sprite_rect, "color", _sprite_color_at_rest, SLAM_IMPACT_FLASH_OUT)
+			sprite_rect, "color", _sprite_color_at_rest, SLAM_IMPACT_FLASH_OUT
+		)
 	else:
 		_slam_impact_flash_tween.tween_property(
-			self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+			self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN
+		)
 		_slam_impact_flash_tween.tween_property(
-			self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+			self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD
+		)
 		_slam_impact_flash_tween.tween_property(
-			self, "modulate", _modulate_at_rest, SLAM_IMPACT_FLASH_OUT)
+			self, "modulate", _modulate_at_rest, SLAM_IMPACT_FLASH_OUT
+		)
 	# Diagnostic trace — distinct tag from _play_hit_flash so the trace stream
 	# can discriminate "boss got hit" (hit_flash) vs "boss dealt slam" (slam_impact_flash).
 	var _branch_tag: String = "self_modulate"
@@ -1538,12 +1656,19 @@ func _play_slam_impact_flash() -> void:
 		_branch_tag = "animated_sprite"
 	elif _hit_flash_uses_sprite:
 		_branch_tag = "color_rect"
-	_combat_trace("Stratum1Boss._play_slam_impact_flash",
-		"tint=(%.2f,%.2f,%.2f) budget_ms=%.0f branch=%s" % [
-			SLAM_IMPACT_FLASH_TINT.r, SLAM_IMPACT_FLASH_TINT.g, SLAM_IMPACT_FLASH_TINT.b,
-			(SLAM_IMPACT_FLASH_IN + SLAM_IMPACT_FLASH_HOLD + SLAM_IMPACT_FLASH_OUT) * 1000.0,
-			_branch_tag
-		])
+	_combat_trace(
+		"Stratum1Boss._play_slam_impact_flash",
+		(
+			"tint=(%.2f,%.2f,%.2f) budget_ms=%.0f branch=%s"
+			% [
+				SLAM_IMPACT_FLASH_TINT.r,
+				SLAM_IMPACT_FLASH_TINT.g,
+				SLAM_IMPACT_FLASH_TINT.b,
+				(SLAM_IMPACT_FLASH_IN + SLAM_IMPACT_FLASH_HOLD + SLAM_IMPACT_FLASH_OUT) * 1000.0,
+				_branch_tag
+			]
+		)
+	)
 
 
 ## §2 hit-flash. M3W-4 3-branch resolver per `.claude/docs/combat-architecture.md`
@@ -1587,33 +1712,59 @@ func _play_hit_flash() -> void:
 		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
-		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Stratum1Boss._play_hit_flash",
-			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)" % [
-				_hit_flash_tween.is_valid(),
-				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
-				_sprite_modulate_at_rest.r, _sprite_modulate_at_rest.g, _sprite_modulate_at_rest.b
-			])
+		_hit_flash_tween.tween_property(
+			asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT
+		)
+		_combat_trace(
+			"Stratum1Boss._play_hit_flash",
+			(
+				"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)"
+				% [
+					_hit_flash_tween.is_valid(),
+					HIT_FLASH_TINT.r,
+					HIT_FLASH_TINT.g,
+					HIT_FLASH_TINT.b,
+					_sprite_modulate_at_rest.r,
+					_sprite_modulate_at_rest.g,
+					_sprite_modulate_at_rest.b
+				]
+			)
+		)
 	elif _hit_flash_uses_sprite:
 		# Branch 2: ColorRect color tween (legacy).
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Stratum1Boss._play_hit_flash",
-			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f) target=white" % [
-				_hit_flash_tween.is_valid(),
-				_sprite_color_at_rest.r,
-				_sprite_color_at_rest.g,
-				_sprite_color_at_rest.b])
+		_combat_trace(
+			"Stratum1Boss._play_hit_flash",
+			(
+				"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f) target=white"
+				% [
+					_hit_flash_tween.is_valid(),
+					_sprite_color_at_rest.r,
+					_sprite_color_at_rest.g,
+					_sprite_color_at_rest.b
+				]
+			)
+		)
 	else:
 		# Branch 3: self.modulate fallback (bare-instanced tests).
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(self, "modulate", _modulate_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Stratum1Boss._play_hit_flash",
-			"modulate-fallback tween_valid=%s rest=(%.2f,%.2f,%.2f)" %
-			[_hit_flash_tween.is_valid(), _modulate_at_rest.r, _modulate_at_rest.g, _modulate_at_rest.b])
+		_combat_trace(
+			"Stratum1Boss._play_hit_flash",
+			(
+				"modulate-fallback tween_valid=%s rest=(%.2f,%.2f,%.2f)"
+				% [
+					_hit_flash_tween.is_valid(),
+					_modulate_at_rest.r,
+					_modulate_at_rest.g,
+					_modulate_at_rest.b
+				]
+			)
+		)
 
 
 ## §3 boss-death: 400ms hold + 200ms scale-down/fade tween, then queue_free.
@@ -1634,13 +1785,16 @@ func _play_boss_death_sequence() -> void:
 	# Sequential by default — first the hold, then a parallel scale+fade.
 	_death_tween.tween_interval(BOSS_DEATH_HOLD)
 	_death_tween.tween_property(
-		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION
+	)
 	# Run the modulate fade in parallel with the scale tween (set_parallel
 	# only flips the *next* step, so use parallel() chained from this step).
 	_death_tween.parallel().tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
 	# Safety-net: parallel timer fires queue_free even if tween_finished hangs.
-	var timer: SceneTreeTimer = get_tree().create_timer(BOSS_DEATH_HOLD + DEATH_TWEEN_DURATION + 0.2)
+	var timer: SceneTreeTimer = get_tree().create_timer(
+		BOSS_DEATH_HOLD + DEATH_TWEEN_DURATION + 0.2
+	)
 	timer.timeout.connect(_force_queue_free)
 
 
@@ -1667,6 +1821,7 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 
 
 # ---- M3W-7 audio-cue wiring -------------------------------------------
+
 
 ## Connect existing combat signals to AudioDirector SFX plays.
 ##   damaged(amount>0)            → SFX_MOB_HIT
@@ -1781,9 +1936,11 @@ func _play_climax_shake() -> void:
 	# total so the whole shake fits inside BOSS_SHAKE_DURATION.
 	var leg: float = BOSS_SHAKE_DURATION / 3.0
 	_shake_tween.tween_property(
-		self, "position", rest_offset + Vector2(BOSS_SHAKE_MAGNITUDE, 0.0), leg)
+		self, "position", rest_offset + Vector2(BOSS_SHAKE_MAGNITUDE, 0.0), leg
+	)
 	_shake_tween.tween_property(
-		self, "position", rest_offset + Vector2(-BOSS_SHAKE_MAGNITUDE, 0.0), leg)
+		self, "position", rest_offset + Vector2(-BOSS_SHAKE_MAGNITUDE, 0.0), leg
+	)
 	_shake_tween.tween_property(self, "position", rest_offset, leg)
 
 
@@ -1834,15 +1991,25 @@ func _spawn_death_particles() -> CPUParticles2D:
 	burst.color_ramp = ramp
 	room.call_deferred("add_child", burst)
 	burst.finished.connect(burst.queue_free)
-	_combat_trace("Stratum1Boss._spawn_death_particles",
-		"climax sustained burst — amount=%d lifetime=%.2f explosiveness=%.2f scale=[%.1f,%.1f] z=%d" % [
-			burst.amount, burst.lifetime, burst.explosiveness,
-			burst.scale_amount_min, burst.scale_amount_max, burst.z_index
-		])
+	_combat_trace(
+		"Stratum1Boss._spawn_death_particles",
+		(
+			"climax sustained burst — amount=%d lifetime=%.2f explosiveness=%.2f scale=[%.1f,%.1f] z=%d"
+			% [
+				burst.amount,
+				burst.lifetime,
+				burst.explosiveness,
+				burst.scale_amount_min,
+				burst.scale_amount_max,
+				burst.z_index
+			]
+		)
+	)
 	return burst
 
 
 # ---- Helpers ----------------------------------------------------------
+
 
 func _tick_timers(delta: float) -> void:
 	if _melee_telegraph_left > 0.0:
@@ -1894,6 +2061,7 @@ func _set_state(new_state: StringName) -> void:
 
 # ---- Animation playback (M3W-4) --------------------------------------
 
+
 ## Play an animation on the AnimatedSprite2D child. Resolves the child lazily
 ## on first call so bare-instanced test bosses (no Sprite child or ColorRect
 ## fallback) no-op safely. `state` is the state-key prefix (`walk`, `atk`,
@@ -1919,8 +2087,10 @@ func _play_anim(state: StringName) -> void:
 	var dir_suffix: String = _compute_facing_dir_suffix()
 	var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
 	if not _animated_sprite.sprite_frames.has_animation(anim_name):
-		_combat_trace("Stratum1Boss._play_anim",
-			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		_combat_trace(
+			"Stratum1Boss._play_anim",
+			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name
+		)
 		return
 	# Only restart if a different anim is queued — re-issuing the same anim
 	# on every physics tick (chase loop hits _set_state(CHASING) every tick)

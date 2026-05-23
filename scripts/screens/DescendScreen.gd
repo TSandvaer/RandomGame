@@ -35,11 +35,11 @@ extends CanvasLayer
 ## Player chose to restart the M1 demo loop. Owning game-flow code reloads
 ## stratum 1 room 1. One-shot — once emitted, further button presses are
 ## no-ops (rapid mash idempotence — see `_on_return_pressed`).
-signal restart_run()
+signal restart_run
 
 ## Fade-in tween has completed. Mostly used by tests to assert the timing
 ## but a cinematic layer could subscribe for "now play the bell strike."
-signal fade_in_completed()
+signal fade_in_completed
 
 # ---- Tuning ------------------------------------------------------------
 
@@ -57,8 +57,7 @@ const TITLE_TEXT: String = "STRATUM 2"
 const SUBTITLE_TEXT: String = "Coming in M2"
 
 ## Body copy explaining the loop-back option.
-const BODY_TEXT: String = (
-	"You have cleared the Outer Cloister.\nThe path deeper waits to be carved.")
+const BODY_TEXT: String = "You have cleared the Outer Cloister.\nThe path deeper waits to be carved."
 
 ## Button copy.
 const RETURN_BUTTON_TEXT: String = "Return to Stratum 1"
@@ -101,6 +100,7 @@ func _ready() -> void:
 
 # ---- Public API -------------------------------------------------------
 
+
 func is_fade_complete() -> bool:
 	return _fade_complete
 
@@ -139,6 +139,7 @@ func press_return_for_test() -> void:
 
 
 # ---- Internal --------------------------------------------------------
+
 
 func _build_ui() -> void:
 	# Background panel — full screen, modulated for the fade-in.
@@ -217,9 +218,7 @@ func _start_fade_in() -> void:
 	if _fade_tween != null and _fade_tween.is_valid():
 		_fade_tween.kill()
 	_fade_tween = create_tween()
-	_fade_tween.tween_property(
-		_bg_panel, "modulate:a", 1.0, FADE_DURATION
-	).from(0.0)
+	_fade_tween.tween_property(_bg_panel, "modulate:a", 1.0, FADE_DURATION).from(0.0)
 	_fade_tween.finished.connect(_on_fade_completed)
 
 

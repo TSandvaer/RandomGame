@@ -42,8 +42,8 @@ const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 const MobLootSpawnerScript: Script = preload("res://scripts/loot/MobLootSpawner.gd")
 const LootRollerScript: Script = preload("res://scripts/loot/LootRoller.gd")
 
-
 # ---- Helpers (mirror of test_hitbox_overlapping_at_spawn.gd patterns) -----
+
 
 func _make_grunt_with_collider(at: Vector2, hp: int = 1) -> Grunt:
 	# Bare-instantiated grunt — uses Grunt._apply_layers() defaults so
@@ -100,6 +100,7 @@ func _await_physics_settles() -> void:
 
 # ---- The P0 paired test --------------------------------------------------
 
+
 func test_two_grunts_die_in_same_frame_no_panic() -> void:
 	# Build a small "room" so the loot spawner has a parent_for_pickups
 	# target and the death-particle bursts have a tree to land in.
@@ -145,9 +146,13 @@ func test_two_grunts_die_in_same_frame_no_panic() -> void:
 	# Death-tween armed on both — PR #136's queue_free decouple should not
 	# be aborted by the panic that the deferred fix prevents.
 	assert_not_null(g_a._death_tween, "grunt A death tween created")
-	assert_not_null(g_b._death_tween,
-		"grunt B death tween created — pre-fix this would be null because"
-			+ " the panic aborted before _play_death_tween could run")
+	assert_not_null(
+		g_b._death_tween,
+		(
+			"grunt B death tween created — pre-fix this would be null because"
+			+ " the panic aborted before _play_death_tween could run"
+		)
+	)
 
 	# Wait for the safety-net timer on each mob to fire (DEATH_TWEEN_DURATION
 	# + 0.2s = 0.4s). We poll with physics frames + a real tree timer so the
@@ -159,14 +164,20 @@ func test_two_grunts_die_in_same_frame_no_panic() -> void:
 	# `is_inside_tree()==false` both signal the queue_free landed.
 	# The grunts were autofreed via `add_child_autofree` — wait, here we
 	# add to room (not autofree), so we check explicitly.
-	assert_true(not is_instance_valid(g_a) or g_a.is_queued_for_deletion(),
-		"grunt A reached queue_free via _force_queue_free (PR #136) — pre-fix it"
-			+ " would still be alive because the panic aborted the chain")
-	assert_true(not is_instance_valid(g_b) or g_b.is_queued_for_deletion(),
-		"grunt B reached queue_free")
+	assert_true(
+		not is_instance_valid(g_a) or g_a.is_queued_for_deletion(),
+		(
+			"grunt A reached queue_free via _force_queue_free (PR #136) — pre-fix it"
+			+ " would still be alive because the panic aborted the chain"
+		)
+	)
+	assert_true(
+		not is_instance_valid(g_b) or g_b.is_queued_for_deletion(), "grunt B reached queue_free"
+	)
 
 
 # ---- Companion: a single mob death with loot still works (sanity) -------
+
 
 func test_single_grunt_death_with_loot_drop_completes_cleanly() -> void:
 	# Sanity check that the deferred add_child fix doesn't break the
@@ -198,13 +209,17 @@ func test_single_grunt_death_with_loot_drop_completes_cleanly() -> void:
 			has_pickup = true
 		if child is CPUParticles2D:
 			has_particles = true
-	assert_true(has_pickup,
-		"deferred Pickup add_child landed under the room (loot drop visible to player)")
-	assert_true(has_particles,
-		"deferred death-burst add_child landed under the room (death FX visible)")
+	assert_true(
+		has_pickup, "deferred Pickup add_child landed under the room (loot drop visible to player)"
+	)
+	assert_true(
+		has_particles, "deferred death-burst add_child landed under the room (death FX visible)"
+	)
 
 	# And the safety-net queue_free fires.
 	var settle_timer: SceneTreeTimer = get_tree().create_timer(0.5)
 	await settle_timer.timeout
-	assert_true(not is_instance_valid(g) or g.is_queued_for_deletion(),
-		"grunt reached queue_free via _force_queue_free")
+	assert_true(
+		not is_instance_valid(g) or g.is_queued_for_deletion(),
+		"grunt reached queue_free via _force_queue_free"
+	)

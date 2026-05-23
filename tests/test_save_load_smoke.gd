@@ -50,7 +50,6 @@ const FIXTURE_DIR: String = "res://tests/fixtures/"
 const FIXTURE_V0: String = "save_v0_pre_migration.json"
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
 
-
 # ---- Universal-warning gate (ticket 86c9uf0mm Half B) --------------------
 ##
 ## Every test in this file attaches the NoWarningGuard in before_each() and
@@ -99,6 +98,7 @@ func after_each() -> void:
 #   asserts ZERO USER WARNING: / USER ERROR: lines (load-bearing gate)
 # =========================================================================
 
+
 func test_smoke_default_save_load_cycle_emits_no_warnings() -> void:
 	## THE LOAD-BEARING TEST. Reproduces the Sponsor soak finding:
 	## save a game with a default payload (no unknown items), load it back
@@ -114,7 +114,8 @@ func test_smoke_default_save_load_cycle_emits_no_warnings() -> void:
 	# — both registered in STARTER_ITEM_PATHS after PR #214).
 	var data: Dictionary = _save().default_payload()
 	data["equipped"] = {
-		"weapon": {
+		"weapon":
+		{
 			"id": "iron_sword",
 			"tier": 0,
 			"rolled_affixes": [],
@@ -138,33 +139,52 @@ func test_smoke_default_save_load_cycle_emits_no_warnings() -> void:
 
 	# Step 3: build a real ContentRegistry (same path as Main._ready production).
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	assert_true(registry.is_resolved(), "ContentRegistry.is_resolved() must be true after load_all()")
+	assert_true(
+		registry.is_resolved(), "ContentRegistry.is_resolved() must be true after load_all()"
+	)
 
 	# Step 4: restore Inventory from the loaded dict — this is the exact code
 	# path that pushed_warning in the Sponsor soak. With leather_vest in
 	# STARTER_ITEM_PATHS, from_save_dict must resolve it silently.
-	_inv().restore_from_save(
-		loaded,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		_inv()
+		. restore_from_save(
+			loaded,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 
 	# Structural assertions: the items are actually in inventory (resolver
 	# returned non-null — from_save_dict only returns null on miss).
 	var equipped_weapon: ItemInstance = _inv().get_equipped(&"weapon") as ItemInstance
-	assert_not_null(equipped_weapon,
-		"SMOKE FAIL: iron_sword must be equipped after restore — if null, resolver returned null "
-		+ "and from_save_dict push_warning'd (ticket 86c9uerqx)")
+	assert_not_null(
+		equipped_weapon,
+		(
+			"SMOKE FAIL: iron_sword must be equipped after restore — if null, resolver returned null "
+			+ "and from_save_dict push_warning'd (ticket 86c9uerqx)"
+		)
+	)
 	assert_eq(equipped_weapon.def.id, &"iron_sword", "equipped weapon is iron_sword")
 	var items: Array = _inv().get_items()
-	assert_eq(items.size(), 1,
-		"SMOKE FAIL: stash must contain one item (leather_vest) after restore — "
-		+ "if zero, resolver returned null and from_save_dict push_warning'd")
+	assert_eq(
+		items.size(),
+		1,
+		(
+			"SMOKE FAIL: stash must contain one item (leather_vest) after restore — "
+			+ "if zero, resolver returned null and from_save_dict push_warning'd"
+		)
+	)
 	var vest: ItemInstance = items[0] as ItemInstance
 	assert_not_null(vest.def, "leather_vest has non-null def (resolver did not return null)")
-	assert_eq(vest.def.id, &"leather_vest",
-		"REGRESSION GUARD (86c9uemdg): leather_vest must resolve via ContentRegistry.STARTER_ITEM_PATHS. "
-		+ "If this fails, the item was removed from STARTER_ITEM_PATHS or leather_vest.tres was moved.")
+	assert_eq(
+		vest.def.id,
+		&"leather_vest",
+		(
+			"REGRESSION GUARD (86c9uemdg): leather_vest must resolve via ContentRegistry.STARTER_ITEM_PATHS. "
+			+ "If this fails, the item was removed from STARTER_ITEM_PATHS or leather_vest.tres was moved."
+		)
+	)
 	# NoWarningGuard asserts zero emissions in after_each() — no explicit
 	# guard call needed here; the gate fires on any WarningBus emission
 	# that was not opt-ed-out via expect_warning().
@@ -198,10 +218,12 @@ func test_smoke_both_starter_items_registered_in_content_registry() -> void:
 	## player's save must be direct-loaded here.
 	assert_true(
 		ContentRegistry.STARTER_ITEM_PATHS.has("res://resources/items/weapons/iron_sword.tres"),
-		"STARTER_ITEM_PATHS must list iron_sword.tres (ticket 86c9qah1f)")
+		"STARTER_ITEM_PATHS must list iron_sword.tres (ticket 86c9qah1f)"
+	)
 	assert_true(
 		ContentRegistry.STARTER_ITEM_PATHS.has("res://resources/items/armors/leather_vest.tres"),
-		"STARTER_ITEM_PATHS must list leather_vest.tres (ticket 86c9uemdg)")
+		"STARTER_ITEM_PATHS must list leather_vest.tres (ticket 86c9uemdg)"
+	)
 
 
 # =========================================================================
@@ -217,6 +239,7 @@ func test_smoke_both_starter_items_registered_in_content_registry() -> void:
 ## it is warning-clean. The v3→v4 step is also tested in isolation under
 ## `tests/test_first_boss_kill_skip.gd` and `tests/test_save_migration.gd`;
 ## the v4→v5 step is tested in isolation under `tests/test_save.gd`.
+
 
 func test_migration_v0_to_current_schema_emits_no_warnings() -> void:
 	## A v0 fixture (no schema_version) migrates cleanly to the current
@@ -240,14 +263,23 @@ func test_migration_v0_to_current_schema_emits_no_warnings() -> void:
 	assert_true(loaded.has("meta"), "migration added 'meta' block (v0→v1)")
 	assert_true(loaded["character"].has("xp_to_next"), "migration added 'xp_to_next' (v1→v2)")
 	assert_true(loaded["character"].has("stats"), "migration added 'stats' block (v2→v3)")
-	assert_true(loaded["character"].has("unspent_stat_points"),
-		"migration added 'unspent_stat_points' (v2→v3)")
-	assert_true(loaded["character"].has("first_boss_kill_seen"),
-		"migration added 'first_boss_kill_seen' (v3→v4)")
-	assert_true(loaded["character"].has("world_seed"),
-		"migration backfilled 'world_seed' (v3→v4) and re-rolled (v4→v5)")
-	assert_ne(int(loaded["character"]["world_seed"]), 0,
-		"v4 → v5 re-rolled the `0` sentinel to a non-zero seed (W2-T4 canonical promotion)")
+	assert_true(
+		loaded["character"].has("unspent_stat_points"),
+		"migration added 'unspent_stat_points' (v2→v3)"
+	)
+	assert_true(
+		loaded["character"].has("first_boss_kill_seen"),
+		"migration added 'first_boss_kill_seen' (v3→v4)"
+	)
+	assert_true(
+		loaded["character"].has("world_seed"),
+		"migration backfilled 'world_seed' (v3→v4) and re-rolled (v4→v5)"
+	)
+	assert_ne(
+		int(loaded["character"]["world_seed"]),
+		0,
+		"v4 → v5 re-rolled the `0` sentinel to a non-zero seed (W2-T4 canonical promotion)"
+	)
 
 	# Schema post-migration — the in-memory data is at the current schema.
 	# Confirm by saving back and reading the envelope.
@@ -256,9 +288,14 @@ func test_migration_v0_to_current_schema_emits_no_warnings() -> void:
 	var raw2: String = f2.get_as_text()
 	f2.close()
 	var envelope: Dictionary = JSON.parse_string(raw2)
-	assert_eq(int(envelope["schema_version"]), 5,
-		"on-disk envelope is v5 after migration + resave (MIGRATION VARIANT: "
-		+ "schema_version on disk must equal current SCHEMA_VERSION=5, not 0)")
+	assert_eq(
+		int(envelope["schema_version"]),
+		5,
+		(
+			"on-disk envelope is v5 after migration + resave (MIGRATION VARIANT: "
+			+ "schema_version on disk must equal current SCHEMA_VERSION=5, not 0)"
+		)
+	)
 
 	# NoWarningGuard asserts zero emissions in after_each().
 
@@ -279,10 +316,13 @@ func test_migration_v0_with_items_restores_cleanly_no_warnings() -> void:
 	assert_false(loaded.is_empty(), "v0 fixture with items must load")
 
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	_inv().restore_from_save(
-		loaded,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		_inv()
+		. restore_from_save(
+			loaded,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 
 	# The v0 fixture has iron_sword + armor_leather in stash. Both must be
@@ -297,10 +337,15 @@ func test_migration_v0_with_items_restores_cleanly_no_warnings() -> void:
 	# test is intentionally load-bearing: a mismatch between fixture ids and
 	# registry ids surfaces here, not in Sponsor soak.
 	var items: Array = _inv().get_items()
-	assert_gte(items.size(), 1,
-		"MIGRATION VARIANT: at least one stash item from the v0 fixture must resolve "
-		+ "via ContentRegistry. If zero, check that the fixture's item ids match the "
-		+ "current STARTER_ITEM_PATHS (see ContentRegistry.STARTER_ITEM_PATHS).")
+	assert_gte(
+		items.size(),
+		1,
+		(
+			"MIGRATION VARIANT: at least one stash item from the v0 fixture must resolve "
+			+ "via ContentRegistry. If zero, check that the fixture's item ids match the "
+			+ "current STARTER_ITEM_PATHS (see ContentRegistry.STARTER_ITEM_PATHS)."
+		)
+	)
 	# NoWarningGuard asserts zero emissions for resolved items in after_each().
 	# If armor_leather is unknown, the guard will also catch the warning — both
 	# the count assertion and the guard work together.
@@ -310,6 +355,7 @@ func test_migration_v0_with_items_restores_cleanly_no_warnings() -> void:
 # VARIANT 3 — UNKNOWN-ID GRACEFUL: warning fires (expected), no crash,
 #   Inventory drops the entry
 # =========================================================================
+
 
 func test_unknown_item_id_emits_expected_warning_and_drops_entry() -> void:
 	## A save dict with an item id that doesn't exist in the registry must:
@@ -325,7 +371,8 @@ func test_unknown_item_id_emits_expected_warning_and_drops_entry() -> void:
 
 	var save_data: Dictionary = {
 		"equipped": {},
-		"stash": [
+		"stash":
+		[
 			{
 				"id": "future_item_from_m3",
 				"tier": 1,
@@ -336,26 +383,39 @@ func test_unknown_item_id_emits_expected_warning_and_drops_entry() -> void:
 	}
 
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	_inv().restore_from_save(
-		save_data,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		_inv()
+		. restore_from_save(
+			save_data,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 
 	# The entry must be DROPPED — no null-def ItemInstance lands in inventory.
 	var items: Array = _inv().get_items()
-	assert_eq(items.size(), 0,
-		"UNKNOWN-ID GRACEFUL: Inventory must have zero items after restore with unknown id — "
-		+ "a null-def ItemInstance in the inventory would crash downstream UI code. "
-		+ "The entry must be silently dropped per ItemInstance.from_save_dict contract.")
+	assert_eq(
+		items.size(),
+		0,
+		(
+			"UNKNOWN-ID GRACEFUL: Inventory must have zero items after restore with unknown id — "
+			+ "a null-def ItemInstance in the inventory would crash downstream UI code. "
+			+ "The entry must be silently dropped per ItemInstance.from_save_dict contract."
+		)
+	)
 
 	# Verify exactly one warning was captured (the one we expect_warning'd for).
 	# assert_clean() in after_each() will verify no extra unexpected warnings.
-	assert_eq(_warn_guard.captured_count(), 1,
-		"UNKNOWN-ID GRACEFUL: exactly one WarningBus emission must fire for the unknown id "
-		+ "(the expect_warning opt-out consumes it). If zero, the warning path is broken — "
-		+ "the contract of from_save_dict is to WARN on unknown ids so future regressions "
-		+ "are visible in CI, not silently hidden.")
+	assert_eq(
+		_warn_guard.captured_count(),
+		1,
+		(
+			"UNKNOWN-ID GRACEFUL: exactly one WarningBus emission must fire for the unknown id "
+			+ "(the expect_warning opt-out consumes it). If zero, the warning path is broken — "
+			+ "the contract of from_save_dict is to WARN on unknown ids so future regressions "
+			+ "are visible in CI, not silently hidden."
+		)
+	)
 
 
 func test_unknown_item_id_with_known_items_present_drops_only_bad_entry() -> void:
@@ -369,7 +429,8 @@ func test_unknown_item_id_with_known_items_present_drops_only_bad_entry() -> voi
 
 	var save_data: Dictionary = {
 		"equipped": {},
-		"stash": [
+		"stash":
+		[
 			{
 				"id": "iron_sword",
 				"tier": 0,
@@ -386,21 +447,32 @@ func test_unknown_item_id_with_known_items_present_drops_only_bad_entry() -> voi
 	}
 
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	_inv().restore_from_save(
-		save_data,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		_inv()
+		. restore_from_save(
+			save_data,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 
 	# Only the known item must survive.
 	var items: Array = _inv().get_items()
-	assert_eq(items.size(), 1,
-		"UNKNOWN-ID GRACEFUL: only the unknown item must be dropped; the known item (iron_sword) "
-		+ "must survive. If zero items, restore_from_save aborted early on the unknown id.")
+	assert_eq(
+		items.size(),
+		1,
+		(
+			"UNKNOWN-ID GRACEFUL: only the unknown item must be dropped; the known item (iron_sword) "
+			+ "must survive. If zero items, restore_from_save aborted early on the unknown id."
+		)
+	)
 	var surviving: ItemInstance = items[0] as ItemInstance
 	assert_not_null(surviving.def, "surviving item has non-null def")
-	assert_eq(surviving.def.id, &"iron_sword",
-		"surviving item is iron_sword (the known entry comes before the unknown one in stash[])")
+	assert_eq(
+		surviving.def.id,
+		&"iron_sword",
+		"surviving item is iron_sword (the known entry comes before the unknown one in stash[])"
+	)
 
 
 func test_unknown_affix_id_emits_expected_warning_drops_only_affix() -> void:
@@ -414,11 +486,13 @@ func test_unknown_affix_id_emits_expected_warning_drops_only_affix() -> void:
 
 	var save_data: Dictionary = {
 		"equipped": {},
-		"stash": [
+		"stash":
+		[
 			{
 				"id": "iron_sword",
 				"tier": 0,
-				"rolled_affixes": [
+				"rolled_affixes":
+				[
 					{"affix_id": "future_affix_x", "value": 0.99},
 					{"affix_id": "swift", "value": 0.08},
 				],
@@ -428,10 +502,13 @@ func test_unknown_affix_id_emits_expected_warning_drops_only_affix() -> void:
 	}
 
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	_inv().restore_from_save(
-		save_data,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		_inv()
+		. restore_from_save(
+			save_data,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 
 	var items: Array = _inv().get_items()
@@ -440,14 +517,18 @@ func test_unknown_affix_id_emits_expected_warning_drops_only_affix() -> void:
 	assert_not_null(inst.def, "item def is non-null (unknown affix didn't kill the item)")
 	assert_eq(inst.def.id, &"iron_sword", "iron_sword survived with the unknown affix dropped")
 	# The known 'swift' affix must survive; the unknown 'future_affix_x' must be dropped.
-	assert_eq(inst.rolled_affixes.size(), 1,
-		"only the known affix (swift) survives; unknown affix is dropped per from_save_dict contract")
+	assert_eq(
+		inst.rolled_affixes.size(),
+		1,
+		"only the known affix (swift) survives; unknown affix is dropped per from_save_dict contract"
+	)
 	assert_eq(inst.rolled_affixes[0].def.id, &"swift", "swift affix present in restored item")
 
 
 # =========================================================================
 # GATE: no-warning posture of the full pipeline (integration smoke)
 # =========================================================================
+
 
 func test_full_pipeline_iron_sword_leather_vest_equipped_stash_no_warnings() -> void:
 	## Integration-level catch-all: the exact save shape Sponsor would have
@@ -468,7 +549,8 @@ func test_full_pipeline_iron_sword_leather_vest_equipped_stash_no_warnings() -> 
 	data["meta"]["deepest_stratum"] = 2
 	data["meta"]["runs_completed"] = 3
 	data["equipped"] = {
-		"weapon": {
+		"weapon":
+		{
 			"id": "iron_sword",
 			"tier": 1,
 			"rolled_affixes": [{"affix_id": "swift", "value": 0.09}],
@@ -489,10 +571,13 @@ func test_full_pipeline_iron_sword_leather_vest_equipped_stash_no_warnings() -> 
 	assert_false(loaded.is_empty(), "load_game must return the saved dict")
 
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	_inv().restore_from_save(
-		loaded,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		_inv()
+		. restore_from_save(
+			loaded,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 
 	# Structural verifications — all items resolved (resolver returned non-null).
@@ -503,9 +588,14 @@ func test_full_pipeline_iron_sword_leather_vest_equipped_stash_no_warnings() -> 
 
 	var items: Array = _inv().get_items()
 	assert_eq(items.size(), 1, "leather_vest in stash survives round-trip")
-	assert_eq((items[0] as ItemInstance).def.id, &"leather_vest",
-		"stash item is leather_vest (REGRESSION GUARD: if unknown, leather_vest was removed "
-		+ "from STARTER_ITEM_PATHS or the .tres was moved — ticket 86c9uemdg)")
+	assert_eq(
+		(items[0] as ItemInstance).def.id,
+		&"leather_vest",
+		(
+			"stash item is leather_vest (REGRESSION GUARD: if unknown, leather_vest was removed "
+			+ "from STARTER_ITEM_PATHS or the .tres was moved — ticket 86c9uemdg)"
+		)
+	)
 
 	assert_eq(loaded["character"]["level"], 3, "character level survives round-trip")
 	assert_eq(loaded["meta"]["deepest_stratum"], 2, "meta deepest_stratum survives round-trip")
@@ -514,6 +604,7 @@ func test_full_pipeline_iron_sword_leather_vest_equipped_stash_no_warnings() -> 
 # =========================================================================
 # Internal helpers
 # =========================================================================
+
 
 func _read_fixture(name: String) -> String:
 	var path: String = FIXTURE_DIR + name

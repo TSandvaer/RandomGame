@@ -32,8 +32,8 @@ const VIGNETTE_SCENE_PATH: String = "res://scenes/ui/Vignette.tscn"
 
 var _warn_guard: NoWarningGuard
 
-
 # ---- Lifecycle --------------------------------------------------------
+
 
 func before_each() -> void:
 	_warn_guard = NoWarningGuard.new()
@@ -48,6 +48,7 @@ func after_each() -> void:
 
 # ---- Helpers ----------------------------------------------------------
 
+
 func _make_vignette() -> Vignette:
 	var packed: PackedScene = load(VIGNETTE_SCENE_PATH) as PackedScene
 	assert_not_null(packed, "Vignette.tscn must load")
@@ -57,6 +58,7 @@ func _make_vignette() -> Vignette:
 
 
 # ---- T12-VIG-01: scene loads and is a Vignette CanvasLayer -----------
+
 
 func test_vignette_scene_loads() -> void:
 	var packed: PackedScene = load(VIGNETTE_SCENE_PATH)
@@ -68,6 +70,7 @@ func test_vignette_scene_loads() -> void:
 
 
 # ---- T12-VIG-01: layer placement — above world (0), below HUD (10) ---
+
 
 func test_vignette_layer_is_between_world_and_hud() -> void:
 	# Uma vignette-spec § "Layer ordering (CanvasLayer indexing)":
@@ -82,16 +85,19 @@ func test_vignette_layer_is_between_world_and_hud() -> void:
 
 # ---- T12-VIG-02: default boot opacity = 30% (S1 baseline) -------------
 
+
 func test_default_boot_opacity_is_s1_baseline() -> void:
 	# Uma vignette-spec § "Default boot state": S1 baseline = 30%.
 	# Matches `palette.md` line 30 (30% → 60% S1 → S8 ramp; T12 ships S1).
 	var v: Vignette = _make_vignette()
 	# `_ready` has run on add_child; opacity is now at the baseline.
-	assert_almost_eq(v.get_current_opacity(), 0.30, 0.001,
-		"default boot opacity is S1 baseline 30%")
+	assert_almost_eq(
+		v.get_current_opacity(), 0.30, 0.001, "default boot opacity is S1 baseline 30%"
+	)
 
 
 # ---- T12-VIG-03: tint is #0A0606 warm-black, every RGB sub-1.0 -------
+
 
 func test_tint_constant_is_warm_black_sub_one() -> void:
 	# Uma vignette-spec § "Tint decision": locked at Color(0.04, 0.024, 0.024).
@@ -106,6 +112,7 @@ func test_tint_constant_is_warm_black_sub_one() -> void:
 
 
 # ---- T12-VIG-04: visual primitive is TextureRect, NOT Polygon2D ------
+
 
 func test_visual_primitive_is_texture_rect_not_polygon2d() -> void:
 	# Uma vignette-spec § "Visual primitive — ColorRect, NOT Polygon2D".
@@ -126,17 +133,18 @@ func test_visual_primitive_is_texture_rect_not_polygon2d() -> void:
 
 # ---- T12-VIG-05: TextureRect ignores mouse input ----------------------
 
+
 func test_texture_rect_mouse_filter_is_ignore() -> void:
 	# Defensive: vignette must not absorb clicks (HUD interactions, pickups,
 	# attack input all sit below or above in the input chain; vignette is
 	# never the click target). Same rule as BossDefeatedTitleCard root.
 	var v: Vignette = _make_vignette()
 	var tex: TextureRect = v.get_texture_rect()
-	assert_eq(tex.mouse_filter, Control.MOUSE_FILTER_IGNORE,
-		"TextureRect.mouse_filter == IGNORE")
+	assert_eq(tex.mouse_filter, Control.MOUSE_FILTER_IGNORE, "TextureRect.mouse_filter == IGNORE")
 
 
 # ---- T12-VIG-06: set_opacity() clamps to [0, 1] -----------------------
+
 
 func test_set_opacity_clamps_to_range() -> void:
 	var v: Vignette = _make_vignette()
@@ -150,6 +158,7 @@ func test_set_opacity_clamps_to_range() -> void:
 
 # ---- T12-VIG-07: set_opacity_tween() reaches target after duration ---
 
+
 func test_opacity_tween_reaches_target() -> void:
 	# Endpoint correctness — tween from 30% to 70% over short duration must
 	# land at 70% when the tween completes. Uses a short duration (0.05 s)
@@ -161,11 +170,13 @@ func test_opacity_tween_reaches_target() -> void:
 	v.set_opacity_tween(0.70, 0.05, Vignette.CURVE_EASE_IN_OUT_CUBIC)
 	# Wait for the tween to complete (signal-driven, no wall-clock guesswork)
 	await v.opacity_tween_completed
-	assert_almost_eq(v.get_current_opacity(), 0.70, 0.001,
-		"tween reaches target opacity at completion")
+	assert_almost_eq(
+		v.get_current_opacity(), 0.70, 0.001, "tween reaches target opacity at completion"
+	)
 
 
 # ---- T12-VIG-08: boss_entry_deepen() — locked BI-04 endpoint ---------
+
 
 func test_boss_entry_deepen_reaches_70_percent() -> void:
 	# Uma vignette-spec § "Duration locks per consumer" BI-04:
@@ -173,10 +184,12 @@ func test_boss_entry_deepen_reaches_70_percent() -> void:
 	# We test the *endpoint* (locked at VignetteScript.BI04_BOSS_ENTRY_TARGET)
 	# without waiting the full 600 ms — fast-forward via direct constant
 	# lookup, then exercise the API with a short-duration override.
-	assert_almost_eq(VignetteScript.BI04_BOSS_ENTRY_TARGET, 0.70, 0.001,
-		"BI-04 target locked at 70%")
-	assert_almost_eq(VignetteScript.BI04_BOSS_ENTRY_DURATION, 0.6, 0.001,
-		"BI-04 duration locked at 600 ms")
+	assert_almost_eq(
+		VignetteScript.BI04_BOSS_ENTRY_TARGET, 0.70, 0.001, "BI-04 target locked at 70%"
+	)
+	assert_almost_eq(
+		VignetteScript.BI04_BOSS_ENTRY_DURATION, 0.6, 0.001, "BI-04 duration locked at 600 ms"
+	)
 	var v: Vignette = _make_vignette()
 	await get_tree().process_frame
 	v.boss_entry_deepen()
@@ -186,27 +199,32 @@ func test_boss_entry_deepen_reaches_70_percent() -> void:
 
 # ---- T12-VIG-09: boss_defeat_climax() — locked F2 endpoint -----------
 
+
 func test_boss_defeat_climax_reaches_80_percent() -> void:
 	# Uma vignette-spec § "Duration locks per consumer" F2:
 	# current → 80%, 900 ms, ease-in-out cubic.
-	assert_almost_eq(VignetteScript.F2_BOSS_DEFEAT_TARGET, 0.80, 0.001,
-		"F2 target locked at 80%")
-	assert_almost_eq(VignetteScript.F2_BOSS_DEFEAT_DURATION, 0.9, 0.001,
-		"F2 duration locked at 900 ms")
+	assert_almost_eq(VignetteScript.F2_BOSS_DEFEAT_TARGET, 0.80, 0.001, "F2 target locked at 80%")
+	assert_almost_eq(
+		VignetteScript.F2_BOSS_DEFEAT_DURATION, 0.9, 0.001, "F2 duration locked at 900 ms"
+	)
 
 
 # ---- T12-VIG-10: boss_defeat_return() — locked F3 endpoint -----------
 
+
 func test_boss_defeat_return_returns_to_30_percent() -> void:
 	# Uma vignette-spec § "Duration locks per consumer" F3:
 	# current → 30%, 400 ms, ease-OUT cubic (NOT ease-in-out).
-	assert_almost_eq(VignetteScript.F3_POST_TITLECARD_TARGET, 0.30, 0.001,
-		"F3 target locked at S1 baseline 30%")
-	assert_almost_eq(VignetteScript.F3_POST_TITLECARD_DURATION, 0.4, 0.001,
-		"F3 duration locked at 400 ms")
+	assert_almost_eq(
+		VignetteScript.F3_POST_TITLECARD_TARGET, 0.30, 0.001, "F3 target locked at S1 baseline 30%"
+	)
+	assert_almost_eq(
+		VignetteScript.F3_POST_TITLECARD_DURATION, 0.4, 0.001, "F3 duration locked at 400 ms"
+	)
 
 
 # ---- T12-VIG-11: idempotence — rapid calls produce one continuous tween
+
 
 func test_set_opacity_tween_idempotent_kills_previous() -> void:
 	# Uma vignette-spec § "Idempotence" — two `set_opacity_tween` calls
@@ -230,11 +248,13 @@ func test_set_opacity_tween_idempotent_kills_previous() -> void:
 	# we'd see opacity_tween_completed fire twice; with proper kill, only
 	# the second target (0.20) lands.
 	await v.opacity_tween_completed
-	assert_almost_eq(v.get_current_opacity(), 0.20, 0.001,
-		"second tween's target wins (first was killed)")
+	assert_almost_eq(
+		v.get_current_opacity(), 0.20, 0.001, "second tween's target wins (first was killed)"
+	)
 
 
 # ---- T12-VIG-11 cont.: instant set_opacity also kills active tween ----
+
 
 func test_set_opacity_instant_kills_active_tween() -> void:
 	# Defensive: set_opacity (instant) must also kill any in-flight tween,
@@ -246,11 +266,13 @@ func test_set_opacity_instant_kills_active_tween() -> void:
 	assert_true(v.has_active_tween(), "tween active")
 	v.set_opacity(0.10)
 	assert_false(v.has_active_tween(), "instant set killed the tween")
-	assert_almost_eq(v.get_current_opacity(), 0.10, 0.001,
-		"instant value lands without tween overwrite")
+	assert_almost_eq(
+		v.get_current_opacity(), 0.10, 0.001, "instant value lands without tween overwrite"
+	)
 
 
 # ---- T12-VIG-14 endpoint: tween-completed signal fires on completion -
+
 
 func test_opacity_tween_completed_signal_fires() -> void:
 	# Signal-driven endpoint assertion — tests subscribing to this signal can
@@ -265,11 +287,13 @@ func test_opacity_tween_completed_signal_fires() -> void:
 	await get_tree().process_frame
 	v.set_opacity_tween(0.55, 0.05, Vignette.CURVE_EASE_IN_OUT_CUBIC)
 	var emitted_target: float = await v.opacity_tween_completed
-	assert_almost_eq(emitted_target, 0.55, 0.001,
-		"opacity_tween_completed emits with the target value")
+	assert_almost_eq(
+		emitted_target, 0.55, 0.001, "opacity_tween_completed emits with the target value"
+	)
 
 
 # ---- T12 — texture is non-trivial (radial gradient generated) ---------
+
 
 func test_radial_gradient_texture_is_generated() -> void:
 	# Defensive: the procedural radial-gradient builder must produce a real
@@ -279,13 +303,20 @@ func test_radial_gradient_texture_is_generated() -> void:
 	var v: Vignette = _make_vignette()
 	var tex: TextureRect = v.get_texture_rect()
 	assert_not_null(tex.texture, "texture assigned")
-	assert_eq(tex.texture.get_width(), Vignette.GRADIENT_TEX_SIZE,
-		"texture width = GRADIENT_TEX_SIZE (256)")
-	assert_eq(tex.texture.get_height(), Vignette.GRADIENT_TEX_SIZE,
-		"texture height = GRADIENT_TEX_SIZE (256)")
+	assert_eq(
+		tex.texture.get_width(),
+		Vignette.GRADIENT_TEX_SIZE,
+		"texture width = GRADIENT_TEX_SIZE (256)"
+	)
+	assert_eq(
+		tex.texture.get_height(),
+		Vignette.GRADIENT_TEX_SIZE,
+		"texture height = GRADIENT_TEX_SIZE (256)"
+	)
 
 
 # ---- T12 — curve-preset enum stability --------------------------------
+
 
 func test_curve_preset_constants_are_stable() -> void:
 	# Pin the curve-preset enum values so future API callers (T13, T16) can

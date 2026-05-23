@@ -19,8 +19,8 @@ extends GutTest
 ## OPFS round-trip baseline + max, idempotent double-migration, unknown-
 ## keys passthrough).
 
-
 # ---- W3-T6-AC1 — save_v4_full_stash_72_slots.json ------------------
+
 
 func test_full_stash_72_slots_loads_clean_under_v4_runtime() -> void:
 	pending("awaiting W3-T6 — tests/fixtures/v4/save_v4_full_stash_72_slots.json + load assertion")
@@ -31,6 +31,7 @@ func test_full_stash_72_slots_round_trip_bit_identical() -> void:
 
 
 # ---- W3-T6-AC2 — save_v4_three_stratum_bags.json -------------------
+
 
 func test_three_stratum_bags_load_independently() -> void:
 	## ST-21 cross-stratum independence — pin via this fixture: ember_bags
@@ -45,6 +46,7 @@ func test_three_stratum_bags_cap_at_8_entries() -> void:
 
 # ---- W3-T6-AC3 — save_v4_partial_corruption_recovery.json ----------
 
+
 func test_partial_corruption_emits_push_warning_drops_entry() -> void:
 	pending("awaiting W3-T6 — corrupted item entry (unknown id) drops with push_warning")
 
@@ -54,6 +56,7 @@ func test_partial_corruption_rest_of_save_loads_clean() -> void:
 
 
 # ---- W3-T6-AC4 — save_v4_max_level_capped_full_inventory.json -----
+
 
 func test_max_level_full_inventory_full_stash_full_bags_round_trip() -> void:
 	pending("awaiting W3-T6 — maximal save round-trips bit-identical (TI-15 size budget hit)")
@@ -66,11 +69,13 @@ func test_max_level_save_size_under_100kb() -> void:
 
 # ---- W3-T6-AC5 — save_v4_html5_opfs_baseline.json ------------------
 
+
 func test_opfs_baseline_fixture_valid_v4_envelope() -> void:
 	pending("awaiting W3-T6 — minimal v4 envelope valid as OPFS round-trip baseline")
 
 
 # ---- W3-T6-AC6 — save_v4_html5_opfs_max.json -----------------------
+
 
 func test_opfs_max_fixture_valid_v4_envelope() -> void:
 	pending("awaiting W3-T6 — maximal v4 envelope valid for OPFS stress testing")
@@ -87,6 +92,7 @@ func test_opfs_round_trip_documented_as_sponsor_probe() -> void:
 
 # ---- W3-T6-AC7 — save_v4_idempotent_double_migration.json ---------
 
+
 func test_idempotent_double_migration_is_no_op() -> void:
 	## INV-7 from save-schema-v4-plan.md §5 — re-running migration on
 	## already-v4 data is a bit-identical no-op.
@@ -94,6 +100,7 @@ func test_idempotent_double_migration_is_no_op() -> void:
 
 
 # ---- W3-T6-AC8 — save_v4_unknown_keys_passthrough.json ------------
+
 
 func test_unknown_keys_preserved_through_round_trip() -> void:
 	## Forward-compat: extra unknown keys are preserved (not silently
@@ -103,10 +110,14 @@ func test_unknown_keys_preserved_through_round_trip() -> void:
 
 # ---- INV-1..INV-8 cross-check (pin via the 8 fixtures collectively) -
 
+
 func test_inv1_v3_to_v4_load_clean() -> void:
 	pending(
-		"awaiting W3-T6 — INV-1 via the v3-baseline-loaded-under-v4 path"
-			+ " (re-use existing fixture)")
+		(
+			"awaiting W3-T6 — INV-1 via the v3-baseline-loaded-under-v4 path"
+			+ " (re-use existing fixture)"
+		)
+	)
 
 
 func test_inv2_empty_stash_backfill_via_fixture() -> void:

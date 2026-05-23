@@ -10,7 +10,6 @@ extends GutTest
 const TEST_SLOT: int = 999
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
 
-
 # ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
 ##
 ## Save is the load-bearing surface the M2 RC soak meta-finding singled
@@ -49,6 +48,7 @@ func _save() -> Node:
 
 
 # --- Round-trip ----------------------------------------------------------
+
 
 func test_save_then_load_round_trips_default_payload() -> void:
 	var ok: bool = _save().save_game(TEST_SLOT)
@@ -112,6 +112,7 @@ func test_delete_save_removes_file() -> void:
 
 # --- Schema versioning ---------------------------------------------------
 
+
 func test_envelope_carries_schema_version_and_saved_at() -> void:
 	_save().save_game(TEST_SLOT)
 	var path: String = _save().save_path(TEST_SLOT)
@@ -135,18 +136,24 @@ func test_envelope_carries_schema_version_and_saved_at() -> void:
 
 # --- Forward-compat migration: v1 -> v2 ---------------------------------
 
+
 func test_migrate_v1_save_to_v2_adds_xp_to_next() -> void:
 	# Hand-author a v1 save: character has level/xp but no xp_to_next.
 	var v1_envelope: Dictionary = {
 		"schema_version": 1,
 		"saved_at": "2026-05-02T10:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Ember-Knight",
 				"level": 3,
 				"xp": 200,
-				"vigor": 0, "focus": 0, "edge": 0,
-				"hp_current": 100, "hp_max": 100,
+				"vigor": 0,
+				"focus": 0,
+				"edge": 0,
+				"hp_current": 100,
+				"hp_max": 100,
 			},
 			"stash": [],
 			"equipped": {},
@@ -159,8 +166,9 @@ func test_migrate_v1_save_to_v2_adds_xp_to_next() -> void:
 
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_true(loaded.has("character"))
-	assert_true(loaded["character"].has("xp_to_next"),
-		"v1 -> v2 migration adds xp_to_next to character")
+	assert_true(
+		loaded["character"].has("xp_to_next"), "v1 -> v2 migration adds xp_to_next to character"
+	)
 	# Curve mirror in Save.gd: floor(100 * L^1.5) — at L=3, 519.
 	assert_eq(loaded["character"]["xp_to_next"], 519)
 	# Untouched fields preserved.
@@ -172,7 +180,8 @@ func test_migrate_v0_save_chains_through_v2() -> void:
 	# A v0 file (no schema_version, no meta) must end up at v2 — both
 	# migrations chain. xp_to_next must be present after the chain.
 	var v0_envelope: Dictionary = {
-		"data": {
+		"data":
+		{
 			"character": {"level": 2, "xp": 50},
 		},
 	}
@@ -191,10 +200,12 @@ func test_migrate_v0_save_chains_through_v2() -> void:
 
 # --- Forward-compat migration: v0 -> v1 ---------------------------------
 
+
 func test_migrate_v0_save_to_v1_adds_meta_block() -> void:
 	# Hand-author a pre-v1 file: no meta, no equipped, no schema_version.
 	var v0_envelope: Dictionary = {
-		"data": {
+		"data":
+		{
 			"character": {"level": 3, "xp": 500},
 			"stash": [{"id": "weapon_x", "tier": 1, "rolled_affixes": [], "stack_count": 1}],
 		},
@@ -234,10 +245,19 @@ func test_migrate_handles_save_from_future_schema() -> void:
 	var future_envelope: Dictionary = {
 		"schema_version": 999,
 		"saved_at": "2099-01-01T00:00:00",
-		"data": {
-			"character": {
-				"level": 99, "xp": 1, "vigor": 1, "focus": 1, "edge": 1,
-				"hp_current": 1, "hp_max": 1, "name": "Future"},
+		"data":
+		{
+			"character":
+			{
+				"level": 99,
+				"xp": 1,
+				"vigor": 1,
+				"focus": 1,
+				"edge": 1,
+				"hp_current": 1,
+				"hp_max": 1,
+				"name": "Future"
+			},
 			"stash": [],
 			"equipped": {},
 			"meta": {"runs_completed": 1, "deepest_stratum": 8, "total_playtime_sec": 0.0},
@@ -260,6 +280,7 @@ func test_migrate_handles_save_from_future_schema() -> void:
 ## sentinel). See `scripts/save/Save.gd::_migrate_v4_to_v5` for the
 ## promotion semantics + idempotence argument.
 
+
 func test_migrate_v4_save_with_zero_sentinel_rerolls_world_seed() -> void:
 	# A v4 save where `character.world_seed == 0` (the v3->v4 backfill
 	# sentinel meaning "this character predates the seed roll") must get
@@ -268,19 +289,27 @@ func test_migrate_v4_save_with_zero_sentinel_rerolls_world_seed() -> void:
 	var v4_envelope: Dictionary = {
 		"schema_version": 4,
 		"saved_at": "2026-05-22T11:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Legacy-Knight",
-				"level": 3, "xp": 600, "xp_to_next": 519,
-				"vigor": 1, "focus": 0, "edge": 0,
+				"level": 3,
+				"xp": 600,
+				"xp_to_next": 519,
+				"vigor": 1,
+				"focus": 0,
+				"edge": 0,
 				"stats": {"vigor": 1, "focus": 0, "edge": 0},
 				"unspent_stat_points": 0,
 				"first_level_up_seen": true,
 				"first_boss_kill_seen": false,
-				"hp_current": 90, "hp_max": 100,
+				"hp_current": 90,
+				"hp_max": 100,
 				"world_seed": 0,  # the v4-additive sentinel
 			},
-			"stash": [], "equipped": {},
+			"stash": [],
+			"equipped": {},
 			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 0.0},
 		},
 	}
@@ -289,11 +318,15 @@ func test_migrate_v4_save_with_zero_sentinel_rerolls_world_seed() -> void:
 	f.close()
 
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_true(loaded["character"].has("world_seed"),
-		"v4 -> v5 migration preserves world_seed key")
+	assert_true(
+		loaded["character"].has("world_seed"), "v4 -> v5 migration preserves world_seed key"
+	)
 	# probability of randi() returning exactly 0 is 1/2^32 (~2.3e-10)
-	assert_ne(int(loaded["character"]["world_seed"]), 0,
-		"v4 -> v5 migration re-rolls the `0` sentinel to a non-zero value")
+	assert_ne(
+		int(loaded["character"]["world_seed"]),
+		0,
+		"v4 -> v5 migration re-rolls the `0` sentinel to a non-zero value"
+	)
 	# Untouched fields preserved bit-identical.
 	assert_eq(loaded["character"]["name"], "Legacy-Knight")
 	assert_eq(loaded["character"]["level"], 3)
@@ -309,19 +342,27 @@ func test_migrate_v4_save_with_nonzero_seed_preserves_world_seed() -> void:
 	var v4_envelope: Dictionary = {
 		"schema_version": 4,
 		"saved_at": "2026-05-22T12:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Already-Rolled",
-				"level": 1, "xp": 0, "xp_to_next": 100,
-				"vigor": 0, "focus": 0, "edge": 0,
+				"level": 1,
+				"xp": 0,
+				"xp_to_next": 100,
+				"vigor": 0,
+				"focus": 0,
+				"edge": 0,
 				"stats": {"vigor": 0, "focus": 0, "edge": 0},
 				"unspent_stat_points": 0,
 				"first_level_up_seen": false,
 				"first_boss_kill_seen": false,
-				"hp_current": 100, "hp_max": 100,
+				"hp_current": 100,
+				"hp_max": 100,
 				"world_seed": existing_seed,
 			},
-			"stash": [], "equipped": {},
+			"stash": [],
+			"equipped": {},
 			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 0.0},
 		},
 	}
@@ -330,8 +371,11 @@ func test_migrate_v4_save_with_nonzero_seed_preserves_world_seed() -> void:
 	f.close()
 
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_eq(int(loaded["character"]["world_seed"]), existing_seed,
-		"v4 -> v5 migration preserves a non-zero world_seed (immutability post-roll)")
+	assert_eq(
+		int(loaded["character"]["world_seed"]),
+		existing_seed,
+		"v4 -> v5 migration preserves a non-zero world_seed (immutability post-roll)"
+	)
 
 
 func test_migrate_v5_save_is_idempotent_on_world_seed() -> void:
@@ -344,19 +388,27 @@ func test_migrate_v5_save_is_idempotent_on_world_seed() -> void:
 	var v5_envelope: Dictionary = {
 		"schema_version": 5,
 		"saved_at": "2026-05-23T09:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Native-v5",
-				"level": 1, "xp": 0, "xp_to_next": 100,
-				"vigor": 0, "focus": 0, "edge": 0,
+				"level": 1,
+				"xp": 0,
+				"xp_to_next": 100,
+				"vigor": 0,
+				"focus": 0,
+				"edge": 0,
 				"stats": {"vigor": 0, "focus": 0, "edge": 0},
 				"unspent_stat_points": 0,
 				"first_level_up_seen": false,
 				"first_boss_kill_seen": false,
-				"hp_current": 100, "hp_max": 100,
+				"hp_current": 100,
+				"hp_max": 100,
 				"world_seed": existing_seed,
 			},
-			"stash": [], "equipped": {},
+			"stash": [],
+			"equipped": {},
 			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 0.0},
 		},
 	}
@@ -365,13 +417,19 @@ func test_migrate_v5_save_is_idempotent_on_world_seed() -> void:
 	f.close()
 
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_eq(int(loaded["character"]["world_seed"]), existing_seed,
-		"v5 -> v5 (no-op) migration preserves world_seed bit-identical")
+	assert_eq(
+		int(loaded["character"]["world_seed"]),
+		existing_seed,
+		"v5 -> v5 (no-op) migration preserves world_seed bit-identical"
+	)
 	# Double-trip: save + reload + verify still bit-identical.
 	assert_true(_save().save_game(TEST_SLOT, loaded))
 	var reloaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_eq(int(reloaded["character"]["world_seed"]), existing_seed,
-		"v5 -> v5 double-trip preserves world_seed (no spurious re-roll on resave)")
+	assert_eq(
+		int(reloaded["character"]["world_seed"]),
+		existing_seed,
+		"v5 -> v5 double-trip preserves world_seed (no spurious re-roll on resave)"
+	)
 
 
 func test_migrate_v3_save_chains_through_to_v5_with_nonzero_seed() -> void:
@@ -382,17 +440,25 @@ func test_migrate_v3_save_chains_through_to_v5_with_nonzero_seed() -> void:
 	var v3_envelope: Dictionary = {
 		"schema_version": 3,
 		"saved_at": "2026-05-02T10:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Mid-game-Knight",
-				"level": 3, "xp": 600, "xp_to_next": 519,
-				"vigor": 1, "focus": 1, "edge": 0,
+				"level": 3,
+				"xp": 600,
+				"xp_to_next": 519,
+				"vigor": 1,
+				"focus": 1,
+				"edge": 0,
 				"stats": {"vigor": 1, "focus": 1, "edge": 0},
 				"unspent_stat_points": 2,
 				"first_level_up_seen": true,
-				"hp_current": 80, "hp_max": 100,
+				"hp_current": 80,
+				"hp_max": 100,
 			},
-			"stash": [], "equipped": {},
+			"stash": [],
+			"equipped": {},
 			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 100.0},
 		},
 	}
@@ -402,13 +468,18 @@ func test_migrate_v3_save_chains_through_to_v5_with_nonzero_seed() -> void:
 
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	# v3 -> v4 added first_boss_kill_seen + world_seed (sentinel `0`).
-	assert_true(loaded["character"].has("first_boss_kill_seen"),
-		"v3 -> v4 added first_boss_kill_seen")
-	assert_true(loaded["character"].has("world_seed"),
-		"v3 -> v4 -> v5 chain preserves world_seed key")
+	assert_true(
+		loaded["character"].has("first_boss_kill_seen"), "v3 -> v4 added first_boss_kill_seen"
+	)
+	assert_true(
+		loaded["character"].has("world_seed"), "v3 -> v4 -> v5 chain preserves world_seed key"
+	)
 	# v4 -> v5 re-rolled the sentinel.
-	assert_ne(int(loaded["character"]["world_seed"]), 0,
-		"v4 -> v5 chain re-rolls the `0` sentinel; loaded seed is non-zero")
+	assert_ne(
+		int(loaded["character"]["world_seed"]),
+		0,
+		"v4 -> v5 chain re-rolls the `0` sentinel; loaded seed is non-zero"
+	)
 	# Untouched v3 fields preserved bit-identical through the chain.
 	assert_eq(loaded["character"]["level"], 3)
 	assert_eq(loaded["character"]["xp"], 600)
@@ -437,19 +508,27 @@ func test_two_consecutive_v4_migrations_roll_different_world_seeds() -> void:
 	var v4_template: Dictionary = {
 		"schema_version": 4,
 		"saved_at": "2026-05-22T13:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Template",
-				"level": 1, "xp": 0, "xp_to_next": 100,
-				"vigor": 0, "focus": 0, "edge": 0,
+				"level": 1,
+				"xp": 0,
+				"xp_to_next": 100,
+				"vigor": 0,
+				"focus": 0,
+				"edge": 0,
 				"stats": {"vigor": 0, "focus": 0, "edge": 0},
 				"unspent_stat_points": 0,
 				"first_level_up_seen": false,
 				"first_boss_kill_seen": false,
-				"hp_current": 100, "hp_max": 100,
+				"hp_current": 100,
+				"hp_max": 100,
 				"world_seed": 0,
 			},
-			"stash": [], "equipped": {},
+			"stash": [],
+			"equipped": {},
 			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 0.0},
 		},
 	}
@@ -467,13 +546,17 @@ func test_two_consecutive_v4_migrations_roll_different_world_seeds() -> void:
 	var seed_b: int = int(loaded_b["character"]["world_seed"])
 	assert_ne(seed_a, 0)
 	assert_ne(seed_b, 0)
-	assert_ne(seed_a, seed_b,
-		"two independent v4 migrations roll DIFFERENT non-zero seeds (per-character variance preserved)")
+	assert_ne(
+		seed_a,
+		seed_b,
+		"two independent v4 migrations roll DIFFERENT non-zero seeds (per-character variance preserved)"
+	)
 	# Clean slot_b.
 	_save().delete_save(slot_b)
 
 
 # --- Corruption resilience -----------------------------------------------
+
 
 func test_load_returns_empty_on_corrupt_json() -> void:
 	# Write garbage to the save path.
@@ -493,6 +576,7 @@ func test_load_returns_empty_on_root_not_dictionary() -> void:
 
 
 # --- Atomic write --------------------------------------------------------
+
 
 func test_atomic_write_overwrites_existing_file() -> void:
 	var path: String = _save().save_path(TEST_SLOT)
@@ -517,6 +601,7 @@ func test_atomic_write_does_not_leave_tmp_on_success() -> void:
 
 # --- Default payload integrity -------------------------------------------
 
+
 func test_default_payload_returns_independent_copies() -> void:
 	# Mutating one default_payload() result must not affect a subsequent call.
 	var a: Dictionary = _save().default_payload()
@@ -529,12 +614,14 @@ func test_default_payload_returns_independent_copies() -> void:
 
 # --- Persistence roundtrip with deep nesting (regression for shallow copy bugs) ---
 
+
 func test_deeply_nested_data_round_trips_exactly() -> void:
 	var data: Dictionary = _save().default_payload()
 	data["equipped"]["weapon"] = {
 		"id": "weapon_flame_blade",
 		"tier": 3,
-		"rolled_affixes": [
+		"rolled_affixes":
+		[
 			{"affix_id": "swift", "value": 0.12},
 			{"affix_id": "burn", "value": 5},
 		],

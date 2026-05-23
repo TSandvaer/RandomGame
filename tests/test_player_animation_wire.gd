@@ -29,8 +29,8 @@ const SPRITE_FRAMES_PATH: String = "res://assets/sprites/player/Player.tres"
 const ANIM_DIRS: Array[String] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 const ANIM_STATES: Array[String] = ["walk", "attack_light", "attack_heavy", "dodge", "hit", "die"]
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_scene_player() -> Player:
 	# Production scene-loaded Player (Sprite child is AnimatedSprite2D).
@@ -42,6 +42,7 @@ func _make_scene_player() -> Player:
 
 # ---- Convention: Sprite child resolves to AnimatedSprite2D ------------
 
+
 func test_scene_sprite_is_animated_sprite2d_with_sprite_frames() -> void:
 	# M3W-2 swap: the production .tscn's "Sprite" node is now AnimatedSprite2D,
 	# not ColorRect. The node name is preserved ("Sprite") so existing
@@ -50,17 +51,22 @@ func test_scene_sprite_is_animated_sprite2d_with_sprite_frames() -> void:
 	var p: Player = _make_scene_player()
 	var sprite_node: Node = p.get_node_or_null("Sprite")
 	assert_not_null(sprite_node, "Player.tscn has a 'Sprite' child")
-	assert_true(sprite_node is AnimatedSprite2D,
-		"Sprite child resolves to AnimatedSprite2D (M3W-2 convention)")
+	assert_true(
+		sprite_node is AnimatedSprite2D,
+		"Sprite child resolves to AnimatedSprite2D (M3W-2 convention)"
+	)
 	var asprite: AnimatedSprite2D = sprite_node as AnimatedSprite2D
-	assert_not_null(asprite.sprite_frames,
-		"AnimatedSprite2D has a SpriteFrames resource assigned")
+	assert_not_null(asprite.sprite_frames, "AnimatedSprite2D has a SpriteFrames resource assigned")
 	# texture_filter = TEXTURE_FILTER_NEAREST (1) preserves pixel-art hardness.
-	assert_eq(asprite.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
-		"texture_filter = NEAREST (pixel-art hardness preserved)")
+	assert_eq(
+		asprite.texture_filter,
+		CanvasItem.TEXTURE_FILTER_NEAREST,
+		"texture_filter = NEAREST (pixel-art hardness preserved)"
+	)
 
 
 # ---- Convention: SpriteFrames exposes all 48 sub-anims ----------------
+
 
 func test_sprite_frames_resource_exposes_all_state_x_direction_keys() -> void:
 	# 6 states × 8 directions = 48 sub-animation keys. The animation_key
@@ -70,8 +76,10 @@ func test_sprite_frames_resource_exposes_all_state_x_direction_keys() -> void:
 	for state in ANIM_STATES:
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: String = "%s_%s" % [state, dir_suffix]
-			assert_true(frames.has_animation(StringName(anim_name)),
-				"SpriteFrames exposes animation '%s'" % anim_name)
+			assert_true(
+				frames.has_animation(StringName(anim_name)),
+				"SpriteFrames exposes animation '%s'" % anim_name
+			)
 
 
 func test_sprite_frames_loop_flags_match_policy() -> void:
@@ -80,13 +88,15 @@ func test_sprite_frames_loop_flags_match_policy() -> void:
 	var frames: SpriteFrames = load(SPRITE_FRAMES_PATH) as SpriteFrames
 	for dir_suffix in ANIM_DIRS:
 		var walk_name: StringName = StringName("walk_%s" % dir_suffix)
-		assert_true(frames.get_animation_loop(walk_name),
-			"'%s' loops (movement is cyclical)" % walk_name)
+		assert_true(
+			frames.get_animation_loop(walk_name), "'%s' loops (movement is cyclical)" % walk_name
+		)
 	for state in ["attack_light", "attack_heavy", "dodge", "hit", "die"]:
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
-			assert_false(frames.get_animation_loop(anim_name),
-				"'%s' is one-shot (loop=false)" % anim_name)
+			assert_false(
+				frames.get_animation_loop(anim_name), "'%s' is one-shot (loop=false)" % anim_name
+			)
 
 
 func test_sprite_frames_fps_is_8_for_all_anims() -> void:
@@ -95,11 +105,15 @@ func test_sprite_frames_fps_is_8_for_all_anims() -> void:
 	for state in ANIM_STATES:
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
-			assert_eq(frames.get_animation_speed(anim_name), 8.0,
-				"'%s' plays at 8 fps (M3W-1 convention)" % anim_name)
+			assert_eq(
+				frames.get_animation_speed(anim_name),
+				8.0,
+				"'%s' plays at 8 fps (M3W-1 convention)" % anim_name
+			)
 
 
 # ---- 8-octant facing quantizer ---------------------------------------
+
 
 func test_dir_suffix_for_facing_8_cardinals() -> void:
 	# Each cardinal / diagonal Vector2 quantizes to its expected suffix.
@@ -109,22 +123,30 @@ func test_dir_suffix_for_facing_8_cardinals() -> void:
 	#   Vector2.LEFT  → "w"
 	#   Vector2.UP    → "n"
 	# Diagonals are unit-length normalized.
-	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2.RIGHT), "e",
-		"+X (right) quantizes to 'e'")
-	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2(1, 1).normalized()), "se",
-		"+X+Y (down-right) quantizes to 'se'")
-	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2.DOWN), "s",
-		"+Y (down) quantizes to 's'")
-	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2(-1, 1).normalized()), "sw",
-		"-X+Y (down-left) quantizes to 'sw'")
-	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2.LEFT), "w",
-		"-X (left) quantizes to 'w'")
-	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2(-1, -1).normalized()), "nw",
-		"-X-Y (up-left) quantizes to 'nw'")
-	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2.UP), "n",
-		"-Y (up) quantizes to 'n'")
-	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2(1, -1).normalized()), "ne",
-		"+X-Y (up-right) quantizes to 'ne'")
+	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2.RIGHT), "e", "+X (right) quantizes to 'e'")
+	assert_eq(
+		PlayerScript.dir_suffix_for_facing(Vector2(1, 1).normalized()),
+		"se",
+		"+X+Y (down-right) quantizes to 'se'"
+	)
+	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2.DOWN), "s", "+Y (down) quantizes to 's'")
+	assert_eq(
+		PlayerScript.dir_suffix_for_facing(Vector2(-1, 1).normalized()),
+		"sw",
+		"-X+Y (down-left) quantizes to 'sw'"
+	)
+	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2.LEFT), "w", "-X (left) quantizes to 'w'")
+	assert_eq(
+		PlayerScript.dir_suffix_for_facing(Vector2(-1, -1).normalized()),
+		"nw",
+		"-X-Y (up-left) quantizes to 'nw'"
+	)
+	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2.UP), "n", "-Y (up) quantizes to 'n'")
+	assert_eq(
+		PlayerScript.dir_suffix_for_facing(Vector2(1, -1).normalized()),
+		"ne",
+		"+X-Y (up-right) quantizes to 'ne'"
+	)
 
 
 func test_dir_suffix_for_facing_8_suffixes_are_permutation() -> void:
@@ -143,18 +165,21 @@ func test_dir_suffix_for_facing_8_suffixes_are_permutation() -> void:
 	for v in cardinals:
 		var s: String = PlayerScript.dir_suffix_for_facing(v)
 		seen[s] = true
-	assert_eq(seen.size(), 8,
-		"8 cardinals produce 8 distinct suffixes — got %d" % seen.size())
+	assert_eq(seen.size(), 8, "8 cardinals produce 8 distinct suffixes — got %d" % seen.size())
 
 
 func test_dir_suffix_for_facing_zero_returns_default() -> void:
 	# Zero vector (no facing) returns default "s" — defensive fallback;
 	# callers should pre-filter, but the helper must not return ""/crash.
-	assert_eq(PlayerScript.dir_suffix_for_facing(Vector2.ZERO), "s",
-		"zero vector returns default 's' (defensive)")
+	assert_eq(
+		PlayerScript.dir_suffix_for_facing(Vector2.ZERO),
+		"s",
+		"zero vector returns default 's' (defensive)"
+	)
 
 
 # ---- Convention: state_changed drives AnimatedSprite2D ---------------
+
 
 func test_state_change_to_attack_light_plays_attack_light_dir() -> void:
 	# state_changed signal handler drives AnimatedSprite2D into
@@ -166,8 +191,11 @@ func test_state_change_to_attack_light_plays_attack_light_dir() -> void:
 	# so the signal handler sees ATTACK_LIGHT.
 	p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("attack_light_e"),
-		"STATE_ATTACK + ATTACK_LIGHT + facing east → 'attack_light_e'")
+	assert_eq(
+		asprite.animation,
+		StringName("attack_light_e"),
+		"STATE_ATTACK + ATTACK_LIGHT + facing east → 'attack_light_e'"
+	)
 
 
 func test_state_change_to_attack_heavy_plays_attack_heavy_dir() -> void:
@@ -175,8 +203,11 @@ func test_state_change_to_attack_heavy_plays_attack_heavy_dir() -> void:
 	p._facing = Vector2.DOWN
 	p.try_attack(Player.ATTACK_HEAVY, Vector2.DOWN)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("attack_heavy_s"),
-		"STATE_ATTACK + ATTACK_HEAVY + facing south → 'attack_heavy_s'")
+	assert_eq(
+		asprite.animation,
+		StringName("attack_heavy_s"),
+		"STATE_ATTACK + ATTACK_HEAVY + facing south → 'attack_heavy_s'"
+	)
 
 
 func test_state_change_to_dodge_plays_dodge_dir() -> void:
@@ -184,8 +215,7 @@ func test_state_change_to_dodge_plays_dodge_dir() -> void:
 	p._facing = Vector2.LEFT
 	p.try_dodge(Vector2.LEFT)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("dodge_w"),
-		"STATE_DODGE + facing west → 'dodge_w'")
+	assert_eq(asprite.animation, StringName("dodge_w"), "STATE_DODGE + facing west → 'dodge_w'")
 
 
 func test_state_change_to_walk_plays_walk_dir_loop() -> void:
@@ -198,13 +228,12 @@ func test_state_change_to_walk_plays_walk_dir_loop() -> void:
 	p.velocity = Vector2.UP * 120.0
 	p.set_state(Player.STATE_WALK)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("walk_n"),
-		"STATE_WALK + velocity north → 'walk_n'")
-	assert_true(asprite.is_playing(),
-		"walk_n is_playing() — looping anim runs immediately")
+	assert_eq(asprite.animation, StringName("walk_n"), "STATE_WALK + velocity north → 'walk_n'")
+	assert_true(asprite.is_playing(), "walk_n is_playing() — looping anim runs immediately")
 
 
 # ---- take_damage drives hit anim + hit-flash --------------------------
+
 
 func test_take_damage_plays_hit_dir_animation() -> void:
 	var p: Player = _make_scene_player()
@@ -212,11 +241,11 @@ func test_take_damage_plays_hit_dir_animation() -> void:
 	# Non-fatal hit (default HP=100, deal 5).
 	p.take_damage(5, Vector2.ZERO, null)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("hit_e"),
-		"take_damage + facing east → 'hit_e'")
+	assert_eq(asprite.animation, StringName("hit_e"), "take_damage + facing east → 'hit_e'")
 
 
 # ---- _die drives die anim ---------------------------------------------
+
 
 func test_die_plays_die_dir_animation() -> void:
 	var p: Player = _make_scene_player()
@@ -225,11 +254,15 @@ func test_die_plays_die_dir_animation() -> void:
 	p.take_damage(100, Vector2.ZERO, null)
 	assert_true(p.is_dead(), "player dead after lethal hit (precondition)")
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("die_s"),
-		"_die + facing south → 'die_s' (overrides in-flight hit_s)")
+	assert_eq(
+		asprite.animation,
+		StringName("die_s"),
+		"_die + facing south → 'die_s' (overrides in-flight hit_s)"
+	)
 
 
 # ---- HIT_FLASH_TINT: Tier 1 color-delta + HTML5 HDR-clamp guard ------
+
 
 func test_hit_flash_tint_differs_from_rest_white() -> void:
 	# Tier 1 invariant per `.claude/docs/test-conventions.md` § "Visual-primitive
@@ -238,13 +271,21 @@ func test_hit_flash_tint_differs_from_rest_white() -> void:
 	#
 	# Mirror PracticeDummy assertion shape (M3W-1 inheritance).
 	var rest_white: Color = Color(1, 1, 1, 1)
-	assert_ne(Player.HIT_FLASH_TINT, rest_white,
-		"HIT_FLASH_TINT differs from rest white (tween is not a no-op)")
-	var delta: float = absf(Player.HIT_FLASH_TINT.r - rest_white.r) \
-		+ absf(Player.HIT_FLASH_TINT.g - rest_white.g) \
+	assert_ne(
+		Player.HIT_FLASH_TINT,
+		rest_white,
+		"HIT_FLASH_TINT differs from rest white (tween is not a no-op)"
+	)
+	var delta: float = (
+		absf(Player.HIT_FLASH_TINT.r - rest_white.r)
+		+ absf(Player.HIT_FLASH_TINT.g - rest_white.g)
 		+ absf(Player.HIT_FLASH_TINT.b - rest_white.b)
-	assert_gt(delta, 0.20,
-		"HIT_FLASH_TINT sum-delta vs (1,1,1) >= 0.20 (delta=%.3f, visible flash)" % delta)
+	)
+	assert_gt(
+		delta,
+		0.20,
+		"HIT_FLASH_TINT sum-delta vs (1,1,1) >= 0.20 (delta=%.3f, visible flash)" % delta
+	)
 
 
 func test_hit_flash_tint_channels_are_html5_safe() -> void:
@@ -265,11 +306,15 @@ func test_hit_flash_tint_matches_practice_dummy_tint() -> void:
 	var pd: GDScript = load("res://scripts/mobs/PracticeDummy.gd") as GDScript
 	# PracticeDummy.HIT_FLASH_TINT is a class constant — read it via the class.
 	var pd_tint: Color = pd.HIT_FLASH_TINT
-	assert_eq(Player.HIT_FLASH_TINT, pd_tint,
-		"Player.HIT_FLASH_TINT == PracticeDummy.HIT_FLASH_TINT (M3W-1 inheritance)")
+	assert_eq(
+		Player.HIT_FLASH_TINT,
+		pd_tint,
+		"Player.HIT_FLASH_TINT == PracticeDummy.HIT_FLASH_TINT (M3W-1 inheritance)"
+	)
 
 
 # ---- Hit-flash tween-reference flips on second hit (Tier 1 invariant) -
+
 
 func test_animated_sprite_hit_flash_tween_reference_flips_on_second_hit() -> void:
 	# The PR #221 Tier 1 reference-change invariant — a second hit during the
@@ -289,11 +334,15 @@ func test_animated_sprite_hit_flash_tween_reference_flips_on_second_hit() -> voi
 	p._play_hit_flash()
 	var second_tween: Tween = p._hit_flash_tween
 	assert_not_null(second_tween, "second hit leaves a tween in place")
-	assert_ne(first_tween, second_tween,
-		"second hit kills + restarts (tween reference flipped — Tier 1 invariant)")
+	assert_ne(
+		first_tween,
+		second_tween,
+		"second hit kills + restarts (tween reference flipped — Tier 1 invariant)"
+	)
 
 
 # ---- AnimatedSprite2D resolved lazily on bare player ----------------
+
 
 func test_play_anim_is_a_safe_noop_on_bare_instanced_player() -> void:
 	# Bare-instanced player (no Sprite child, no SpriteFrames) — `_play_anim`
@@ -309,6 +358,7 @@ func test_play_anim_is_a_safe_noop_on_bare_instanced_player() -> void:
 
 
 # ---- Idle freezes on frame 0 -----------------------------------------
+
 
 func test_idle_state_stops_animated_sprite_on_frame_0() -> void:
 	# STATE_IDLE special-case: prefix resolves to `walk` (placeholder, no idle
@@ -327,10 +377,8 @@ func test_idle_state_stops_animated_sprite_on_frame_0() -> void:
 	p.velocity = Vector2.ZERO
 	p.set_state(Player.STATE_IDLE)
 	# IDLE handler calls stop() + frame = 0.
-	assert_false(asprite.is_playing(),
-		"STATE_IDLE stops the AnimatedSprite2D (rest pose)")
-	assert_eq(asprite.frame, 0,
-		"STATE_IDLE freezes on frame 0 of walk_<dir>")
+	assert_false(asprite.is_playing(), "STATE_IDLE stops the AnimatedSprite2D (rest pose)")
+	assert_eq(asprite.frame, 0, "STATE_IDLE freezes on frame 0 of walk_<dir>")
 
 
 # ---- Walk-feel fix: anim dir follows velocity, not _facing -----------
@@ -342,6 +390,7 @@ func test_idle_state_stops_animated_sprite_on_frame_0() -> void:
 # These tests pin the decoupling so a future refactor can't silently
 # re-couple walk anim to `_facing`.
 
+
 func test_walk_anim_follows_velocity_not_facing() -> void:
 	# Player moving NORTH with mouse-facing EAST should play `walk_n`
 	# (movement direction), NOT `walk_e` (mouse direction).
@@ -350,8 +399,11 @@ func test_walk_anim_follows_velocity_not_facing() -> void:
 	p.velocity = Vector2.UP * 120.0  # WASD pushing north (Y-up in Godot)
 	p.set_state(Player.STATE_WALK)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("walk_n"),
-		"WALK + velocity north + facing east → 'walk_n' (movement wins)")
+	assert_eq(
+		asprite.animation,
+		StringName("walk_n"),
+		"WALK + velocity north + facing east → 'walk_n' (movement wins)"
+	)
 
 
 func test_walk_anim_velocity_octant_for_all_8_directions() -> void:
@@ -381,8 +433,11 @@ func test_walk_anim_velocity_octant_for_all_8_directions() -> void:
 		p.set_state(Player.STATE_IDLE)
 		p.velocity = v * 120.0
 		p.set_state(Player.STATE_WALK)
-		assert_eq(asprite.animation, StringName("walk_%s" % expected_dir),
-			"velocity %s (facing east) → 'walk_%s'" % [v, expected_dir])
+		assert_eq(
+			asprite.animation,
+			StringName("walk_%s" % expected_dir),
+			"velocity %s (facing east) → 'walk_%s'" % [v, expected_dir]
+		)
 
 
 func test_idle_holds_last_walk_direction_not_facing() -> void:
@@ -394,14 +449,18 @@ func test_idle_holds_last_walk_direction_not_facing() -> void:
 	p.velocity = Vector2.UP * 120.0
 	p.set_state(Player.STATE_WALK)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("walk_n"),
-		"phase 1: walking north → 'walk_n' (precondition)")
+	assert_eq(
+		asprite.animation, StringName("walk_n"), "phase 1: walking north → 'walk_n' (precondition)"
+	)
 	# Phase 2: stop walking, mouse swings east — IDLE must hold north.
 	p._facing = Vector2.RIGHT  # cursor moves east
 	p.velocity = Vector2.ZERO  # WASD released
 	p.set_state(Player.STATE_IDLE)
-	assert_eq(asprite.animation, StringName("walk_n"),
-		"phase 2: idle + cursor east holds 'walk_n' (not snap to 'walk_e')")
+	assert_eq(
+		asprite.animation,
+		StringName("walk_n"),
+		"phase 2: idle + cursor east holds 'walk_n' (not snap to 'walk_e')"
+	)
 	# IDLE special-case: frozen on frame 0.
 	assert_false(asprite.is_playing(), "idle frozen (not looping)")
 	assert_eq(asprite.frame, 0, "idle frozen on frame 0")
@@ -417,13 +476,17 @@ func test_walk_dir_updates_when_velocity_octant_changes_mid_walk() -> void:
 	p.velocity = Vector2.UP * 120.0
 	p.set_state(Player.STATE_WALK)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("walk_n"),
-		"phase 1: velocity north → 'walk_n' (precondition)")
+	assert_eq(
+		asprite.animation, StringName("walk_n"), "phase 1: velocity north → 'walk_n' (precondition)"
+	)
 	# Phase 2: velocity rotates east mid-walk (still STATE_WALK).
 	p.velocity = Vector2.RIGHT * 120.0
 	p._drive_walk_anim_if_moving()  # called by _physics_process post-move_and_slide
-	assert_eq(asprite.animation, StringName("walk_e"),
-		"velocity east mid-walk → 'walk_e' (re-driven without state transition)")
+	assert_eq(
+		asprite.animation,
+		StringName("walk_e"),
+		"velocity east mid-walk → 'walk_e' (re-driven without state transition)"
+	)
 
 
 func test_walk_anim_does_not_restart_when_velocity_octant_unchanged() -> void:
@@ -442,8 +505,7 @@ func test_walk_anim_does_not_restart_when_velocity_octant_unchanged() -> void:
 	p._drive_walk_anim_if_moving()
 	p._drive_walk_anim_if_moving()
 	p._drive_walk_anim_if_moving()
-	assert_eq(asprite.frame, 2,
-		"velocity unchanged → no play() restart (frame stays at 2)")
+	assert_eq(asprite.frame, 2, "velocity unchanged → no play() restart (frame stays at 2)")
 
 
 func test_attack_anim_still_uses_facing_not_velocity() -> void:
@@ -457,8 +519,11 @@ func test_attack_anim_still_uses_facing_not_velocity() -> void:
 	# Fire light attack — try_attack sets _current_attack_kind THEN set_state.
 	p.try_attack(Player.ATTACK_LIGHT, Vector2.ZERO)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("attack_light_e"),
-		"attack with mouse east + walking south → 'attack_light_e' (cursor wins)")
+	assert_eq(
+		asprite.animation,
+		StringName("attack_light_e"),
+		"attack with mouse east + walking south → 'attack_light_e' (cursor wins)"
+	)
 
 
 func test_heavy_attack_anim_still_uses_facing_not_velocity() -> void:
@@ -469,8 +534,11 @@ func test_heavy_attack_anim_still_uses_facing_not_velocity() -> void:
 	p.set_state(Player.STATE_WALK)
 	p.try_attack(Player.ATTACK_HEAVY, Vector2.ZERO)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("attack_heavy_n"),
-		"heavy attack with mouse north + walking west → 'attack_heavy_n'")
+	assert_eq(
+		asprite.animation,
+		StringName("attack_heavy_n"),
+		"heavy attack with mouse north + walking west → 'attack_heavy_n'"
+	)
 
 
 func test_dodge_anim_uses_facing_after_try_dodge() -> void:
@@ -484,8 +552,11 @@ func test_dodge_anim_uses_facing_after_try_dodge() -> void:
 	p._facing = Vector2.RIGHT  # initial cursor east (irrelevant after try_dodge)
 	p.try_dodge(Vector2.LEFT)  # dodge west — try_dodge sets _facing = LEFT
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("dodge_w"),
-		"dodge west → 'dodge_w' (try_dodge sets _facing to dodge dir)")
+	assert_eq(
+		asprite.animation,
+		StringName("dodge_w"),
+		"dodge west → 'dodge_w' (try_dodge sets _facing to dodge dir)"
+	)
 
 
 func test_hit_anim_uses_facing_not_velocity() -> void:
@@ -499,8 +570,11 @@ func test_hit_anim_uses_facing_not_velocity() -> void:
 	# Non-fatal hit.
 	p.take_damage(5, Vector2.ZERO, null)
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("hit_e"),
-		"hit with cursor east + walking south → 'hit_e' (cursor wins)")
+	assert_eq(
+		asprite.animation,
+		StringName("hit_e"),
+		"hit with cursor east + walking south → 'hit_e' (cursor wins)"
+	)
 
 
 func test_die_anim_uses_facing_not_velocity() -> void:
@@ -512,8 +586,11 @@ func test_die_anim_uses_facing_not_velocity() -> void:
 	p.take_damage(100, Vector2.ZERO, null)  # lethal
 	assert_true(p.is_dead(), "player dead after lethal hit (precondition)")
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("die_n"),
-		"_die with cursor north + walking west → 'die_n' (cursor wins)")
+	assert_eq(
+		asprite.animation,
+		StringName("die_n"),
+		"_die with cursor north + walking west → 'die_n' (cursor wins)"
+	)
 
 
 func test_velocity_octant_threshold_treats_near_zero_as_idle() -> void:
@@ -532,8 +609,11 @@ func test_velocity_octant_threshold_treats_near_zero_as_idle() -> void:
 	# physics-bounce drift). Should still hold "walk_s", not snap.
 	p.velocity = Vector2(0.3, -0.4)  # length ~0.5, below 1.0 threshold
 	p.set_state(Player.STATE_IDLE)
-	assert_eq(asprite.animation, StringName("walk_s"),
-		"velocity below threshold treated as idle (holds last dir)")
+	assert_eq(
+		asprite.animation,
+		StringName("walk_s"),
+		"velocity below threshold treated as idle (holds last dir)"
+	)
 
 
 func test_seed_anim_in_ready_renders_walk_s_for_default_facing() -> void:
@@ -543,6 +623,9 @@ func test_seed_anim_in_ready_renders_walk_s_for_default_facing() -> void:
 	# same first-frame rest pose — this test pins post-fix parity.
 	var p: Player = _make_scene_player()
 	var asprite: AnimatedSprite2D = p.get_node("Sprite") as AnimatedSprite2D
-	assert_eq(asprite.animation, StringName("walk_s"),
-		"seed-anim: default IDLE state + default facing south → 'walk_s'")
+	assert_eq(
+		asprite.animation,
+		StringName("walk_s"),
+		"seed-anim: default IDLE state + default facing south → 'walk_s'"
+	)
 	assert_false(asprite.is_playing(), "seed-anim: frozen on frame 0 (idle)")

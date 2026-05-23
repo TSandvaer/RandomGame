@@ -44,8 +44,8 @@ signal state_changed(from_state: StringName, to_state: StringName)
 ## the dodge i-frame window AND the post-hit invuln grant, so subscribing
 ## the dodge-whoosh cue here fires it on every damage taken (the bug PR #278
 ## shipped — ticket 86c9vbhf1).
-signal iframes_started()
-signal iframes_ended()
+signal iframes_started
+signal iframes_ended
 
 ## Emitted ONLY from `try_dodge()` after `can_dodge()` validation passes —
 ## i.e. when the player intentionally rolls. Distinct from `iframes_started`
@@ -57,7 +57,7 @@ signal iframes_ended()
 ## Ticket 86c9vbhf1 — Tess PR #278 review found dodge-whoosh fired on every
 ## damage taken because the audio handler subscribed to `iframes_started`,
 ## which also fires from `take_damage`. Split fixes that.
-signal dodge_started()
+signal dodge_started
 
 ## Emitted whenever the player spawns an attack hitbox. Useful for VFX
 ## hooks and tests that want to verify an attack actually fired.
@@ -501,10 +501,13 @@ func _physics_process(delta: float) -> void:
 		var _sprite_for_rot: Node = get_node_or_null("Sprite")
 		if _sprite_for_rot is CanvasItem:
 			_sprite_rot = (_sprite_for_rot as CanvasItem).rotation
-		_combat_trace("Player.pos",
-			"pos=(%.0f,%.0f) state=%s sprite_rot=%.6f" % [
-				global_position.x, global_position.y, _state, _sprite_rot
-			])
+		_combat_trace(
+			"Player.pos",
+			(
+				"pos=(%.0f,%.0f) state=%s sprite_rot=%.6f"
+				% [global_position.x, global_position.y, _state, _sprite_rot]
+			)
+		)
 		# Diagnostic-only instrumentation (ticket `86c9uq0ky` — Finding 2 NEW
 		# bug class investigation, 2026-05-16 Sponsor soak of `8e76c74`).
 		# Throttled alongside `Player.pos` so Sponsor's HTML5 console always
@@ -522,15 +525,24 @@ func _physics_process(delta: float) -> void:
 		var pcs_disabled: String = "<no_cs>"
 		if pcs != null:
 			pcs_disabled = str(pcs.disabled)
-		_combat_trace("Player.coll_diag",
-			"pos=(%.0f,%.0f) layer=%d mask=%d cs_disabled=%s iframes=%s" % [
-				global_position.x, global_position.y,
-				collision_layer, collision_mask,
-				pcs_disabled, str(_is_invulnerable),
-			])
+		_combat_trace(
+			"Player.coll_diag",
+			(
+				"pos=(%.0f,%.0f) layer=%d mask=%d cs_disabled=%s iframes=%s"
+				% [
+					global_position.x,
+					global_position.y,
+					collision_layer,
+					collision_mask,
+					pcs_disabled,
+					str(_is_invulnerable),
+				]
+			)
+		)
 
 
 # ---- Public API (used by tests, hitbox scripts, save) -------------------
+
 
 ## Returns the current state. Read-only — transitions go through the state
 ## machine.
@@ -594,6 +606,7 @@ func set_equipped_weapon(weapon: ItemDef) -> void:
 
 const SLOT_WEAPON: StringName = &"weapon"
 const SLOT_ARMOR: StringName = &"armor"
+
 
 ## Equip an `ItemInstance` into its slot. Walks the instance's rolled
 ## affixes and applies each one to PlayerStats (for V/F/E) or directly to
@@ -659,6 +672,7 @@ func get_move_speed_bonus() -> float:
 
 
 # ---- Internal: affix apply / reverse ----------------------------------
+
 
 func _slot_for(item_slot: int) -> StringName:
 	match item_slot:
@@ -810,11 +824,13 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 		# by a mob (Hitbox.gd attaches an `owner_mob_class` if available).
 		if "name" in source and source.name != "":
 			src_name = String(source.name)
-	_combat_trace("Player.take_damage",
-		"amount=%d hp=%d->%d src=%s pos=(%.0f,%.0f)" % [
-			clean_amount, hp_before, hp_current, src_name,
-			global_position.x, global_position.y
-		])
+	_combat_trace(
+		"Player.take_damage",
+		(
+			"amount=%d hp=%d->%d src=%s pos=(%.0f,%.0f)"
+			% [clean_amount, hp_before, hp_current, src_name, global_position.x, global_position.y]
+		)
+	)
 	damaged.emit(clean_amount, hp_current, source)
 	hp_changed.emit(hp_current, hp_max)
 	# M3W-2: play the hit anim + AnimatedSprite2D-modulate hit-flash on every
@@ -847,7 +863,8 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 		return
 	_enter_iframes()
 	get_tree().create_timer(HIT_IFRAMES_SECS).timeout.connect(
-		_exit_iframes_if_not_dodging, CONNECT_ONE_SHOT)
+		_exit_iframes_if_not_dodging, CONNECT_ONE_SHOT
+	)
 
 
 ## Heal `amount` HP, clamped at hp_max. No-op while dead. Fires `hp_changed`.
@@ -920,10 +937,13 @@ func _die() -> void:
 	if _is_invulnerable:
 		_exit_iframes()
 	velocity = Vector2.ZERO
-	_combat_trace("Player._die",
-		"hp=0 pos=(%.0f,%.0f) — emitting player_died; M1 death rule will respawn in Room 01" % [
-			global_position.x, global_position.y
-		])
+	_combat_trace(
+		"Player._die",
+		(
+			"hp=0 pos=(%.0f,%.0f) — emitting player_died; M1 death rule will respawn in Room 01"
+			% [global_position.x, global_position.y]
+		)
+	)
 	# M3W-2: play the die anim on the AnimatedSprite2D. `_die` runs to completion
 	# in the same frame the M1 death rule reloads Room 01, so the die anim may be
 	# visually short-lived in the production flow — but for harness clips and
@@ -1026,16 +1046,17 @@ func try_dodge(dir: Vector2) -> bool:
 ## intended hit direction; if zero, uses current facing.
 func try_attack(kind: StringName, dir: Vector2 = Vector2.ZERO) -> Node:
 	if not can_attack():
-		_combat_trace("Player.try_attack",
-			"REJECTED kind=%s state=%s recovery=%.3f" % [kind, _state, _attack_recovery_left])
+		_combat_trace(
+			"Player.try_attack",
+			"REJECTED kind=%s state=%s recovery=%.3f" % [kind, _state, _attack_recovery_left]
+		)
 		return null
 	if kind != ATTACK_LIGHT and kind != ATTACK_HEAVY:
 		push_warning("Player.try_attack: unknown kind '%s'" % kind)
 		return null
 	var d: Vector2 = dir.normalized() if dir.length_squared() > 0.0 else _facing
 	_facing = d
-	_combat_trace("Player.try_attack",
-		"FIRED kind=%s facing=(%.1f,%.1f)" % [kind, d.x, d.y])
+	_combat_trace("Player.try_attack", "FIRED kind=%s facing=(%.1f,%.1f)" % [kind, d.x, d.y])
 
 	# Damage routed through the formula utility. Reads equipped weapon +
 	# Edge stat, returns floored int. Fist (no weapon) = 1 damage flat per
@@ -1094,6 +1115,7 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 
 # ---- M3W-7 audio-cue handlers ----------------------------------------
 
+
 ## Resolve the AudioDirector autoload, or null in a bare-instanced test
 ## context where no autoloads are registered. Mirrors the look-up convention
 ## used by `_combat_trace` above — defensive against test stubs.
@@ -1144,6 +1166,7 @@ func _on_dodge_started_audio() -> void:
 
 
 # ---- State handlers -----------------------------------------------------
+
 
 func _process_grounded(_delta: float) -> void:
 	var input_dir: Vector2 = _read_movement_input()
@@ -1248,6 +1271,7 @@ func _process_attack(_delta: float) -> void:
 
 # ---- Mouse-direction facing (ticket 86c9uthf0) -----------------------------
 
+
 ## Per-frame facing update from the mouse cursor. Gated by state so the
 ## facing snapshots at swing-spawn / dodge-init time and does NOT continuously
 ## drift during attack-active or dodge-active frames (edge case 3 in the
@@ -1293,9 +1317,8 @@ func _update_mouse_facing() -> void:
 ##   - Returns the input `last_facing` unchanged inside the dead-zone.
 ##   - Exact-zero delta returns `last_facing` (no NaN from normalise(0)).
 static func _resolve_facing_from_mouse(
-		mouse_global: Vector2,
-		self_global: Vector2,
-		last_facing: Vector2) -> Vector2:
+	mouse_global: Vector2, self_global: Vector2, last_facing: Vector2
+) -> Vector2:
 	var delta: Vector2 = mouse_global - self_global
 	if delta.length() < MOUSE_FACING_DEADZONE_PX:
 		return last_facing
@@ -1471,6 +1494,7 @@ func _exit_iframes_if_not_dodging() -> void:
 
 # ---- Visual feedback ---------------------------------------------------
 
+
 ## Spawn the ember directional wedge (§1a in `combat-visual-feedback.md`).
 ## ColorRect parented to Player, oriented along `dir`, length = `reach`,
 ## width = `radius * 2` (full half-width on each side of the swing axis).
@@ -1491,11 +1515,8 @@ func _exit_iframes_if_not_dodging() -> void:
 ## M1 placeholder fidelity — the ColorRect mounts at the player center,
 ## extends `reach` px along the facing direction, and is `radius*2` px wide.
 func _spawn_swing_wedge(
-		kind: StringName,
-		dir: Vector2,
-		reach: float,
-		radius: float,
-		lifetime: float) -> ColorRect:
+	kind: StringName, dir: Vector2, reach: float, radius: float, lifetime: float
+) -> ColorRect:
 	# Drop any in-flight wedge so the new attack's cue is the only one
 	# visible. is_instance_valid covers the case where _on_wedge_finished
 	# already nulled the ref but the queue_free hasn't been processed yet.
@@ -1543,9 +1564,13 @@ func _spawn_swing_wedge(
 	var tween: Tween = create_tween()
 	tween.tween_property(wedge, "modulate:a", 0.0, lifetime)
 	tween.tween_callback(Callable(self, "_on_wedge_finished").bind(wedge))
-	_combat_trace("Player.swing_wedge",
-		"spawned kind=%s lifetime=%.3f tween_valid=%s alpha=%.2f"
-			% [kind, lifetime, tween.is_valid(), rgba.a])
+	_combat_trace(
+		"Player.swing_wedge",
+		(
+			"spawned kind=%s lifetime=%.3f tween_valid=%s alpha=%.2f"
+			% [kind, lifetime, tween.is_valid(), rgba.a]
+		)
+	)
 	return wedge
 
 
@@ -1565,13 +1590,19 @@ func _play_swing_flash() -> void:
 	tween.tween_property(self, "modulate", SWING_FLASH_TINT, SWING_FLASH_HALF_DURATION)
 	tween.tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 1.0), SWING_FLASH_HALF_DURATION)
 	_active_flash_tween = tween
-	_combat_trace("Player.swing_flash",
-		"tween_valid=%s tint=(%.2f,%.2f,%.2f) duration=%.3f" % [
-			tween.is_valid(),
-			SWING_FLASH_TINT.r,
-			SWING_FLASH_TINT.g,
-			SWING_FLASH_TINT.b,
-			SWING_FLASH_HALF_DURATION * 2.0])
+	_combat_trace(
+		"Player.swing_flash",
+		(
+			"tween_valid=%s tint=(%.2f,%.2f,%.2f) duration=%.3f"
+			% [
+				tween.is_valid(),
+				SWING_FLASH_TINT.r,
+				SWING_FLASH_TINT.g,
+				SWING_FLASH_TINT.b,
+				SWING_FLASH_HALF_DURATION * 2.0
+			]
+		)
+	)
 
 
 ## Internal: tween-finished callback for the swing wedge. Frees the node and
@@ -1587,13 +1618,10 @@ func _on_wedge_finished(wedge: ColorRect) -> void:
 
 # ---- Hitbox spawn -------------------------------------------------------
 
+
 func _spawn_hitbox(
-		dir: Vector2,
-		damage: int,
-		knockback: Vector2,
-		reach: float,
-		radius: float,
-		lifetime: float) -> Hitbox:
+	dir: Vector2, damage: int, knockback: Vector2, reach: float, radius: float, lifetime: float
+) -> Hitbox:
 	var hitbox: Hitbox = HitboxScript.new()
 	# Configure BEFORE adding to tree so _ready() reads correct values.
 	hitbox.configure(damage, knockback, lifetime, Hitbox.TEAM_PLAYER, self)
@@ -1630,6 +1658,7 @@ func _on_hitbox_hit_target(_target: Node, _damage: int, _source: Node) -> void:
 
 # ---- Input --------------------------------------------------------------
 
+
 func _read_movement_input() -> Vector2:
 	# Input.get_vector handles 8-direction normalisation cleanly.
 	var v: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
@@ -1644,6 +1673,7 @@ func _read_movement_input() -> Vector2:
 # Per `team/priya-pl/m3-scene-wiring-scope.md §M3W-2` + the M3W-1 (PR #271)
 # inheritance contract. Mirrors the PracticeDummy.gd 3-branch hit-flash
 # resolver shape and the `_play_anim` helper shape.
+
 
 ## 8-octant facing quantizer. Returns one of `n / ne / e / se / s / sw / w / nw`
 ## from a Vector2 facing direction. Uses the angle in radians from +X axis
@@ -1779,8 +1809,9 @@ func _play_anim(prefix: String) -> void:
 	var dir_suffix: String = _resolve_anim_dir(prefix)
 	var anim_name: StringName = StringName("%s_%s" % [prefix, dir_suffix])
 	if not _animated_sprite.sprite_frames.has_animation(anim_name):
-		_combat_trace("Player._play_anim",
-			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		_combat_trace(
+			"Player._play_anim", "MISS anim=%s — SpriteFrames lacks this animation key" % anim_name
+		)
 		return
 	_animated_sprite.play(anim_name)
 	_combat_trace("Player._play_anim", "PLAY anim=%s" % anim_name)
@@ -1919,22 +1950,36 @@ func _play_hit_flash() -> void:
 		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
-		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Player._play_hit_flash",
-			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f)" % [
-				_hit_flash_tween.is_valid(),
-				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
-			])
+		_hit_flash_tween.tween_property(
+			asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT
+		)
+		_combat_trace(
+			"Player._play_hit_flash",
+			(
+				"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f)"
+				% [
+					_hit_flash_tween.is_valid(),
+					HIT_FLASH_TINT.r,
+					HIT_FLASH_TINT.g,
+					HIT_FLASH_TINT.b,
+				]
+			)
+		)
 	elif _hit_flash_uses_sprite:
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Player._play_hit_flash",
-			"sprite tween_valid=%s" % _hit_flash_tween.is_valid())
+		_combat_trace(
+			"Player._play_hit_flash", "sprite tween_valid=%s" % _hit_flash_tween.is_valid()
+		)
 	else:
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
-		_hit_flash_tween.tween_property(self, "modulate", _hit_flash_modulate_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Player._play_hit_flash",
-			"modulate-fallback tween_valid=%s" % _hit_flash_tween.is_valid())
+		_hit_flash_tween.tween_property(
+			self, "modulate", _hit_flash_modulate_at_rest, HIT_FLASH_OUT
+		)
+		_combat_trace(
+			"Player._play_hit_flash",
+			"modulate-fallback tween_valid=%s" % _hit_flash_tween.is_valid()
+		)

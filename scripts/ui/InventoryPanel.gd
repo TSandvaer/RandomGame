@@ -35,8 +35,8 @@ extends CanvasLayer
 
 # ---- Signals ----------------------------------------------------------
 
-signal panel_opened()
-signal panel_closed()
+signal panel_opened
+signal panel_closed
 
 # ---- Tuning -----------------------------------------------------------
 
@@ -65,16 +65,20 @@ const GRID_ROWS: int = 3
 
 # Slot order in the equipped row (left to right).
 const EQUIPPED_SLOT_ORDER: Array[StringName] = [
-	&"weapon", &"armor", &"off_hand", &"trinket", &"relic",
+	&"weapon",
+	&"armor",
+	&"off_hand",
+	&"trinket",
+	&"relic",
 ]
 
 # ---- Palette (Uma `palette.md`) -------------------------------------
 
 const COLOR_PANEL_BG: Color = Color(0.10588235, 0.10196078, 0.12156863, 0.92)  # #1B1A1F @92%
-const COLOR_PANEL_BORDER: Color = Color(0.18431373, 0.16470588, 0.2, 1.0)      # #2F2A33
-const COLOR_EMBER: Color = Color(1.0, 0.4156862745, 0.1647058824, 1.0)         # #FF6A2A
-const COLOR_BODY: Color = Color(0.9098, 0.8941, 0.8392, 1.0)                   # #E8E4D6
-const COLOR_HINT: Color = Color(0.7215686275, 0.6745098039, 0.5568627451, 1.0) # #B8AC8E
+const COLOR_PANEL_BORDER: Color = Color(0.18431373, 0.16470588, 0.2, 1.0)  # #2F2A33
+const COLOR_EMBER: Color = Color(1.0, 0.4156862745, 0.1647058824, 1.0)  # #FF6A2A
+const COLOR_BODY: Color = Color(0.9098, 0.8941, 0.8392, 1.0)  # #E8E4D6
+const COLOR_HINT: Color = Color(0.7215686275, 0.6745098039, 0.5568627451, 1.0)  # #B8AC8E
 const COLOR_DISABLED: Color = Color(0.3764705882, 0.3607843137, 0.3137254902, 1.0)  # #605C50
 const COLOR_CELL_EMPTY: Color = Color(0.2274509804, 0.2078431373, 0.2509803922, 0.4)  # #3A3540 @40%
 
@@ -117,7 +121,7 @@ const TIER_COLORS: Dictionary = {
 	2: Color(0.353, 0.561, 0.722, 1.0),  # T3 #5A8FB8
 	3: Color(0.545, 0.357, 0.831, 1.0),  # T4 #8B5BD4
 	4: Color(0.878, 0.690, 0.251, 1.0),  # T5 #E0B040
-	5: Color(1.0, 0.416, 0.165, 1.0),    # T6 #FF6A2A
+	5: Color(1.0, 0.416, 0.165, 1.0),  # T6 #FF6A2A
 }
 
 # ---- Runtime ---------------------------------------------------------
@@ -161,6 +165,7 @@ func _ready() -> void:
 
 
 # ---- Public API -------------------------------------------------------
+
 
 func is_open() -> bool:
 	return _open
@@ -264,6 +269,7 @@ func force_close_for_test() -> void:
 
 # ---- Input -----------------------------------------------------------
 
+
 ## Handled BEFORE the GUI focus system (unlike `_unhandled_input`), so both
 ## the Tab-toggle and the test-only force-close action reach the panel even
 ## when a focusable grid `Button` holds keyboard focus.
@@ -321,6 +327,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 # ---- View refresh ---------------------------------------------------
+
 
 func _refresh_all() -> void:
 	_refresh_stats()
@@ -485,7 +492,9 @@ func _render_cell(btn: Button, item: ItemInstance, interactive: bool) -> void:
 		return
 	if item == null or item.def == null:
 		btn.text = ""
-		btn.add_theme_color_override("font_color", COLOR_DISABLED if not interactive else COLOR_HINT)
+		btn.add_theme_color_override(
+			"font_color", COLOR_DISABLED if not interactive else COLOR_HINT
+		)
 		btn.tooltip_text = ""
 	else:
 		var name: String = item.get_display_name()
@@ -504,6 +513,7 @@ func _render_cell(btn: Button, item: ItemInstance, interactive: bool) -> void:
 
 
 # ---- Click handlers --------------------------------------------------
+
 
 func _handle_inventory_click(index: int, button: int) -> void:
 	var inv: Node = _inventory_node()
@@ -568,6 +578,7 @@ func _handle_inventory_hover(index: int, entered: bool) -> void:
 
 # ---- Inventory autoload signal handlers -----------------------------
 
+
 func _on_inventory_changed(_items: Array) -> void:
 	if not _open:
 		return
@@ -585,6 +596,7 @@ func _on_equipped_changed(_item: ItemInstance, _slot: StringName) -> void:
 
 
 # ---- UI build --------------------------------------------------------
+
 
 func _build_ui() -> void:
 	# Background — full-canvas dark slate at 92%.
@@ -785,17 +797,20 @@ func _build_equipped_indicators_for_slot(btn: Button) -> void:
 	# (it returns the ~27 px full line box, not the visible glyph height).
 	var label_min: Vector2 = badge_label.get_minimum_size()
 	plate.size = Vector2(
-		BADGE_PLATE_H_PADDING          # left pad
-		+ BADGE_CHECK_SIZE.x           # checkmark shape area
-		+ BADGE_CHECK_TEXT_GAP         # gap between check and text
-		+ ceil(label_min.x)            # measured label width
-		+ BADGE_PLATE_H_PADDING,       # right pad
-		BADGE_PLATE_HEIGHT)
+		(
+			BADGE_PLATE_H_PADDING  # left pad
+			+ BADGE_CHECK_SIZE.x  # checkmark shape area
+			+ BADGE_CHECK_TEXT_GAP  # gap between check and text
+			+ ceil(label_min.x)  # measured label width
+			+ BADGE_PLATE_H_PADDING
+		),  # right pad
+		BADGE_PLATE_HEIGHT
+	)
 	# Position the label after the checkmark area; give it the plate's height
 	# so its own vertical-centre alignment draws the glyphs centred.
 	badge_label.position = Vector2(
-		BADGE_PLATE_H_PADDING + BADGE_CHECK_SIZE.x + BADGE_CHECK_TEXT_GAP,
-		0)
+		BADGE_PLATE_H_PADDING + BADGE_CHECK_SIZE.x + BADGE_CHECK_TEXT_GAP, 0
+	)
 	badge_label.size = Vector2(ceil(label_min.x), plate.size.y)
 	# Centre the checkmark vertically within the plate.
 	check.position.y = (plate.size.y - BADGE_CHECK_SIZE.y) * 0.5
@@ -927,6 +942,7 @@ func _build_tooltip() -> void:
 
 # ---- Button signal adapters -----------------------------------------
 
+
 func _on_grid_btn_pressed(index: int, button: int) -> void:
 	# Default-button signal only fires for left mouse — we still route via
 	# _handle_inventory_click to keep the test-only force_click path
@@ -964,6 +980,7 @@ func _on_equipped_btn_gui_input(event: InputEvent, slot: StringName) -> void:
 
 
 # ---- Helpers ---------------------------------------------------------
+
 
 func _slot_for_def(def: ItemDef) -> StringName:
 	if def == null:

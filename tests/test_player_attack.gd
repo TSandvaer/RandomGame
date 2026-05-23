@@ -19,6 +19,7 @@ func _make_player_in_tree() -> Player:
 
 # --- 1: light attack spawns hitbox with light tuning ----------------------
 
+
 func test_light_attack_spawns_hitbox_with_correct_payload() -> void:
 	var p: Player = _make_player_in_tree()
 	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT)
@@ -35,6 +36,7 @@ func test_light_attack_spawns_hitbox_with_correct_payload() -> void:
 
 # --- 2: heavy attack uses heavy tuning ------------------------------------
 
+
 func test_heavy_attack_uses_heavy_tuning() -> void:
 	var p: Player = _make_player_in_tree()
 	var hb: Hitbox = p.try_attack(Player.ATTACK_HEAVY, Vector2.UP)
@@ -46,6 +48,7 @@ func test_heavy_attack_uses_heavy_tuning() -> void:
 
 # --- 3: hitbox positioned at player + facing*reach ------------------------
 
+
 func test_hitbox_position_uses_facing_reach() -> void:
 	var p: Player = _make_player_in_tree()
 	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT)
@@ -56,6 +59,7 @@ func test_hitbox_position_uses_facing_reach() -> void:
 
 # --- 4: cannot attack mid-dodge -------------------------------------------
 
+
 func test_attack_blocked_during_dodge() -> void:
 	var p: Player = _make_player_in_tree()
 	p.try_dodge(Vector2.RIGHT)
@@ -65,6 +69,7 @@ func test_attack_blocked_during_dodge() -> void:
 
 
 # --- 5: attack recovery blocks immediate re-attack ------------------------
+
 
 func test_attack_recovery_blocks_immediate_reattack() -> void:
 	var p: Player = _make_player_in_tree()
@@ -80,6 +85,7 @@ func test_attack_recovery_blocks_immediate_reattack() -> void:
 
 # --- 6: state transitions to attack and back to idle ----------------------
 
+
 func test_attack_transitions_to_attack_state_then_idle() -> void:
 	var p: Player = _make_player_in_tree()
 	p.try_attack(Player.ATTACK_LIGHT, Vector2.DOWN)
@@ -92,6 +98,7 @@ func test_attack_transitions_to_attack_state_then_idle() -> void:
 
 # --- 7: dodge interrupts attack recovery (Hades convention) --------------
 
+
 func test_dodge_cancels_attack_recovery() -> void:
 	var p: Player = _make_player_in_tree()
 	p.try_attack(Player.ATTACK_HEAVY, Vector2.RIGHT)
@@ -100,10 +107,13 @@ func test_dodge_cancels_attack_recovery() -> void:
 	var ok: bool = p.try_dodge(Vector2.LEFT)
 	assert_true(ok)
 	assert_eq(p.get_state(), Player.STATE_DODGE)
-	assert_eq(p._attack_recovery_left, 0.0, "dodge zeroed attack recovery so post-dodge feels clean")
+	assert_eq(
+		p._attack_recovery_left, 0.0, "dodge zeroed attack recovery so post-dodge feels clean"
+	)
 
 
 # --- 8: unknown attack kind warns and returns null ------------------------
+
 
 func test_unknown_attack_kind_returns_null() -> void:
 	var p: Player = _make_player_in_tree()
@@ -112,6 +122,7 @@ func test_unknown_attack_kind_returns_null() -> void:
 
 
 # --- 9: attack_spawned signal carries kind and hitbox --------------------
+
 
 func test_attack_spawned_signal() -> void:
 	var p: Player = _make_player_in_tree()
@@ -124,26 +135,29 @@ func test_attack_spawned_signal() -> void:
 # The boss's T2 hit-pause selects duration via `source.get_current_attack_kind()`.
 # Pin the accessor + that it reflects the most-recent try_attack kind.
 
+
 func test_get_current_attack_kind_defaults_to_light_before_any_attack() -> void:
 	var p: Player = _make_player_in_tree()
-	assert_eq(p.get_current_attack_kind(), Player.ATTACK_LIGHT,
-		"default attack-kind is light before any try_attack")
+	assert_eq(
+		p.get_current_attack_kind(),
+		Player.ATTACK_LIGHT,
+		"default attack-kind is light before any try_attack"
+	)
 
 
 func test_get_current_attack_kind_reflects_last_swing() -> void:
 	var p: Player = _make_player_in_tree()
 	p.try_attack(Player.ATTACK_HEAVY, Vector2.RIGHT)
-	assert_eq(p.get_current_attack_kind(), Player.ATTACK_HEAVY,
-		"after heavy swing, kind is heavy")
+	assert_eq(p.get_current_attack_kind(), Player.ATTACK_HEAVY, "after heavy swing, kind is heavy")
 	# Sit out the recovery so the next light swing isn't blocked.
 	p._tick_timers(Player.HEAVY_RECOVERY + 0.05)
 	p._process_attack(0.0)
 	p.try_attack(Player.ATTACK_LIGHT, Vector2.LEFT)
-	assert_eq(p.get_current_attack_kind(), Player.ATTACK_LIGHT,
-		"after light swing, kind is light")
+	assert_eq(p.get_current_attack_kind(), Player.ATTACK_LIGHT, "after light swing, kind is light")
 
 
 # --- 10: attack uses facing if dir omitted --------------------------------
+
 
 func test_attack_uses_facing_when_dir_zero() -> void:
 	var p: Player = _make_player_in_tree()
@@ -160,6 +174,7 @@ func test_attack_uses_facing_when_dir_zero() -> void:
 
 # --- 11: hitbox direction = mouse-derived facing (ticket 86c9uthf0) -------
 
+
 func test_hitbox_direction_matches_mouse_derived_facing() -> void:
 	# Sponsor 2026-05-17 AC1 + AC5: LMB melee swing direction must equal the
 	# Player→mouse vector. The mouse-facing pipeline lives in
@@ -171,9 +186,7 @@ func test_hitbox_direction_matches_mouse_derived_facing() -> void:
 	var p: Player = _make_player_in_tree()
 	# Simulate "mouse 100 px southeast of player at origin": _facing should
 	# resolve to (1/sqrt(2), 1/sqrt(2)).
-	p._facing = Player._resolve_facing_from_mouse(
-		Vector2(100.0, 100.0), Vector2.ZERO, Vector2.UP
-	)
+	p._facing = Player._resolve_facing_from_mouse(Vector2(100.0, 100.0), Vector2.ZERO, Vector2.UP)
 	var expected_axis: float = 1.0 / sqrt(2.0)
 	assert_almost_eq(p._facing.x, expected_axis, 0.001, "mouse-derived facing.x")
 	assert_almost_eq(p._facing.y, expected_axis, 0.001, "mouse-derived facing.y")
@@ -182,18 +195,35 @@ func test_hitbox_direction_matches_mouse_derived_facing() -> void:
 	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.ZERO)
 	assert_not_null(hb)
 	# Hitbox position = facing * LIGHT_REACH.
-	assert_almost_eq(hb.position.x, expected_axis * Player.LIGHT_REACH, 0.001,
-		"hitbox.x matches mouse-derived facing.x * reach")
-	assert_almost_eq(hb.position.y, expected_axis * Player.LIGHT_REACH, 0.001,
-		"hitbox.y matches mouse-derived facing.y * reach")
+	assert_almost_eq(
+		hb.position.x,
+		expected_axis * Player.LIGHT_REACH,
+		0.001,
+		"hitbox.x matches mouse-derived facing.x * reach"
+	)
+	assert_almost_eq(
+		hb.position.y,
+		expected_axis * Player.LIGHT_REACH,
+		0.001,
+		"hitbox.y matches mouse-derived facing.y * reach"
+	)
 	# Knockback is also facing-aligned (carried through _spawn_hitbox).
-	assert_almost_eq(hb.knockback.x, expected_axis * Player.LIGHT_KNOCKBACK, 0.001,
-		"knockback.x matches mouse-derived direction")
-	assert_almost_eq(hb.knockback.y, expected_axis * Player.LIGHT_KNOCKBACK, 0.001,
-		"knockback.y matches mouse-derived direction")
+	assert_almost_eq(
+		hb.knockback.x,
+		expected_axis * Player.LIGHT_KNOCKBACK,
+		0.001,
+		"knockback.x matches mouse-derived direction"
+	)
+	assert_almost_eq(
+		hb.knockback.y,
+		expected_axis * Player.LIGHT_KNOCKBACK,
+		0.001,
+		"knockback.y matches mouse-derived direction"
+	)
 
 
 # --- 12: heavy attack also uses mouse-derived facing ----------------------
+
 
 func test_heavy_hitbox_direction_matches_mouse_derived_facing() -> void:
 	# AC2: same as AC1 but for RMB heavy. The mouse-direction wiring is
@@ -201,17 +231,17 @@ func test_heavy_hitbox_direction_matches_mouse_derived_facing() -> void:
 	# `_facing` when dir=ZERO is passed.
 	var p: Player = _make_player_in_tree()
 	# Mouse 80 px due west.
-	p._facing = Player._resolve_facing_from_mouse(
-		Vector2(-80.0, 0.0), Vector2.ZERO, Vector2.UP
-	)
+	p._facing = Player._resolve_facing_from_mouse(Vector2(-80.0, 0.0), Vector2.ZERO, Vector2.UP)
 	assert_eq(p._facing, Vector2.LEFT, "mouse due west → facing LEFT")
 	var hb: Hitbox = p.try_attack(Player.ATTACK_HEAVY, Vector2.ZERO)
-	assert_almost_eq(hb.position.x, -Player.HEAVY_REACH, 0.001,
-		"heavy hitbox at -HEAVY_REACH along facing")
+	assert_almost_eq(
+		hb.position.x, -Player.HEAVY_REACH, 0.001, "heavy hitbox at -HEAVY_REACH along facing"
+	)
 	assert_almost_eq(hb.position.y, 0.0, 0.001)
 
 
 # --- 13: facing snapshots at swing-spawn (mid-swing mouse changes ignored) -
+
 
 func test_attack_facing_snapshot_does_not_drift_mid_swing() -> void:
 	# Edge case 3 from the ticket: facing should snapshot at swing-spawn,
@@ -227,5 +257,8 @@ func test_attack_facing_snapshot_does_not_drift_mid_swing() -> void:
 	# update with the player still in STATE_ATTACK.
 	p._update_mouse_facing()
 	# _facing must remain RIGHT (no overwrite during STATE_ATTACK).
-	assert_eq(p._facing, Vector2.RIGHT,
-		"mid-swing mouse-facing update is suppressed; swing direction snapshotted")
+	assert_eq(
+		p._facing,
+		Vector2.RIGHT,
+		"mid-swing mouse-facing update is suppressed; swing direction snapshotted"
+	)

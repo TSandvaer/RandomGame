@@ -107,8 +107,8 @@ var _last_quest_action: StringName = &""
 var _last_npc_id: StringName = &""
 var _has_received: bool = false
 
-
 # ---- Lifecycle -------------------------------------------------------
+
 
 func _ready() -> void:
 	# Subscribe to DialogueController at autoload-ready time. The controller
@@ -132,6 +132,7 @@ func _ready() -> void:
 
 
 # ---- Public API ------------------------------------------------------
+
 
 ## Most-recent quest_action StringName, or `&""` if none received this session.
 func last_quest_action() -> StringName:
@@ -177,6 +178,7 @@ func clear() -> void:
 
 
 # ---- DialogueController signal handlers -----------------------------
+
 
 ## **Read-order pin** — `branch_opened` fires when the controller opens a
 ## new branch (open() AND select_response → navigate). Capture the
@@ -233,6 +235,7 @@ func _on_dialogue_closed(npc_id: StringName) -> void:
 
 
 # ---- Helpers ---------------------------------------------------------
+
 
 func _controller_node() -> Node:
 	var loop: SceneTree = Engine.get_main_loop() as SceneTree

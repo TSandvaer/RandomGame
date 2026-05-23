@@ -42,6 +42,7 @@ func after_each() -> void:
 
 # ---- Pin 1: behavioural — DialoguePanel mounted on Main ---------------
 
+
 func test_main_mounts_dialogue_panel_under_canvaslayer() -> void:
 	# Bare-instantiated Main exercises _ready end-to-end. We are testing the
 	# mount, not the full lifecycle.
@@ -55,25 +56,21 @@ func test_main_mounts_dialogue_panel_under_canvaslayer() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	# Mount assertion.
-	assert_true(main.has_method("get_dialogue_panel"),
-		"Main exposes get_dialogue_panel() accessor")
+	assert_true(main.has_method("get_dialogue_panel"), "Main exposes get_dialogue_panel() accessor")
 	var panel: CanvasLayer = main.get_dialogue_panel()
-	assert_not_null(panel,
-		"Main.get_dialogue_panel() returns mounted DialoguePanel")
-	assert_eq(panel.name, "DialoguePanel",
-		"mounted panel is named 'DialoguePanel'")
-	assert_true(panel.get_parent() == main,
-		"DialoguePanel is a direct child of Main")
+	assert_not_null(panel, "Main.get_dialogue_panel() returns mounted DialoguePanel")
+	assert_eq(panel.name, "DialoguePanel", "mounted panel is named 'DialoguePanel'")
+	assert_true(panel.get_parent() == main, "DialoguePanel is a direct child of Main")
 	# Hidden by default — no active session at boot.
 	# (The panel's own `_ready` hides it; we verify via the script's API
 	# rather than the .visible field so the test is decoupled from how the
 	# panel script implements hide-when-idle.)
 	if panel.has_method("is_open"):
-		assert_false(panel.is_open(),
-			"DialoguePanel.is_open() false at boot (no active session)")
+		assert_false(panel.is_open(), "DialoguePanel.is_open() false at boot (no active session)")
 
 
 # ---- Pin 2: source-scan structural — mount call sites + ordering ------
+
 
 func test_main_gd_calls_build_dialogue_panel_in_ready() -> void:
 	# Per `.claude/docs/test-conventions.md` § "Source-scan structural pins":
@@ -102,9 +99,19 @@ func test_main_gd_calls_build_dialogue_panel_in_ready() -> void:
 	assert_gt(inv_pos, -1, "_build_inventory_panel() called in _ready")
 	assert_gt(dlg_pos, -1, "_build_dialogue_panel() called in _ready")
 	assert_gt(stat_pos, -1, "_build_stat_panel() called in _ready")
-	assert_lt(inv_pos, dlg_pos,
-		"_build_dialogue_panel() called AFTER _build_inventory_panel() — " +
-		"mount ordering pin (layer ordering convention)")
-	assert_lt(dlg_pos, stat_pos,
-		"_build_dialogue_panel() called BEFORE _build_stat_panel() — " +
-		"mount ordering pin (consistent with InventoryPanel adjacency)")
+	assert_lt(
+		inv_pos,
+		dlg_pos,
+		(
+			"_build_dialogue_panel() called AFTER _build_inventory_panel() — "
+			+ "mount ordering pin (layer ordering convention)"
+		)
+	)
+	assert_lt(
+		dlg_pos,
+		stat_pos,
+		(
+			"_build_dialogue_panel() called BEFORE _build_stat_panel() — "
+			+ "mount ordering pin (consistent with InventoryPanel adjacency)"
+		)
+	)

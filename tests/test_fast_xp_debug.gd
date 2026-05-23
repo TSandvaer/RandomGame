@@ -40,6 +40,7 @@ func after_each() -> void:
 
 # --- Multiplier round-trip ----------------------------------------------
 
+
 func test_default_multiplier_is_one() -> void:
 	assert_eq(_flags().xp_multiplier(), 1, "default fast_xp off -> 1x XP")
 
@@ -67,6 +68,7 @@ func test_toggle_is_idempotent_pair() -> void:
 
 # --- Signal --------------------------------------------------------------
 
+
 func test_toggle_fires_signal() -> void:
 	if not OS.is_debug_build():
 		pending("Test requires a debug build.")
@@ -78,6 +80,7 @@ func test_toggle_fires_signal() -> void:
 
 
 # --- Chord input ---------------------------------------------------------
+
 
 func test_ctrl_shift_x_triggers_toggle() -> void:
 	# Synthesize the InputEventKey the OS would deliver. Verifies the chord
@@ -121,7 +124,7 @@ func test_chord_ignores_echo_events() -> void:
 	var ev: InputEventKey = InputEventKey.new()
 	ev.physical_keycode = KEY_X
 	ev.pressed = true
-	ev.echo = true   # auto-repeat
+	ev.echo = true  # auto-repeat
 	ev.ctrl_pressed = true
 	ev.shift_pressed = true
 	_flags()._input(ev)
@@ -143,6 +146,7 @@ func test_chord_ignores_release_phase() -> void:
 
 
 # --- Release-build structural gate (state poisoning) --------------------
+
 
 func test_xp_multiplier_only_amplifies_when_debug_build() -> void:
 	# Force fast_xp_enabled true, then assert xp_multiplier respects the

@@ -20,6 +20,7 @@ const PHYS_DELTA: float = 1.0 / 60.0
 
 # Helpers ------------------------------------------------------------------
 
+
 func _make_player_in_tree() -> Player:
 	var p: Player = PlayerScript.new()
 	add_child_autofree(p)
@@ -44,6 +45,7 @@ func _pre_satisfy_regen_timers(p: Player) -> void:
 
 # ---- AC-1: regen activates after 3 s of no damage + no hits -----------
 
+
 func test_regen_activates_after_3s_of_no_damage_no_hit() -> void:
 	var p: Player = _make_player_in_tree()
 	p.hp_current = 50  # not at max so regen can fire
@@ -51,8 +53,7 @@ func test_regen_activates_after_3s_of_no_damage_no_hit() -> void:
 
 	# Advance both timers to just under the threshold — regen must NOT activate.
 	_tick_idle(p, PHYS_DELTA, int(2.9 / PHYS_DELTA))
-	assert_false(p.is_regenerating,
-		"AC-1: regen must NOT activate before 3.0 s threshold")
+	assert_false(p.is_regenerating, "AC-1: regen must NOT activate before 3.0 s threshold")
 
 	# Cross thresholds + run long enough for the carry accumulator to credit
 	# at least one HP tick. At 2.0 HP/s with PHYS_DELTA = 1/60, the integer
@@ -61,13 +62,12 @@ func test_regen_activates_after_3s_of_no_damage_no_hit() -> void:
 	# ~30 ticks (0.5 s). Use 0.7 s to give headroom for the assertion (Tess CR
 	# feedback bug 2 — original 0.3 s window was below the 0.5 s carry threshold).
 	_tick_idle(p, PHYS_DELTA, int(0.7 / PHYS_DELTA))
-	assert_true(p.is_regenerating,
-		"AC-1: regen must activate after both timers exceed 3.0 s")
-	assert_gt(p.hp_current, 50,
-		"AC-1: hp_current must increase after regen activates")
+	assert_true(p.is_regenerating, "AC-1: regen must activate after both timers exceed 3.0 s")
+	assert_gt(p.hp_current, 50, "AC-1: hp_current must increase after regen activates")
 
 
 # ---- AC-2 (damage): regen stops immediately on damage taken -----------
+
 
 func test_regen_stops_immediately_on_damage_taken() -> void:
 	var p: Player = _make_player_in_tree()
@@ -81,21 +81,26 @@ func test_regen_stops_immediately_on_damage_taken() -> void:
 	var dummy_source: Node = Node.new()
 	add_child_autofree(dummy_source)
 	p.take_damage(5, Vector2.ZERO, dummy_source)
-	assert_false(p.is_regenerating,
-		"AC-2: regen must stop immediately on damage taken")
+	assert_false(p.is_regenerating, "AC-2: regen must stop immediately on damage taken")
 	# HP must NOT increase on the next tick (regen is off).
 	var hp_after_damage: int = p.hp_current
 	_tick_idle(p, PHYS_DELTA, 1)
-	assert_eq(p.hp_current, hp_after_damage,
-		"AC-2: HP must not increase the tick after damage (regen stopped)")
+	assert_eq(
+		p.hp_current,
+		hp_after_damage,
+		"AC-2: HP must not increase the tick after damage (regen stopped)"
+	)
 	# Timer-restart assertion: simulating 2.9 s more without damage must NOT
 	# resume regen (damage timer was reset to 0 on take_damage).
 	_tick_idle(p, PHYS_DELTA, int(2.9 / PHYS_DELTA))
-	assert_false(p.is_regenerating,
-		"AC-2: regen must not resume at 2.9 s after damage (timer reset, threshold is 3.0 s)")
+	assert_false(
+		p.is_regenerating,
+		"AC-2: regen must not resume at 2.9 s after damage (timer reset, threshold is 3.0 s)"
+	)
 
 
 # ---- AC-2 (hit-landed): regen stops immediately on hit landed ----------
+
 
 func test_regen_stops_immediately_on_hit_landed() -> void:
 	var p: Player = _make_player_in_tree()
@@ -108,15 +113,19 @@ func test_regen_stops_immediately_on_hit_landed() -> void:
 	# Simulate a player hitbox landing a hit — call _on_hitbox_hit_target
 	# directly (the same path _spawn_hitbox connects to hit_target signal).
 	p._on_hitbox_hit_target(Node.new(), 1, p)
-	assert_false(p.is_regenerating,
-		"AC-2 (hit-landed): regen must stop immediately when player lands a hit")
+	assert_false(
+		p.is_regenerating, "AC-2 (hit-landed): regen must stop immediately when player lands a hit"
+	)
 	# Timer-restart assertion: 2.9 s more must NOT resume regen (attack timer reset).
 	_tick_idle(p, PHYS_DELTA, int(2.9 / PHYS_DELTA))
-	assert_false(p.is_regenerating,
-		"AC-2 (hit-landed): regen must not resume at 2.9 s after hit (timer reset)")
+	assert_false(
+		p.is_regenerating,
+		"AC-2 (hit-landed): regen must not resume at 2.9 s after hit (timer reset)"
+	)
 
 
 # ---- AC-3 (Uma AC-4): regen rate is exactly REGEN_RATE_HP_PER_SEC -----
+
 
 func test_regen_rate_is_2_hp_per_sec() -> void:
 	var p: Player = _make_player_in_tree()
@@ -134,13 +143,12 @@ func test_regen_rate_is_2_hp_per_sec() -> void:
 	# Expected gain: 5 * 2.0 = 10 HP. Float accumulation across frames
 	# means we allow ±1 HP per Uma's AC-4 precision tolerance.
 	var gained: int = p.hp_current - hp_at_regen_start
-	assert_gte(gained, 9,
-		"AC-3: 5 s regen must gain at least 9 HP (expected 10 at 2.0 HP/s)")
-	assert_lte(gained, 11,
-		"AC-3: 5 s regen must gain at most 11 HP (float precision tolerance ±1)")
+	assert_gte(gained, 9, "AC-3: 5 s regen must gain at least 9 HP (expected 10 at 2.0 HP/s)")
+	assert_lte(gained, 11, "AC-3: 5 s regen must gain at most 11 HP (float precision tolerance ±1)")
 
 
 # ---- AC-4 (Uma AC-5): regen caps at HP_MAX; no overheal ---------------
+
 
 func test_regen_caps_at_hp_max_no_overheal() -> void:
 	var p: Player = _make_player_in_tree()
@@ -158,16 +166,16 @@ func test_regen_caps_at_hp_max_no_overheal() -> void:
 		if p.hp_current > p.hp_max:
 			exceeded_max = true
 
-	assert_false(exceeded_max,
-		"AC-4: hp_current must NEVER exceed hp_max at any intermediate tick")
-	assert_eq(p.hp_current, p.hp_max,
-		"AC-4: hp_current must equal hp_max after sustained regen past cap")
+	assert_false(exceeded_max, "AC-4: hp_current must NEVER exceed hp_max at any intermediate tick")
+	assert_eq(
+		p.hp_current, p.hp_max, "AC-4: hp_current must equal hp_max after sustained regen past cap"
+	)
 	# Regen should be inactive once hp == hp_max.
-	assert_false(p.is_regenerating,
-		"AC-4: is_regenerating must be false when hp_current == hp_max")
+	assert_false(p.is_regenerating, "AC-4: is_regenerating must be false when hp_current == hp_max")
 
 
 # ---- AC-5: regen_active_changed signal fires on transitions -----------
+
 
 func test_regen_active_changed_signal_fires_on_activation() -> void:
 	var p: Player = _make_player_in_tree()
@@ -176,8 +184,12 @@ func test_regen_active_changed_signal_fires_on_activation() -> void:
 
 	_pre_satisfy_regen_timers(p)
 	assert_true(p.is_regenerating, "regen activated")
-	assert_signal_emitted_with_parameters(p, "regen_active_changed", [true],
-		"AC-5: regen_active_changed(true) must fire on activation")
+	assert_signal_emitted_with_parameters(
+		p,
+		"regen_active_changed",
+		[true],
+		"AC-5: regen_active_changed(true) must fire on activation"
+	)
 
 
 func test_regen_active_changed_signal_fires_on_damage_interrupt() -> void:
@@ -190,8 +202,12 @@ func test_regen_active_changed_signal_fires_on_damage_interrupt() -> void:
 	var src: Node = Node.new()
 	add_child_autofree(src)
 	p.take_damage(5, Vector2.ZERO, src)
-	assert_signal_emitted_with_parameters(p, "regen_active_changed", [false],
-		"AC-5: regen_active_changed(false) must fire when damage interrupts regen")
+	assert_signal_emitted_with_parameters(
+		p,
+		"regen_active_changed",
+		[false],
+		"AC-5: regen_active_changed(false) must fire when damage interrupts regen"
+	)
 
 
 func test_regen_not_active_at_full_hp() -> void:
@@ -199,13 +215,13 @@ func test_regen_not_active_at_full_hp() -> void:
 	var p: Player = _make_player_in_tree()
 	p.hp_current = p.hp_max  # already full
 	_pre_satisfy_regen_timers(p)
-	assert_false(p.is_regenerating,
-		"regen must not activate when hp_current == hp_max")
+	assert_false(p.is_regenerating, "regen must not activate when hp_current == hp_max")
 
 
 # ---- AC-7: visual-primitive test — shimmer ColorRect modulate != rest --
 # Drives Main.tscn so the HUD is live and the regen_active_changed signal
 # is wired to the HpBarShimmer node. Asserts observable modulate delta.
+
 
 func _instantiate_main() -> Node:
 	var packed: PackedScene = load("res://scenes/Main.tscn")
@@ -261,15 +277,23 @@ func test_regen_shimmer_colorect_modulate_differs_from_rest_when_regen_active() 
 	await get_tree().process_frame
 
 	var shimmer: ColorRect = main.get_hp_bar_shimmer()
-	assert_not_null(shimmer,
-		"AC-7 Tier 2: HpBarShimmer ColorRect must be accessible via Main.get_hp_bar_shimmer()")
-	assert_true(shimmer is ColorRect,
-		"AC-7 Tier 2: shimmer node must be a ColorRect (not Polygon2D or parent node)")
+	assert_not_null(
+		shimmer,
+		"AC-7 Tier 2: HpBarShimmer ColorRect must be accessible via Main.get_hp_bar_shimmer()"
+	)
+	assert_true(
+		shimmer is ColorRect,
+		"AC-7 Tier 2: shimmer node must be a ColorRect (not Polygon2D or parent node)"
+	)
 
 	# Rest state: shimmer must be fully transparent (alpha = 0) at boot.
 	var rest_modulate: Color = shimmer.modulate
-	assert_almost_eq(rest_modulate.a, 0.0, 0.01,
-		"AC-7: HpBarShimmer modulate.a must be 0.0 at rest (fully transparent)")
+	assert_almost_eq(
+		rest_modulate.a,
+		0.0,
+		0.01,
+		"AC-7: HpBarShimmer modulate.a must be 0.0 at rest (fully transparent)"
+	)
 
 	# Activate regen: set HP below max, advance both regen timers past threshold.
 	var p: Player = main.get_player()
@@ -295,12 +319,19 @@ func test_regen_shimmer_colorect_modulate_differs_from_rest_when_regen_active() 
 	# Tier 1 invariant: shimmer modulate must differ from rest (alpha 0).
 	# The tween was started — after two process_frames the first property step
 	# should have made alpha > 0.
-	assert_true(shimmer.modulate.a > 0.0,
-		"AC-7 Tier 1: HpBarShimmer modulate.a must be > 0.0 when regen is active (shimmer visible)")
-	assert_ne(shimmer.modulate, Color(1.0, 1.0, 1.0, 0.0),
-		"AC-7 Tier 1: target_modulate != rest_modulate — shimmer must produce observable delta")
-	assert_true(main.get_player().is_regenerating,
-		"AC-7: is_regenerating must be true when both timers exceeded")
+	assert_true(
+		shimmer.modulate.a > 0.0,
+		"AC-7 Tier 1: HpBarShimmer modulate.a must be > 0.0 when regen is active (shimmer visible)"
+	)
+	assert_ne(
+		shimmer.modulate,
+		Color(1.0, 1.0, 1.0, 0.0),
+		"AC-7 Tier 1: target_modulate != rest_modulate — shimmer must produce observable delta"
+	)
+	assert_true(
+		main.get_player().is_regenerating,
+		"AC-7: is_regenerating must be true when both timers exceeded"
+	)
 
 
 func test_regen_shimmer_returns_to_rest_on_damage() -> void:
@@ -325,5 +356,9 @@ func test_regen_shimmer_returns_to_rest_on_damage() -> void:
 	await get_tree().process_frame
 
 	assert_false(p.is_regenerating, "regen must stop after damage")
-	assert_almost_eq(shimmer.modulate.a, 0.0, 0.01,
-		"AC-7: shimmer modulate.a must snap to 0.0 when regen deactivates")
+	assert_almost_eq(
+		shimmer.modulate.a,
+		0.0,
+		0.01,
+		"AC-7: shimmer modulate.a must snap to 0.0 when regen deactivates"
+	)

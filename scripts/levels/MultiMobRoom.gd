@@ -49,7 +49,7 @@ extends Node2D
 ## Emitted when the room's RoomGate flips to UNLOCKED — i.e. all mobs are
 ## dead. The Main / level-flow controller listens to this to mark the room
 ## cleared in StratumProgression and to unblock the exit port.
-signal room_cleared()
+signal room_cleared
 
 # ---- Inspector -------------------------------------------------------
 
@@ -80,8 +80,8 @@ signal room_cleared()
 
 ## res:// paths to the optional dressing scenes.
 @export_file("*.tscn") var room_gate_scene_path: String = "res://scenes/levels/RoomGate.tscn"
-@export_file("*.tscn") var healing_fountain_scene_path: String = (
-	"res://scenes/levels/HealingFountain.tscn")
+@export_file("*.tscn")
+var healing_fountain_scene_path: String = "res://scenes/levels/HealingFountain.tscn"
 
 ## If non-zero, spawn a RoomGate at this world position. Vector2.ZERO means
 ## "no gate" — used by the boss-room handoff or by test scaffolding.
@@ -155,6 +155,7 @@ func _assemble_room_fixtures() -> void:
 
 # ---- Public API ------------------------------------------------------
 
+
 func get_assembly() -> LevelAssembler.AssemblyResult:
 	return _assembly
 
@@ -186,6 +187,7 @@ func get_room_id() -> StringName:
 
 
 # ---- Build ---------------------------------------------------------
+
 
 ## Construct the chunk assembly (geometry + mob CharacterBody2Ds) and splice
 ## it into this room's tree. Synchronous by design — `Main._wire_room_signals`
@@ -279,6 +281,7 @@ func _register_mobs_with_gate() -> void:
 
 # ---- Spawner -------------------------------------------------------
 
+
 ## Mob spawn dispatch. **W3-T5 / #86c9ue1up — refactored from match-block to
 ## MobRegistry.** Pre-refactor: this function carried a per-mob match-block
 ## that pulled scenes + defs from `@export_file` paths and `_get_*` cache
@@ -340,6 +343,7 @@ func _get_mob_registry() -> Node:
 
 
 # ---- Internal -------------------------------------------------------
+
 
 func _on_room_gate_unlocked() -> void:
 	# Position B contract (ticket 86c9q94fg): gate_unlocked means the door

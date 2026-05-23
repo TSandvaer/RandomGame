@@ -89,6 +89,7 @@ func after_each() -> void:
 
 # ---- Pin 1: behavioural — branch_key survives close ---------------------
 
+
 func test_router_last_branch_key_survives_close_after_quest_action() -> void:
 	# The integration scenario: player picks an accept-bounty response in
 	# the `pre_quest` branch → controller emits quest_action_invoked →
@@ -111,8 +112,11 @@ func test_router_last_branch_key_survives_close_after_quest_action() -> void:
 	dc.advance_line()  # into responses
 	dc.select_response(0)  # accept_bounty → navigates to `accepted`
 	# Router captured the pre_quest branch_key at quest_action_invoked time.
-	assert_eq(router.last_branch_key(), &"pre_quest",
-		"router captured originating branch_key (pre_quest) at quest_action time")
+	assert_eq(
+		router.last_branch_key(),
+		&"pre_quest",
+		"router captured originating branch_key (pre_quest) at quest_action time"
+	)
 	# Close — controller's _reset_state clears its internal branch_key to &""
 	# BEFORE emitting dialogue_closed.
 	dc.close()
@@ -120,16 +124,27 @@ func test_router_last_branch_key_survives_close_after_quest_action() -> void:
 	# future refactor moved the branch_key capture into _on_dialogue_closed,
 	# the controller's current_branch_key() would return &"" by then and
 	# this assertion would fail loudly.
-	assert_eq(router.last_branch_key(), &"pre_quest",
-		"router last_branch_key() preserves originating branch after close — " +
-		"NOT &\"\" (the controller's post-close state)")
+	assert_eq(
+		router.last_branch_key(),
+		&"pre_quest",
+		(
+			"router last_branch_key() preserves originating branch after close — "
+			+ 'NOT &"" (the controller\'s post-close state)'
+		)
+	)
 	# Sanity — controller IS reset to &"" after close (engine surface check).
-	assert_eq(dc.current_branch_key(), &"",
-		"DialogueController.current_branch_key() IS &\"\" after close — " +
-		"confirming the discipline matters (read-after-close is unsafe)")
+	assert_eq(
+		dc.current_branch_key(),
+		&"",
+		(
+			'DialogueController.current_branch_key() IS &"" after close — '
+			+ "confirming the discipline matters (read-after-close is unsafe)"
+		)
+	)
 
 
 # ---- Pin 2: source-scan — _on_dialogue_closed does NOT read controller --
+
 
 func test_router_source_does_not_call_current_branch_key_in_dialogue_closed_handler() -> void:
 	# Per `.claude/docs/test-conventions.md` § "Source-scan structural pins":
@@ -144,12 +159,10 @@ func test_router_source_does_not_call_current_branch_key_in_dialogue_closed_hand
 	# We read the file as a string + assert the named call does NOT appear
 	# inside the `_on_dialogue_closed` function body.
 	var source: String = FileAccess.get_file_as_string(ROUTER_SOURCE_PATH)
-	assert_gt(source.length(), 0,
-		"QuestActionRouter.gd readable as resource")
+	assert_gt(source.length(), 0, "QuestActionRouter.gd readable as resource")
 	# Find the `_on_dialogue_closed` function definition.
 	var fn_start: int = source.find("func _on_dialogue_closed(")
-	assert_gt(fn_start, -1,
-		"QuestActionRouter.gd defines _on_dialogue_closed function")
+	assert_gt(fn_start, -1, "QuestActionRouter.gd defines _on_dialogue_closed function")
 	# Find the start of the NEXT top-level function (or end of file) so we
 	# scope the search to the handler's body. GDScript top-level functions
 	# start at column 0 with `func `.
@@ -161,14 +174,20 @@ func test_router_source_does_not_call_current_branch_key_in_dialogue_closed_hand
 	# read-after-close trap Drew's nit pinned. Same forbidden-call class:
 	# DialogueController.current_branch_key(), self.current_branch_key(),
 	# or a bare current_branch_key() reference.
-	assert_eq(fn_body.find("current_branch_key("), -1,
-		"_on_dialogue_closed does NOT call current_branch_key() — " +
-		"branch_key must be captured during active session (via branch_opened " +
-		"or quest_action_invoked), NOT read post-close from the controller " +
-		"(which has already reset to &\"\"). Drew nit 1+2 routing pin.")
+	assert_eq(
+		fn_body.find("current_branch_key("),
+		-1,
+		(
+			"_on_dialogue_closed does NOT call current_branch_key() — "
+			+ "branch_key must be captured during active session (via branch_opened "
+			+ "or quest_action_invoked), NOT read post-close from the controller "
+			+ '(which has already reset to &""). Drew nit 1+2 routing pin.'
+		)
+	)
 
 
 # ---- Pin 3: dialogue_closed payload contract -----------------------
+
 
 func test_dialogue_closed_signal_is_single_arg() -> void:
 	# Drew nit 1: `dialogue_closed(npc_id)` is SINGLE-arg. If a future
@@ -184,16 +203,18 @@ func test_dialogue_closed_signal_is_single_arg() -> void:
 		if String(sig.get("name", "")) == "dialogue_closed":
 			found = sig
 			break
-	assert_true(not found.is_empty(),
-		"DialogueController exposes dialogue_closed signal")
+	assert_true(not found.is_empty(), "DialogueController exposes dialogue_closed signal")
 	var args: Array = found.get("args", [])
-	assert_eq(args.size(), 1,
-		"dialogue_closed is single-arg (npc_id); two-arg would be Drew nit 1 regression")
-	assert_eq(String(args[0].get("name", "")), "npc_id",
-		"dialogue_closed single arg is npc_id")
+	assert_eq(
+		args.size(),
+		1,
+		"dialogue_closed is single-arg (npc_id); two-arg would be Drew nit 1 regression"
+	)
+	assert_eq(String(args[0].get("name", "")), "npc_id", "dialogue_closed single arg is npc_id")
 
 
 # ---- Pin 4: close() is no-arg ----------------------------------------
+
 
 func test_controller_close_is_no_arg() -> void:
 	# Drew nit 2: `close() -> void` takes no args. The survey paper-shaped
@@ -207,14 +228,17 @@ func test_controller_close_is_no_arg() -> void:
 		if String(m.get("name", "")) == "close":
 			found = m
 			break
-	assert_true(not found.is_empty(),
-		"DialogueController exposes close() method")
+	assert_true(not found.is_empty(), "DialogueController exposes close() method")
 	var args: Array = found.get("args", [])
-	assert_eq(args.size(), 0,
-		"close() is no-arg; (npc_id, branch_key) form would be Drew nit 2 regression")
+	assert_eq(
+		args.size(),
+		0,
+		"close() is no-arg; (npc_id, branch_key) form would be Drew nit 2 regression"
+	)
 
 
 # ---- Helpers --------------------------------------------------------
+
 
 func _controller() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("DialogueController")

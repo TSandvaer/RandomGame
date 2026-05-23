@@ -30,8 +30,8 @@ extends GutTest
 const PHYS_DELTA: float = 1.0 / 60.0
 const TEST_SLOT: int = 991  # avoid collisions with sibling tests
 
-
 # ---- Helpers ---------------------------------------------------------
+
 
 func _instantiate_main() -> Main:
 	var packed: PackedScene = load("res://scenes/Main.tscn")
@@ -121,6 +121,7 @@ func _collect_pickups_in(parent: Node) -> Array[Pickup]:
 
 # ---- Test 1: boss loot lands as Main's children + auto-collect wired -
 
+
 func test_boss_loot_pickups_land_in_room_and_are_auto_collect_wired() -> void:
 	var main: Main = _instantiate_main()
 	await get_tree().process_frame
@@ -146,22 +147,30 @@ func test_boss_loot_pickups_land_in_room_and_are_auto_collect_wired() -> void:
 	# parents under the current room — `_load_room_at_index` calls
 	# `_loot_spawner.set_parent_for_pickups(room)`).
 	var pickups: Array[Pickup] = _collect_pickups_in(boss_room)
-	assert_gt(pickups.size(), 0,
-		"REGRESSION-86c9uemdg: boss death drops at least one Pickup via Main's pipeline")
+	assert_gt(
+		pickups.size(),
+		0,
+		"REGRESSION-86c9uemdg: boss death drops at least one Pickup via Main's pipeline"
+	)
 
 	# REGRESSION: each Pickup's `picked_up` signal IS wired to
 	# `Inventory.on_pickup_collected` — the auto_collect_pickups handshake.
 	# Pre-fix the Stratum1BossRoom's own spawner's pickups were NOT wired.
 	var inv: Node = _inventory()
 	for p in pickups:
-		assert_true(p.picked_up.get_connections().size() > 0,
-			"REGRESSION-86c9uemdg: every boss-loot Pickup has a `picked_up` listener wired (auto-collect)")
+		assert_true(
+			p.picked_up.get_connections().size() > 0,
+			"REGRESSION-86c9uemdg: every boss-loot Pickup has a `picked_up` listener wired (auto-collect)"
+		)
 		# Concretely: the listener is Inventory.on_pickup_collected.
-		assert_true(p.is_connected("picked_up", inv.on_pickup_collected),
-			"REGRESSION-86c9uemdg: `picked_up` is wired specifically to Inventory.on_pickup_collected")
+		assert_true(
+			p.is_connected("picked_up", inv.on_pickup_collected),
+			"REGRESSION-86c9uemdg: `picked_up` is wired specifically to Inventory.on_pickup_collected"
+		)
 
 
 # ---- Test 2: boss loot is collectable via real body_entered ---------
+
 
 func test_boss_loot_is_collectable_player_walking_over_picks_up() -> void:
 	# **The user-visible Sponsor symptom — "cannot loot dropped items."**
@@ -212,11 +221,14 @@ func test_boss_loot_is_collectable_player_walking_over_picks_up() -> void:
 	# the collection succeeded.
 	var weapon_now_equipped: bool = _inventory().get_equipped(&"weapon") != null
 	var inventory_grew: bool = inv_after > inv_before
-	assert_true(inventory_grew or weapon_now_equipped,
-		"REGRESSION-86c9uemdg: player walking over boss loot adds items to inventory or equips a weapon")
+	assert_true(
+		inventory_grew or weapon_now_equipped,
+		"REGRESSION-86c9uemdg: player walking over boss loot adds items to inventory or equips a weapon"
+	)
 
 
 # ---- Test 3: single-pipeline pickup count (no dual-spawn) -----------
+
 
 func test_boss_loot_pickup_count_equals_loot_table_rolls_no_double_spawn() -> void:
 	# **The dual-spawn regression check.** Pre-fix, two MobLootSpawners
@@ -249,10 +261,18 @@ func test_boss_loot_pickup_count_equals_loot_table_rolls_no_double_spawn() -> vo
 	# semantically `pickup_count <= 2x` — and add an explicit `< 2 * entries`
 	# guard so the dual-spawn case (exactly 2x) fails loud.
 	var entries: int = boss.mob_def.loot_table.entries.size()
-	assert_lt(pickup_count, entries * 2,
-		"REGRESSION-86c9uemdg: dual-spawn would produce %d pickups (2x %d entries); got %d" % [
-			entries * 2, entries, pickup_count,
-		])
+	assert_lt(
+		pickup_count,
+		entries * 2,
+		(
+			"REGRESSION-86c9uemdg: dual-spawn would produce %d pickups (2x %d entries); got %d"
+			% [
+				entries * 2,
+				entries,
+				pickup_count,
+			]
+		)
+	)
 	assert_gt(pickup_count, 0, "boss does drop loot via Main's pipeline")
 
 
@@ -282,14 +302,21 @@ func test_pickup_wired_to_inventory_after_three_frames() -> void:
 
 	var inv: Node = _inventory()
 	var pickups: Array[Pickup] = _collect_pickups_in(boss_room)
-	assert_gt(pickups.size(), 0,
-		"REGRESSION-86c9un4nh: boss loot Pickups still in room after 3 frames")
+	assert_gt(
+		pickups.size(), 0, "REGRESSION-86c9un4nh: boss loot Pickups still in room after 3 frames"
+	)
 	for p in pickups:
-		assert_true(p.has_signal("picked_up") and p.picked_up.get_connections().size() > 0,
-			"REGRESSION-86c9un4nh: Pickup.picked_up still wired after 3-frame settle")
-		assert_true(p.is_connected("picked_up", inv.on_pickup_collected),
-			"REGRESSION-86c9un4nh: picked_up wired to Inventory.on_pickup_collected after 3-frame delay — " +
-			"auto_collect_pickups runs synchronously before deferred add_child, wiring persists")
+		assert_true(
+			p.has_signal("picked_up") and p.picked_up.get_connections().size() > 0,
+			"REGRESSION-86c9un4nh: Pickup.picked_up still wired after 3-frame settle"
+		)
+		assert_true(
+			p.is_connected("picked_up", inv.on_pickup_collected),
+			(
+				"REGRESSION-86c9un4nh: picked_up wired to Inventory.on_pickup_collected after 3-frame delay — "
+				+ "auto_collect_pickups runs synchronously before deferred add_child, wiring persists"
+			)
+		)
 
 
 # ---- Test 5: REGRESSION-86c9unkr2 boss-loot Pickup monitoring is active post-double-defer
@@ -304,6 +331,7 @@ func test_pickup_wired_to_inventory_after_three_frames() -> void:
 # `await get_tree().physics_frame` BEFORE writing monitoring=true. This GUT
 # integration test pins that boss-loot Pickups end up with `monitoring=true`
 # after the new defer chain settles — the production-shape end-to-end check.
+
 
 func test_boss_loot_pickups_have_active_monitoring_after_double_defer() -> void:
 	# REGRESSION-86c9unkr2: end-to-end pin that boss-spawned Pickups reach
@@ -328,17 +356,22 @@ func test_boss_loot_pickups_have_active_monitoring_after_double_defer() -> void:
 		await get_tree().process_frame
 
 	var pickups: Array[Pickup] = _collect_pickups_in(boss_room)
-	assert_gt(pickups.size(), 0,
-		"REGRESSION-86c9unkr2: boss loot Pickups still in room post-defer")
+	assert_gt(pickups.size(), 0, "REGRESSION-86c9unkr2: boss loot Pickups still in room post-defer")
 	for p in pickups:
-		assert_true(p.monitoring,
-			"REGRESSION-86c9unkr2: Pickup.monitoring=true after double-defer settles — " +
-			"the load-bearing surface against HTML5 silent ERR_FAIL_COND on monitoring setter")
-		assert_true(p.monitorable,
-			"REGRESSION-86c9unkr2: Pickup.monitorable=true parity post-defer")
+		assert_true(
+			p.monitoring,
+			(
+				"REGRESSION-86c9unkr2: Pickup.monitoring=true after double-defer settles — "
+				+ "the load-bearing surface against HTML5 silent ERR_FAIL_COND on monitoring setter"
+			)
+		)
+		assert_true(
+			p.monitorable, "REGRESSION-86c9unkr2: Pickup.monitorable=true parity post-defer"
+		)
 
 
 # ---- Test 6: REGRESSION-86c9unkr2 StratumExit monitoring is active post-double-defer
+
 
 func test_stratum_exit_interaction_area_monitoring_active_after_boss_death() -> void:
 	# REGRESSION-86c9unkr2: end-to-end pin that the boss-room StratumExit's
@@ -364,13 +397,20 @@ func test_stratum_exit_interaction_area_monitoring_active_after_boss_death() -> 
 
 	var exit: StratumExit = boss_room.get_stratum_exit()
 	assert_not_null(exit, "boss room has StratumExit")
-	assert_true(exit.is_active(),
-		"StratumExit.is_active() true post-boss-death (sync flip in activate())")
+	assert_true(
+		exit.is_active(), "StratumExit.is_active() true post-boss-death (sync flip in activate())"
+	)
 	var area: Area2D = exit.get_interaction_area()
 	assert_not_null(area, "interaction area exists")
-	assert_true(area.monitoring,
-		"REGRESSION-86c9unkr2: StratumExit interaction_area.monitoring=true after"
+	assert_true(
+		area.monitoring,
+		(
+			"REGRESSION-86c9unkr2: StratumExit interaction_area.monitoring=true after"
 			+ " double-defer — _arm_interaction_area_after_flush awaited physics_frame"
-			+ " and wrote monitoring=true outside the flush")
-	assert_true(area.monitorable,
-		"REGRESSION-86c9unkr2: StratumExit interaction_area.monitorable=true parity post-defer")
+			+ " and wrote monitoring=true outside the flush"
+		)
+	)
+	assert_true(
+		area.monitorable,
+		"REGRESSION-86c9unkr2: StratumExit interaction_area.monitorable=true parity post-defer"
+	)

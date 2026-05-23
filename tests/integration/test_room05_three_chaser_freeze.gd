@@ -66,8 +66,8 @@ const GATED_ROOM_SCENES: Array[String] = [
 	"res://scenes/levels/Stratum1Room08.tscn",
 ]
 
-
 # ---- Helpers ---------------------------------------------------------------
+
 
 func _await_settle(frames: int = 8) -> void:
 	# Drain physics + idle frames so MultiMobRoom._ready's deferred
@@ -118,6 +118,7 @@ func _connection_is_deferred(obj: Object, signal_name: StringName, target: Objec
 
 # ---- 1: structural — gate_traversed → room is connected CONNECT_DEFERRED ---
 
+
 func test_room05_gate_traversed_connection_is_deferred() -> void:
 	# The load-bearing fix, pinned directly: MultiMobRoom must connect the
 	# RoomGate's `gate_traversed` signal to its own `_on_room_gate_traversed`
@@ -132,9 +133,12 @@ func test_room05_gate_traversed_connection_is_deferred() -> void:
 		return
 	assert_true(
 		_connection_is_deferred(gate, "gate_traversed", room),
-		"REGRESSION-86c9u1cx1: RoomGate.gate_traversed → MultiMobRoom." +
-		"_on_room_gate_traversed must be a CONNECT_DEFERRED connection so the " +
-		"next-room load chain runs OUTSIDE the body_entered physics-flush window")
+		(
+			"REGRESSION-86c9u1cx1: RoomGate.gate_traversed → MultiMobRoom."
+			+ "_on_room_gate_traversed must be a CONNECT_DEFERRED connection so the "
+			+ "next-room load chain runs OUTSIDE the body_entered physics-flush window"
+		)
+	)
 
 
 func test_every_gated_room_defers_gate_traversed() -> void:
@@ -150,10 +154,12 @@ func test_every_gated_room_defers_gate_traversed() -> void:
 			continue
 		assert_true(
 			_connection_is_deferred(gate, "gate_traversed", room),
-			"%s: gate_traversed → _on_room_gate_traversed must be CONNECT_DEFERRED" % scene_path)
+			"%s: gate_traversed → _on_room_gate_traversed must be CONNECT_DEFERRED" % scene_path
+		)
 
 
 # ---- 2: behavioural — room_cleared lands DEFERRED, not synchronously ------
+
 
 func test_room_cleared_fires_deferred_after_gate_traversed() -> void:
 	# Behavioural consequence of the CONNECT_DEFERRED fix: when the RoomGate
@@ -177,9 +183,7 @@ func test_room_cleared_fires_deferred_after_gate_traversed() -> void:
 		return
 
 	var cleared_count: Array[int] = [0]
-	room.room_cleared.connect(func() -> void:
-		cleared_count[0] += 1
-	)
+	room.room_cleared.connect(func() -> void: cleared_count[0] += 1)
 
 	# Drive the gate to UNLOCKED the real way (lock → kill all 3 mobs), so
 	# `traverse_for_test()` can legitimately emit `gate_traversed`.
@@ -196,19 +200,28 @@ func test_room_cleared_fires_deferred_after_gate_traversed() -> void:
 	# NOT run inside this call — so room_cleared must still be at 0 immediately
 	# after the emit returns.
 	gate.traverse_for_test()
-	assert_eq(cleared_count[0], 0,
-		"REGRESSION-86c9u1cx1: room_cleared must NOT fire synchronously inside " +
-		"the gate_traversed emit — the gate_traversed → _on_room_gate_traversed " +
-		"connection is CONNECT_DEFERRED so the next-room load escapes the " +
-		"body_entered physics-flush window")
+	assert_eq(
+		cleared_count[0],
+		0,
+		(
+			"REGRESSION-86c9u1cx1: room_cleared must NOT fire synchronously inside "
+			+ "the gate_traversed emit — the gate_traversed → _on_room_gate_traversed "
+			+ "connection is CONNECT_DEFERRED so the next-room load escapes the "
+			+ "body_entered physics-flush window"
+		)
+	)
 
 	# After one frame's deferred-call flush, the handler runs and room_cleared fires.
 	await _await_settle(2)
-	assert_eq(cleared_count[0], 1,
-		"room_cleared fires exactly once on the deferred-call flush after gate_traversed")
+	assert_eq(
+		cleared_count[0],
+		1,
+		"room_cleared fires exactly once on the deferred-call flush after gate_traversed"
+	)
 
 
 # ---- 3: end-to-end — all 3 Room 05 mobs hittable + killable + gate unlocks -
+
 
 func test_room05_three_mobs_hittable_and_gate_unlocks() -> void:
 	# End-to-end smoke for the Room 05 roster: load the real Stratum1Room05,
@@ -225,8 +238,11 @@ func test_room05_three_mobs_hittable_and_gate_unlocks() -> void:
 	assert_not_null(gate, "Room 05 spawned its RoomGate")
 	if gate == null:
 		return
-	assert_eq(gate.mobs_alive(), 3,
-		"all 3 Room 05 mobs registered with the gate after the deferred fixture pass")
+	assert_eq(
+		gate.mobs_alive(),
+		3,
+		"all 3 Room 05 mobs registered with the gate after the deferred fixture pass"
+	)
 
 	gate.test_skip_death_wait = true
 	gate.lock()
@@ -238,15 +254,27 @@ func test_room05_three_mobs_hittable_and_gate_unlocks() -> void:
 		var hb: Hitbox = _make_player_hitbox_at(m.global_position, 32.0)
 		room.add_child(hb)
 		await _await_settle(3)
-		assert_lt(m.get_hp(), hp_before,
-			"REGRESSION-86c9u1cx1: player hitbox overlapping Room 05 mob '%s' applies damage" % m.name)
-		assert_true(m.is_dead(),
-			"REGRESSION-86c9u1cx1: Room 05 mob '%s' is killable by a real player hitbox" % m.name)
+		assert_lt(
+			m.get_hp(),
+			hp_before,
+			(
+				"REGRESSION-86c9u1cx1: player hitbox overlapping Room 05 mob '%s' applies damage"
+				% m.name
+			)
+		)
+		assert_true(
+			m.is_dead(),
+			"REGRESSION-86c9u1cx1: Room 05 mob '%s' is killable by a real player hitbox" % m.name
+		)
 		hb.queue_free()
 
 	# With all 3 mobs dead, the gate must reach UNLOCKED — Room 05 clears.
 	await _await_settle()
 	assert_eq(gate.mobs_alive(), 0, "gate counter reached 0 after all 3 mobs died")
-	assert_true(gate.is_unlocked(),
-		"REGRESSION-86c9u1cx1: RoomGate UNLOCKS once all 3 Room 05 mobs die — " +
-		"Room 05 is beatable")
+	assert_true(
+		gate.is_unlocked(),
+		(
+			"REGRESSION-86c9u1cx1: RoomGate UNLOCKS once all 3 Room 05 mobs die — "
+			+ "Room 05 is beatable"
+		)
+	)

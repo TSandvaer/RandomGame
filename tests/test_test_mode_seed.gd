@@ -39,6 +39,7 @@ func after_each() -> void:
 
 # --- Test mode OFF: free RNG --------------------------------------------
 
+
 func test_seed_varies_when_test_mode_off() -> void:
 	# Three calls; collect distinct values. With a 32-bit randi() space, the
 	# probability of a collision in 3 draws is ~3e-9 — effectively zero.
@@ -56,6 +57,7 @@ func test_seed_varies_when_test_mode_off() -> void:
 
 
 # --- Test mode ON: stable seed ------------------------------------------
+
 
 func test_seed_is_stable_when_test_mode_on() -> void:
 	if not OS.is_debug_build():
@@ -97,11 +99,15 @@ func test_test_mode_seed_constant_is_stable() -> void:
 	# Defensive: the actual seed value is documented in debug-flags.md; if
 	# someone changes it, AC4 layouts shift and the docs go stale. This
 	# test pins the constant.
-	assert_eq(_flags().TEST_MODE_MOB_SEED, 0x7E57C0DE,
-		"TEST_MODE_MOB_SEED is the documented testability constant")
+	assert_eq(
+		_flags().TEST_MODE_MOB_SEED,
+		0x7E57C0DE,
+		"TEST_MODE_MOB_SEED is the documented testability constant"
+	)
 
 
 # --- Test mode toggle is independent of fast-XP ------------------------
+
 
 func test_test_mode_does_not_affect_xp_multiplier() -> void:
 	if not OS.is_debug_build():
@@ -130,6 +136,7 @@ func test_fast_xp_does_not_affect_mob_seed() -> void:
 
 # --- Release-build structural gate --------------------------------------
 
+
 func test_set_test_mode_for_test_is_release_safe() -> void:
 	# Belt-and-braces: in a release build, set_test_mode_for_test forcibly
 	# returns false. We can only assert this directly in a debug build by
@@ -140,7 +147,9 @@ func test_set_test_mode_for_test_is_release_safe() -> void:
 	if OS.is_debug_build():
 		assert_true(_flags().test_mode_enabled)
 	else:
-		assert_false(_flags().test_mode_enabled, "release build must ignore set_test_mode_for_test(true)")
+		assert_false(
+			_flags().test_mode_enabled, "release build must ignore set_test_mode_for_test(true)"
+		)
 
 
 func test_mob_spawn_seed_release_build_never_pins() -> void:
@@ -150,5 +159,8 @@ func test_mob_spawn_seed_release_build_never_pins() -> void:
 	if OS.is_debug_build():
 		assert_eq(_flags().mob_spawn_seed(), _flags().TEST_MODE_MOB_SEED)
 	else:
-		assert_ne(_flags().mob_spawn_seed(), _flags().TEST_MODE_MOB_SEED,
-			"release build must never pin mob seed regardless of state")
+		assert_ne(
+			_flags().mob_spawn_seed(),
+			_flags().TEST_MODE_MOB_SEED,
+			"release build must never pin mob seed regardless of state"
+		)

@@ -121,6 +121,7 @@ func _exit_tree() -> void:
 
 # ---- Public API (Uma vignette-spec § "API surface") --------------------
 
+
 ## Set vignette opacity directly (no tween). `value` is clamped to `[0.0, 1.0]`.
 ## Used for boot init + tests + any consumer that needs an instant snap.
 func set_opacity(value: float) -> void:
@@ -141,9 +142,8 @@ func set_opacity(value: float) -> void:
 ## Idempotent: a second call while a tween is active kills the previous
 ## tween before starting the new one (no overlap).
 func set_opacity_tween(
-		value: float,
-		duration: float,
-		curve_preset: int = CURVE_EASE_IN_OUT_CUBIC) -> void:
+	value: float, duration: float, curve_preset: int = CURVE_EASE_IN_OUT_CUBIC
+) -> void:
 	if _texture_rect == null:
 		return
 	var target: float = clampf(value, 0.0, 1.0)
@@ -188,6 +188,7 @@ func boss_defeat_return() -> void:
 
 # ---- Test introspection ----------------------------------------------
 
+
 func get_texture_rect() -> TextureRect:
 	return _texture_rect
 
@@ -203,6 +204,7 @@ func has_active_tween() -> bool:
 
 
 # ---- Internal --------------------------------------------------------
+
 
 func _build_texture_rect() -> void:
 	if _texture_rect != null:

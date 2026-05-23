@@ -49,8 +49,8 @@ extends Resource
 ## against the MobRegistry. Empty for purely decorative / boss-room chunks.
 @export var mob_spawns: Array[MobSpawnPoint] = []
 
-
 # ---- Convenience helpers ---------------------------------------------
+
 
 ## Returns the chunk's pixel size (size_tiles * tile_size_px).
 func size_px() -> Vector2i:
@@ -60,8 +60,10 @@ func size_px() -> Vector2i:
 ## True iff `tile_pos` is inside this chunk's grid bounds.
 func contains_tile(tile_pos: Vector2i) -> bool:
 	return (
-		tile_pos.x >= 0 and tile_pos.x < size_tiles.x
-		and tile_pos.y >= 0 and tile_pos.y < size_tiles.y
+		tile_pos.x >= 0
+		and tile_pos.x < size_tiles.x
+		and tile_pos.y >= 0
+		and tile_pos.y < size_tiles.y
 	)
 
 
@@ -93,7 +95,10 @@ func validate() -> Array[String]:
 	for ms: MobSpawnPoint in mob_spawns:
 		if not contains_tile(ms.position_tiles):
 			errors.append(
-				"MobSpawnPoint at %s outside chunk bounds %s" % [str(ms.position_tiles), str(size_tiles)]
+				(
+					"MobSpawnPoint at %s outside chunk bounds %s"
+					% [str(ms.position_tiles), str(size_tiles)]
+				)
 			)
 		if ms.mob_id == &"":
 			errors.append("MobSpawnPoint has empty mob_id at %s" % str(ms.position_tiles))

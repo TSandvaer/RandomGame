@@ -91,7 +91,8 @@ const _V2_MAX_LEVEL: int = 5
 # disk so the migration chain (v0 → … → v4 → v5) has a stable entry
 # point for the multi-character lift to extend later.
 const DEFAULT_PAYLOAD: Dictionary = {
-	"character": {
+	"character":
+	{
 		"name": "Ember-Knight",
 		"level": 1,
 		"xp": 0,
@@ -99,7 +100,8 @@ const DEFAULT_PAYLOAD: Dictionary = {
 		"vigor": 0,
 		"focus": 0,
 		"edge": 0,
-		"stats": {
+		"stats":
+		{
 			"vigor": 0,
 			"focus": 0,
 			"edge": 0,
@@ -116,9 +118,10 @@ const DEFAULT_PAYLOAD: Dictionary = {
 		# § "Seed-derivation contract" for the consumer side.
 		"world_seed": 0,
 	},
-	"stash": [],         # list of item dicts
-	"equipped": {},      # slot -> item dict
-	"meta": {
+	"stash": [],  # list of item dicts
+	"equipped": {},  # slot -> item dict
+	"meta":
+	{
 		"runs_completed": 0,
 		"deepest_stratum": 1,
 		"total_playtime_sec": 0.0,
@@ -132,6 +135,7 @@ func _ready() -> void:
 
 
 # ---- Public API ---------------------------------------------------------
+
 
 func save_path(slot: int = 0) -> String:
 	return SAVE_DIR + (SAVE_FILE_FMT % slot)
@@ -187,7 +191,9 @@ func load_game(slot: int = 0) -> Dictionary:
 		return {}
 	var f: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if f == null:
-		push_error("[Save] load_game(%d): open failed (err %d)" % [slot, FileAccess.get_open_error()])
+		push_error(
+			"[Save] load_game(%d): open failed (err %d)" % [slot, FileAccess.get_open_error()]
+		)
 		return {}
 	var raw: String = f.get_as_text()
 	f.close()
@@ -236,6 +242,7 @@ func default_payload() -> Dictionary:
 
 # ---- Crash-safe write helper -------------------------------------------
 
+
 ## Writes `text` to `path` atomically: write to <path>.tmp first, then
 ## DirAccess.rename to overwrite. A power-yank mid-write leaves the old
 ## file intact. Returns true on success.
@@ -243,7 +250,9 @@ func atomic_write(path: String, text: String) -> bool:
 	var tmp: String = path + TMP_SUFFIX
 	var f: FileAccess = FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
-		push_error("[Save] atomic_write: cannot open %s (err %d)" % [tmp, FileAccess.get_open_error()])
+		push_error(
+			"[Save] atomic_write: cannot open %s (err %d)" % [tmp, FileAccess.get_open_error()]
+		)
 		return false
 	f.store_string(text)
 	f.close()
@@ -260,6 +269,7 @@ func atomic_write(path: String, text: String) -> bool:
 
 # ---- Migration ----------------------------------------------------------
 
+
 ## Migrate `data` from `from_version` up to SCHEMA_VERSION. Each step is
 ## an explicit migration function. Returns the migrated dict.
 ##
@@ -272,9 +282,12 @@ func migrate(data: Dictionary, from_version: int) -> Dictionary:
 		# Routed through WarningBus so the universal-warning gate (ticket
 		# 86c9uf0mm Half B) catches this in GUT tests.
 		_emit_warning(
-			"[Save] save schema_version %d is newer than runtime %d — loading as-is"
-				% [from_version, SCHEMA_VERSION],
-			"schema_newer_than_runtime")
+			(
+				"[Save] save schema_version %d is newer than runtime %d — loading as-is"
+				% [from_version, SCHEMA_VERSION]
+			),
+			"schema_newer_than_runtime"
+		)
 		return data
 	var out: Dictionary = data.duplicate(true)
 	if from_version < 1:
@@ -494,7 +507,9 @@ static func _v2_xp_required_for(level: int) -> int:
 	var clean_level: int = max(1, level)
 	return int(floor(float(_V2_BASE_XP) * pow(float(clean_level), _V2_EXP_POWER)))
 
+
 # ---- Testability README -------------------------------------------------
+
 
 ## Writes a one-liner README to the save dir explaining where saves live,
 ## the schema_version, and how to clear them. Called from `save_game` after
@@ -512,7 +527,10 @@ func _write_readme() -> void:
 		+ "\n"
 		+ "Save files: save_<slot>.json (one per slot, slot 0 is default).\n"
 		+ "Location:   %s (Godot user://)\n" % abs_path
-		+ "Format:     JSON, schema_version=%d (see team/devon-dev/save-format.md).\n" % SCHEMA_VERSION
+		+ (
+			"Format:     JSON, schema_version=%d (see team/devon-dev/save-format.md).\n"
+			% SCHEMA_VERSION
+		)
 		+ "\n"
 		+ "To start a fresh run / clear saves:\n"
 		+ "  1. Quit the game.\n"
@@ -532,8 +550,11 @@ func _write_readme() -> void:
 		# a context where the user dir can't be written, but the underlying
 		# bug isn't a save-correctness issue. Reconsider on a future ticket.
 		push_warning(
-			"[Save] could not write README at %s (err %d)"
-				% [README_PATH, FileAccess.get_open_error()])
+			(
+				"[Save] could not write README at %s (err %d)"
+				% [README_PATH, FileAccess.get_open_error()]
+			)
+		)
 		return
 	f.store_string(contents)
 	f.close()

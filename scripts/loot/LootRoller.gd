@@ -50,6 +50,7 @@ func seed_rng(seed: int) -> void:
 const TIER_MIN_INDEX: int = 0
 const TIER_MAX_INDEX: int = 5  # T6 is index 5 (T1..T6)
 
+
 ## Affix count by tier (single tunable point per `team/drew-dev/tres-schemas.md`).
 ##   T1: 0 affixes (worn)
 ##   T2: 1 (common)
@@ -83,6 +84,7 @@ static func clamp_tier(tier: int) -> int:
 
 # ---- Roll a whole table ----------------------------------------------
 
+
 ## Returns an array of `ItemInstance`s rolled from `table`. Empty array
 ## means "no drops this kill", never null.
 func roll(table: LootTableDef) -> Array[ItemInstance]:
@@ -98,6 +100,7 @@ func roll(table: LootTableDef) -> Array[ItemInstance]:
 
 # ---- Roll a single affix on an item ---------------------------------
 
+
 ## Roll one `AffixRoll` from `affix_def` at `tier`. Tier index resolves
 ## directly into `affix_def.value_ranges[i]`.
 ##
@@ -109,9 +112,10 @@ func roll_affix(affix_def: AffixDef, tier: int) -> AffixRoll:
 	var tier_idx: int = clamp_tier(tier)
 	assert(
 		tier_idx < affix_def.value_ranges.size(),
-		"LootRoller.roll_affix: affix '%s' has %d value_ranges but tier index %d requested" % [
-			affix_def.id, affix_def.value_ranges.size(), tier_idx
-		]
+		(
+			"LootRoller.roll_affix: affix '%s' has %d value_ranges but tier index %d requested"
+			% [affix_def.id, affix_def.value_ranges.size(), tier_idx]
+		)
 	)
 	var rng_range: AffixValueRange = affix_def.value_ranges[tier_idx]
 	var v: float = lerp(rng_range.min_value, rng_range.max_value, _rng.randf())
@@ -119,6 +123,7 @@ func roll_affix(affix_def: AffixDef, tier: int) -> AffixRoll:
 
 
 # ---- Roll affixes for a whole item ----------------------------------
+
 
 ## Picks `affix_count_for_tier(tier)` affixes from `pool` without
 ## duplicates and rolls each. Returns an empty array if the pool is empty
@@ -148,6 +153,7 @@ func roll_affixes_for_item(pool: Array[AffixDef], tier: int) -> Array[AffixRoll]
 
 # ---- Independent roll mode ------------------------------------------
 
+
 func _roll_independent(table: LootTableDef, out: Array[ItemInstance]) -> void:
 	for entry: LootEntry in table.entries:
 		if entry == null or entry.item_def == null:
@@ -162,6 +168,7 @@ func _roll_independent(table: LootTableDef, out: Array[ItemInstance]) -> void:
 
 # ---- Weighted pick mode ---------------------------------------------
 
+
 func _roll_weighted_pick(table: LootTableDef, out: Array[ItemInstance]) -> void:
 	var total_weight: float = 0.0
 	for entry: LootEntry in table.entries:
@@ -169,7 +176,9 @@ func _roll_weighted_pick(table: LootTableDef, out: Array[ItemInstance]) -> void:
 			continue
 		total_weight += max(0.0, entry.weight)
 	if total_weight <= 0.0:
-		push_warning("LootRoller: weighted-pick table has no positive-weight entries — returning []")
+		push_warning(
+			"LootRoller: weighted-pick table has no positive-weight entries — returning []"
+		)
 		return
 	var n: int = max(0, table.roll_count)
 	for _i in n:
@@ -186,6 +195,7 @@ func _roll_weighted_pick(table: LootTableDef, out: Array[ItemInstance]) -> void:
 
 
 # ---- Build an ItemInstance from a LootEntry -------------------------
+
 
 func _make_instance(entry: LootEntry) -> ItemInstance:
 	var rolled_tier_int: int = clamp_tier(int(entry.item_def.tier) + entry.tier_modifier)

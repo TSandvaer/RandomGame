@@ -25,7 +25,6 @@ extends GutTest
 const TEST_SLOT: int = 998
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
 
-
 # ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
 ##
 ## See test_save.gd for the rationale. Save-roundtrip exercises the same
@@ -58,6 +57,7 @@ func _save() -> Node:
 
 # --- tu-save-01: level survives round-trip exactly ----------------------
 
+
 func test_save_load_preserves_level() -> void:
 	var data: Dictionary = _save().default_payload()
 	data["character"]["level"] = 3
@@ -75,6 +75,7 @@ func test_save_load_preserves_level() -> void:
 
 # --- tu-save-02: stash items round-trip with affix rolls --------------
 
+
 func test_save_load_preserves_stash_items() -> void:
 	var data: Dictionary = _save().default_payload()
 	data["stash"] = [
@@ -85,9 +86,16 @@ func test_save_load_preserves_stash_items() -> void:
 			"stack_count": 1,
 		},
 		{"id": "armor_leather", "tier": 1, "rolled_affixes": [], "stack_count": 1},
-		{"id": "weapon_flame_blade", "tier": 3, "rolled_affixes": [
-			{"affix_id": "vital", "value": 12}, {"affix_id": "keen", "value": 0.05},
-		], "stack_count": 1},
+		{
+			"id": "weapon_flame_blade",
+			"tier": 3,
+			"rolled_affixes":
+			[
+				{"affix_id": "vital", "value": 12},
+				{"affix_id": "keen", "value": 0.05},
+			],
+			"stack_count": 1
+		},
 	]
 	_save().save_game(TEST_SLOT, data)
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
@@ -107,13 +115,24 @@ func test_save_load_preserves_stash_items() -> void:
 
 # --- tu-save-03: equipped weapon + armor round-trip --------------------
 
+
 func test_save_load_preserves_equipped() -> void:
 	var data: Dictionary = _save().default_payload()
 	data["equipped"] = {
-		"weapon": {"id": "weapon_iron_sword", "tier": 2,
-			"rolled_affixes": [{"affix_id": "swift", "value": 0.08}], "stack_count": 1},
-		"armor": {"id": "armor_chain", "tier": 2,
-			"rolled_affixes": [{"affix_id": "vital", "value": 12}], "stack_count": 1},
+		"weapon":
+		{
+			"id": "weapon_iron_sword",
+			"tier": 2,
+			"rolled_affixes": [{"affix_id": "swift", "value": 0.08}],
+			"stack_count": 1
+		},
+		"armor":
+		{
+			"id": "armor_chain",
+			"tier": 2,
+			"rolled_affixes": [{"affix_id": "vital", "value": 12}],
+			"stack_count": 1
+		},
 	}
 	_save().save_game(TEST_SLOT, data)
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
@@ -127,10 +146,10 @@ func test_save_load_preserves_equipped() -> void:
 
 # --- tu-save-04: save path is in user:// (catches accidental project-dir writes) ---
 
+
 func test_save_writes_to_user_dir() -> void:
 	var path: String = _save().save_path(0)
-	assert_true(path.begins_with("user://"),
-		"save_path must live under user:// (got %s)" % path)
+	assert_true(path.begins_with("user://"), "save_path must live under user:// (got %s)" % path)
 	# Slot interpolation works for non-zero slots.
 	var slot42: String = _save().save_path(42)
 	assert_true(slot42.begins_with("user://"))
@@ -138,6 +157,7 @@ func test_save_writes_to_user_dir() -> void:
 
 
 # --- tu-save-05: missing save returns default-shaped behaviour ----------
+
 
 func test_load_missing_save_returns_empty_dict() -> void:
 	# Caller decides whether to treat {} as "new game" — Save's contract
@@ -164,6 +184,7 @@ func test_default_payload_is_a_full_save_shape() -> void:
 # Maps DECISIONS.md 2026-05-02 "M1 death rule" to a spec-shaped test.
 # This is the AC3 test backstop — if it fails, M1 ships broken.
 
+
 func test_death_rule_keeps_level_xp_equipped() -> void:
 	# Setup: pre-death state — level 3 character with equipped gear.
 	var pre: Dictionary = _save().default_payload()
@@ -172,10 +193,14 @@ func test_death_rule_keeps_level_xp_equipped() -> void:
 	pre["character"]["vigor"] = 2
 	pre["character"]["focus"] = 1
 	pre["equipped"] = {
-		"weapon": {"id": "weapon_iron_sword", "tier": 2,
-			"rolled_affixes": [{"affix_id": "swift", "value": 0.08}], "stack_count": 1},
-		"armor": {"id": "armor_leather", "tier": 1,
-			"rolled_affixes": [], "stack_count": 1},
+		"weapon":
+		{
+			"id": "weapon_iron_sword",
+			"tier": 2,
+			"rolled_affixes": [{"affix_id": "swift", "value": 0.08}],
+			"stack_count": 1
+		},
+		"armor": {"id": "armor_leather", "tier": 1, "rolled_affixes": [], "stack_count": 1},
 	}
 	# Run-only state on death must NOT survive: simulated unequipped inventory
 	# items the player picked up during the run that they hadn't equipped.
@@ -192,13 +217,23 @@ func test_death_rule_keeps_level_xp_equipped() -> void:
 	assert_eq(post["character"]["vigor"], 2, "AC3: stat allocations preserved")
 	assert_eq(post["character"]["focus"], 1)
 	# Gear ladder is preserved.
-	assert_eq(post["equipped"]["weapon"]["id"], "weapon_iron_sword",
-		"AC3 + DECISIONS death rule: equipped weapon persists across death")
-	assert_eq(post["equipped"]["armor"]["id"], "armor_leather",
-		"AC3 + DECISIONS death rule: equipped armor persists across death")
+	assert_eq(
+		post["equipped"]["weapon"]["id"],
+		"weapon_iron_sword",
+		"AC3 + DECISIONS death rule: equipped weapon persists across death"
+	)
+	assert_eq(
+		post["equipped"]["armor"]["id"],
+		"armor_leather",
+		"AC3 + DECISIONS death rule: equipped armor persists across death"
+	)
 	# Affix rolls survive.
-	assert_almost_eq(float(post["equipped"]["weapon"]["rolled_affixes"][0]["value"]), 0.08, 1e-6,
-		"equipped weapon's rolled affix values preserved across death")
+	assert_almost_eq(
+		float(post["equipped"]["weapon"]["rolled_affixes"][0]["value"]),
+		0.08,
+		1e-6,
+		"equipped weapon's rolled affix values preserved across death"
+	)
 
 
 func test_death_rule_run_state_is_not_persistent() -> void:
@@ -213,13 +248,18 @@ func test_death_rule_run_state_is_not_persistent() -> void:
 	# Devon adds a `run` block to default_payload(), this test fires and
 	# we re-evaluate the death save flow.
 	var dp: Dictionary = _save().default_payload()
-	assert_false(dp.has("run"),
-		"default_payload must not include a `run` block — run state is non-persistent " +
-		"per DECISIONS.md 2026-05-02 M1 death rule. If you're adding run state, the save " +
-		"flow needs to clear it on death; ping Tess.")
+	assert_false(
+		dp.has("run"),
+		(
+			"default_payload must not include a `run` block — run state is non-persistent "
+			+ "per DECISIONS.md 2026-05-02 M1 death rule. If you're adding run state, the save "
+			+ "flow needs to clear it on death; ping Tess."
+		)
+	)
 
 
 # --- tu-save-07: saved file is valid JSON --------------------------------
+
 
 func test_saved_file_parses_as_json() -> void:
 	var data: Dictionary = _save().default_payload()

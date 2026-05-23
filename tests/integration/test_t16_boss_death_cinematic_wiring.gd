@@ -82,6 +82,7 @@ func _save() -> Node:
 
 # ---- F2 wiring tests --------------------------------------------------
 
+
 func test_t16_f2_boss_died_requests_camera_zoom_1_5x_at_death_position() -> void:
 	var main: Main = _instantiate_main()
 	main.load_room_index(8)
@@ -98,13 +99,14 @@ func test_t16_f2_boss_died_requests_camera_zoom_1_5x_at_death_position() -> void
 	assert_not_null(boss)
 
 	var camera_director: Node = _autoload("CameraDirector")
-	assert_not_null(camera_director,
-		"CameraDirector autoload must be registered for T16 cinematic")
+	assert_not_null(camera_director, "CameraDirector autoload must be registered for T16 cinematic")
 
 	# Capture the zoom_requested signal — emits payload (target, duration, anchor).
 	var captured_args: Array = []
-	camera_director.zoom_requested.connect(func(t: float, d: float, a: Vector2) -> void:
-		captured_args.append({"target": t, "duration": d, "anchor": a}))
+	camera_director.zoom_requested.connect(
+		func(t: float, d: float, a: Vector2) -> void:
+			captured_args.append({"target": t, "duration": d, "anchor": a})
+	)
 
 	# Fire boss_died — drives the F2 cinematic chain.
 	var death_pos: Vector2 = boss.global_position
@@ -112,17 +114,26 @@ func test_t16_f2_boss_died_requests_camera_zoom_1_5x_at_death_position() -> void
 	await get_tree().process_frame
 
 	# Camera was zoomed to 1.5× over 0.9 s anchored at death position.
-	assert_gte(captured_args.size(), 1,
-		"T16: CameraDirector.zoom_requested must fire on boss_died")
+	assert_gte(captured_args.size(), 1, "T16: CameraDirector.zoom_requested must fire on boss_died")
 	var last: Dictionary = captured_args[-1]
-	assert_almost_eq(last["target"], 1.5, 0.001,
-		"T16: camera zoom target = 1.5× (Stratum1BossRoom.T16_CAMERA_ZOOM_TARGET)")
-	assert_almost_eq(last["duration"], 0.9, 0.001,
-		"T16: camera zoom duration = 0.9 s (locked to F2 vignette window)")
-	assert_almost_eq(last["anchor"].x, death_pos.x, 0.5,
-		"T16: camera anchored at boss's last X position")
-	assert_almost_eq(last["anchor"].y, death_pos.y, 0.5,
-		"T16: camera anchored at boss's last Y position")
+	assert_almost_eq(
+		last["target"],
+		1.5,
+		0.001,
+		"T16: camera zoom target = 1.5× (Stratum1BossRoom.T16_CAMERA_ZOOM_TARGET)"
+	)
+	assert_almost_eq(
+		last["duration"],
+		0.9,
+		0.001,
+		"T16: camera zoom duration = 0.9 s (locked to F2 vignette window)"
+	)
+	assert_almost_eq(
+		last["anchor"].x, death_pos.x, 0.5, "T16: camera anchored at boss's last X position"
+	)
+	assert_almost_eq(
+		last["anchor"].y, death_pos.y, 0.5, "T16: camera anchored at boss's last Y position"
+	)
 
 
 func test_t16_f2_boss_died_fires_vignette_boss_defeat_climax() -> void:
@@ -140,8 +151,7 @@ func test_t16_f2_boss_died_fires_vignette_boss_defeat_climax() -> void:
 	var boss: Stratum1Boss = boss_room.get_boss()
 
 	var vignette: Vignette = main.get_vignette()
-	assert_not_null(vignette,
-		"Vignette must be instantiated under Main before F2 fires")
+	assert_not_null(vignette, "Vignette must be instantiated under Main before F2 fires")
 
 	# Capture the next opacity tween completion. The F2 tween targets 0.80.
 	# We cannot rely on opacity-mid-tween snapshots in this test because
@@ -153,15 +163,15 @@ func test_t16_f2_boss_died_fires_vignette_boss_defeat_climax() -> void:
 	# with the F2 target" — verified via `has_active_tween()` + the future
 	# `opacity_tween_completed` signal payload.
 	var captured_targets: Array = []
-	vignette.opacity_tween_completed.connect(func(target: float) -> void:
-		captured_targets.append(target))
+	vignette.opacity_tween_completed.connect(
+		func(target: float) -> void: captured_targets.append(target)
+	)
 
 	boss.boss_died.emit(boss, boss.global_position, boss.mob_def)
 	await get_tree().process_frame
 
 	# An active tween must be running (the F2 deepen scheduled).
-	assert_true(vignette.has_active_tween(),
-		"T16: Vignette tween active after F2 fires")
+	assert_true(vignette.has_active_tween(), "T16: Vignette tween active after F2 fires")
 
 	# Release the freeze + advance enough time for the F2 0.9 s tween to
 	# complete. The TSD freeze auto-releases on wall-clock (ignore_time_scale=true)
@@ -174,8 +184,10 @@ func test_t16_f2_boss_died_fires_vignette_boss_defeat_climax() -> void:
 	# now back to 1.0. Use a SceneTreeTimer to walk wall-clock.
 	await get_tree().create_timer(1.0).timeout
 	# The F2 target = 0.80.
-	assert_true(captured_targets.has(Vignette.F2_BOSS_DEFEAT_TARGET),
-		"T16: vignette opacity_tween_completed fired with F2 target 0.80")
+	assert_true(
+		captured_targets.has(Vignette.F2_BOSS_DEFEAT_TARGET),
+		"T16: vignette opacity_tween_completed fired with F2 target 0.80"
+	)
 
 
 func test_t16_f2_boss_died_fires_horn_sfx_placeholder() -> void:
@@ -192,8 +204,7 @@ func test_t16_f2_boss_died_fires_horn_sfx_placeholder() -> void:
 	assert_not_null(boss_room)
 	var boss: Stratum1Boss = boss_room.get_boss()
 	var ad: Node = _autoload("AudioDirector")
-	assert_not_null(ad,
-		"AudioDirector autoload required for horn-SFX placeholder")
+	assert_not_null(ad, "AudioDirector autoload required for horn-SFX placeholder")
 
 	boss.boss_died.emit(boss, boss.global_position, boss.mob_def)
 	await get_tree().process_frame
@@ -211,11 +222,15 @@ func test_t16_f2_boss_died_fires_horn_sfx_placeholder() -> void:
 	# instead. The trace-line is asserted by Playwright; the GUT-side here
 	# just verifies the call did not crash + the horn cue id is the right
 	# StringName constant.
-	assert_eq(Stratum1BossRoom.T16_HORN_SFX_CUE_ID, &"sfx-boss-kill-horn",
-		"T16: horn cue id is sfx-boss-kill-horn (pinned for Devon's T16b cue path)")
+	assert_eq(
+		Stratum1BossRoom.T16_HORN_SFX_CUE_ID,
+		&"sfx-boss-kill-horn",
+		"T16: horn cue id is sfx-boss-kill-horn (pinned for Devon's T16b cue path)"
+	)
 
 
 # ---- F3 wiring tests --------------------------------------------------
+
 
 func test_t16_f3_title_card_dismissed_resets_camera_and_vignette() -> void:
 	var main: Main = _instantiate_main()
@@ -258,13 +273,16 @@ func test_t16_f3_title_card_dismissed_resets_camera_and_vignette() -> void:
 	# Capture the next CameraDirector.zoom_requested — F3 should call
 	# `reset_to_player()` which translates to `request_zoom(1.0, ..., Vector2.ZERO)`.
 	var f3_camera_args: Array = []
-	camera_director.zoom_requested.connect(func(t: float, d: float, a: Vector2) -> void:
-		f3_camera_args.append({"target": t, "duration": d, "anchor": a}))
+	camera_director.zoom_requested.connect(
+		func(t: float, d: float, a: Vector2) -> void:
+			f3_camera_args.append({"target": t, "duration": d, "anchor": a})
+	)
 
 	# Capture vignette opacity-tween completion.
 	var f3_vignette_targets: Array = []
-	vignette.opacity_tween_completed.connect(func(target: float) -> void:
-		f3_vignette_targets.append(target))
+	vignette.opacity_tween_completed.connect(
+		func(target: float) -> void: f3_vignette_targets.append(target)
+	)
 
 	# Synthetically fire `title_card_dismissed`. In production this fires
 	# after the card's full fade-in/hold/fade-out tween chain completes;
@@ -273,15 +291,24 @@ func test_t16_f3_title_card_dismissed_resets_camera_and_vignette() -> void:
 	await get_tree().process_frame
 
 	# F3 camera reset — should request_zoom(1.0, ..., Vector2.ZERO).
-	assert_gte(f3_camera_args.size(), 1,
-		"T16 F3: CameraDirector.zoom_requested must fire on title_card_dismissed")
+	assert_gte(
+		f3_camera_args.size(),
+		1,
+		"T16 F3: CameraDirector.zoom_requested must fire on title_card_dismissed"
+	)
 	var last_cam: Dictionary = f3_camera_args[-1]
-	assert_almost_eq(last_cam["target"], 1.0, 0.001,
-		"T16 F3: camera target back to 1.0 (player-follow / DEFAULT_NORMALIZED_ZOOM)")
-	assert_almost_eq(last_cam["anchor"].x, 0.0, 0.001,
-		"T16 F3: camera anchor cleared (follow mode)")
-	assert_almost_eq(last_cam["anchor"].y, 0.0, 0.001,
-		"T16 F3: camera anchor cleared (follow mode)")
+	assert_almost_eq(
+		last_cam["target"],
+		1.0,
+		0.001,
+		"T16 F3: camera target back to 1.0 (player-follow / DEFAULT_NORMALIZED_ZOOM)"
+	)
+	assert_almost_eq(
+		last_cam["anchor"].x, 0.0, 0.001, "T16 F3: camera anchor cleared (follow mode)"
+	)
+	assert_almost_eq(
+		last_cam["anchor"].y, 0.0, 0.001, "T16 F3: camera anchor cleared (follow mode)"
+	)
 
 	# F3 vignette return — tween toward S1 default 30%. The tween
 	# completion may be slower than one frame; we just verify the call
@@ -291,11 +318,13 @@ func test_t16_f3_title_card_dismissed_resets_camera_and_vignette() -> void:
 	# the tween either completes at that target OR is in flight toward it.
 	# `set_opacity_tween` kills any in-flight tween and starts a new one;
 	# `has_active_tween` will be true immediately after.
-	assert_true(vignette.has_active_tween(),
-		"T16 F3: Vignette tween active after title_card_dismissed")
+	assert_true(
+		vignette.has_active_tween(), "T16 F3: Vignette tween active after title_card_dismissed"
+	)
 
 
 # ---- F3 idempotence: second title-card-dismissed is safe (defensive) --
+
 
 func test_t16_f3_double_dismiss_is_safe() -> void:
 	# Defensive against a future regression where a title-card refactor

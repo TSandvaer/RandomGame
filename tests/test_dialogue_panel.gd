@@ -46,6 +46,7 @@ func after_each() -> void:
 
 # ---- AC1: panel scene loads + instantiates ------------------------
 
+
 func test_panel_scene_loads_and_instantiates() -> void:
 	var panel: DialoguePanel = PanelScene.instantiate()
 	assert_not_null(panel, "DialoguePanel instantiates")
@@ -57,6 +58,7 @@ func test_panel_scene_loads_and_instantiates() -> void:
 
 
 # ---- AC2: panel becomes visible when controller opens session ---
+
 
 func test_panel_opens_on_controller_open_signal() -> void:
 	var panel: DialoguePanel = PanelScene.instantiate()
@@ -71,6 +73,7 @@ func test_panel_opens_on_controller_open_signal() -> void:
 
 
 # ---- AC3: panel hides when controller closes session ------------
+
 
 func test_panel_closes_on_controller_close_signal() -> void:
 	var panel: DialoguePanel = PanelScene.instantiate()
@@ -87,6 +90,7 @@ func test_panel_closes_on_controller_close_signal() -> void:
 
 
 # ---- AC4: panel _exit_tree safety closes active session ---------
+
 
 func test_panel_exit_tree_closes_active_dialogue() -> void:
 	# Safety guard parallel to InventoryPanel._exit_tree's Engine.time_scale
@@ -105,17 +109,21 @@ func test_panel_exit_tree_closes_active_dialogue() -> void:
 	# Awaiting two frames so _exit_tree fires + signal propagates.
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert_false(dc.is_active(),
-		"controller is_active() false after panel free — Player input never permanently gated")
+	assert_false(
+		dc.is_active(),
+		"controller is_active() false after panel free — Player input never permanently gated"
+	)
 
 
 # ---- AC5: Player attack-input gate reads DialogueController.is_active() ----
 
+
 func test_player_dialogue_is_active_returns_false_when_no_session() -> void:
 	var player: Player = PlayerScript.new()
 	add_child_autofree(player)
-	assert_false(player._dialogue_is_active(),
-		"_dialogue_is_active() false when no dialogue session open")
+	assert_false(
+		player._dialogue_is_active(), "_dialogue_is_active() false when no dialogue session open"
+	)
 
 
 func test_player_dialogue_is_active_returns_true_during_session() -> void:
@@ -124,14 +132,15 @@ func test_player_dialogue_is_active_returns_true_during_session() -> void:
 	var tree: DialogueTreeDef = _make_simple_tree()
 	var dc: Node = _controller()
 	dc.open(tree, &"flavor")
-	assert_true(player._dialogue_is_active(),
-		"_dialogue_is_active() true while dialogue session open")
+	assert_true(
+		player._dialogue_is_active(), "_dialogue_is_active() true while dialogue session open"
+	)
 	dc.close()
-	assert_false(player._dialogue_is_active(),
-		"_dialogue_is_active() false after close")
+	assert_false(player._dialogue_is_active(), "_dialogue_is_active() false after close")
 
 
 # ---- AC6: panel renders response buttons when responses presented ----
+
 
 func test_panel_renders_response_buttons_on_responses_presented() -> void:
 	var panel: DialoguePanel = PanelScene.instantiate()
@@ -145,8 +154,9 @@ func test_panel_renders_response_buttons_on_responses_presented() -> void:
 	dc.advance_line()
 	await get_tree().process_frame
 	# Two responses authored → two buttons rendered.
-	var container: VBoxContainer = panel.get_node_or_null(
-		"Background/ResponseContainer") as VBoxContainer
+	var container: VBoxContainer = (
+		panel.get_node_or_null("Background/ResponseContainer") as VBoxContainer
+	)
 	assert_not_null(container, "response container exists")
 	var button_count: int = 0
 	for child in container.get_children():
@@ -156,6 +166,7 @@ func test_panel_renders_response_buttons_on_responses_presented() -> void:
 
 
 # ---- Helpers --------------------------------------------------------
+
 
 func _controller() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("DialogueController")

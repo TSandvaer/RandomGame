@@ -26,8 +26,8 @@ const SPRITE_FRAMES_PATH: String = "res://assets/sprites/practice_dummy/Practice
 const ANIM_DIRS: Array[String] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 const ANIM_STATES: Array[String] = ["hit", "die"]
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_scene_dummy() -> PracticeDummy:
 	# Production scene-loaded dummy (Sprite child is AnimatedSprite2D).
@@ -54,6 +54,7 @@ func _hit(d: PracticeDummy, dmg: int) -> void:
 
 # ---- Convention: Sprite child resolves to AnimatedSprite2D ------------
 
+
 func test_scene_sprite_is_animated_sprite2d_with_sprite_frames() -> void:
 	# M3W-1 swap: the production .tscn's "Sprite" node is now AnimatedSprite2D,
 	# not ColorRect. The node name is preserved ("Sprite") so `get_node("Sprite")`
@@ -62,17 +63,22 @@ func test_scene_sprite_is_animated_sprite2d_with_sprite_frames() -> void:
 	var d: PracticeDummy = _make_scene_dummy()
 	var sprite_node: Node = d.get_node_or_null("Sprite")
 	assert_not_null(sprite_node, "PracticeDummy.tscn has a 'Sprite' child")
-	assert_true(sprite_node is AnimatedSprite2D,
-		"Sprite child resolves to AnimatedSprite2D (M3W-1 convention)")
+	assert_true(
+		sprite_node is AnimatedSprite2D,
+		"Sprite child resolves to AnimatedSprite2D (M3W-1 convention)"
+	)
 	var asprite: AnimatedSprite2D = sprite_node as AnimatedSprite2D
-	assert_not_null(asprite.sprite_frames,
-		"AnimatedSprite2D has a SpriteFrames resource assigned")
+	assert_not_null(asprite.sprite_frames, "AnimatedSprite2D has a SpriteFrames resource assigned")
 	# texture_filter = TEXTURE_FILTER_NEAREST (1) preserves pixel-art hardness.
-	assert_eq(asprite.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
-		"texture_filter = NEAREST (pixel-art hardness preserved)")
+	assert_eq(
+		asprite.texture_filter,
+		CanvasItem.TEXTURE_FILTER_NEAREST,
+		"texture_filter = NEAREST (pixel-art hardness preserved)"
+	)
 
 
 # ---- Convention: SpriteFrames exposes all 16 sub-anims ----------------
+
 
 func test_sprite_frames_resource_exposes_all_state_x_direction_keys() -> void:
 	# 2 states × 8 directions = 16 sub-animation keys. The animation_key
@@ -82,24 +88,32 @@ func test_sprite_frames_resource_exposes_all_state_x_direction_keys() -> void:
 	for state in ANIM_STATES:
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: String = "%s_%s" % [state, dir_suffix]
-			assert_true(frames.has_animation(StringName(anim_name)),
-				"SpriteFrames exposes animation '%s'" % anim_name)
+			assert_true(
+				frames.has_animation(StringName(anim_name)),
+				"SpriteFrames exposes animation '%s'" % anim_name
+			)
 	# Loop flag policy — hit + die are one-shot (loop=false).
 	for state in ANIM_STATES:
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
-			assert_false(frames.get_animation_loop(anim_name),
-				"'%s' is one-shot (loop=false) — hit/die never loop" % anim_name)
+			assert_false(
+				frames.get_animation_loop(anim_name),
+				"'%s' is one-shot (loop=false) — hit/die never loop" % anim_name
+			)
 	# FPS policy — 8 fps (PixelLab 6-frame anims read cleanly per Priya's
 	# brief). Downstream walks/idles may override; M3W-1 fixes the hit/die default.
 	for state in ANIM_STATES:
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
-			assert_eq(frames.get_animation_speed(anim_name), 8.0,
-				"'%s' plays at 8 fps (M3W-1 convention)" % anim_name)
+			assert_eq(
+				frames.get_animation_speed(anim_name),
+				8.0,
+				"'%s' plays at 8 fps (M3W-1 convention)" % anim_name
+			)
 
 
 # ---- Convention: take_damage drives `hit_s` ---------------------------
+
 
 func test_take_damage_plays_hit_s_animation() -> void:
 	var d: PracticeDummy = _make_scene_dummy()
@@ -107,13 +121,14 @@ func test_take_damage_plays_hit_s_animation() -> void:
 	_hit(d, 1)
 	# AnimatedSprite2D.animation reflects the most recent play() call. PD has
 	# no facing-derivation (it's stationary), so the suffix is always "s".
-	assert_eq(asprite.animation, StringName("hit_s"),
-		"take_damage plays 'hit_s' on the AnimatedSprite2D")
-	assert_true(asprite.is_playing(),
-		"AnimatedSprite2D is_playing() true after take_damage")
+	assert_eq(
+		asprite.animation, StringName("hit_s"), "take_damage plays 'hit_s' on the AnimatedSprite2D"
+	)
+	assert_true(asprite.is_playing(), "AnimatedSprite2D is_playing() true after take_damage")
 
 
 # ---- Convention: _die drives `die_s` ----------------------------------
+
 
 func test_die_plays_die_s_animation() -> void:
 	var bundle: Array = _make_scene_dummy_in_room()
@@ -122,11 +137,15 @@ func test_die_plays_die_s_animation() -> void:
 	# Lethal hit drives _die which plays "die_s".
 	_hit(d, PracticeDummy.HP_MAX)
 	assert_true(d.is_dead(), "dummy dead after lethal hit (precondition)")
-	assert_eq(asprite.animation, StringName("die_s"),
-		"_die plays 'die_s' on the AnimatedSprite2D (overrides the in-flight hit_s)")
+	assert_eq(
+		asprite.animation,
+		StringName("die_s"),
+		"_die plays 'die_s' on the AnimatedSprite2D (overrides the in-flight hit_s)"
+	)
 
 
 # ---- Hit-flash tint != rest (Tier 1 invariant per test-conventions.md) -
+
 
 func test_hit_flash_animated_sprite_tint_differs_from_rest_white() -> void:
 	# Tier 1 invariant per `.claude/docs/test-conventions.md` § "Visual-primitive
@@ -142,23 +161,32 @@ func test_hit_flash_animated_sprite_tint_differs_from_rest_white() -> void:
 	# Rest modulate on the AnimatedSprite2D is the .tscn-author-time spawn
 	# value (Color(1,1,1,1) — no per-author override in PracticeDummy.tscn).
 	var rest: Color = asprite.modulate
-	assert_eq(rest, Color(1, 1, 1, 1),
-		"rest modulate is (1,1,1,1) — AnimatedSprite2D's spawn-time default")
+	assert_eq(
+		rest,
+		Color(1, 1, 1, 1),
+		"rest modulate is (1,1,1,1) — AnimatedSprite2D's spawn-time default"
+	)
 	# Drive the hit-flash so the .tres-side state is exercised end-to-end.
 	_hit(d, 1)
 	# Tier 1 — the tween target (HIT_FLASH_TINT) must differ from rest by an
 	# observable amount. This is the actual gate that catches the PR #115/#140
 	# no-op trap; tween-progression checks are deferred to Tier 3 (framebuffer
 	# pixel-delta, post-renderer-CI-lane).
-	assert_ne(PracticeDummy.HIT_FLASH_TINT, rest,
-		"HIT_FLASH_TINT differs from rest modulate (tween is not a no-op)")
+	assert_ne(
+		PracticeDummy.HIT_FLASH_TINT,
+		rest,
+		"HIT_FLASH_TINT differs from rest modulate (tween is not a no-op)"
+	)
 	# Stronger gate: channel-sum delta from rest must exceed a threshold so a
 	# near-imperceptible tint (e.g. Color(1.0, 0.99, 0.99)) doesn't sneak past.
-	var delta: float = absf(PracticeDummy.HIT_FLASH_TINT.r - rest.r) \
-		+ absf(PracticeDummy.HIT_FLASH_TINT.g - rest.g) \
+	var delta: float = (
+		absf(PracticeDummy.HIT_FLASH_TINT.r - rest.r)
+		+ absf(PracticeDummy.HIT_FLASH_TINT.g - rest.g)
 		+ absf(PracticeDummy.HIT_FLASH_TINT.b - rest.b)
-	assert_gt(delta, 0.20,
-		"HIT_FLASH_TINT vs rest sum-delta >= 0.20 (visible flash, delta=%.3f)" % delta)
+	)
+	assert_gt(
+		delta, 0.20, "HIT_FLASH_TINT vs rest sum-delta >= 0.20 (visible flash, delta=%.3f)" % delta
+	)
 
 
 func test_hit_flash_modulate_endpoints_are_html5_safe() -> void:
@@ -174,14 +202,17 @@ func test_hit_flash_modulate_endpoints_are_html5_safe() -> void:
 	# is a no-op — the PR #115/#140 trap class). Channel delta vs (1,1,1) ≥ 0.20.
 	var rest_white: Color = Color(1, 1, 1, 1)
 	var delta: float = (
-		absf(tint.r - rest_white.r)
-		+ absf(tint.g - rest_white.g)
-		+ absf(tint.b - rest_white.b))
-	assert_gt(delta, 0.20,
-		"HIT_FLASH_TINT delta vs (1,1,1) >= 0.20 (visible flash, not PR#115/#140 no-op trap)")
+		absf(tint.r - rest_white.r) + absf(tint.g - rest_white.g) + absf(tint.b - rest_white.b)
+	)
+	assert_gt(
+		delta,
+		0.20,
+		"HIT_FLASH_TINT delta vs (1,1,1) >= 0.20 (visible flash, not PR#115/#140 no-op trap)"
+	)
 
 
 # ---- queue_free pipeline still completes post-die ---------------------
+
 
 func test_force_queue_free_still_completes_post_die_with_animated_sprite() -> void:
 	# Regression guard — the AnimatedSprite2D swap does NOT break the existing
@@ -202,11 +233,14 @@ func test_force_queue_free_still_completes_post_die_with_animated_sprite() -> vo
 	# instance"). The OR short-circuits when validity is false, leaving the
 	# expression as true (pipeline did complete, the node is gone).
 	var pipeline_complete: bool = not is_instance_valid(d) or d.is_queued_for_deletion()
-	assert_true(pipeline_complete,
-		"dummy queued for deletion / freed after _die (post-AnimatedSprite2D pipeline intact)")
+	assert_true(
+		pipeline_complete,
+		"dummy queued for deletion / freed after _die (post-AnimatedSprite2D pipeline intact)"
+	)
 
 
 # ---- Tween reference still flips on second hit (Tier 1 invariant) -----
+
 
 func test_animated_sprite_hit_flash_tween_reference_flips_on_second_hit() -> void:
 	# The PR #221 Tier 1 reference-change invariant survives the AnimatedSprite2D
@@ -220,11 +254,15 @@ func test_animated_sprite_hit_flash_tween_reference_flips_on_second_hit() -> voi
 	_hit(d, 1)
 	var second_tween: Tween = d._hit_flash_tween
 	assert_not_null(second_tween, "second hit leaves a tween in place")
-	assert_ne(first_tween, second_tween,
-		"second hit kills + restarts (tween reference flipped — Tier 1 invariant)")
+	assert_ne(
+		first_tween,
+		second_tween,
+		"second hit kills + restarts (tween reference flipped — Tier 1 invariant)"
+	)
 
 
 # ---- `_play_anim` no-op safety (bare-instanced dummy) -----------------
+
 
 func test_play_anim_is_a_safe_noop_on_bare_instanced_dummy() -> void:
 	# Bare-instanced dummy (no Sprite child, no SpriteFrames) — `_play_anim`

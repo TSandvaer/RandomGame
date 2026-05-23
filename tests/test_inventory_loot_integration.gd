@@ -50,6 +50,7 @@ func after_each() -> void:
 # Test 1 — MobLootSpawner -> Inventory.add fires (via Pickup signal)
 # =======================================================================
 
+
 func test_spawner_drop_routes_to_inventory_via_pickup() -> void:
 	var roller: LootRoller = LootRollerScript.new()
 	roller.seed_rng(11)
@@ -59,9 +60,15 @@ func test_spawner_drop_routes_to_inventory_via_pickup() -> void:
 
 	# ARMOR item — armor never auto-equips on pickup, so the routing assertion
 	# (item lands in the grid) is clean (ticket 86c9qbb3k).
-	var item_def: ItemDef = ContentFactory.make_item_def({
-		"id": &"int_armor", "slot": ItemDef.Slot.ARMOR,
-	})
+	var item_def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": &"int_armor",
+				"slot": ItemDef.Slot.ARMOR,
+			}
+		)
+	)
 	var table: LootTableDef = _build_table_with(item_def, 1)
 	var mob_def: MobDef = ContentFactory.make_mob_def({"loot_table": table})
 
@@ -81,6 +88,7 @@ func test_spawner_drop_routes_to_inventory_via_pickup() -> void:
 # Test 2 — Multiple drops in quick succession all picked up correctly
 # =======================================================================
 
+
 func test_multiple_drops_all_picked_up() -> void:
 	var roller: LootRoller = LootRollerScript.new()
 	roller.seed_rng(22)
@@ -90,9 +98,15 @@ func test_multiple_drops_all_picked_up() -> void:
 
 	# ARMOR items — armor never auto-equips on pickup, so all N drops land in
 	# the grid and the count assertion stays clean (ticket 86c9qbb3k).
-	var item_def: ItemDef = ContentFactory.make_item_def({
-		"id": &"int_burst", "slot": ItemDef.Slot.ARMOR,
-	})
+	var item_def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": &"int_burst",
+				"slot": ItemDef.Slot.ARMOR,
+			}
+		)
+	)
 	var table: LootTableDef = _build_table_with(item_def, 3)
 	var mob_def: MobDef = ContentFactory.make_mob_def({"loot_table": table})
 
@@ -102,21 +116,26 @@ func test_multiple_drops_all_picked_up() -> void:
 	for p_v in spawned:
 		var p: Pickup = p_v as Pickup
 		p.emit_signal("picked_up", p.item, p)
-	assert_eq(_inv().get_items().size(), spawned.size(),
-		"every spawned drop ended up in inventory")
+	assert_eq(_inv().get_items().size(), spawned.size(), "every spawned drop ended up in inventory")
 
 
 # =======================================================================
 # Test 3 — Pickup near full inventory: graceful capacity check
 # =======================================================================
 
+
 func test_pickup_near_full_inventory_gracefully_rejects() -> void:
 	# Fill the inventory to the cap.
 	for i in 24:
-		var d: ItemDef = ContentFactory.make_item_def({
-			"id": StringName("filler_%d" % i),
-			"slot": ItemDef.Slot.WEAPON,
-		})
+		var d: ItemDef = (
+			ContentFactory
+			. make_item_def(
+				{
+					"id": StringName("filler_%d" % i),
+					"slot": ItemDef.Slot.WEAPON,
+				}
+			)
+		)
 		_inv().add(ItemInstance.new(d, ItemDef.Tier.T1))
 	assert_true(_inv().is_full(), "inventory full")
 
@@ -146,12 +165,20 @@ func test_pickup_near_full_inventory_gracefully_rejects() -> void:
 	# toast: the item was just gone. Post-fix the Pickup must remain alive
 	# (`is_instance_valid` true, `is_queued_for_deletion` false) so the player
 	# can free a slot and re-collect it.
-	assert_true(is_instance_valid(pickup),
-		"Pickup must NOT be destroyed when add() rejected the item (full grid) — " +
-		"silent-drop is the bug ticket 86c9u33h1 fixes")
-	assert_false(pickup.is_queued_for_deletion(),
-		"Pickup must NOT be queued for deletion after rejected add — " +
-		"the player must be able to re-collect after freeing a slot")
+	assert_true(
+		is_instance_valid(pickup),
+		(
+			"Pickup must NOT be destroyed when add() rejected the item (full grid) — "
+			+ "silent-drop is the bug ticket 86c9u33h1 fixes"
+		)
+	)
+	assert_false(
+		pickup.is_queued_for_deletion(),
+		(
+			"Pickup must NOT be queued for deletion after rejected add — "
+			+ "the player must be able to re-collect after freeing a slot"
+		)
+	)
 	# Cleanup: pickup is not parented (deferred add_child never landed) and the
 	# autofree'd room won't catch it. Free explicitly so test cleanup is clean.
 	pickup.free()
@@ -160,6 +187,7 @@ func test_pickup_near_full_inventory_gracefully_rejects() -> void:
 # =======================================================================
 # Test 4 — auto-equip-first-weapon-on-pickup via the MobLootSpawner path
 # =======================================================================
+
 
 func test_weapon_drop_auto_equips_first_weapon_on_pickup() -> void:
 	# Ticket 86c9qbb3k: when a WEAPON is picked up and no weapon is equipped,
@@ -186,16 +214,21 @@ func test_weapon_drop_auto_equips_first_weapon_on_pickup() -> void:
 	(spawned[0] as Pickup).emit_signal("picked_up", (spawned[0] as Pickup).item, spawned[0])
 	# The weapon must have auto-equipped — not just landed in the grid.
 	var equipped: ItemInstance = _inv().get_equipped(&"weapon") as ItemInstance
-	assert_not_null(equipped,
-		"first weapon picked up auto-equips (ticket 86c9qbb3k onboarding rule)")
+	assert_not_null(
+		equipped, "first weapon picked up auto-equips (ticket 86c9qbb3k onboarding rule)"
+	)
 	assert_eq(equipped.def.id, &"drop_weapon", "the auto-equipped weapon is the dropped one")
-	assert_eq(_inv().get_items().size(), 0,
-		"the auto-equipped weapon moved from grid into the slot — grid is empty")
+	assert_eq(
+		_inv().get_items().size(),
+		0,
+		"the auto-equipped weapon moved from grid into the slot — grid is empty"
+	)
 
 
 # =======================================================================
 # Test 5 — full-grid Pickup rejection does NOT auto-equip (ticket 86c9u33h1)
 # =======================================================================
+
 
 func test_full_grid_pickup_does_not_auto_equip_or_destroy() -> void:
 	# Ticket 86c9u33h1 — coordination check on PR #194's auto-equip path:
@@ -210,14 +243,21 @@ func test_full_grid_pickup_does_not_auto_equip_or_destroy() -> void:
 	# weapon slot stays empty. Drop a weapon. add() rejects on full grid;
 	# the weapon must NOT auto-equip, and the Pickup must persist on ground.
 	for i in 24:
-		var d: ItemDef = ContentFactory.make_item_def({
-			"id": StringName("filler_armor_%d" % i),
-			"slot": ItemDef.Slot.ARMOR,
-		})
+		var d: ItemDef = (
+			ContentFactory
+			. make_item_def(
+				{
+					"id": StringName("filler_armor_%d" % i),
+					"slot": ItemDef.Slot.ARMOR,
+				}
+			)
+		)
 		_inv().add(ItemInstance.new(d, ItemDef.Tier.T1))
 	assert_true(_inv().is_full(), "inventory full of armor")
-	assert_null(_inv().get_equipped(&"weapon"),
-		"precondition: no weapon equipped (so auto-equip would fire if not gated)")
+	assert_null(
+		_inv().get_equipped(&"weapon"),
+		"precondition: no weapon equipped (so auto-equip would fire if not gated)"
+	)
 
 	# Spawn a weapon drop.
 	var roller: LootRoller = LootRollerScript.new()
@@ -236,20 +276,28 @@ func test_full_grid_pickup_does_not_auto_equip_or_destroy() -> void:
 	pickup.emit_signal("picked_up", pickup.item, pickup)
 
 	# Invariant A — the weapon must NOT auto-equip on a rejected add.
-	assert_null(_inv().get_equipped(&"weapon"),
-		"add() rejected → weapon slot stays empty (auto-equip is gated by " +
-		"`if not add(item): return` in on_pickup_collected)")
+	assert_null(
+		_inv().get_equipped(&"weapon"),
+		(
+			"add() rejected → weapon slot stays empty (auto-equip is gated by "
+			+ "`if not add(item): return` in on_pickup_collected)"
+		)
+	)
 	# Invariant B — the Pickup must NOT be silently destroyed (ticket 86c9u33h1).
-	assert_true(is_instance_valid(pickup),
-		"Pickup must persist on ground when add() rejects (no silent drop)")
-	assert_false(pickup.is_queued_for_deletion(),
-		"Pickup must NOT be queued for deletion after rejected add")
+	assert_true(
+		is_instance_valid(pickup),
+		"Pickup must persist on ground when add() rejects (no silent drop)"
+	)
+	assert_false(
+		pickup.is_queued_for_deletion(), "Pickup must NOT be queued for deletion after rejected add"
+	)
 	pickup.free()
 
 
 # =======================================================================
 # Test 6 — edge probe: full grid → free a slot → re-collect succeeds
 # =======================================================================
+
 
 func test_full_grid_then_free_slot_pickup_re_collects() -> void:
 	# Ticket 86c9u33h1 edge probe: the player approaches a Pickup with the
@@ -258,10 +306,15 @@ func test_full_grid_then_free_slot_pickup_re_collects() -> void:
 	# the Pickup should still be alive and a second `picked_up` emission
 	# should land in the now-free slot.
 	for i in 24:
-		var d: ItemDef = ContentFactory.make_item_def({
-			"id": StringName("filler_armor_%d" % i),
-			"slot": ItemDef.Slot.ARMOR,
-		})
+		var d: ItemDef = (
+			ContentFactory
+			. make_item_def(
+				{
+					"id": StringName("filler_armor_%d" % i),
+					"slot": ItemDef.Slot.ARMOR,
+				}
+			)
+		)
 		_inv().add(ItemInstance.new(d, ItemDef.Tier.T1))
 	assert_true(_inv().is_full())
 
@@ -271,9 +324,15 @@ func test_full_grid_then_free_slot_pickup_re_collects() -> void:
 	var spawner: MobLootSpawner = MobLootSpawnerScript.new(roller)
 	var room: Node2D = _make_room_root()
 	spawner.set_parent_for_pickups(room)
-	var item_def: ItemDef = ContentFactory.make_item_def({
-		"id": &"recovered_loot", "slot": ItemDef.Slot.ARMOR,
-	})
+	var item_def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": &"recovered_loot",
+				"slot": ItemDef.Slot.ARMOR,
+			}
+		)
+	)
 	var table: LootTableDef = _build_table_with(item_def, 1)
 	var mob_def: MobDef = ContentFactory.make_mob_def({"loot_table": table})
 	var spawned: Array[Node] = spawner.on_mob_died(null, Vector2.ZERO, mob_def)
@@ -309,21 +368,29 @@ func test_full_grid_then_free_slot_pickup_re_collects() -> void:
 			break
 	assert_true(found, "the recovered_loot item is in the inventory after round 2")
 	# Pickup is consumed: queue_freed (still valid this frame, but queued).
-	assert_true(pickup.is_queued_for_deletion(),
-		"round 2: pickup is queue_freed by Inventory.on_pickup_collected on success")
+	assert_true(
+		pickup.is_queued_for_deletion(),
+		"round 2: pickup is queue_freed by Inventory.on_pickup_collected on success"
+	)
 
 
 # =======================================================================
 # Bonus probe — direct ingest_rolls helper handles batched roll arrays
 # =======================================================================
 
+
 func test_ingest_rolls_handles_batches() -> void:
 	var rolls: Array = []
 	for i in 5:
-		var d: ItemDef = ContentFactory.make_item_def({
-			"id": StringName("batch_%d" % i),
-			"slot": ItemDef.Slot.WEAPON,
-		})
+		var d: ItemDef = (
+			ContentFactory
+			. make_item_def(
+				{
+					"id": StringName("batch_%d" % i),
+					"slot": ItemDef.Slot.WEAPON,
+				}
+			)
+		)
 		rolls.append(ItemInstance.new(d, ItemDef.Tier.T1))
 	var accepted: int = _inv().ingest_rolls(rolls)
 	assert_eq(accepted, 5, "all 5 rolls accepted")

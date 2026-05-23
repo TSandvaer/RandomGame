@@ -138,7 +138,7 @@ const HIT_FLASH_OUT: float = 0.040
 const DEATH_TWEEN_DURATION: float = 0.200
 const DEATH_PARTICLE_COUNT: int = 6
 const DEATH_TARGET_SCALE: float = 0.6
-const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
+const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)  # #FFB066
 const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 
 ## Hit-flash modulate tint for the AnimatedSprite2D path (M3W-1 / M3W-3 convention).
@@ -153,9 +153,9 @@ const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 const HIT_FLASH_TINT: Color = Color(1.0, 0.50, 0.50, 1.0)  # soft red wash, HTML5-safe
 
 ## Layer bits (mirror project.godot — same as Grunt).
-const LAYER_WORLD: int = 1 << 0          # bit 1
-const LAYER_PLAYER: int = 1 << 1         # bit 2
-const LAYER_ENEMY: int = 1 << 3          # bit 4
+const LAYER_WORLD: int = 1 << 0  # bit 1
+const LAYER_PLAYER: int = 1 << 1  # bit 2
+const LAYER_ENEMY: int = 1 << 3  # bit 4
 
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
@@ -257,6 +257,7 @@ func _ready() -> void:
 
 # ---- Public API -------------------------------------------------------
 
+
 func get_state() -> StringName:
 	return _state
 
@@ -313,13 +314,14 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 		return
 	var clean_amount: int = max(0, amount)
 	var multiplier: float = (
-		RECOVERY_DAMAGE_MULTIPLIER if _state == STATE_RECOVERING
-		else ARMORED_DAMAGE_MULTIPLIER)
+		RECOVERY_DAMAGE_MULTIPLIER if _state == STATE_RECOVERING else ARMORED_DAMAGE_MULTIPLIER
+	)
 	var final_amount: int = int(round(clean_amount * multiplier))
 	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - final_amount)
-	_combat_trace("Charger.take_damage",
-		"amount=%d hp=%d->%d" % [final_amount, hp_before, hp_current])
+	_combat_trace(
+		"Charger.take_damage", "amount=%d hp=%d->%d" % [final_amount, hp_before, hp_current]
+	)
 	damaged.emit(final_amount, hp_current, source)
 	# Visual: white hit-flash on every actual-damage take_damage (Uma §2).
 	if final_amount > 0:
@@ -333,6 +335,7 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 
 
 # ---- Physics tick -----------------------------------------------------
+
 
 func _physics_process(delta: float) -> void:
 	if _is_dead:
@@ -352,10 +355,13 @@ func _physics_process(delta: float) -> void:
 		var dist_to_player: float = -1.0
 		if _player != null:
 			dist_to_player = (_player.global_position - global_position).length()
-		_combat_trace("Charger.pos",
-			"pos=(%.0f,%.0f) state=%s hp=%d dist_to_player=%.0f" % [
-				global_position.x, global_position.y, _state, hp_current, dist_to_player
-			])
+		_combat_trace(
+			"Charger.pos",
+			(
+				"pos=(%.0f,%.0f) state=%s hp=%d dist_to_player=%.0f"
+				% [global_position.x, global_position.y, _state, hp_current, dist_to_player]
+			)
+		)
 
 	# Snapshot the entry state so we know whether CHARGING was already active
 	# coming into this tick. Same-tick transitions (telegraph -> charging) must
@@ -400,6 +406,7 @@ func _physics_process(delta: float) -> void:
 
 
 # ---- State handlers ---------------------------------------------------
+
 
 func _process_idle(_delta: float) -> void:
 	velocity = Vector2.ZERO
@@ -451,6 +458,7 @@ func _process_recover(_delta: float) -> void:
 
 # ---- State entry helpers ---------------------------------------------
 
+
 func _enter_spotted() -> void:
 	_spotted_hold_left = SPOTTED_HOLD
 	_set_state(STATE_SPOTTED)
@@ -494,10 +502,12 @@ func _enter_recovery() -> void:
 		var contact_envelope_sq: float = (
 			(CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH)
 			* (CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH)
-			* 4.0)
+			* 4.0
+		)
 		if away.length_squared() < contact_envelope_sq:
 			var push_dir: Vector2 = (
-				away.normalized() if away.length_squared() > 0.0 else -_charge_dir)
+				away.normalized() if away.length_squared() > 0.0 else -_charge_dir
+			)
 			velocity = push_dir * POST_CONTACT_PUSHBACK_SPEED
 		else:
 			velocity = Vector2.ZERO
@@ -516,6 +526,7 @@ func _end_charge_into_wall() -> void:
 
 
 # ---- Charge body-contact ---------------------------------------------
+
 
 func _maybe_charge_hit_player() -> void:
 	if _player == null:
@@ -542,11 +553,8 @@ func _spawn_charge_hitbox() -> Hitbox:
 	var hit_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
 	var hb: Hitbox = HitboxScript.new()
 	hb.configure(
-		hit_dmg,
-		_charge_dir * CHARGE_KNOCKBACK,
-		CHARGE_HITBOX_LIFETIME,
-		Hitbox.TEAM_ENEMY,
-		self)
+		hit_dmg, _charge_dir * CHARGE_KNOCKBACK, CHARGE_HITBOX_LIFETIME, Hitbox.TEAM_ENEMY, self
+	)
 	hb.position = _charge_dir * CHARGE_HITBOX_REACH
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	var circle: CircleShape2D = CircleShape2D.new()
@@ -558,6 +566,7 @@ func _spawn_charge_hitbox() -> Hitbox:
 
 
 # ---- Death ------------------------------------------------------------
+
 
 func _die() -> void:
 	if _is_dead:
@@ -588,6 +597,7 @@ func _die() -> void:
 
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
 
+
 ## Attack-telegraph visual (player-journey.md Beat 6 + M1 RC soak-4):
 ## tween the Sprite child's color from rest → red for the charge telegraph
 ## window, then back to rest when the charge fires. All channels sub-1.0
@@ -613,15 +623,22 @@ func _play_attack_telegraph() -> void:
 	var prop: String = "color" if uses_sprite else "modulate"
 	var hold_dur: float = max(0.0, TELEGRAPH_DURATION - ATTACK_TELEGRAPH_TWEEN_IN * 2.0)
 	_attack_telegraph_tween.tween_property(
-		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN
+	)
 	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, hold_dur)
-	_attack_telegraph_tween.tween_property(
-		target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
-	_combat_trace("Charger._play_attack_telegraph",
-		"tween_valid=%s tint=(%.2f,%.2f,%.2f)" % [
-			_attack_telegraph_tween.is_valid(),
-			ATTACK_TELEGRAPH_TINT.r, ATTACK_TELEGRAPH_TINT.g, ATTACK_TELEGRAPH_TINT.b
-		])
+	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
+	_combat_trace(
+		"Charger._play_attack_telegraph",
+		(
+			"tween_valid=%s tint=(%.2f,%.2f,%.2f)"
+			% [
+				_attack_telegraph_tween.is_valid(),
+				ATTACK_TELEGRAPH_TINT.r,
+				ATTACK_TELEGRAPH_TINT.g,
+				ATTACK_TELEGRAPH_TINT.b
+			]
+		)
+	)
 
 
 func _cancel_attack_telegraph_tween() -> void:
@@ -666,13 +683,24 @@ func _play_hit_flash() -> void:
 		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
-		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Charger._play_hit_flash",
-			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)" % [
-				_hit_flash_tween.is_valid(),
-				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
-				_sprite_modulate_at_rest.r, _sprite_modulate_at_rest.g, _sprite_modulate_at_rest.b
-			])
+		_hit_flash_tween.tween_property(
+			asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT
+		)
+		_combat_trace(
+			"Charger._play_hit_flash",
+			(
+				"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)"
+				% [
+					_hit_flash_tween.is_valid(),
+					HIT_FLASH_TINT.r,
+					HIT_FLASH_TINT.g,
+					HIT_FLASH_TINT.b,
+					_sprite_modulate_at_rest.r,
+					_sprite_modulate_at_rest.g,
+					_sprite_modulate_at_rest.b
+				]
+			)
+		)
 	elif _hit_flash_uses_sprite:
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
@@ -696,7 +724,8 @@ func _play_death_tween() -> void:
 	_death_tween = create_tween()
 	_death_tween.set_parallel(true)
 	_death_tween.tween_property(
-		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION
+	)
 	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
 	# Safety-net: parallel timer fires queue_free even if tween_finished hangs.
@@ -728,6 +757,7 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 
 
 # ---- M3W-7 audio-cue wiring -------------------------------------------
+
 
 ## Connect existing combat signals to AudioDirector SFX plays.
 ##   damaged(final_amount>0)     → SFX_MOB_HIT
@@ -783,6 +813,7 @@ func _on_hit_spawned_audio(_hitbox: Node) -> void:
 
 # ---- Animation playback (M3W-3) --------------------------------------
 
+
 ## Play an animation on the AnimatedSprite2D child. Lazy-resolves the child on
 ## first call. State-key prefixes: `walk`, `telegraph`, `atk`, `die`. No
 ## `hit_<dir>` key exists in Charger.tres (bear PixelLab template has no
@@ -805,8 +836,9 @@ func _play_anim(state: StringName) -> void:
 	var dir_suffix: String = _compute_facing_dir_suffix()
 	var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
 	if not _animated_sprite.sprite_frames.has_animation(anim_name):
-		_combat_trace("Charger._play_anim",
-			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		_combat_trace(
+			"Charger._play_anim", "MISS anim=%s — SpriteFrames lacks this animation key" % anim_name
+		)
 		return
 	if _animated_sprite.animation == anim_name and _animated_sprite.is_playing():
 		return
@@ -868,6 +900,7 @@ func _spawn_death_particles() -> void:
 
 
 # ---- Helpers ----------------------------------------------------------
+
 
 func _tick_timers(delta: float) -> void:
 	if _spotted_hold_left > 0.0:

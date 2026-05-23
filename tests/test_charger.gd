@@ -30,8 +30,8 @@ const ChargerScript: Script = preload("res://scripts/mobs/Charger.gd")
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const MobDefScript: Script = preload("res://scripts/content/MobDef.gd")
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 class FakePlayer:
 	extends Node2D
@@ -76,9 +76,11 @@ func _drive_to_charging(c: Charger) -> void:
 
 # ---- 1: spawn HP from MobDef + spec defaults --------------------------
 
+
 func test_spawns_with_full_hp_from_mobdef() -> void:
 	var def: MobDef = ContentFactory.make_mob_def(
-		{"hp_base": 70, "damage_base": 8, "move_speed": 180.0})
+		{"hp_base": 70, "damage_base": 8, "move_speed": 180.0}
+	)
 	var c: Charger = _make_charger_with_def(def)
 	assert_eq(c.get_hp(), 70, "starts at hp_base")
 	assert_eq(c.get_max_hp(), 70, "max_hp = hp_base at spawn")
@@ -98,6 +100,7 @@ func test_default_stats_when_no_mobdef() -> void:
 
 
 # ---- 2: damage + death + payload --------------------------------------
+
 
 func test_damaged_signal_carries_payload() -> void:
 	var c: Charger = _make_charger()
@@ -128,6 +131,7 @@ func test_death_emits_mob_died_once_with_grunt_compatible_payload() -> void:
 
 
 # ---- 3: full state path ----------------------------------------------
+
 
 func test_full_state_machine_path() -> void:
 	var c: Charger = _make_charger()
@@ -161,8 +165,9 @@ func test_full_state_machine_path() -> void:
 	# Recovering -> Spotted again when player back in range (re-engage).
 	p.global_position = Vector2(200.0, 0.0)
 	c._physics_process(Charger.RECOVERY_DURATION + 0.001)
-	assert_eq(c.get_state(), Charger.STATE_SPOTTED,
-		"recovery ends with player in range -> spotted again")
+	assert_eq(
+		c.get_state(), Charger.STATE_SPOTTED, "recovery ends with player in range -> spotted again"
+	)
 
 
 func test_recovery_returns_to_idle_when_player_out_of_range() -> void:
@@ -194,6 +199,7 @@ func test_idle_when_no_player() -> void:
 
 # ---- 5: charge direction locked at telegraph start --------------------
 
+
 func test_charge_direction_locks_at_telegraph_start() -> void:
 	var c: Charger = _make_charger()
 	var p: FakePlayer = FakePlayer.new()
@@ -213,14 +219,18 @@ func test_charge_direction_locks_at_telegraph_start() -> void:
 	c._physics_process(Charger.TELEGRAPH_DURATION + 0.001)
 	# We're now in charging — direction is still +x.
 	assert_eq(c.get_state(), Charger.STATE_CHARGING)
-	assert_almost_eq(c.get_charge_dir().x, 1.0, 0.001, "charge dir does NOT redirect during telegraph")
+	assert_almost_eq(
+		c.get_charge_dir().x, 1.0, 0.001, "charge dir does NOT redirect during telegraph"
+	)
 
 
 # ---- 6: velocity during charge ---------------------------------------
 
+
 func test_velocity_during_charge_is_dir_times_speed() -> void:
 	var def: MobDef = ContentFactory.make_mob_def(
-		{"hp_base": 70, "damage_base": 8, "move_speed": 180.0})
+		{"hp_base": 70, "damage_base": 8, "move_speed": 180.0}
+	)
 	var c: Charger = _make_charger_with_def(def)
 	var p: FakePlayer = FakePlayer.new()
 	add_child_autofree(p)
@@ -237,6 +247,7 @@ func test_velocity_during_charge_is_dir_times_speed() -> void:
 
 
 # ---- 7: vulnerability multiplier ------------------------------------
+
 
 func test_armored_outside_recovery_takes_1x() -> void:
 	var c: Charger = _make_charger()
@@ -264,6 +275,7 @@ func test_recovery_takes_2x_damage() -> void:
 
 
 # ---- 8 EDGE: charge-into-wall stops cleanly --------------------------
+
 
 func test_charge_into_wall_stops_cleanly() -> void:
 	# We can't easily author wall tiles in this test, but we can exercise
@@ -293,6 +305,7 @@ func test_charge_into_wall_stops_cleanly() -> void:
 
 # ---- 9 EDGE: player dodges out of charge line - no contact -----------
 
+
 func test_player_dodge_out_of_line_no_contact() -> void:
 	# The charger only spawns a charge_hit if the player is within the
 	# contact radius of its position. If the player dodges sideways during
@@ -317,6 +330,7 @@ func test_player_dodge_out_of_line_no_contact() -> void:
 
 
 # ---- 10 EDGE: killed mid-charge ------------------------------------
+
 
 func test_killed_mid_charge_no_orphan_motion() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 30})
@@ -380,6 +394,7 @@ func test_killed_mid_charge_zero_velocity_immediate_loop() -> void:
 
 # ---- 11: layers per DECISIONS.md ----------------------------------
 
+
 func test_collision_layer_is_enemy() -> void:
 	var c: Charger = _make_charger()
 	assert_eq(c.collision_layer, Charger.LAYER_ENEMY, "charger sits on enemy layer (bit 4)")
@@ -387,6 +402,7 @@ func test_collision_layer_is_enemy() -> void:
 
 
 # ---- 12: charge-contact hitbox is enemy team ---------------------
+
 
 func test_charge_contact_hitbox_is_enemy_team() -> void:
 	var c: Charger = _make_charger()
@@ -398,9 +414,7 @@ func test_charge_contact_hitbox_is_enemy_team() -> void:
 	# Drive to charging so the body-contact code path activates.
 	_drive_to_charging(c)
 	var captured_hb: Array = [null]
-	c.charge_hit_spawned.connect(func(hb: Node) -> void:
-		captured_hb[0] = hb
-	)
+	c.charge_hit_spawned.connect(func(hb: Node) -> void: captured_hb[0] = hb)
 	# One charging tick — should trigger _maybe_charge_hit_player.
 	c._physics_process(0.016)
 	assert_not_null(captured_hb[0], "charge body-hit spawned hitbox in contact range")
@@ -414,10 +428,12 @@ func test_charge_contact_hitbox_is_enemy_team() -> void:
 
 # ---- 13: apply_mob_def() rebinds at runtime ---------------------
 
+
 func test_apply_mob_def_rebinds_runtime_stats() -> void:
 	var c: Charger = _make_charger()
 	var hot_swap: MobDef = ContentFactory.make_mob_def(
-		{"hp_base": 200, "damage_base": 25, "move_speed": 240.0})
+		{"hp_base": 200, "damage_base": 25, "move_speed": 240.0}
+	)
 	c.apply_mob_def(hot_swap)
 	assert_eq(c.get_hp(), 200)
 	assert_eq(c.get_max_hp(), 200)
@@ -426,6 +442,7 @@ func test_apply_mob_def_rebinds_runtime_stats() -> void:
 
 
 # ---- 14: takes damage from player Hitbox ---------------------
+
 
 func test_takes_damage_from_player_hitbox() -> void:
 	var c: Charger = _make_charger()
@@ -438,6 +455,7 @@ func test_takes_damage_from_player_hitbox() -> void:
 
 
 # ---- 15: rapid hit spam -> single death ---------------------
+
 
 func test_rapid_hit_spam_single_death() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 30})
@@ -452,6 +470,7 @@ func test_rapid_hit_spam_single_death() -> void:
 
 
 # ---- 16: knockback skipped during charge ---------------------
+
 
 func test_knockback_skipped_during_charge() -> void:
 	var c: Charger = _make_charger()
@@ -473,6 +492,7 @@ func test_knockback_skipped_during_charge() -> void:
 
 # ---- 17: negative damage clamp ---------------------
 
+
 func test_negative_damage_does_not_heal() -> void:
 	var c: Charger = _make_charger()
 	c.take_damage(-100, Vector2.ZERO, null)
@@ -481,6 +501,7 @@ func test_negative_damage_does_not_heal() -> void:
 
 
 # ---- 18: telegraph signal carries direction ---------------------
+
 
 func test_telegraph_signal_carries_direction() -> void:
 	var c: Charger = _make_charger()
@@ -517,16 +538,20 @@ func test_telegraph_signal_carries_direction() -> void:
 # the emit *happens* — stronger than the no-op-safety pattern in
 # test_inventory_equip_source_enum.gd, which is what this ticket asks for.
 
+
 class CombatTraceSpy:
 	extends Node
 	var calls: Array = []  # Array of [tag, msg]
+
 	func combat_trace(tag: String, msg: String = "") -> void:
 		calls.append([tag, msg])
+
 	func has_tag(tag: String) -> bool:
 		for c: Array in calls:
 			if c[0] == tag:
 				return true
 		return false
+
 	func has_msg_containing(tag: String, needle: String) -> bool:
 		for c: Array in calls:
 			if c[0] == tag and (c[1] as String).find(needle) != -1:
@@ -565,9 +590,13 @@ func test_die_emits_combat_trace_die_line() -> void:
 	c.take_damage(20, Vector2.ZERO, null)
 	var captured: bool = spy.has_tag("Charger._die")
 	_restore_debug_flags(spy)
-	assert_true(captured,
-		"Charger._die must emit [combat-trace] Charger._die — harness kill-" +
-		"counting greps on the <Mob>._die line for uniform kill counts")
+	assert_true(
+		captured,
+		(
+			"Charger._die must emit [combat-trace] Charger._die — harness kill-"
+			+ "counting greps on the <Mob>._die line for uniform kill counts"
+		)
+	)
 	# Downstream consequence still holds (Tier 2 bar): the mob actually died.
 	assert_true(c.is_dead(), "lethal take_damage still kills the charger")
 	assert_eq(c.get_state(), Charger.STATE_DEAD)
@@ -581,6 +610,7 @@ func test_die_emits_combat_trace_die_line() -> void:
 # harder for soak debugging. Same CombatTraceSpy injection pattern as
 # test_die_emits_combat_trace_die_line above.
 
+
 func test_take_damage_emits_combat_trace_line() -> void:
 	var c: Charger = _make_charger()  # 70 HP default
 	var spy: CombatTraceSpy = _install_combat_trace_spy()
@@ -589,9 +619,13 @@ func test_take_damage_emits_combat_trace_line() -> void:
 	c.take_damage(10, Vector2.ZERO, null)
 	var captured: bool = spy.has_tag("Charger.take_damage")
 	_restore_debug_flags(spy)
-	assert_true(captured,
-		"Charger.take_damage must emit [combat-trace] Charger.take_damage — " +
-		"console-based hit verification greps on the <Mob>.take_damage line")
+	assert_true(
+		captured,
+		(
+			"Charger.take_damage must emit [combat-trace] Charger.take_damage — "
+			+ "console-based hit verification greps on the <Mob>.take_damage line"
+		)
+	)
 	# Downstream consequence still holds (Tier 2 bar): HP actually dropped.
 	assert_eq(c.get_hp(), 60, "non-lethal take_damage still decrements HP (70 - 10)")
 	assert_false(c.is_dead())
@@ -607,6 +641,7 @@ func test_take_damage_emits_combat_trace_line() -> void:
 # tell "hit hit a corpse" apart from "hit never registered". Same
 # CombatTraceSpy injection pattern as the tests above.
 
+
 func test_take_damage_on_dead_charger_emits_ignored_already_dead() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 20})
 	var c: Charger = _make_charger_with_def(def)
@@ -618,10 +653,14 @@ func test_take_damage_on_dead_charger_emits_ignored_already_dead() -> void:
 	c.take_damage(10, Vector2.ZERO, null)
 	var captured: bool = spy.has_msg_containing("Charger.take_damage", "IGNORED already_dead")
 	_restore_debug_flags(spy)
-	assert_true(captured,
-		"Charger.take_damage must emit [combat-trace] Charger.take_damage " +
-		"IGNORED already_dead on the _is_dead early-return — mirrors Grunt so " +
-		"soak console greps distinguish corpse-hits from unregistered hits")
+	assert_true(
+		captured,
+		(
+			"Charger.take_damage must emit [combat-trace] Charger.take_damage "
+			+ "IGNORED already_dead on the _is_dead early-return — mirrors Grunt so "
+			+ "soak console greps distinguish corpse-hits from unregistered hits"
+		)
+	)
 	# Downstream consequence (Tier 2 bar): the rejected hit changed nothing.
 	assert_eq(c.get_hp(), 0, "rejected take_damage does not decrement HP further")
 
@@ -635,6 +674,7 @@ func test_take_damage_on_dead_charger_emits_ignored_already_dead() -> void:
 # <Mob>.pos` line. `Shooter.pos` already existed (ticket 86c9tz7zg); this
 # closes the sibling gap for `Charger.pos`. Same CombatTraceSpy injection +
 # direct-physics-frame pattern as test_shooter.gd's pos-trace test.
+
 
 func test_pos_trace_emits_after_throttle_interval() -> void:
 	var c: Charger = _make_charger()
@@ -659,12 +699,20 @@ func test_pos_trace_emits_after_throttle_interval() -> void:
 			pos_msg = call[1]
 			break
 	_restore_debug_flags(spy)
-	assert_false(emitted_early,
-		"Charger.pos must NOT emit before POS_TRACE_INTERVAL elapses — the " +
-		"trace is throttled so it is a cheap no-op on perf")
-	assert_true(emitted_after,
-		"Charger.pos must emit once the throttle accumulator passes " +
-		"POS_TRACE_INTERVAL — the AC4 multi-chaser clear helper steers off it")
+	assert_false(
+		emitted_early,
+		(
+			"Charger.pos must NOT emit before POS_TRACE_INTERVAL elapses — the "
+			+ "trace is throttled so it is a cheap no-op on perf"
+		)
+	)
+	assert_true(
+		emitted_after,
+		(
+			"Charger.pos must emit once the throttle accumulator passes "
+			+ "POS_TRACE_INTERVAL — the AC4 multi-chaser clear helper steers off it"
+		)
+	)
 	# Downstream consequence (Tier 2 bar): the payload carries the world
 	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/. Position
 	# may have drifted ±1px from the seeded value if the engine auto-ticked
@@ -673,8 +721,16 @@ func test_pos_trace_emits_after_throttle_interval() -> void:
 	# matching test in test_grunt.gd, which CAN drift).
 	var pos_match := RegEx.new()
 	pos_match.compile("pos=\\(-?\\d+,-?\\d+\\)")
-	assert_true(pos_match.search(pos_msg) != null,
-		"Charger.pos payload must carry the parseable world-coord tuple " +
-		"(harness parses /pos=\\((-?\\d+),(-?\\d+)\\)/); got: " + pos_msg)
-	assert_string_contains(pos_msg, "dist_to_player=",
-		"Charger.pos payload must carry dist_to_player for the chase helper")
+	assert_true(
+		pos_match.search(pos_msg) != null,
+		(
+			"Charger.pos payload must carry the parseable world-coord tuple "
+			+ "(harness parses /pos=\\((-?\\d+),(-?\\d+)\\)/); got: "
+			+ pos_msg
+		)
+	)
+	assert_string_contains(
+		pos_msg,
+		"dist_to_player=",
+		"Charger.pos payload must carry dist_to_player for the chase helper"
+	)

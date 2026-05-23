@@ -170,18 +170,14 @@ const SEGMENT_ACTIVE_FG: Color = Color(0x7A / 255.0, 0x2A / 255.0, 0x26 / 255.0,
 ## Future-phase locked segment fill — same red at 60% brightness per
 ## Uma §"Segment fill (active phase)".
 const SEGMENT_FUTURE_FG: Color = Color(
-		0x7A / 255.0 * 0.6,
-		0x2A / 255.0 * 0.6,
-		0x26 / 255.0 * 0.6,
-		1.0)
+	0x7A / 255.0 * 0.6, 0x2A / 255.0 * 0.6, 0x26 / 255.0 * 0.6, 1.0
+)
 
 ## Ghost-drain layer — darker, drains behind the foreground for the
 ## "ghost damage" trail. Mirrors regular mob HP bar shape.
 const SEGMENT_GHOST_FG: Color = Color(
-		0x7A / 255.0 * 0.45,
-		0x2A / 255.0 * 0.45,
-		0x26 / 255.0 * 0.45,
-		1.0)
+	0x7A / 255.0 * 0.45, 0x2A / 255.0 * 0.45, 0x26 / 255.0 * 0.45, 1.0
+)
 
 # ---- Copy spec (locked from Uma §"Copy spec") -------------------------
 
@@ -198,7 +194,7 @@ const FALLBACK_BOSS_NAME: String = "WARDEN OF THE OUTER CLOISTER"
 
 ## Emitted when the slide-in tween completes (T+0.4 game-time post-show).
 ## Tests + future consumers subscribe to assert the reveal landed.
-signal slide_in_completed()
+signal slide_in_completed
 
 ## Emitted on every observed `damaged` event after the foreground +
 ## ghost are updated. Carries the post-damage active-segment fill in [0,1].
@@ -227,9 +223,9 @@ var _threat_label: Label = null
 # Per-segment composition. Index 0..2 = phase 1..3.
 var _segment_ghosts: Array[ColorRect] = []
 var _segment_fgs: Array[ColorRect] = []
-var _segment_separators: Array[ColorRect] = []   # 2 separators between 3 segs
+var _segment_separators: Array[ColorRect] = []  # 2 separators between 3 segs
 var _phase_labels: Array[Label] = []
-var _pulse_outlines: Array[ColorRect] = []       # T18 — 1 per segment
+var _pulse_outlines: Array[ColorRect] = []  # T18 — 1 per segment
 
 # Per-segment ghost-drain tweens (killed + restarted on each hit).
 # Plain Array (not Array[Tween]) so null entries are tolerated without
@@ -250,7 +246,7 @@ var _slide_tween: Tween = null
 var _shown: bool = false
 var _slide_in_done: bool = false
 var _dismissed: bool = false
-var _current_phase: int = 1   # Phases 1..3 (boss starts in phase 1).
+var _current_phase: int = 1  # Phases 1..3 (boss starts in phase 1).
 var _hp_max_cached: int = 0
 ## Bound boss — kept so we can disconnect on dismiss and to read state.
 var _boss: Node = null
@@ -269,6 +265,7 @@ func _ready() -> void:
 
 
 # ---- Public API -------------------------------------------------------
+
 
 ## Wire the nameplate to a Stratum1Boss + show the slide-in. Subscribes to
 ## the boss's `damaged` + `phase_changed` signals. Idempotent — a second
@@ -310,6 +307,7 @@ func show_for(boss: Node) -> void:
 
 
 # ---- Test introspection -----------------------------------------------
+
 
 func get_root_control() -> Control:
 	return _root
@@ -391,6 +389,7 @@ func get_ghost_tween(phase: int) -> Tween:
 
 # ---- Internal: composition --------------------------------------------
 
+
 func _build_ui() -> void:
 	if _root != null:
 		return
@@ -405,7 +404,7 @@ func _build_ui() -> void:
 	# Never absorb mouse input — clicks must fall through to the gameplay
 	# canvas for combat. Same rule as BossDefeatedTitleCard + Vignette.
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.modulate = Color(1, 1, 1, 0)   # hidden by default until show_for
+	_root.modulate = Color(1, 1, 1, 0)  # hidden by default until show_for
 	add_child(_root)
 
 	_build_panel_bg_and_border()
@@ -565,8 +564,8 @@ func _build_segment_row() -> void:
 		# 4 strips like the panel border, but inline as a single composite
 		# node-tree.
 		var pulse: ColorRect = _build_pulse_outline_rect(
-				"PulseOutline%d" % (i + 1),
-				seg_x, bar_y_top, SEGMENT_WIDTH, BAR_HEIGHT)
+			"PulseOutline%d" % (i + 1), seg_x, bar_y_top, SEGMENT_WIDTH, BAR_HEIGHT
+		)
 		_pulse_outlines.append(pulse)
 		_root.add_child(pulse)
 
@@ -599,8 +598,8 @@ func _build_segment_row() -> void:
 ## so a single modulate.a tween affects all 4 strips. Wrapper returned as
 ## the "outline" handle since modulate.a writes propagate to children.
 func _build_pulse_outline_rect(
-		base_name: String,
-		x: float, y: float, w: float, h: float) -> ColorRect:
+	base_name: String, x: float, y: float, w: float, h: float
+) -> ColorRect:
 	# Wrap the 4 strips under a ColorRect-typed parent whose own `color.a`
 	# we keep at 0 (parent draws nothing). We need a Control-derived parent
 	# for modulate cascade; a plain Control would work but ColorRect is
@@ -664,6 +663,7 @@ func _build_pulse_outline_rect(
 
 # ---- Internal: paint helpers ------------------------------------------
 
+
 func _color_for_phase_label(phase: int) -> Color:
 	# Active phase → HUD off-white; completed → muted parchment;
 	# future → HUD disabled. Per Uma §"Phase label".
@@ -683,7 +683,7 @@ func _color_for_segment_phase(phase: int) -> Color:
 	if phase == _current_phase:
 		return SEGMENT_ACTIVE_FG
 	if phase < _current_phase:
-		return SEGMENT_ACTIVE_FG   # color stays; width snaps to 0 in paint helper
+		return SEGMENT_ACTIVE_FG  # color stays; width snaps to 0 in paint helper
 	return SEGMENT_FUTURE_FG
 
 
@@ -731,8 +731,7 @@ func _set_segment_ghost_fill(phase: int, fraction: float) -> void:
 func _apply_phase_label_state() -> void:
 	for i in range(SEGMENT_COUNT):
 		var p: int = i + 1
-		_phase_labels[i].add_theme_color_override("font_color",
-				_color_for_phase_label(p))
+		_phase_labels[i].add_theme_color_override("font_color", _color_for_phase_label(p))
 
 
 func _apply_boss_name(boss: Node) -> void:
@@ -751,6 +750,7 @@ func _apply_boss_name(boss: Node) -> void:
 
 # ---- Internal: tween + signal handlers --------------------------------
 
+
 func _start_slide_in_tween() -> void:
 	if _slide_tween != null and _slide_tween.is_valid():
 		_slide_tween.kill()
@@ -762,15 +762,24 @@ func _start_slide_in_tween() -> void:
 	# Slide offset_top from -PANEL_HEIGHT (offscreen) to TOP_MARGIN (on-screen).
 	# offset_bottom from 0 to TOP_MARGIN + PANEL_HEIGHT in tandem keeps the
 	# rect height constant during the tween.
-	_slide_tween.tween_property(_root, "offset_top",
-			TOP_MARGIN, SLIDE_IN_DURATION) \
-			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_slide_tween.tween_property(_root, "offset_bottom",
-			TOP_MARGIN + PANEL_HEIGHT, SLIDE_IN_DURATION) \
-			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_slide_tween.tween_property(_root, "modulate:a",
-			1.0, SLIDE_IN_DURATION) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	(
+		_slide_tween
+		. tween_property(_root, "offset_top", TOP_MARGIN, SLIDE_IN_DURATION)
+		. set_trans(Tween.TRANS_CUBIC)
+		. set_ease(Tween.EASE_OUT)
+	)
+	(
+		_slide_tween
+		. tween_property(_root, "offset_bottom", TOP_MARGIN + PANEL_HEIGHT, SLIDE_IN_DURATION)
+		. set_trans(Tween.TRANS_CUBIC)
+		. set_ease(Tween.EASE_OUT)
+	)
+	(
+		_slide_tween
+		. tween_property(_root, "modulate:a", 1.0, SLIDE_IN_DURATION)
+		. set_trans(Tween.TRANS_QUAD)
+		. set_ease(Tween.EASE_OUT)
+	)
 	_slide_tween.chain().tween_callback(Callable(self, "_on_slide_in_done"))
 
 
@@ -851,9 +860,12 @@ func _start_ghost_drain_tween(phase: int, target_fraction: float) -> void:
 	# the ghost finishes draining).
 	var target_offset_right: float = ghost.offset_left + SEGMENT_WIDTH * target_fraction
 	var t: Tween = create_tween()
-	t.tween_property(ghost, "offset_right", target_offset_right,
-			GHOST_DRAIN_DURATION) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	(
+		t
+		. tween_property(ghost, "offset_right", target_offset_right, GHOST_DRAIN_DURATION)
+		. set_trans(Tween.TRANS_QUAD)
+		. set_ease(Tween.EASE_OUT)
+	)
 	_ghost_tweens[i] = t
 
 
@@ -886,15 +898,14 @@ func _on_boss_phase_changed(new_phase: int) -> void:
 	# Flash the separator immediately before the new active segment.
 	_flash_separator_for_phase(_current_phase)
 	phase_transition_flashed.emit(_current_phase)
-	_combat_trace("BossNameplate.phase_transition_flashed",
-			"new_phase=%d" % _current_phase)
+	_combat_trace("BossNameplate.phase_transition_flashed", "new_phase=%d" % _current_phase)
 
 
 ## Flash separator at the boundary leading INTO the new active phase.
 ## new_phase=2 → flash separator 0 (between segments 1 and 2).
 ## new_phase=3 → flash separator 1 (between segments 2 and 3).
 func _flash_separator_for_phase(new_phase: int) -> void:
-	var sep_idx: int = new_phase - 2   # 2 → 0, 3 → 1
+	var sep_idx: int = new_phase - 2  # 2 → 0, 3 → 1
 	if sep_idx < 0 or sep_idx >= _segment_separators.size():
 		return
 	var sep: ColorRect = _segment_separators[sep_idx]
@@ -914,10 +925,14 @@ func _flash_separator_for_phase(new_phase: int) -> void:
 
 # ---- T18 — Below-10% HP pulse ----------------------------------------
 
+
 func _start_pulse_if_inactive(phase: int) -> void:
-	if _active_pulse_tween != null and _active_pulse_tween.is_valid() \
-			and _active_pulse_segment_index == phase - 1:
-		return   # Already pulsing this segment.
+	if (
+		_active_pulse_tween != null
+		and _active_pulse_tween.is_valid()
+		and _active_pulse_segment_index == phase - 1
+	):
+		return  # Already pulsing this segment.
 	# Stop any prior pulse (rare — phase changed mid-pulse).
 	_stop_pulse_for_segment(_active_pulse_segment_index + 1)
 	var i: int = phase - 1
@@ -928,7 +943,7 @@ func _start_pulse_if_inactive(phase: int) -> void:
 	# is well-defined (modulate.a goes 0 → 1 → 0 → 1 → ...).
 	pulse.modulate = Color(1, 1, 1, 0)
 	var t: Tween = create_tween()
-	t.set_loops()   # infinite loop until killed
+	t.set_loops()  # infinite loop until killed
 	# Half-period up, half-period down — produces a 1.5 Hz frequency
 	# (full cycle is up + down = PULSE_PERIOD).
 	t.tween_property(pulse, "modulate:a", 1.0, PULSE_PERIOD * 0.5)
@@ -953,6 +968,7 @@ func _stop_pulse_for_segment(phase: int) -> void:
 
 # ---- Boss-died handler ------------------------------------------------
 
+
 func _on_boss_died(_died_boss, _death_pos: Vector2, _mob_def) -> void:
 	# Boss is dead — title card takes over. Stop pulse + ghost tweens.
 	# Do NOT free the nameplate here; Main owns the lifecycle (the
@@ -968,6 +984,7 @@ func _on_boss_died(_died_boss, _death_pos: Vector2, _mob_def) -> void:
 
 
 # ---- Boss-state reading (tolerant of test stubs) ----------------------
+
 
 func _read_hp_max(boss: Node) -> int:
 	if boss == null:
@@ -1005,6 +1022,7 @@ func _read_display_name(boss: Node) -> String:
 
 
 # ---- Diagnostics ------------------------------------------------------
+
 
 ## Combat-trace shim — routes through DebugFlags.combat_trace (HTML5-only).
 ## Same pattern as `Stratum1BossRoom._combat_trace` /

@@ -31,7 +31,7 @@ extends Node
 # ---- Signals --------------------------------------------------------
 
 signal room_cleared(room_id: StringName)
-signal progression_reset()
+signal progression_reset
 
 # ---- State ----------------------------------------------------------
 
@@ -39,8 +39,8 @@ signal progression_reset()
 # and treat `true` as "cleared". Absence == not-yet-cleared.
 var _cleared: Dictionary = {}
 
-
 # ---- Public API -----------------------------------------------------
+
 
 func mark_cleared(room_id: StringName) -> void:
 	if room_id == &"":
@@ -88,6 +88,7 @@ func preserve_for_descend() -> void:
 
 
 # ---- Save integration ----------------------------------------------
+
 
 ## Write progression state into the save payload's
 ## `data["stratum_progression"]` slot. The shape is a simple list of

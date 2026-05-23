@@ -35,6 +35,7 @@ func _instantiate_main() -> Main:
 
 # ---- Banner mount ----------------------------------------------------
 
+
 func test_boot_banner_label_mounts_in_hud() -> void:
 	var main: Main = _instantiate_main()
 	await get_tree().process_frame
@@ -50,11 +51,13 @@ func test_get_boot_banner_label_accessor_returns_the_mounted_label() -> void:
 	await get_tree().process_frame
 	var label: Label = main.get_boot_banner_label()
 	assert_not_null(label, "Main.get_boot_banner_label() returns the mounted Label")
-	assert_true(label.is_inside_tree(),
-		"BootBanner is parented under the HUD CanvasLayer (not orphaned)")
+	assert_true(
+		label.is_inside_tree(), "BootBanner is parented under the HUD CanvasLayer (not orphaned)"
+	)
 
 
 # ---- Banner copy contract -------------------------------------------
+
 
 func test_boot_banner_lists_lmb_attack_binding() -> void:
 	# Direct BB-5 regression guard — the original symptom was "no mention
@@ -63,10 +66,12 @@ func test_boot_banner_lists_lmb_attack_binding() -> void:
 	await get_tree().process_frame
 	var label: Label = main.get_boot_banner_label()
 	assert_not_null(label, "BootBanner exists")
-	assert_string_contains(label.text, "LMB",
-		"BB-5: banner must mention LMB (light attack) — was missing pre-fix")
-	assert_string_contains(label.text, "LMB to attack",
-		"BB-5: full LMB-to-attack line preserved exactly")
+	assert_string_contains(
+		label.text, "LMB", "BB-5: banner must mention LMB (light attack) — was missing pre-fix"
+	)
+	assert_string_contains(
+		label.text, "LMB to attack", "BB-5: full LMB-to-attack line preserved exactly"
+	)
 
 
 func test_boot_banner_lists_rmb_heavy_attack_binding() -> void:
@@ -75,10 +80,12 @@ func test_boot_banner_lists_rmb_heavy_attack_binding() -> void:
 	await get_tree().process_frame
 	var label: Label = main.get_boot_banner_label()
 	assert_not_null(label, "BootBanner exists")
-	assert_string_contains(label.text, "RMB",
-		"BB-5: banner must mention RMB (heavy attack) — was missing pre-fix")
-	assert_string_contains(label.text, "RMB to heavy attack",
-		"BB-5: full RMB-to-heavy-attack line preserved exactly")
+	assert_string_contains(
+		label.text, "RMB", "BB-5: banner must mention RMB (heavy attack) — was missing pre-fix"
+	)
+	assert_string_contains(
+		label.text, "RMB to heavy attack", "BB-5: full RMB-to-heavy-attack line preserved exactly"
+	)
 
 
 func test_boot_banner_lists_every_player_input_action() -> void:
@@ -101,11 +108,15 @@ func test_boot_banner_lists_every_player_input_action() -> void:
 		"P to allocate stats",
 	]
 	for line: String in required_lines:
-		assert_string_contains(label.text, line,
-			"BB-5: banner must contain '%s' so first-time players see all 7 verbs" % line)
+		assert_string_contains(
+			label.text,
+			line,
+			"BB-5: banner must contain '%s' so first-time players see all 7 verbs" % line
+		)
 
 
 # ---- Banner visibility / layout contract ----------------------------
+
 
 func test_boot_banner_is_visible_at_boot() -> void:
 	# Whole point — first-time players should see this on boot, not after
@@ -114,11 +125,9 @@ func test_boot_banner_is_visible_at_boot() -> void:
 	await get_tree().process_frame
 	var label: Label = main.get_boot_banner_label()
 	assert_not_null(label, "BootBanner exists")
-	assert_true(label.visible,
-		"BB-5: BootBanner is visible at boot (no toggle-to-discover)")
+	assert_true(label.visible, "BB-5: BootBanner is visible at boot (no toggle-to-discover)")
 	var color: Color = label.get_theme_color("font_color")
-	assert_gt(color.a, 0.0,
-		"BB-5: BootBanner font alpha > 0 (would render invisible at 0)")
+	assert_gt(color.a, 0.0, "BB-5: BootBanner font alpha > 0 (would render invisible at 0)")
 
 
 func test_boot_banner_does_not_block_mouse_input() -> void:
@@ -129,5 +138,8 @@ func test_boot_banner_does_not_block_mouse_input() -> void:
 	await get_tree().process_frame
 	var label: Label = main.get_boot_banner_label()
 	assert_not_null(label, "BootBanner exists")
-	assert_eq(label.mouse_filter, Control.MOUSE_FILTER_IGNORE,
-		"BB-5: BootBanner mouse_filter is IGNORE so LMB/RMB clicks reach the play area")
+	assert_eq(
+		label.mouse_filter,
+		Control.MOUSE_FILTER_IGNORE,
+		"BB-5: BootBanner mouse_filter is IGNORE so LMB/RMB clicks reach the play area"
+	)

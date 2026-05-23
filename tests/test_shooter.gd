@@ -34,8 +34,8 @@ const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const MobDefScript: Script = preload("res://scripts/content/MobDef.gd")
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 class FakePlayer:
 	extends Node2D
@@ -56,9 +56,11 @@ func _make_shooter_with_def(def: MobDef) -> Shooter:
 
 # ---- 1: spawn HP from MobDef + spec defaults --------------------------
 
+
 func test_spawns_with_full_hp_from_mobdef() -> void:
 	var def: MobDef = ContentFactory.make_mob_def(
-		{"hp_base": 40, "damage_base": 6, "move_speed": 60.0})
+		{"hp_base": 40, "damage_base": 6, "move_speed": 60.0}
+	)
 	var s: Shooter = _make_shooter_with_def(def)
 	assert_eq(s.get_hp(), 40, "starts at hp_base")
 	assert_eq(s.get_max_hp(), 40)
@@ -76,6 +78,7 @@ func test_default_stats_when_no_mobdef() -> void:
 
 
 # ---- 2: damage signal + death --------------------------------------
+
 
 func test_damaged_signal_carries_payload() -> void:
 	var s: Shooter = _make_shooter()
@@ -104,6 +107,7 @@ func test_death_emits_mob_died_once_with_compatible_payload() -> void:
 
 
 # ---- 3: idle -> spotted -> aiming -> firing -> recovery -> aiming -
+
 
 func test_full_state_path_in_sweet_spot() -> void:
 	var s: Shooter = _make_shooter()
@@ -144,6 +148,7 @@ func test_full_state_path_in_sweet_spot() -> void:
 
 # ---- 4: aiming -> kiting when player closes -----------------
 
+
 func test_aiming_interrupts_to_kiting_when_player_closes() -> void:
 	var s: Shooter = _make_shooter()
 	var p: FakePlayer = FakePlayer.new()
@@ -182,6 +187,7 @@ func test_kiting_returns_to_aiming_when_distance_restored() -> void:
 
 # ---- 5: post-fire-recovery -> idle when player out of range ---
 
+
 func test_post_fire_recovery_to_idle_when_player_gone() -> void:
 	var s: Shooter = _make_shooter()
 	var p: FakePlayer = FakePlayer.new()
@@ -202,6 +208,7 @@ func test_post_fire_recovery_to_idle_when_player_gone() -> void:
 
 # ---- 6: firing spawns a projectile w/ correct config -----------
 
+
 func test_firing_spawns_projectile_with_correct_payload() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 40, "damage_base": 6})
 	var s: Shooter = _make_shooter_with_def(def)
@@ -211,9 +218,10 @@ func test_firing_spawns_projectile_with_correct_payload() -> void:
 	p.global_position = Vector2(200.0, 0.0)  # +x, sweet spot
 	s.set_player(p)
 	var captured: Array = [null, Vector2.ZERO]
-	s.projectile_fired.connect(func(proj: Node, dir: Vector2) -> void:
-		captured[0] = proj
-		captured[1] = dir
+	s.projectile_fired.connect(
+		func(proj: Node, dir: Vector2) -> void:
+			captured[0] = proj
+			captured[1] = dir
 	)
 	# Drive to firing.
 	s._physics_process(0.016)
@@ -238,6 +246,7 @@ func test_firing_spawns_projectile_with_correct_payload() -> void:
 
 # ---- 8: layers per DECISIONS.md --------------------------
 
+
 func test_collision_layer_is_enemy() -> void:
 	var s: Shooter = _make_shooter()
 	assert_eq(s.collision_layer, Shooter.LAYER_ENEMY)
@@ -245,6 +254,7 @@ func test_collision_layer_is_enemy() -> void:
 
 
 # ---- 9 EDGE: rapid hit spam -----------------------
+
 
 func test_rapid_hit_spam_single_death() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 20})
@@ -260,6 +270,7 @@ func test_rapid_hit_spam_single_death() -> void:
 
 # ---- 10 EDGE: aim direction tracks player up to firing ----
 
+
 func test_aim_direction_locks_at_firing() -> void:
 	var s: Shooter = _make_shooter()
 	var p: FakePlayer = FakePlayer.new()
@@ -274,18 +285,21 @@ func test_aim_direction_locks_at_firing() -> void:
 	p.global_position = Vector2(0.0, 200.0)  # straight down
 	# Drive aim duration until firing.
 	var captured_dir: Array = [Vector2.ZERO]
-	s.projectile_fired.connect(func(_proj: Node, dir: Vector2) -> void:
-		captured_dir[0] = dir
-	)
+	s.projectile_fired.connect(func(_proj: Node, dir: Vector2) -> void: captured_dir[0] = dir)
 	s._physics_process(Shooter.AIM_DURATION + 0.001)
 	s._physics_process(0.001)
 	# Direction at firing time should be toward the player's NEW position.
 	assert_almost_eq(captured_dir[0].x, 0.0, 0.05)
-	assert_almost_eq(captured_dir[0].y, 1.0, 0.05,
-		"fires at last-tracked direction (down), not aim-start direction")
+	assert_almost_eq(
+		captured_dir[0].y,
+		1.0,
+		0.05,
+		"fires at last-tracked direction (down), not aim-start direction"
+	)
 
 
 # ---- 11 EDGE: killed mid-aim - no projectile fires ---
+
 
 func test_killed_mid_aim_no_projectile() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 25})
@@ -312,6 +326,7 @@ func test_killed_mid_aim_no_projectile() -> void:
 
 
 # ---- 12 EDGE: killed during post-fire-recovery - no second shot ---
+
 
 func test_killed_during_recovery_no_second_shot() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 30})
@@ -342,10 +357,12 @@ func test_killed_during_recovery_no_second_shot() -> void:
 
 # ---- 13: apply_mob_def() rebinds runtime stats ---------
 
+
 func test_apply_mob_def_rebinds_runtime_stats() -> void:
 	var s: Shooter = _make_shooter()
 	var hot_swap: MobDef = ContentFactory.make_mob_def(
-		{"hp_base": 100, "damage_base": 20, "move_speed": 90.0})
+		{"hp_base": 100, "damage_base": 20, "move_speed": 90.0}
+	)
 	s.apply_mob_def(hot_swap)
 	assert_eq(s.get_hp(), 100)
 	assert_eq(s.get_max_hp(), 100)
@@ -354,6 +371,7 @@ func test_apply_mob_def_rebinds_runtime_stats() -> void:
 
 
 # ---- 14: negative damage clamp ---------------
+
 
 func test_negative_damage_does_not_heal() -> void:
 	var s: Shooter = _make_shooter()
@@ -364,15 +382,20 @@ func test_negative_damage_does_not_heal() -> void:
 
 # ---- 15: projectile speed < player walk speed (spec: dodgeable) ---
 
+
 func test_projectile_speed_is_slower_than_player_walk() -> void:
 	# Spec: "projectile speed slower than player run speed so player can
 	# dodge." We assert it's slower than player WALK speed too — even more
 	# generous: a walking player can clear the line.
-	assert_lt(Shooter.PROJECTILE_SPEED, PlayerScript.WALK_SPEED,
-		"projectile slower than player walk — guaranteed dodgeable")
+	assert_lt(
+		Shooter.PROJECTILE_SPEED,
+		PlayerScript.WALK_SPEED,
+		"projectile slower than player walk — guaranteed dodgeable"
+	)
 
 
 # ---- 16: takes damage from player Hitbox ---------------
+
 
 func test_takes_damage_from_player_hitbox() -> void:
 	var s: Shooter = _make_shooter()
@@ -384,6 +407,7 @@ func test_takes_damage_from_player_hitbox() -> void:
 
 
 # ---- 17: aim_started signal carries direction ---------
+
 
 func test_aim_started_signal_carries_direction() -> void:
 	var s: Shooter = _make_shooter()
@@ -420,16 +444,20 @@ func test_aim_started_signal_carries_direction() -> void:
 # the emit *happens* — stronger than the no-op-safety pattern in
 # test_inventory_equip_source_enum.gd, which is what this ticket asks for.
 
+
 class CombatTraceSpy:
 	extends Node
 	var calls: Array = []  # Array of [tag, msg]
+
 	func combat_trace(tag: String, msg: String = "") -> void:
 		calls.append([tag, msg])
+
 	func has_tag(tag: String) -> bool:
 		for c: Array in calls:
 			if c[0] == tag:
 				return true
 		return false
+
 	func has_msg_containing(tag: String, needle: String) -> bool:
 		for c: Array in calls:
 			if c[0] == tag and (c[1] as String).find(needle) != -1:
@@ -467,9 +495,13 @@ func test_die_emits_combat_trace_die_line() -> void:
 	s.take_damage(20, Vector2.ZERO, null)
 	var captured: bool = spy.has_tag("Shooter._die")
 	_restore_debug_flags(spy)
-	assert_true(captured,
-		"Shooter._die must emit [combat-trace] Shooter._die — harness kill-" +
-		"counting greps on the <Mob>._die line for uniform kill counts")
+	assert_true(
+		captured,
+		(
+			"Shooter._die must emit [combat-trace] Shooter._die — harness kill-"
+			+ "counting greps on the <Mob>._die line for uniform kill counts"
+		)
+	)
 	# Downstream consequence still holds (Tier 2 bar): the mob actually died.
 	assert_true(s.is_dead(), "lethal take_damage still kills the shooter")
 	assert_eq(s.get_state(), Shooter.STATE_DEAD)
@@ -483,6 +515,7 @@ func test_die_emits_combat_trace_die_line() -> void:
 # harder for soak debugging. Same CombatTraceSpy injection pattern as
 # test_die_emits_combat_trace_die_line above.
 
+
 func test_take_damage_emits_combat_trace_line() -> void:
 	var s: Shooter = _make_shooter()  # 40 HP default
 	var spy: CombatTraceSpy = _install_combat_trace_spy()
@@ -491,9 +524,13 @@ func test_take_damage_emits_combat_trace_line() -> void:
 	s.take_damage(10, Vector2.ZERO, null)
 	var captured: bool = spy.has_tag("Shooter.take_damage")
 	_restore_debug_flags(spy)
-	assert_true(captured,
-		"Shooter.take_damage must emit [combat-trace] Shooter.take_damage — " +
-		"console-based hit verification greps on the <Mob>.take_damage line")
+	assert_true(
+		captured,
+		(
+			"Shooter.take_damage must emit [combat-trace] Shooter.take_damage — "
+			+ "console-based hit verification greps on the <Mob>.take_damage line"
+		)
+	)
 	# Downstream consequence still holds (Tier 2 bar): HP actually dropped.
 	assert_eq(s.get_hp(), 30, "non-lethal take_damage still decrements HP (40 - 10)")
 	assert_false(s.is_dead())
@@ -509,6 +546,7 @@ func test_take_damage_emits_combat_trace_line() -> void:
 # tell "hit hit a corpse" apart from "hit never registered". Same
 # CombatTraceSpy injection pattern as test_take_damage_emits_combat_trace_line.
 
+
 func test_take_damage_on_dead_shooter_emits_ignored_already_dead() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 20})
 	var s: Shooter = _make_shooter_with_def(def)
@@ -520,10 +558,14 @@ func test_take_damage_on_dead_shooter_emits_ignored_already_dead() -> void:
 	s.take_damage(10, Vector2.ZERO, null)
 	var captured: bool = spy.has_msg_containing("Shooter.take_damage", "IGNORED already_dead")
 	_restore_debug_flags(spy)
-	assert_true(captured,
-		"Shooter.take_damage must emit [combat-trace] Shooter.take_damage " +
-		"IGNORED already_dead on the _is_dead early-return — mirrors Grunt so " +
-		"soak console greps distinguish corpse-hits from unregistered hits")
+	assert_true(
+		captured,
+		(
+			"Shooter.take_damage must emit [combat-trace] Shooter.take_damage "
+			+ "IGNORED already_dead on the _is_dead early-return — mirrors Grunt so "
+			+ "soak console greps distinguish corpse-hits from unregistered hits"
+		)
+	)
 	# Downstream consequence (Tier 2 bar): the rejected hit changed nothing.
 	assert_eq(s.get_hp(), 0, "rejected take_damage does not decrement HP further")
 
@@ -537,6 +579,7 @@ func test_take_damage_on_dead_shooter_emits_ignored_already_dead() -> void:
 # pattern as test_die_emits_combat_trace_die_line above: the real shim is
 # HTML5-only, so we slot a recording spy under the DebugFlags name and drive
 # physics frames directly. Paired with the trace emit in Shooter._physics_process.
+
 
 func test_pos_trace_emits_after_throttle_interval() -> void:
 	var s: Shooter = _make_shooter()
@@ -556,15 +599,27 @@ func test_pos_trace_emits_after_throttle_interval() -> void:
 			pos_msg = c[1]
 			break
 	_restore_debug_flags(spy)
-	assert_false(emitted_early,
-		"Shooter.pos must NOT emit before POS_TRACE_INTERVAL elapses — the " +
-		"trace is throttled so it is a cheap no-op on perf")
-	assert_true(emitted_after,
-		"Shooter.pos must emit once the throttle accumulator passes " +
-		"POS_TRACE_INTERVAL — the AC4 chase helper steers off this line")
+	assert_false(
+		emitted_early,
+		(
+			"Shooter.pos must NOT emit before POS_TRACE_INTERVAL elapses — the "
+			+ "trace is throttled so it is a cheap no-op on perf"
+		)
+	)
+	assert_true(
+		emitted_after,
+		(
+			"Shooter.pos must emit once the throttle accumulator passes "
+			+ "POS_TRACE_INTERVAL — the AC4 chase helper steers off this line"
+		)
+	)
 	# Downstream consequence (Tier 2 bar): the payload carries the world
 	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/.
-	assert_string_contains(pos_msg, "pos=(384,96)",
-		"Shooter.pos payload must carry the parseable world-coord tuple")
-	assert_string_contains(pos_msg, "dist_to_player=",
-		"Shooter.pos payload must carry dist_to_player for the chase helper")
+	assert_string_contains(
+		pos_msg, "pos=(384,96)", "Shooter.pos payload must carry the parseable world-coord tuple"
+	)
+	assert_string_contains(
+		pos_msg,
+		"dist_to_player=",
+		"Shooter.pos payload must carry dist_to_player for the chase helper"
+	)
