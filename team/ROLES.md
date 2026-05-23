@@ -16,7 +16,8 @@ The user (Thomas) is the **Sponsor**. Sponsor only gives sign-off on big deliver
 
 **Sponsor's hands-off rules**:
 - All tech and design choices belong to the team. Do not ask Sponsor for opinions.
-- Sponsor only tests big deliveries and signs off. Big delivery = a player-runnable build hitting a milestone (M1, M2, ...).
+- Sponsor only tests big deliveries and signs off. **Big delivery = an M-tier RC or a wave-completion sign-off** (e.g. M3 Tier 3 W1 closure, M3 Tier 3 RC) — per the Diablo-shape vertical-slice cadence locked 2026-05-22 (orchestrator memory `m3-diablo-shape-directive`; calendar in `team/priya-pl/post-wave3-sequencing.md` v1.1). M1 and M2 RCs shipped; current target is M3 Tier 3 (~7-10 wk vertical slice).
+- Sponsor's soak ask is right-sized per `.claude/docs/sponsor-soak-routing.md` — Playwright + Tess own mechanical correctness; Sponsor owns subjective-feel slices (1-2 min targeted ask, not full geometric verification). Don't queue "PR needs Sponsor review" — sub-agent peer-review is the gate (memory `sponsor-does-not-review-prs-agents-do`); don't queue "Sponsor creates ticket X" — ticket creation is PL territory (memory `sponsor-does-not-create-clickup-tickets`).
 - Orchestrator (this conversation) makes any cross-role call the PL escalates.
 
 ## ClickUp board
