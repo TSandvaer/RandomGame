@@ -34,10 +34,10 @@ signal room_changed(room: Node, index: int)
 ## Emitted when the player dies (after the death rule has been applied and
 ## the player respawned at Room01). Useful for tests + future death-screen
 ## hook.
-signal player_respawned()
+signal player_respawned
 
 ## Emitted after the boss is defeated and the descend signal fires.
-signal stratum_descended()
+signal stratum_descended
 
 # ---- Constants --------------------------------------------------------
 
@@ -87,6 +87,37 @@ const VIGNETTE_SCENE_PATH: String = "res://scenes/ui/Vignette.tscn"
 ## Player spawn position — center of a 480x270 internal canvas (rooms are
 ## sized to that grid per Uma's visual-direction lock).
 const DEFAULT_PLAYER_SPAWN: Vector2 = Vector2(240, 200)
+
+## M3-T3-W2-T1 — Continuous-scroll wiring. The CameraDirector spike (PR #314,
+## ticket `86c9xu9yt`) added `follow_target(target, deadzone_px)` +
+## `set_world_bounds(bounds)`. W2-T1 (ticket `86c9y0zmg`) wires every room
+## load to engage continuous-scroll against the player with these constants.
+##
+## **Authored S1 room bounds — Rect2(0, 0, 480, 270).** All current
+## Stratum-1 rooms (Rooms 01-08 + boss room) are authored at viewport-native
+## 480×270. Per `.claude/docs/camera-scroll.md` § "Bounds-clamp math —
+## viewport-aware", a `bounds.size <= viewport_world` rect takes the
+## "narrower than viewport" branch in `_clamp_to_world_bounds` and centers
+## the camera on the bounds center — preserving the pre-T9 viewport-stretch
+## visual EXACTLY. Engaging follow_target is therefore zero-visual-change
+## for current S1 content while still wiring the production code-path that
+## W2-T3+ procgen / multi-chunk rooms will consume.
+##
+## **Forward-compat note (post-PR-#344):** `AssembledFloor.bounding_box_px`
+## now exists on main (W2-T3 procgen). `Main.gd` does NOT yet consume it —
+## room load goes through `ROOM_SCENE_PATHS` + authored .tscn instantiation.
+## When the procgen W2-T3-impl PR swaps `_load_room_at_index` to consume
+## `AssembledFloor`, the `set_world_bounds(...)` call below should switch
+## its source from `S1_ROOM_BOUNDS` to `assembled.bounding_box_px` per
+## `.claude/docs/procgen-pipeline.md` § "AssembledFloor output shape".
+const S1_ROOM_BOUNDS: Rect2 = Rect2(0, 0, 480, 270)
+
+## Half-extents of the camera deadzone in WORLD pixels. Identical to the
+## W1 spike's authored value (`scenes/spike/CameraScrollSpike.tscn` →
+## `scripts/spike/CameraScrollSpike.gd`). Vector2(40, 24) = 80×48 freely-
+## moveable rectangle — small enough that the player rarely sits outside,
+## large enough that single-frame WASD doesn't shake the camera.
+const CAMERA_FOLLOW_DEADZONE: Vector2 = Vector2(40, 24)
 
 # ---- Runtime ---------------------------------------------------------
 
@@ -252,6 +283,7 @@ func _exit_tree() -> void:
 
 # ---- Public API ------------------------------------------------------
 
+
 ## Returns the active room node (Stratum1Room01 / MultiMobRoom / Stratum1BossRoom).
 func get_current_room() -> Node:
 	return _current_room
@@ -355,8 +387,13 @@ func apply_death_rule() -> void:
 	# physics-flush sibling-freeze. See `Player._die` for the full rationale.
 	var df: Node = get_tree().root.get_node_or_null("DebugFlags")
 	if df != null and df.has_method("combat_trace"):
-		df.combat_trace("Main.apply_death_rule",
-			"reloading Room 01 — death rule: keep level/equipped/stats, lose unequipped+progression+xp")
+		(
+			df
+			. combat_trace(
+				"Main.apply_death_rule",
+				"reloading Room 01 — death rule: keep level/equipped/stats, lose unequipped+progression+xp"
+			)
+		)
 	var levels: Node = _levels()
 	if levels != null:
 		levels.set_state(levels.current_level(), 0)
@@ -415,6 +452,7 @@ func get_affix_resolver() -> Callable:
 
 # ---- World / scene construction --------------------------------------
 
+
 func _build_world_root() -> void:
 	_world = Node2D.new()
 	_world.name = "World"
@@ -447,6 +485,7 @@ func _spawn_player() -> void:
 
 
 # ---- Room loading ----------------------------------------------------
+
 
 func _load_room_at_index(index: int) -> void:
 	if index < 0 or index >= ROOM_SCENE_PATHS.size():
@@ -483,6 +522,18 @@ func _load_room_at_index(index: int) -> void:
 			_player.get_parent().remove_child(_player)
 		_player.position = DEFAULT_PLAYER_SPAWN
 		room.add_child(_player)
+	# M3-T3-W2-T1 — Engage continuous-scroll follow against the freshly-
+	# re-parented player + clamp the camera to the room's authored bounds.
+	# Both calls are idempotent per spike's idempotence semantics
+	# (`.claude/docs/camera-scroll.md` § "Public API"): same target + same
+	# deadzone → no signal spam, same bounds → no-op. Per-tick player-
+	# fallback lookup in `CameraDirector._process` handles room-cycle re-
+	# resolution if the player reference goes stale. The boss room uses
+	# the same call shape but ALSO runs its own engage at the end of
+	# `_assemble_room_fixtures` (deferred), guarding against an edge-case
+	# where the deferred fixture pass could re-trigger camera bounds
+	# changes after a future widened-boss-room refactor lands.
+	_engage_camera_for_room()
 	# Wire room-specific signals.
 	_wire_room_signals(room, index)
 	# Push pickups into the room (loot spawner re-targets so dropped pickups
@@ -687,11 +738,15 @@ func _clear_room01_pickup_gate() -> void:
 	_room01_already_equipped_awaiting_add = false
 	var inventory: Node = _inventory()
 	if inventory != null:
-		if inventory.has_signal("item_equipped") \
-				and inventory.is_connected("item_equipped", _on_weapon_equipped):
+		if (
+			inventory.has_signal("item_equipped")
+			and inventory.is_connected("item_equipped", _on_weapon_equipped)
+		):
 			inventory.disconnect("item_equipped", _on_weapon_equipped)
-		if inventory.has_signal("item_added") \
-				and inventory.is_connected("item_added", _on_weapon_added_to_grid):
+		if (
+			inventory.has_signal("item_added")
+			and inventory.is_connected("item_added", _on_weapon_added_to_grid)
+		):
 			inventory.disconnect("item_added", _on_weapon_added_to_grid)
 
 
@@ -704,6 +759,7 @@ func _mob_is_dead(m: Node) -> bool:
 
 
 # ---- HUD construction -----------------------------------------------
+
 
 func _build_hud() -> void:
 	_hud = CanvasLayer.new()
@@ -783,7 +839,9 @@ func _build_hud() -> void:
 
 	_xp_label = Label.new()
 	_xp_label.name = "XpLabel"
-	_xp_label.add_theme_color_override("font_color", Color(0.7215686275, 0.6745098039, 0.5568627451, 1.0))
+	_xp_label.add_theme_color_override(
+		"font_color", Color(0.7215686275, 0.6745098039, 0.5568627451, 1.0)
+	)
 	_xp_label.add_theme_font_size_override("font_size", 11)
 	_xp_label.position = Vector2(228, 42)
 	_xp_label.size = Vector2(160, 14)
@@ -832,7 +890,9 @@ func _build_hud() -> void:
 	_stat_pip_label.offset_top = -52.0
 	_stat_pip_label.offset_right = -16.0
 	_stat_pip_label.offset_bottom = -32.0
-	_stat_pip_label.add_theme_color_override("font_color", Color(1.0, 0.4156862745, 0.1647058824, 1.0))
+	_stat_pip_label.add_theme_color_override(
+		"font_color", Color(1.0, 0.4156862745, 0.1647058824, 1.0)
+	)
 	_stat_pip_label.add_theme_font_size_override("font_size", 14)
 	_stat_pip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_stat_pip_label.text = ""
@@ -967,6 +1027,7 @@ func _build_stat_panel() -> void:
 
 # ---- Subscriptions: autoloads -------------------------------------
 
+
 func _subscribe_to_levels() -> void:
 	var levels: Node = _levels()
 	if levels == null:
@@ -986,11 +1047,15 @@ func _subscribe_to_player_stats() -> void:
 	var ps: Node = _player_stats()
 	if ps == null:
 		return
-	if ps.has_signal("unspent_points_changed") and not ps.is_connected("unspent_points_changed", _on_unspent_points_changed):
+	if (
+		ps.has_signal("unspent_points_changed")
+		and not ps.is_connected("unspent_points_changed", _on_unspent_points_changed)
+	):
 		ps.connect("unspent_points_changed", _on_unspent_points_changed)
 
 
 # ---- Save load / persist ------------------------------------------
+
 
 func _load_save_or_defaults() -> void:
 	var save_node: Node = _save()
@@ -1024,10 +1089,13 @@ func _load_save_or_defaults() -> void:
 	# item silently. The registry was scanned in `_ready` before this runs.
 	var inventory: Node = _inventory()
 	if inventory != null:
-		inventory.restore_from_save(
-			data,
-			get_item_resolver(),
-			get_affix_resolver(),
+		(
+			inventory
+			. restore_from_save(
+				data,
+				get_item_resolver(),
+				get_affix_resolver(),
+			)
 		)
 	# Restore stratum progression.
 	var sp: Node = _stratum_progression()
@@ -1070,6 +1138,7 @@ func _save_on_quit() -> void:
 
 # ---- Signal handlers --------------------------------------------
 
+
 func _on_mob_died(mob: Node, death_position: Vector2, mob_def: Resource) -> void:
 	# Diagnostic trace (ticket 86c9un4nh — Finding 2 re-diagnosis). Emit at
 	# the entry point so the trace stream shows WHICH mob died and whether
@@ -1081,10 +1150,13 @@ func _on_mob_died(mob: Node, death_position: Vector2, mob_def: Resource) -> void
 		var mob_id: String = "<null>"
 		if mob_def != null and mob_def.has_method("get") and mob_def.get("id") != null:
 			mob_id = String(mob_def.get("id"))
-		df.combat_trace("Main._on_mob_died",
-			"mob=%s mob_def=%s mob_id=%s pos=(%.0f,%.0f)" % [
-				str(mob), str(mob_def != null), mob_id,
-				death_position.x, death_position.y])
+		df.combat_trace(
+			"Main._on_mob_died",
+			(
+				"mob=%s mob_def=%s mob_id=%s pos=(%.0f,%.0f)"
+				% [str(mob), str(mob_def != null), mob_id, death_position.x, death_position.y]
+			)
+		)
 	# Forward to the loot spawner so a pickup spawns at the death position.
 	if _loot_spawner != null and mob_def != null:
 		var pickups: Array[Node] = _loot_spawner.on_mob_died(mob, death_position, mob_def as MobDef)
@@ -1092,8 +1164,16 @@ func _on_mob_died(mob: Node, death_position: Vector2, mob_def: Resource) -> void
 		if inventory != null and inventory.has_method("auto_collect_pickups"):
 			inventory.auto_collect_pickups(pickups)
 			if df != null and df.has_method("combat_trace"):
-				df.combat_trace("Main._on_mob_died",
-					"auto_collect_pickups wired for %d pickups — picked_up→on_pickup_collected connected" % pickups.size())
+				(
+					df
+					. combat_trace(
+						"Main._on_mob_died",
+						(
+							"auto_collect_pickups wired for %d pickups — picked_up→on_pickup_collected connected"
+							% pickups.size()
+						)
+					)
+				)
 	# Levels.subscribe_to_mob already grants XP via its own one-shot
 	# connection, so we don't double-call here.
 
@@ -1130,7 +1210,12 @@ func _on_room_cleared(_room_id: Variant = null) -> void:
 func _on_boss_defeated(boss: Stratum1Boss, death_position: Vector2) -> void:
 	var packed: PackedScene = load(BOSS_DEFEATED_TITLE_CARD_SCENE_PATH) as PackedScene
 	if packed == null:
-		push_warning("[Main] BossDefeatedTitleCard scene missing at '%s'" % BOSS_DEFEATED_TITLE_CARD_SCENE_PATH)
+		push_warning(
+			(
+				"[Main] BossDefeatedTitleCard scene missing at '%s'"
+				% BOSS_DEFEATED_TITLE_CARD_SCENE_PATH
+			)
+		)
 		return
 	var card: BossDefeatedTitleCard = packed.instantiate() as BossDefeatedTitleCard
 	if card == null:
@@ -1148,8 +1233,9 @@ func _on_boss_defeated(boss: Stratum1Boss, death_position: Vector2) -> void:
 		# Wrap in lambda so the default-arg form is called (Callable.connect
 		# strict-arg-counts means the raw Callable would expect zero args; a
 		# zero-arg lambda forwards into the default-fade method cleanly).
-		card.title_card_dismissed.connect(func() -> void:
-			ad.resume_stratum1_ambient_at_60_percent())
+		card.title_card_dismissed.connect(
+			func() -> void: ad.resume_stratum1_ambient_at_60_percent()
+		)
 	# T16 F3 ramp-out (`86c9wjzgh`, M3 Tier 2 Wave 3). The F2 camera zoom +
 	# vignette deepen were fired from `Stratum1BossRoom._on_boss_died` over
 	# the same 0.9 s window as the sustained ember emitter; the card then
@@ -1164,11 +1250,9 @@ func _on_boss_defeated(boss: Stratum1Boss, death_position: Vector2) -> void:
 	# wiring above — soft no-ops when the autoload / Vignette is absent.
 	var cam: Node = _camera_director()
 	if cam != null and cam.has_method("reset_to_player"):
-		card.title_card_dismissed.connect(func() -> void:
-			cam.reset_to_player())
+		card.title_card_dismissed.connect(func() -> void: cam.reset_to_player())
 	if _vignette != null and _vignette.has_method("boss_defeat_return"):
-		card.title_card_dismissed.connect(func() -> void:
-			_vignette.boss_defeat_return())
+		card.title_card_dismissed.connect(func() -> void: _vignette.boss_defeat_return())
 	card.show_for(boss, death_position)
 
 
@@ -1296,14 +1380,10 @@ func _on_player_regen_active_changed(active: bool) -> void:
 		_hp_shimmer_tween.set_trans(Tween.TRANS_SINE)
 		_hp_shimmer_tween.set_ease(Tween.EASE_IN_OUT)
 		_hp_shimmer_tween.tween_property(
-			_hp_bar_shimmer, "modulate",
-			Color(1.0, 1.0, 1.0, 1.0),   # peak: full opacity → warm amber shows through
-			0.4
+			_hp_bar_shimmer, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.4  # peak: full opacity → warm amber shows through
 		)
 		_hp_shimmer_tween.tween_property(
-			_hp_bar_shimmer, "modulate",
-			Color(1.0, 1.0, 1.0, 0.25),  # trough: dim, "breathing" dip
-			0.4
+			_hp_bar_shimmer, "modulate", Color(1.0, 1.0, 1.0, 0.25), 0.4  # trough: dim, "breathing" dip
 		)
 	else:
 		# Shimmer off: immediately snap to transparent so the shimmer doesn't
@@ -1335,6 +1415,7 @@ func _on_unspent_points_changed(new_unspent: int) -> void:
 
 
 # ---- HUD refresh ------------------------------------------------
+
 
 func _refresh_hud_full() -> void:
 	_refresh_hp_widget()
@@ -1405,6 +1486,7 @@ func _refresh_stat_pip() -> void:
 
 # ---- Autoload accessors -----------------------------------------
 
+
 func _save() -> Node:
 	return get_tree().root.get_node_or_null("Save")
 
@@ -1435,3 +1517,33 @@ func _audio_director() -> Node:
 ## construct Main without crashing if the autoload is absent.
 func _camera_director() -> Node:
 	return get_tree().root.get_node_or_null("CameraDirector")
+
+
+## M3-T3-W2-T1 (`86c9y0zmg`) — Engage CameraDirector continuous-scroll
+## against the freshly-loaded room. Called from `_load_room_at_index`
+## after the player has been re-parented into the new room.
+##
+## Idempotent on room-cycle: re-engaging with the same player + deadzone
+## emits no follow_target_changed signal (per spike's idempotence
+## semantics); re-setting the same Rect2 bounds is also a no-op. The
+## CameraDirector autoload survives the room-swap, so the live-state
+## persists across loads — these calls just re-assert the same contract.
+##
+## Bare-test soft-fail: if `CameraDirector` autoload is absent (bare-
+## instance GUT tests that don't include the autoload), the helper logs
+## once and returns. Mirrors the `_audio_director()` / `_camera_director()`
+## soft-resolve shape — the rest of the room-load flow MUST continue.
+##
+## See `.claude/docs/camera-scroll.md` § "Production wiring" for the
+## end-to-end contract; `S1_ROOM_BOUNDS` + `CAMERA_FOLLOW_DEADZONE`
+## constants define the values used.
+func _engage_camera_for_room() -> void:
+	if _player == null:
+		return
+	var cd: Node = _camera_director()
+	if cd == null:
+		return
+	if cd.has_method("follow_target"):
+		cd.follow_target(_player, CAMERA_FOLLOW_DEADZONE)
+	if cd.has_method("set_world_bounds"):
+		cd.set_world_bounds(S1_ROOM_BOUNDS)

@@ -167,6 +167,17 @@ const T16_CAMERA_ZOOM_TARGET: float = 1.5
 const T16_CAMERA_ZOOM_DURATION: float = 0.9
 const T16_HORN_SFX_CUE_ID: StringName = &"sfx-boss-kill-horn"
 
+## M3-T3-W2-T1 (`86c9y0zmg`) — Continuous-scroll engagement constants.
+## Boss room is viewport-native 480×270 today (same shape as the other S1
+## rooms). When a future ticket widens the boss room for the climax beats
+## or swaps to procgen-assembled bounds via `AssembledFloor.bounding_box_px`,
+## update `BOSS_ROOM_BOUNDS` only. The deadzone matches Main's authored
+## value (`Main.CAMERA_FOLLOW_DEADZONE` = `Vector2(40, 24)`) — kept as a
+## local constant so the boss-room engage is self-contained for tests
+## that bare-instantiate this controller without loading Main.gd.
+const BOSS_ROOM_BOUNDS: Rect2 = Rect2(0, 0, 480, 270)
+const BOSS_ROOM_FOLLOW_DEADZONE: Vector2 = Vector2(40, 24)
+
 # ---- Inspector --------------------------------------------------------
 
 ## res:// path to the boss scene. Indirected via export so tests can swap
@@ -363,6 +374,28 @@ func _assemble_room_fixtures() -> void:
 	# auto-fire as designed.
 	if _boss != null:
 		trigger_entry_sequence()
+	# M3-T3-W2-T1 (`86c9y0zmg`) — Re-engage CameraDirector continuous-scroll
+	# AFTER the deferred fixture pass drains. Main._load_room_at_index
+	# already ran `_engage_camera_for_room()` synchronously on room-load
+	# (which is idempotent against same target + same deadzone + same
+	# bounds), so this call is normally a no-op signal-wise. The reason we
+	# still issue it from the boss room's deferred fixture pass:
+	#
+	#   1. **Defensive in depth.** When a future ticket widens the boss
+	#      room beyond viewport-native 480×270 (or swaps to procgen-
+	#      assembled bounds via `AssembledFloor.bounding_box_px`), the
+	#      boss room can override `set_world_bounds(...)` here without
+	#      touching Main.gd. The hook is in place.
+	#   2. **Symmetry with the regular-room path.** Every other room
+	#      (Rooms 01-08, MultiMobRoom) gets its camera engage from Main;
+	#      the boss room joins the same contract from inside its own
+	#      controller, making the boss room self-contained for tests
+	#      that bare-instantiate it (e.g. `test_room_advance_only_on_door_walk`).
+	#
+	# Soft-resolve CameraDirector (matches `_camera_director` helper at
+	# the bottom of this file). Same player resolution via the `"player"`
+	# group as the per-tick fallback in `CameraDirector._process`.
+	_engage_camera_for_boss_room()
 
 
 # ---- Public API -------------------------------------------------------
@@ -1099,6 +1132,33 @@ func _resolve_camera_director() -> Node:
 	if not is_inside_tree():
 		return null
 	return get_tree().root.get_node_or_null("CameraDirector")
+
+
+## M3-T3-W2-T1 (`86c9y0zmg`) — Engage CameraDirector continuous-scroll
+## against the player from the boss room's deferred fixture pass.
+##
+## Same call shape as `Main._engage_camera_for_room`. Resolves the player
+## via the `"player"` group (matches `CameraDirector._process`'s per-tick
+## fallback). Bare-test soft-fail when CameraDirector autoload is absent
+## OR the player group is empty.
+##
+## Bounds: viewport-native `Rect2(0, 0, 480, 270)` — see Main.gd
+## `S1_ROOM_BOUNDS` for the forward-compat note about future widened-room
+## / procgen-assembled bounds. Deadzone: `Vector2(40, 24)` — same value
+## the spike + Main use.
+func _engage_camera_for_boss_room() -> void:
+	if not is_inside_tree():
+		return
+	var cd: Node = _resolve_camera_director()
+	if cd == null:
+		return
+	var player: Node = get_tree().get_first_node_in_group("player")
+	if player == null:
+		return
+	if cd.has_method("follow_target"):
+		cd.follow_target(player, BOSS_ROOM_FOLLOW_DEADZONE)
+	if cd.has_method("set_world_bounds"):
+		cd.set_world_bounds(BOSS_ROOM_BOUNDS)
 
 
 ## Resolve the Vignette instance. Production lives under Main as a child;
