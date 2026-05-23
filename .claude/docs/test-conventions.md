@@ -473,6 +473,43 @@ The gate at `Stratum1BossRoom.gd:358` (currently — verify line if refactored) 
 
 **Symptom to recognize:** test premise reads "no boss should mean no entry-sequence-active" yet GUT log shows the entry sequence engaging anyway after a frame-drain await. The deferred-call resolution is the culprit, not the test order.
 
+## Timing assertions — signal-await vs fixed-timer floor (PR #357 follow-up)
+
+**The anti-pattern.** A GUT test wants to assert "this completes within X ms," so it writes:
+
+```gdscript
+var start_ms: int = Time.get_ticks_msec()
+trigger_thing()
+await get_tree().create_timer(0.8).timeout      # ← THE TRAP
+var elapsed_ms: int = Time.get_ticks_msec() - start_ms
+assert_lt(elapsed_ms, 800, "thing completes under 800 ms")
+```
+
+**Why it's structurally broken.** The `create_timer(0.8).timeout` await is ITSELF the measurement floor. The assertion `assert_lt(elapsed_ms, 800)` then races the timer-driven floor against the assertion bound — zero margin. Worked example: `tests/test_first_boss_kill_skip.gd::test_skip_collapses_intro_timing_to_about_half_a_second` (pre-fix) passed on main for weeks by 1-5 ms of luck. PR #357's preload-hoist work perturbed CI variance enough to tip the at-bound assertion (812 ms / 812 ms on rerun-same-SHA — definitively not flake; the test was always fragile).
+
+**The fix — await the actual completion signal.** Production code that emits a `<thing>_completed` signal IS already the right oracle. Subscribe + await directly:
+
+```gdscript
+var start_ms: int = Time.get_ticks_msec()
+trigger_thing()
+if not subject.is_thing_completed():
+    await subject.thing_completed
+var elapsed_ms: int = Time.get_ticks_msec() - start_ms
+assert_lt(elapsed_ms, 700, "thing completes under 700 ms")
+```
+
+This measures actual signal-fire time with frame-period precision (~16 ms at 60 Hz, the GUT runner's typical frame budget). The assertion bound is now a real behavioral bound on the system-under-test, NOT a race against a fixture-side timer.
+
+**Pre-fire guard against signal-race.** If the production code can complete BEFORE the test's `await` line executes (e.g. the `trigger_*` call synchronously fires the signal), the bare `await` would hang. Guard with `if not subject.is_*_completed(): await subject.<signal>` — checks the post-condition first, awaits only if not yet completed. This is the canonical shape; see the worked example at `tests/test_first_boss_kill_skip.gd:359-360`.
+
+**Bound headroom.** Pick the assertion bound by considering signal-fire-time + frame-period overhead. For 60Hz GUT the headroom should be ≥ ~50 ms for safety margin. The PR #357 fix tightened from 800 ms (at-bound) to 700 ms (signal-fire-bound with ~16 ms headroom against the empirically-observed ~684 ms mean). Don't bound TOO loosely — a 1500 ms bound on a 700 ms behavior won't catch a regression that doubled the runway.
+
+**When the anti-pattern is acceptable.** Only when there is genuinely no production signal to await (extremely rare for any system with completion-state — most GUT-tested subjects emit a `<state>_completed` or similar). If you find yourself unable to identify the natural completion signal, that's a code-smell on the production code, not a justification for the timer-await pattern. File a follow-up to add the signal.
+
+**Surfaces this trap repeats on.** Sequence-collapse tests (boss intro skip), freeze-recovery tests (time-scale unwind), animation-completion tests (tween-driven HUD reveal), hit-pause tests (TimeScaleDirector.freeze duration). Audit any GUT test with `await create_timer(N).timeout` followed by `assert_lt(elapsed_ms, ~N*1000)` — the timer-floor-IS-the-bound trap is the same shape.
+
+**Cite shape.** PR #357 (ticket `86c9y58pf`, merge `1aabfce`) — commit `36ccf12` (Devon's follow-up) refactored `tests/test_first_boss_kill_skip.gd:319-374` from the timer-await pattern to the signal-await pattern. Tess's PR #357 final-review noted that the underlying test had been passing by 1-5 ms of luck for weeks; Drew initially classified the failure as a flake until rerun-same-SHA failed twice. The trap is structural, not specific to that test.
+
 ## Test stubs — script-typed `extends Node` required for `Object.set` writes (PR #352 lesson)
 
 **What it is.** A GUT test wants a lightweight stub for a real game object (e.g. `Player`), so it instantiates `Node.new()` and seeds fields via `Object.set("active_bounty", QuestState.new())`. Every assertion against the stub then fails with bizarre shapes — `active_bounty is null` when it was just `set` to a value, `Trying to assign value of type 'Nil' to a variable of type 'Array'` when reading a Variant field.
