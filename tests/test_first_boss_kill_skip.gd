@@ -212,14 +212,16 @@ func test_migration_v3_to_v4_default_false() -> void:
 
 
 # =====================================================================
-# Test 5 — Migration chain v0 → v4 idempotent
+# Test 5 — Migration chain v0 → v5 idempotent (W2-T4 extended chain)
 # =====================================================================
 
-func test_migration_chain_v0_to_v4_idempotent() -> void:
-	# A v0 envelope migrates through v0 → v1 → v2 → v3 → v4 in one
+func test_migration_chain_v0_to_v5_idempotent() -> void:
+	# A v0 envelope migrates through v0 → v1 → v2 → v3 → v4 → v5 in one
 	# load_game call. Loading TWICE (and re-saving in between) must
 	# produce the same migrated shape — no double-backfill, no field
-	# duplication, schema_version stays at 4.
+	# duplication, schema_version stays at 5, first_boss_kill_seen
+	# remains stable, and world_seed (re-rolled on first v4→v5 pass)
+	# does NOT get re-rolled again on the second load (idempotence).
 	var save_node: Node = _save()
 	var v0_envelope: Dictionary = {
 		"data": {
@@ -232,10 +234,16 @@ func test_migration_chain_v0_to_v4_idempotent() -> void:
 	# First load — full chain migrates in memory.
 	var first_loaded: Dictionary = save_node.load_game(SAVE_SLOT)
 	assert_true(first_loaded["character"].has("first_boss_kill_seen"),
-		"v0 → v4 chain ends with first_boss_kill_seen present")
+		"v0 → v5 chain ends with first_boss_kill_seen present")
 	assert_false(bool(first_loaded["character"]["first_boss_kill_seen"]),
-		"v0 → v4 chain ends with first_boss_kill_seen=false default")
-	# Save back — on-disk envelope is now v4.
+		"v0 → v5 chain ends with first_boss_kill_seen=false default")
+	# v4 → v5 step rolls world_seed to a non-zero value.
+	assert_true(first_loaded["character"].has("world_seed"),
+		"v0 → v5 chain ends with world_seed key present (backfilled at v3→v4, re-rolled at v4→v5)")
+	var first_seed: int = int(first_loaded["character"]["world_seed"])
+	assert_ne(first_seed, 0,
+		"v4 → v5 re-rolled world_seed to non-zero value (W2-T4 promotion)")
+	# Save back — on-disk envelope is now v5.
 	save_node.save_game(SAVE_SLOT, first_loaded)
 	# Read raw envelope to verify schema_version on disk.
 	var path: String = save_node.save_path(SAVE_SLOT)
@@ -243,14 +251,19 @@ func test_migration_chain_v0_to_v4_idempotent() -> void:
 	var raw: String = f2.get_as_text()
 	f2.close()
 	var on_disk: Dictionary = JSON.parse_string(raw)
-	assert_eq(int(on_disk["schema_version"]), 4, "on-disk envelope is v4 after migration + save")
-	# Second load — no-op on already-v4. Re-saving + reloading lands on
-	# the same shape; flag value unchanged.
+	assert_eq(int(on_disk["schema_version"]), 5, "on-disk envelope is v5 after migration + save")
+	# Critically — world_seed survives the double-trip; no second re-roll.
+	assert_eq(int(on_disk["data"]["character"]["world_seed"]), first_seed,
+		"world_seed is stable on already-v5 re-save (no spurious second re-roll)")
+	# Second load — no-op on already-v5. Re-saving + reloading lands on
+	# the same shape; flag value unchanged; world_seed bit-identical.
 	var second_loaded: Dictionary = save_node.load_game(SAVE_SLOT)
 	assert_false(bool(second_loaded["character"]["first_boss_kill_seen"]),
-		"already-v4 load is idempotent — first_boss_kill_seen unchanged")
+		"already-v5 load is idempotent — first_boss_kill_seen unchanged")
 	assert_eq(int(second_loaded["character"]["level"]), 2,
 		"v0 level survives the full chain through to second load")
+	assert_eq(int(second_loaded["character"]["world_seed"]), first_seed,
+		"already-v5 load preserves world_seed (no spurious re-roll on idempotent reload)")
 
 
 # =====================================================================

@@ -207,16 +207,20 @@ func test_smoke_both_starter_items_registered_in_content_registry() -> void:
 # =========================================================================
 # VARIANT 2 — MIGRATION: v0 save → migrate to current schema → zero warnings
 # =========================================================================
-## Schema v4 landed via M3-T2-W3-T17 (`first_boss_kill_seen` for the
-## boss-intro skip rule). The live migration variant here is v0→v4,
-## which exercises the FULL migration chain (_migrate_v0_to_v1 →
-## _migrate_v1_to_v2 → _migrate_v2_to_v3 → _migrate_v3_to_v4) and verifies
+## Schema v5 landed via W2-T4 (ticket `86c9y108t`, 2026-05-23) — promoted
+## `character.world_seed` from v4-additive to v5-canonical layer with a
+## one-time re-roll of the `0` sentinel for legacy v4 characters. Schema
+## v4 landed via M3-T2-W3-T17 (`first_boss_kill_seen` for the boss-intro
+## skip rule). The live migration variant here is v0→v5, which exercises
+## the FULL migration chain (_migrate_v0_to_v1 → _migrate_v1_to_v2 →
+## _migrate_v2_to_v3 → _migrate_v3_to_v4 → _migrate_v4_to_v5) and verifies
 ## it is warning-clean. The v3→v4 step is also tested in isolation under
-## `tests/test_first_boss_kill_skip.gd` and `tests/test_save_migration.gd`.
+## `tests/test_first_boss_kill_skip.gd` and `tests/test_save_migration.gd`;
+## the v4→v5 step is tested in isolation under `tests/test_save.gd`.
 
 func test_migration_v0_to_current_schema_emits_no_warnings() -> void:
 	## A v0 fixture (no schema_version) migrates cleanly to the current
-	## schema (v4 as of 2026-05-22) without firing any WarningBus emissions.
+	## schema (v5 as of 2026-05-23) without firing any WarningBus emissions.
 	## The only warnings the migration path emits are for "schema newer than
 	## runtime" (an intentional future-save safety net) — v0 is OLDER than
 	## runtime, so that path never triggers here.
@@ -232,13 +236,17 @@ func test_migration_v0_to_current_schema_emits_no_warnings() -> void:
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_false(loaded.is_empty(), "v0 fixture must load without returning {}")
 
-	# Verify migration landed at v4 fields (structural migration smoke).
+	# Verify migration landed at v5 fields (structural migration smoke).
 	assert_true(loaded.has("meta"), "migration added 'meta' block (v0→v1)")
 	assert_true(loaded["character"].has("xp_to_next"), "migration added 'xp_to_next' (v1→v2)")
 	assert_true(loaded["character"].has("stats"), "migration added 'stats' block (v2→v3)")
 	assert_true(loaded["character"].has("unspent_stat_points"), "migration added 'unspent_stat_points' (v2→v3)")
 	assert_true(loaded["character"].has("first_boss_kill_seen"),
 		"migration added 'first_boss_kill_seen' (v3→v4)")
+	assert_true(loaded["character"].has("world_seed"),
+		"migration backfilled 'world_seed' (v3→v4) and re-rolled (v4→v5)")
+	assert_ne(int(loaded["character"]["world_seed"]), 0,
+		"v4 → v5 re-rolled the `0` sentinel to a non-zero seed (W2-T4 canonical promotion)")
 
 	# Schema post-migration — the in-memory data is at the current schema.
 	# Confirm by saving back and reading the envelope.
@@ -247,9 +255,9 @@ func test_migration_v0_to_current_schema_emits_no_warnings() -> void:
 	var raw2: String = f2.get_as_text()
 	f2.close()
 	var envelope: Dictionary = JSON.parse_string(raw2)
-	assert_eq(int(envelope["schema_version"]), 4,
-		"on-disk envelope is v4 after migration + resave (MIGRATION VARIANT: "
-		+ "schema_version on disk must equal current SCHEMA_VERSION=4, not 0)")
+	assert_eq(int(envelope["schema_version"]), 5,
+		"on-disk envelope is v5 after migration + resave (MIGRATION VARIANT: "
+		+ "schema_version on disk must equal current SCHEMA_VERSION=5, not 0)")
 
 	# NoWarningGuard asserts zero emissions in after_each().
 

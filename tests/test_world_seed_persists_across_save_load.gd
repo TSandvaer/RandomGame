@@ -1,6 +1,7 @@
 extends GutTest
 ## Per-character `world_seed` save/load round-trip — M3 Tier 3 W1 procgen
-## spike Part B (ticket `86c9xub9p`).
+## spike Part B (ticket `86c9xub9p`), promoted to v5-canonical by W2-T4
+## (ticket `86c9y108t`, 2026-05-23).
 ##
 ## **Bug class this catches:** any future refactor that drops `world_seed`
 ## from the save schema, fails to roll it on new-character creation, or
@@ -18,9 +19,9 @@ extends GutTest
 ##   3. Two consecutive `default_payload()` calls roll DIFFERENT seeds
 ##      (sanity check on the RNG — if randi() returned a constant, the
 ##      Diablo-shape variance is silently dead).
-##   4. The `_migrate_v3_to_v4` back-fill lands `world_seed=0` on a
-##      hand-authored v3 fixture, and the post-migration value is
-##      stable through subsequent save/load cycles.
+##   4. The v3 → v4 → v5 migration chain re-rolls the `0` sentinel to a
+##      non-zero value (W2-T4 canonical promotion), and the post-migration
+##      value is immutable through subsequent save/load cycles.
 ##   5. **The brief's invariant** — same world_seed → same
 ##      `AssembledFloor` output across the save round-trip. Exercises the
 ##      whole pipeline end-to-end:
@@ -29,10 +30,12 @@ extends GutTest
 ##
 ## Cross-references:
 ##   tests/test_save.gd               — sibling save-schema round-trip tests
+##                                      (v5 migration isolated tests live here)
 ##   tests/test_floor_assembler.gd    — Part A's determinism pins
-##   scripts/save/Save.gd             — DEFAULT_PAYLOAD + _migrate_v3_to_v4
+##   scripts/save/Save.gd             — DEFAULT_PAYLOAD + _migrate_v4_to_v5
 ##   scripts/levels/FloorAssembler.gd — consumer of world_seed via derive_zone_seed
-##   team/devon-dev/save-schema-v5-plan.md — additive doctrine source
+##   team/devon-dev/save-schema-v5-plan.md       — additive doctrine source
+##   team/devon-dev/save-schema-v5-tier3-additions.md — §5.1 sentinel re-roll recommendation
 
 const TEST_SLOT: int = 998
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
@@ -145,12 +148,26 @@ func test_two_consecutive_default_payloads_roll_different_world_seeds() -> void:
 
 
 # -----------------------------------------------------------------------
-# Coverage 4 — _migrate_v3_to_v4 back-fills world_seed to 0
+# Coverage 4 — v3 → v4 → v5 migration chain: sentinel re-rolled
 # -----------------------------------------------------------------------
+##
+## W2-T4 lift (ticket `86c9y108t`, 2026-05-23): v5 promoted `world_seed`
+## from v4-additive (sentinel `0` backfill, immutable) to v5-canonical
+## (one-time re-roll of the sentinel on first v5 load). These tests
+## previously asserted the sentinel STAYED `0` through round-trip —
+## that's now the v4-isolated behaviour. With v5 in the chain,
+## `_migrate_v4_to_v5` re-rolls the sentinel to a non-zero value, then
+## the field is immutable (subsequent saves preserve bit-identical).
 
 
-func test_v3_migration_backfills_world_seed_to_zero_sentinel() -> void:
+func test_v3_migration_rerolls_world_seed_via_v5_canonical_promotion() -> void:
 	# Hand-author a v3 save (no world_seed, no first_boss_kill_seen).
+	# Under the v0 → v1 → v2 → v3 → v4 → v5 chain:
+	#   - v3 → v4 backfills world_seed = 0 (sentinel).
+	#   - v4 → v5 re-rolls the sentinel to a non-zero value.
+	# The previous test (pre-W2-T4) asserted the sentinel stayed 0; W2-T4
+	# inverts that contract — under v5-canonical, no character ever
+	# carries the `0` sentinel out of `load_game`.
 	var v3_envelope: Dictionary = {
 		"schema_version": 3,
 		"saved_at": "2026-05-02T10:00:00",
@@ -177,19 +194,20 @@ func test_v3_migration_backfills_world_seed_to_zero_sentinel() -> void:
 
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_true(loaded["character"].has("world_seed"),
-		"v3 → v4 migration backfills character.world_seed")
-	assert_eq(int(loaded["character"]["world_seed"]), 0,
-		"backfill default is 0 (sentinel — fresh new-character flow re-rolls)")
-	# Subsequent save/load preserves the sentinel.
+		"v3 → v4 → v5 chain preserves world_seed key")
+	var rolled: int = int(loaded["character"]["world_seed"])
+	assert_ne(rolled, 0,
+		"v4 → v5 re-rolls the `0` sentinel to a non-zero value (W2-T4)")
+	# Subsequent save/load is immutable — no spurious second re-roll.
 	assert_true(_save().save_game(TEST_SLOT, loaded))
 	var reloaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_eq(int(reloaded["character"]["world_seed"]), 0,
-		"world_seed sentinel stable across re-save (no random re-roll on existing characters)")
+	assert_eq(int(reloaded["character"]["world_seed"]), rolled,
+		"world_seed is immutable post-re-roll (no random second roll on existing characters)")
 
 
 func test_v3_migration_preserves_non_default_character_fields() -> void:
-	# Belt-and-suspenders: confirm the v3→v4 chain doesn't stomp the
-	# character's other fields when adding world_seed.
+	# Belt-and-suspenders: confirm the v3 → v4 → v5 chain doesn't stomp
+	# the character's other fields when adding + re-rolling world_seed.
 	var v3_envelope: Dictionary = {
 		"schema_version": 3,
 		"saved_at": "2026-05-02T10:00:00",
@@ -215,9 +233,10 @@ func test_v3_migration_preserves_non_default_character_fields() -> void:
 	f.close()
 
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
-	# world_seed added.
+	# world_seed added + re-rolled to non-zero (W2-T4).
 	assert_true(loaded["character"].has("world_seed"))
-	assert_eq(int(loaded["character"]["world_seed"]), 0)
+	assert_ne(int(loaded["character"]["world_seed"]), 0,
+		"v3 → v5 chain re-rolls the sentinel to non-zero (W2-T4 canonical promotion)")
 	# Other fields preserved.
 	assert_eq(loaded["character"]["name"], "Devon-Test")
 	assert_eq(loaded["character"]["level"], 4)

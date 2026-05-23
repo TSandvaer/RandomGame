@@ -29,7 +29,7 @@ const TMP_SUFFIX: String = ".tmp"
 const README_FILENAME: String = "README.txt"
 const README_PATH: String = SAVE_DIR + README_FILENAME
 
-const SCHEMA_VERSION: int = 4
+const SCHEMA_VERSION: int = 5
 
 # ---- Signals ----------------------------------------------------------
 
@@ -74,17 +74,22 @@ const _V2_MAX_LEVEL: int = 5
 # pressing any movement key during Beats 2–4. Default false (first-ever
 # fight is NOT skippable). Mirrors `first_level_up_seen` lifecycle exactly.
 #
-# Additive v4 extension (2026-05-22, M3 Tier 3 W1 procgen spike Part B,
-# ticket 86c9xub9p): `character.world_seed` — per-character procgen seed
-# rolled on character creation, immutable thereafter. Drives
-# `FloorAssembler.derive_zone_seed(...)` so every character sees a
-# deterministic-per-them map layout (Diablo-shape per
-# `m3-diablo-shape-directive` memory). Default `0` is the migration
-# back-fill (legacy v3/v4 characters); fresh characters get a rolled
-# `randi()` value via `default_payload()`. Stays on schema v4 — the v5
-# plan (multi-character lift) owns the next bump; world_seed is a
-# purely additive field within v4's character block per the
-# additive-only rule in `save-schema-v4-plan.md §4.1`.
+# v5 (2026-05-23, M3 Tier 3 W2-T4, ticket 86c9y108t): promotes
+# `character.world_seed` from the v4-additive layer (PR #328 Part B,
+# back-fill sentinel `0`) to the v5-canonical layer. The field shape is
+# unchanged (per-character procgen seed rolled on character creation,
+# immutable thereafter; drives `FloorAssembler.derive_zone_seed(...)`),
+# but the v4→v5 migration adds a one-time re-roll for legacy v4
+# characters whose `world_seed == 0` sentinel — so that after the
+# bump, every loaded character has a non-zero seed (the Diablo-shape
+# per-character-variance promise per `m3-diablo-shape-directive`
+# memory). Note: this is NOT the v5 multi-character lift catalogued in
+# `team/devon-dev/save-schema-v5-plan.md`. That lift (data.character →
+# data.characters[]) is paper-only at W2-T4 time and lands in a
+# separate downstream ticket. W2-T4 owns the `world_seed` promotion
+# AND the SCHEMA_VERSION bump from 4 to 5 — the bump anchors v5 on
+# disk so the migration chain (v0 → … → v4 → v5) has a stable entry
+# point for the multi-character lift to extend later.
 const DEFAULT_PAYLOAD: Dictionary = {
 	"character": {
 		"name": "Ember-Knight",
@@ -211,6 +216,12 @@ func load_game(slot: int = 0) -> Dictionary:
 ## migration back-fill default (`0`) is replaced HERE so a hand-rolled
 ## "new character" flow + the `save_game(slot, null)` fallback both land
 ## on a meaningful seed.
+##
+## v5 (W2-T4, ticket `86c9y108t`): the roll path here is unchanged; v5's
+## `_migrate_v4_to_v5` is the load-side complement that re-rolls the `0`
+## sentinel for legacy v4 characters once on first v5 load. Together the
+## two paths guarantee that EVERY in-memory character has a non-zero
+## `world_seed` regardless of which surface created the character.
 func default_payload() -> Dictionary:
 	# Manual deep-copy because Dictionary.duplicate(true) duplicates nested
 	# arrays/dicts — exactly what we want.
@@ -272,6 +283,8 @@ func migrate(data: Dictionary, from_version: int) -> Dictionary:
 		out = _migrate_v2_to_v3(out)
 	if from_version < 4:
 		out = _migrate_v3_to_v4(out)
+	if from_version < 5:
+		out = _migrate_v4_to_v5(out)
 	return out
 
 
@@ -385,10 +398,14 @@ func _migrate_v2_to_v3(data: Dictionary) -> Dictionary:
 ## (sentinel meaning "rolled on first new-character creation, this
 ## character predates the seed roll"). Idempotent — re-running on
 ## already-v4 data with a non-zero `world_seed` does NOT overwrite it.
-## Migrated characters that hit a procgen surface before a fresh new-
-## character flow re-rolls will see a deterministic but boring
-## `derive_zone_seed(0, ...)` layout — acceptable for migrated saves;
-## the M3 multi-character title flow will re-roll for any fresh slot.
+##
+## v5 (2026-05-23, W2-T4) note: the `0` sentinel set here is consumed
+## by `_migrate_v4_to_v5`, which re-rolls it to a non-zero `randi()`
+## value once on first v5 load. Migrated characters therefore only
+## ever see the boring `derive_zone_seed(0, ...)` layout if they
+## hit a procgen surface BEFORE the chain reaches v5 — which is
+## impossible at HEAD because the chain runs to SCHEMA_VERSION (now
+## 5) inside `migrate()` before returning the dict to callers.
 func _migrate_v3_to_v4(data: Dictionary) -> Dictionary:
 	if not data.has("character") or not (data["character"] is Dictionary):
 		data["character"] = DEFAULT_PAYLOAD["character"].duplicate(true)
@@ -397,6 +414,73 @@ func _migrate_v3_to_v4(data: Dictionary) -> Dictionary:
 		character["first_boss_kill_seen"] = false
 	if not character.has("world_seed"):
 		character["world_seed"] = 0
+	return data
+
+
+## v4 -> v5: promote `character.world_seed` from the v4-additive layer
+## (PR #328 Part B) to the v5-canonical layer (W2-T4, ticket
+## `86c9y108t`).
+##
+## **What changes on disk:** `SCHEMA_VERSION` flips from 4 to 5; the
+## next `save_game` call writes `schema_version: 5` into the envelope.
+## **The character payload SHAPE is unchanged** — `world_seed` is the
+## same int field at the same path. The semantic that promotes is
+## "what does `world_seed == 0` mean": under v4 it was the migration
+## back-fill sentinel meaning "this character predates the procgen
+## roll"; under v5 the sentinel is consumed at migration time and
+## **re-rolled** to a non-zero `randi()` value.
+##
+## **One-time backfill semantics:** any v4 character (or earlier;
+## v0..v3 chain through `_migrate_v3_to_v4` which back-fills `0`) that
+## reaches v5 with `world_seed == 0` gets a fresh `randi()` roll here.
+## After this single migration pass the seed is non-zero and immutable
+## (the discipline lives in the character-creation flow + the lack of
+## any in-game mutator). Subsequent v5 loads observe the non-zero
+## value and the `world_seed == 0` branch is not re-taken — i.e. the
+## re-roll fires exactly once per legacy character.
+##
+## **Why re-roll instead of leaving the sentinel:** the v5 brief from
+## `team/devon-dev/save-schema-v5-tier3-additions.md §5.1` enumerates
+## two design options for the sentinel — "treat 0 as re-roll" vs
+## "treat 0 as deterministic-for-legacy." The brief recommends
+## re-roll: legacy characters then see fresh, per-character maps that
+## match the Diablo-shape promise (per `m3-diablo-shape-directive`
+## memory), rather than every legacy character sharing one boring
+## `derive_zone_seed(0, ...)` layout.
+##
+## **Idempotence:** running on a v5 save where `world_seed` is already
+## non-zero is a no-op (the inner `if seed == 0` guard fails). Running
+## twice on a v5 save (e.g. defensive double-migration test) yields
+## the same dict, no field drift, no second re-roll. Mirrors the
+## `_migrate_v3_to_v4` defensive-guard idiom — character block
+## back-filled if missing; per-field `has()` checks before write.
+##
+## **What v5 does NOT do here:** this migration is the `world_seed`
+## canonical promotion ONLY. The full v5 multi-character lift
+## (`data.character` -> `data.characters[]`, equipped lift to per-character,
+## shared_stash lift, active_slot) catalogued in
+## `team/devon-dev/save-schema-v5-plan.md` is paper-only at W2-T4
+## time and lands in a separate downstream ticket. The two
+## promotions co-exist on schema v5 (additive, per the v5 plan
+## §2.3 multi-character lift's own out-of-W2-T4 scope).
+func _migrate_v4_to_v5(data: Dictionary) -> Dictionary:
+	if not data.has("character") or not (data["character"] is Dictionary):
+		data["character"] = DEFAULT_PAYLOAD["character"].duplicate(true)
+	var character: Dictionary = data["character"]
+	# Defensive: v0..v3 chains backfill world_seed=0 via _migrate_v3_to_v4.
+	# If a hand-edited v4 save somehow lacks the key entirely, treat that
+	# as the sentinel too (effectively merges the "key absent" and "key
+	# present == 0" cases — both mean "this character predates the roll").
+	var seed_value: int = int(character.get("world_seed", 0))
+	if seed_value == 0:
+		# One-time backfill: roll a fresh non-zero seed. randi() returns
+		# [0, 2^32); probability of rolling exactly 0 is 1/2^32 (~2.3e-10).
+		# We do NOT re-loop on a zero re-roll — the test surface treats the
+		# 1/2^32 chance as a quirk of `randi()`, not a contract violation.
+		# (The character would migrate to v5 with `world_seed == 0` and
+		# the next migration pass — which can't happen at v5 HEAD — would
+		# re-roll. In practice the seed will be non-zero on first try.)
+		character["world_seed"] = randi()
 	return data
 
 
