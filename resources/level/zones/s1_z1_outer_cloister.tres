@@ -1,34 +1,49 @@
-[gd_resource type="Resource" script_class="ZoneDef" load_steps=8 format=3]
+[gd_resource type="Resource" script_class="ZoneDef" load_steps=12 format=3]
 
-; Worked-example ZoneDef for the M3 Tier 3 W1 zone-schema spike (ticket
-; 86c9xuap4). This is the FIRST zone authored against the new schema — it
-; demonstrates the data shape the procgen spike (sibling ticket 86c9xub9p)
-; will consume and the W2 S1 retrofit will replicate across the rest of S1.
+; W2-T3 retrofit (`86c9y1045`, SI-8 (b) lock) — single S1 ZoneDef covering
+; the full Stratum-1 narrative arc. All 8 hand-authored S1 chunks are
+; declared as anchors per the SI-8 (b) commitment ("partially procedural
+; with hand-pinned set-pieces"); the procedural slot pool is intentionally
+; SMALL (3 rooms × max 1 slot per gap) so per-character variance reads
+; without diluting the deliberate narrative ordering.
 ;
-; Anchors (in zone-graph order):
-;   entry         → s1_room01 (Threshold — existing single-entry chunk)
-;   npc_room      → s1_room02 (Antechamber — quiet, room for a stationary NPC)
-;   quest_target  → s1_room04 (Marksman's Perch — Shooter-only chunk;
-;                              good "find the marksman" objective room)
-;   boss_room     → s1_room08 (Bossward Threshold — already has boss_door
-;                              port toward Stratum1BossRoom.tscn)
-;   exit          → s1_z1_descent (re-uses s1_room08 chunk GEOMETRY but
-;                                  distinct anchor room_id; demonstrates
-;                                  the "two anchors may share chunk
-;                                  geometry, must have distinct room_ids"
-;                                  convention per ZoneAnchor.gd doc).
-;                  target_zone_id = &"s2_z1_sunken_entrance" — cross-zone
-;                  mating per level-chunks.md § "Cross-zone transitions".
-;                  Targets a not-yet-authored S2 zone; the assembler will
-;                  treat the unresolved target_zone_id as a terminal exit
-;                  until S2 zones land in W3.
+; Anchors (in zone-graph order — narrative-ordered):
+;   1. entry         → s1_room01 (Threshold — practice dummy; player intro)
+;   2. npc_room      → s1_room02 (Antechamber — quiet, room for a stationary NPC)
+;   3. story_beat    → s1_room03 (Charger's Run — first chase-archetype intro)
+;   4. quest_target  → s1_room04 (Marksman's Perch — Shooter-only chunk;
+;                                 "find the marksman" objective room)
+;   5. story_beat    → s1_room05 (Crossfire Yard — mixed-archetype trial)
+;   6. npc_room      → s1_room06 (Hallowed Spring — healing fountain in
+;                                 MultiMobRoom; restful NPC slot)
+;   7. story_beat    → s1_room07 (Pincer Hall — multi-shooter pressure beat)
+;   8. boss_room     → s1_room08 (Bossward Threshold — boss_door port
+;                                 toward Stratum1BossRoom.tscn)
+;   9. exit          → s1_z1_descent (re-uses s1_room08 chunk GEOMETRY but
+;                                     distinct anchor room_id; demonstrates
+;                                     "two anchors may share chunk geometry,
+;                                     must have distinct room_ids" per
+;                                     ZoneAnchor.gd doc).
+;                      target_zone_id = &"s2_z1_sunken_entrance" — cross-zone
+;                      mating per level-chunks.md § "Cross-zone transitions".
+;                      Targets a not-yet-authored S2 zone; the assembler will
+;                      treat the unresolved target_zone_id as a terminal exit
+;                      until S2 zones land in W3.
 ;
-; Procedural slot pool: 4 existing S1 mid-tier chunks. Procgen draws from
-; this pool with per-character zone_seed to fill 1..3 slots between each
-; consecutive anchor pair (see min_/max_slots_between_anchors).
+; Procedural slot pool: 3 mid-tier combat chunks (rooms 03 / 05 / 07). All
+; three carry the canonical WEST entry + EAST exit ports + non-trivial mob
+; spawns, so per-character procedural fill remains combat-shaped without
+; producing dead corridors.
 ;
-; This .tres is the spike artifact — NOT yet wired into Main.tscn. W2's
-; assemble_floor impl + S1 retrofit consumes it.
+; Slot range: [0, 1] per gap × 8 gaps = 0..8 procedural chunks per assembly.
+; Total chunks per assembly: 9 (anchor-only floor) .. 17 (max fill). The
+; SMALL fill range (vs the spike's [1, 3]) is the SI-8 (b) "light
+; procedural fill between anchors" commitment — narrative reads first,
+; per-character variance second.
+;
+; W2-T3 acceptance: assemble across N≥8 seeds → port_mating_errors stays
+; empty (s1_room01 east-seam fix in same PR closes R-PROCGEN.b). Pinned by
+; tests/test_floor_assembler.gd::test_s1_z1_clean_mating_across_8_seeds.
 
 [ext_resource type="Script" path="res://resources/level/ZoneDef.gd" id="1_zone"]
 [ext_resource type="Script" path="res://resources/level/ZoneAnchor.gd" id="2_anchor"]
@@ -40,18 +55,46 @@ chunk_id = &"s1_room01"
 anchor_kind = &"entry"
 target_zone_id = &""
 
-[sub_resource type="Resource" id="Resource_anchor_npc"]
+[sub_resource type="Resource" id="Resource_anchor_npc_antechamber"]
 script = ExtResource("2_anchor")
 room_id = &"s1_z1_antechamber"
 chunk_id = &"s1_room02"
 anchor_kind = &"npc_room"
 target_zone_id = &""
 
-[sub_resource type="Resource" id="Resource_anchor_quest"]
+[sub_resource type="Resource" id="Resource_anchor_story_chargers_run"]
+script = ExtResource("2_anchor")
+room_id = &"s1_z1_chargers_run"
+chunk_id = &"s1_room03"
+anchor_kind = &"story_beat"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_quest_marksmans_perch"]
 script = ExtResource("2_anchor")
 room_id = &"s1_z1_marksmans_perch"
 chunk_id = &"s1_room04"
 anchor_kind = &"quest_target"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_story_crossfire_yard"]
+script = ExtResource("2_anchor")
+room_id = &"s1_z1_crossfire_yard"
+chunk_id = &"s1_room05"
+anchor_kind = &"story_beat"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_npc_hallowed_spring"]
+script = ExtResource("2_anchor")
+room_id = &"s1_z1_hallowed_spring"
+chunk_id = &"s1_room06"
+anchor_kind = &"npc_room"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_story_pincer_hall"]
+script = ExtResource("2_anchor")
+room_id = &"s1_z1_pincer_hall"
+chunk_id = &"s1_room07"
+anchor_kind = &"story_beat"
 target_zone_id = &""
 
 [sub_resource type="Resource" id="Resource_anchor_boss"]
@@ -73,8 +116,8 @@ script = ExtResource("1_zone")
 zone_id = &"s1_z1_outer_cloister"
 display_name = "Outer Cloister"
 stratum_id = 1
-anchors = [SubResource("Resource_anchor_entry"), SubResource("Resource_anchor_npc"), SubResource("Resource_anchor_quest"), SubResource("Resource_anchor_boss"), SubResource("Resource_anchor_exit")]
-procedural_slot_pool = [&"s1_room03", &"s1_room05", &"s1_room06", &"s1_room07"]
-min_slots_between_anchors = 1
-max_slots_between_anchors = 3
+anchors = [SubResource("Resource_anchor_entry"), SubResource("Resource_anchor_npc_antechamber"), SubResource("Resource_anchor_story_chargers_run"), SubResource("Resource_anchor_quest_marksmans_perch"), SubResource("Resource_anchor_story_crossfire_yard"), SubResource("Resource_anchor_npc_hallowed_spring"), SubResource("Resource_anchor_story_pincer_hall"), SubResource("Resource_anchor_boss"), SubResource("Resource_anchor_exit")]
+procedural_slot_pool = [&"s1_room03", &"s1_room05", &"s1_room07"]
+min_slots_between_anchors = 0
+max_slots_between_anchors = 1
 port_mating_rules = {}
