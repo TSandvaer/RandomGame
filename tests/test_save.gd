@@ -68,7 +68,12 @@ func test_save_then_load_round_trips_modified_payload() -> void:
 	data["character"]["xp"] = 1234
 	data["character"]["vigor"] = 3
 	data["stash"] = [
-		{"id": "weapon_iron_sword", "tier": 2, "rolled_affixes": [{"affix_id": "swift", "value": 0.08}], "stack_count": 1},
+		{
+			"id": "weapon_iron_sword",
+			"tier": 2,
+			"rolled_affixes": [{"affix_id": "swift", "value": 0.08}],
+			"stack_count": 1,
+		},
 	]
 	data["meta"]["runs_completed"] = 7
 	data["meta"]["deepest_stratum"] = 3
@@ -230,7 +235,9 @@ func test_migrate_handles_save_from_future_schema() -> void:
 		"schema_version": 999,
 		"saved_at": "2099-01-01T00:00:00",
 		"data": {
-			"character": {"level": 99, "xp": 1, "vigor": 1, "focus": 1, "edge": 1, "hp_current": 1, "hp_max": 1, "name": "Future"},
+			"character": {
+				"level": 99, "xp": 1, "vigor": 1, "focus": 1, "edge": 1,
+				"hp_current": 1, "hp_max": 1, "name": "Future"},
 			"stash": [],
 			"equipped": {},
 			"meta": {"runs_completed": 1, "deepest_stratum": 8, "total_playtime_sec": 0.0},

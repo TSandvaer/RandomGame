@@ -161,7 +161,8 @@ func test_room06_includes_healing_fountain() -> void:
 	# HealingFountain is spawned in the deferred `_assemble_room_fixtures`
 	# pass (ticket 86c9tqvxx) — drain a frame before asserting it exists.
 	var room: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s1_room06"])
-	assert_not_null(room.get_healing_fountain(), "room06 places a healing fountain (mid-stratum reward)")
+	assert_not_null(room.get_healing_fountain(),
+		"room06 places a healing fountain (mid-stratum reward)")
 
 
 # ---- 2b. RoomGate registration — the AC4 blocker (ticket 86c9tqvxx) --

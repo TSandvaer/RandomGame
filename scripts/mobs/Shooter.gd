@@ -363,7 +363,8 @@ func _process_aiming(_delta: float) -> void:
 			# projectile actually has a chance to reach the player.
 			velocity = _vec_to_player_dir() * move_speed
 			_combat_trace("Shooter._process_aiming",
-				"dist=%.0f > SHOOT_RANGE=%.0f, velocity=(%.0f,%.0f)" % [dist, SHOOT_RANGE, velocity.x, velocity.y])
+				"dist=%.0f > SHOOT_RANGE=%.0f, velocity=(%.0f,%.0f)"
+					% [dist, SHOOT_RANGE, velocity.x, velocity.y])
 		else:
 			velocity = Vector2.ZERO
 	else:
@@ -400,7 +401,8 @@ func _process_post_fire(_delta: float) -> void:
 			# Still out of effective firing range — keep closing during recovery.
 			velocity = _vec_to_player_dir() * move_speed
 			_combat_trace("Shooter._process_post_fire",
-				"dist=%.0f > SHOOT_RANGE=%.0f, closing gap at move_speed=%.0f" % [dist, SHOOT_RANGE, move_speed])
+				"dist=%.0f > SHOOT_RANGE=%.0f, closing gap at move_speed=%.0f"
+					% [dist, SHOOT_RANGE, move_speed])
 		else:
 			velocity = Vector2.ZERO
 	else:
@@ -467,7 +469,8 @@ func _promote_cornered_to_aiming(dist: float) -> void:
 	_aim_left = CORNERED_AIM_DURATION
 	_last_aim_dir = _vec_to_player_dir()
 	_combat_trace("Shooter._promote_cornered_to_aiming",
-		"CORNERED dist=%.0f wall-blocked, promote to AIMING (windup=%.2fs)" % [dist, CORNERED_AIM_DURATION])
+		"CORNERED dist=%.0f wall-blocked, promote to AIMING (windup=%.2fs)"
+			% [dist, CORNERED_AIM_DURATION])
 	_set_state(STATE_AIMING)
 	aim_started.emit(_last_aim_dir)
 	_play_attack_telegraph()
@@ -557,7 +560,13 @@ func _spawn_projectile(dir: Vector2) -> void:
 	# the damage payload (matches Grunt's swing-time policy).
 	var hit_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
 	# Configure BEFORE add_child so _ready picks up team/lifetime/layers.
-	p.configure(hit_dmg, d * PROJECTILE_SPEED, PROJECTILE_LIFETIME, Projectile.TEAM_ENEMY, self, PROJECTILE_KNOCKBACK)
+	p.configure(
+		hit_dmg,
+		d * PROJECTILE_SPEED,
+		PROJECTILE_LIFETIME,
+		Projectile.TEAM_ENEMY,
+		self,
+		PROJECTILE_KNOCKBACK)
 	# Spawn at the shooter's position. Parent under the shooter's parent so
 	# the projectile outlives the shooter (player should still take the hit
 	# of an in-flight projectile from a corpse — the projectile is its own
@@ -621,9 +630,11 @@ func _play_attack_telegraph() -> void:
 	_attack_telegraph_tween = create_tween()
 	var prop: String = "color" if uses_sprite else "modulate"
 	var hold_dur: float = max(0.0, AIM_DURATION - ATTACK_TELEGRAPH_TWEEN_IN * 2.0)
-	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(
+		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
 	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, hold_dur)
-	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(
+		target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
 	_combat_trace("Shooter._play_attack_telegraph",
 		"tween_valid=%s tint=(%.2f,%.2f,%.2f)" % [
 			_attack_telegraph_tween.is_valid(),
@@ -700,7 +711,8 @@ func _play_death_tween() -> void:
 		return
 	_death_tween = create_tween()
 	_death_tween.set_parallel(true)
-	_death_tween.tween_property(self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+	_death_tween.tween_property(
+		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
 	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
 	# Safety-net: parallel timer fires queue_free even if tween_finished hangs.
@@ -914,7 +926,8 @@ func _set_state(new_state: StringName) -> void:
 	if _player != null and is_inside_tree():
 		dist = (_player.global_position - global_position).length()
 	_combat_trace("Shooter._set_state",
-		"%s -> %s dist=%.0f pos=(%.0f,%.0f)" % [old, new_state, dist, global_position.x, global_position.y])
+		"%s -> %s dist=%.0f pos=(%.0f,%.0f)"
+			% [old, new_state, dist, global_position.x, global_position.y])
 	# M3W-3 animation playback. State→anim mapping per `Shooter.gd`'s 3-band
 	# engagement design (see `.claude/docs/combat-architecture.md` §"Shooter
 	# state machine"). KITING walks away → walk anim. AIMING is the windup

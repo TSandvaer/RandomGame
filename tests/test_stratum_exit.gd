@@ -395,7 +395,8 @@ func test_activate_is_active_flips_synchronously() -> void:
 	exit.activate()
 	# NO await — we expect is_active() true synchronously.
 	assert_true(exit.is_active(),
-		"REGRESSION-86c9unkr2: _is_active flips synchronously in activate() even with the async monitoring defer below")
+		"REGRESSION-86c9unkr2: _is_active flips synchronously in activate()"
+			+ " even with the async monitoring defer below")
 
 
 func test_activate_monitoring_flips_after_physics_frame_not_synchronously() -> void:

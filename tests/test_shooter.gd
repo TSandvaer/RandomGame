@@ -57,7 +57,8 @@ func _make_shooter_with_def(def: MobDef) -> Shooter:
 # ---- 1: spawn HP from MobDef + spec defaults --------------------------
 
 func test_spawns_with_full_hp_from_mobdef() -> void:
-	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 40, "damage_base": 6, "move_speed": 60.0})
+	var def: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 40, "damage_base": 6, "move_speed": 60.0})
 	var s: Shooter = _make_shooter_with_def(def)
 	assert_eq(s.get_hp(), 40, "starts at hp_base")
 	assert_eq(s.get_max_hp(), 40)
@@ -280,7 +281,8 @@ func test_aim_direction_locks_at_firing() -> void:
 	s._physics_process(0.001)
 	# Direction at firing time should be toward the player's NEW position.
 	assert_almost_eq(captured_dir[0].x, 0.0, 0.05)
-	assert_almost_eq(captured_dir[0].y, 1.0, 0.05, "fires at last-tracked direction (down), not aim-start direction")
+	assert_almost_eq(captured_dir[0].y, 1.0, 0.05,
+		"fires at last-tracked direction (down), not aim-start direction")
 
 
 # ---- 11 EDGE: killed mid-aim - no projectile fires ---
@@ -342,7 +344,8 @@ func test_killed_during_recovery_no_second_shot() -> void:
 
 func test_apply_mob_def_rebinds_runtime_stats() -> void:
 	var s: Shooter = _make_shooter()
-	var hot_swap: MobDef = ContentFactory.make_mob_def({"hp_base": 100, "damage_base": 20, "move_speed": 90.0})
+	var hot_swap: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 100, "damage_base": 20, "move_speed": 90.0})
 	s.apply_mob_def(hot_swap)
 	assert_eq(s.get_hp(), 100)
 	assert_eq(s.get_max_hp(), 100)
@@ -365,7 +368,8 @@ func test_projectile_speed_is_slower_than_player_walk() -> void:
 	# Spec: "projectile speed slower than player run speed so player can
 	# dodge." We assert it's slower than player WALK speed too — even more
 	# generous: a walking player can clear the line.
-	assert_lt(Shooter.PROJECTILE_SPEED, PlayerScript.WALK_SPEED, "projectile slower than player walk — guaranteed dodgeable")
+	assert_lt(Shooter.PROJECTILE_SPEED, PlayerScript.WALK_SPEED,
+		"projectile slower than player walk — guaranteed dodgeable")
 
 
 # ---- 16: takes damage from player Hitbox ---------------

@@ -697,7 +697,8 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 		# soak diagnostician can discriminate "wake-window rejection" from
 		# "dormant rejection" by a single trace-line read.
 		_combat_trace("Stratum1Boss.take_damage",
-			"IGNORED waking amount=%d hp=%d wake_left=%.3f (wake-anim window)" % [amount, hp_current, _wake_left])
+			"IGNORED waking amount=%d hp=%d wake_left=%.3f (wake-anim window)"
+				% [amount, hp_current, _wake_left])
 		return
 	if _state == STATE_PHASE_TRANSITION:
 		_combat_trace("Stratum1Boss.take_damage",
@@ -962,7 +963,8 @@ func _fire_melee_swing() -> void:
 	# to the move_and_slide() call at the bottom of _physics_process.
 	if _player != null:
 		var away: Vector2 = global_position - _player.global_position
-		velocity = (away.normalized() if away.length_squared() > 0.0 else -dir) * POST_CONTACT_PUSHBACK_SPEED
+		var push_dir: Vector2 = away.normalized() if away.length_squared() > 0.0 else -dir
+		velocity = push_dir * POST_CONTACT_PUSHBACK_SPEED
 	else:
 		velocity = -dir * POST_CONTACT_PUSHBACK_SPEED
 
@@ -1167,7 +1169,9 @@ func _die() -> void:
 	if _is_dead:
 		return
 	_is_dead = true
-	_combat_trace("Stratum1Boss._die", "starting death sequence at hp=%d phase=%d" % [hp_current, phase])
+	_combat_trace(
+		"Stratum1Boss._die",
+		"starting death sequence at hp=%d phase=%d" % [hp_current, phase])
 	# Cancel every pending action so a death-mid-attack doesn't fire from
 	# the corpse. Same defensive pattern as Grunt/Charger.
 	_melee_telegraph_left = 0.0
@@ -1253,9 +1257,11 @@ func _play_attack_telegraph(telegraph_duration: float) -> void:
 		_attack_telegraph_tween.kill()
 	_attack_telegraph_tween = create_tween()
 	var hold_dur: float = max(0.0, telegraph_duration - ATTACK_TELEGRAPH_TWEEN_IN * 2.0)
-	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(
+		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
 	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, hold_dur)
-	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(
+		target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
 	_combat_trace("Stratum1Boss._play_attack_telegraph",
 		"tween_valid=%s duration=%.2f tint=(%.2f,%.2f,%.2f) prop=%s" % [
 			_attack_telegraph_tween.is_valid(), telegraph_duration,
@@ -1504,25 +1510,39 @@ func _play_slam_impact_flash() -> void:
 	_slam_impact_flash_tween = create_tween()
 	if _hit_flash_uses_animated_sprite:
 		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
-		_slam_impact_flash_tween.tween_property(asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
-		_slam_impact_flash_tween.tween_property(asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
-		_slam_impact_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, SLAM_IMPACT_FLASH_OUT)
+		_slam_impact_flash_tween.tween_property(
+			asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+		_slam_impact_flash_tween.tween_property(
+			asprite, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+		_slam_impact_flash_tween.tween_property(
+			asprite, "modulate", _sprite_modulate_at_rest, SLAM_IMPACT_FLASH_OUT)
 	elif _hit_flash_uses_sprite:
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
-		_slam_impact_flash_tween.tween_property(sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
-		_slam_impact_flash_tween.tween_property(sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
-		_slam_impact_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, SLAM_IMPACT_FLASH_OUT)
+		_slam_impact_flash_tween.tween_property(
+			sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+		_slam_impact_flash_tween.tween_property(
+			sprite_rect, "color", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+		_slam_impact_flash_tween.tween_property(
+			sprite_rect, "color", _sprite_color_at_rest, SLAM_IMPACT_FLASH_OUT)
 	else:
-		_slam_impact_flash_tween.tween_property(self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
-		_slam_impact_flash_tween.tween_property(self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
-		_slam_impact_flash_tween.tween_property(self, "modulate", _modulate_at_rest, SLAM_IMPACT_FLASH_OUT)
+		_slam_impact_flash_tween.tween_property(
+			self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_IN)
+		_slam_impact_flash_tween.tween_property(
+			self, "modulate", SLAM_IMPACT_FLASH_TINT, SLAM_IMPACT_FLASH_HOLD)
+		_slam_impact_flash_tween.tween_property(
+			self, "modulate", _modulate_at_rest, SLAM_IMPACT_FLASH_OUT)
 	# Diagnostic trace — distinct tag from _play_hit_flash so the trace stream
 	# can discriminate "boss got hit" (hit_flash) vs "boss dealt slam" (slam_impact_flash).
+	var _branch_tag: String = "self_modulate"
+	if _hit_flash_uses_animated_sprite:
+		_branch_tag = "animated_sprite"
+	elif _hit_flash_uses_sprite:
+		_branch_tag = "color_rect"
 	_combat_trace("Stratum1Boss._play_slam_impact_flash",
 		"tint=(%.2f,%.2f,%.2f) budget_ms=%.0f branch=%s" % [
 			SLAM_IMPACT_FLASH_TINT.r, SLAM_IMPACT_FLASH_TINT.g, SLAM_IMPACT_FLASH_TINT.b,
 			(SLAM_IMPACT_FLASH_IN + SLAM_IMPACT_FLASH_HOLD + SLAM_IMPACT_FLASH_OUT) * 1000.0,
-			"animated_sprite" if _hit_flash_uses_animated_sprite else ("color_rect" if _hit_flash_uses_sprite else "self_modulate")
+			_branch_tag
 		])
 
 
@@ -1581,8 +1601,11 @@ func _play_hit_flash() -> void:
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, HIT_FLASH_OUT)
 		_combat_trace("Stratum1Boss._play_hit_flash",
-			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f) target=white" %
-			[_hit_flash_tween.is_valid(), _sprite_color_at_rest.r, _sprite_color_at_rest.g, _sprite_color_at_rest.b])
+			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f) target=white" % [
+				_hit_flash_tween.is_valid(),
+				_sprite_color_at_rest.r,
+				_sprite_color_at_rest.g,
+				_sprite_color_at_rest.b])
 	else:
 		# Branch 3: self.modulate fallback (bare-instanced tests).
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
@@ -1610,7 +1633,8 @@ func _play_boss_death_sequence() -> void:
 	_death_tween = create_tween()
 	# Sequential by default — first the hold, then a parallel scale+fade.
 	_death_tween.tween_interval(BOSS_DEATH_HOLD)
-	_death_tween.tween_property(self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+	_death_tween.tween_property(
+		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
 	# Run the modulate fade in parallel with the scale tween (set_parallel
 	# only flips the *next* step, so use parallel() chained from this step).
 	_death_tween.parallel().tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
@@ -1756,8 +1780,10 @@ func _play_climax_shake() -> void:
 	# Quick three-step jiggle: +x, -x, back to rest. Each leg is 1/3 of the
 	# total so the whole shake fits inside BOSS_SHAKE_DURATION.
 	var leg: float = BOSS_SHAKE_DURATION / 3.0
-	_shake_tween.tween_property(self, "position", rest_offset + Vector2(BOSS_SHAKE_MAGNITUDE, 0.0), leg)
-	_shake_tween.tween_property(self, "position", rest_offset + Vector2(-BOSS_SHAKE_MAGNITUDE, 0.0), leg)
+	_shake_tween.tween_property(
+		self, "position", rest_offset + Vector2(BOSS_SHAKE_MAGNITUDE, 0.0), leg)
+	_shake_tween.tween_property(
+		self, "position", rest_offset + Vector2(-BOSS_SHAKE_MAGNITUDE, 0.0), leg)
 	_shake_tween.tween_property(self, "position", rest_offset, leg)
 
 

@@ -41,7 +41,8 @@ func test_configure_before_add_child() -> void:
 	assert_eq(p.team, Projectile.TEAM_ENEMY)
 	assert_eq(p.knockback_strength, 100.0)
 	# Layers applied during _ready.
-	assert_eq(p.collision_layer, Projectile.LAYER_ENEMY_HITBOX, "enemy team -> enemy_hitbox layer (bit 5)")
+	assert_eq(p.collision_layer, Projectile.LAYER_ENEMY_HITBOX,
+		"enemy team -> enemy_hitbox layer (bit 5)")
 
 
 # ---- 2: enemy team layer routing -----------------------------------

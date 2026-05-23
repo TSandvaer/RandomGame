@@ -463,7 +463,8 @@ func _play_attack_telegraph() -> void:
 	var prop: String = "color" if uses_sprite else "modulate"
 	# Ramp to red, hold for the rest of the telegraph duration, then snap back
 	# at swing-fire time via _cancel_attack_telegraph_tween.
-	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(
+		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
 	_attack_telegraph_tween.tween_property(
 		target, prop, ATTACK_TELEGRAPH_TINT,
 		max(0.0, LIGHT_TELEGRAPH_DURATION - ATTACK_TELEGRAPH_TWEEN_IN - ATTACK_TELEGRAPH_TWEEN_OUT)
@@ -694,8 +695,11 @@ func _play_hit_flash() -> void:
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, HIT_FLASH_OUT)
 		_combat_trace("Grunt._play_hit_flash",
-			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f) target=white" %
-			[_hit_flash_tween.is_valid(), _sprite_color_at_rest.r, _sprite_color_at_rest.g, _sprite_color_at_rest.b])
+			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f) target=white" % [
+				_hit_flash_tween.is_valid(),
+				_sprite_color_at_rest.r,
+				_sprite_color_at_rest.g,
+				_sprite_color_at_rest.b])
 	else:
 		# Branch 3: self.modulate fallback (bare-instanced tests).
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
@@ -730,7 +734,8 @@ func _play_death_tween() -> void:
 		return
 	_death_tween = create_tween()
 	_death_tween.set_parallel(true)
-	_death_tween.tween_property(self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+	_death_tween.tween_property(
+		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
 	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
 	# HTML5 safety-net: parallel timer that fires queue_free even if

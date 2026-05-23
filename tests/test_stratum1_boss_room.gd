@@ -116,7 +116,8 @@ func test_door_trigger_enters_tree_and_monitors_after_deferred_pass() -> void:
 	await get_tree().process_frame
 	# Post-drain: the deferred `_assemble_room_fixtures` pass has run.
 	var trigger: Area2D = room.get_door_trigger()
-	assert_not_null(trigger, "REGRESSION-86c9tv8uf: door trigger Area2D built in deferred fixture pass")
+	assert_not_null(trigger,
+		"REGRESSION-86c9tv8uf: door trigger Area2D built in deferred fixture pass")
 	assert_true(trigger.is_inside_tree(),
 		"REGRESSION-86c9tv8uf: door trigger Area2D is inserted in the scene tree")
 	assert_eq(trigger.get_parent(), room,
@@ -366,9 +367,10 @@ func test_stratum_exit_activate_deferred_after_boss_death() -> void:
 	await get_tree().physics_frame
 	await get_tree().process_frame
 	assert_true(area.monitoring,
-		"REGRESSION-86c9ujq8d + 86c9unkr2: interaction area IS monitoring after " +
-		"the double-defer settles (call_deferred activate + await physics_frame inside _arm_interaction_area_after_flush) — " +
-		"player can walk in and trigger descend_triggered")
+		"REGRESSION-86c9ujq8d + 86c9unkr2: interaction area IS monitoring after"
+			+ " the double-defer settles (call_deferred activate + await physics_frame"
+			+ " inside _arm_interaction_area_after_flush) — player can walk in and"
+			+ " trigger descend_triggered")
 
 
 # ---- M3-T2-W3-T13 — BossNameplate wiring -----------------------------

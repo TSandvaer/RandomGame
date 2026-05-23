@@ -106,7 +106,10 @@ func test_t16_b_lifetime_matches_f2_window() -> void:
 	# Cross-pin: should equal the vignette F2 constant + camera zoom duration.
 	assert_almost_eq(Stratum1Boss.CLIMAX_BURST_LIFETIME, Vignette.F2_BOSS_DEFEAT_DURATION, 0.001,
 		"T16-B: burst lifetime matches Vignette.F2_BOSS_DEFEAT_DURATION (one cinematic window)")
-	assert_almost_eq(Stratum1Boss.CLIMAX_BURST_LIFETIME, Stratum1BossRoom.T16_CAMERA_ZOOM_DURATION, 0.001,
+	assert_almost_eq(
+		Stratum1Boss.CLIMAX_BURST_LIFETIME,
+		Stratum1BossRoom.T16_CAMERA_ZOOM_DURATION,
+		0.001,
 		"T16-B: burst lifetime matches Stratum1BossRoom.T16_CAMERA_ZOOM_DURATION")
 
 

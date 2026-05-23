@@ -82,7 +82,8 @@ const MOVEMENT_THRESHOLD_SQ: float = 900.0
 
 ## res:// path to the PracticeDummy scene (Stage 2b). Indirected via export
 ## so tests can swap in a marker fake.
-@export_file("*.tscn") var practice_dummy_scene_path: String = "res://scenes/mobs/PracticeDummy.tscn"
+@export_file("*.tscn") var practice_dummy_scene_path: String = (
+	"res://scenes/mobs/PracticeDummy.tscn")
 
 ## res:// path to the Grunt MobDef.
 @export_file("*.tres") var grunt_mob_def_path: String = "res://resources/mobs/grunt.tres"
@@ -178,7 +179,9 @@ func _spawn_mob(mob_id: StringName, _world_pos: Vector2) -> Node:
 	if mob_id == &"practice_dummy":
 		var dummy_scene: PackedScene = _get_practice_dummy_scene()
 		if dummy_scene == null:
-			push_warning("Stratum1Room01: practice_dummy scene failed to load at '%s'" % practice_dummy_scene_path)
+			push_warning(
+				"Stratum1Room01: practice_dummy scene failed to load at '%s'"
+					% practice_dummy_scene_path)
 			return null
 		return dummy_scene.instantiate()
 	if mob_id == &"grunt":

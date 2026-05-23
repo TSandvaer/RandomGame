@@ -312,7 +312,9 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 		_combat_trace("Charger.take_damage", "IGNORED already_dead amount=%d" % amount)
 		return
 	var clean_amount: int = max(0, amount)
-	var multiplier: float = RECOVERY_DAMAGE_MULTIPLIER if _state == STATE_RECOVERING else ARMORED_DAMAGE_MULTIPLIER
+	var multiplier: float = (
+		RECOVERY_DAMAGE_MULTIPLIER if _state == STATE_RECOVERING
+		else ARMORED_DAMAGE_MULTIPLIER)
 	var final_amount: int = int(round(clean_amount * multiplier))
 	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - final_amount)
@@ -489,8 +491,14 @@ func _enter_recovery() -> void:
 	# overlap is plausible (within the charge hitbox envelope).
 	if _player != null:
 		var away: Vector2 = global_position - _player.global_position
-		if away.length_squared() < (CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH) * (CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH) * 4.0:
-			velocity = (away.normalized() if away.length_squared() > 0.0 else -_charge_dir) * POST_CONTACT_PUSHBACK_SPEED
+		var contact_envelope_sq: float = (
+			(CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH)
+			* (CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH)
+			* 4.0)
+		if away.length_squared() < contact_envelope_sq:
+			var push_dir: Vector2 = (
+				away.normalized() if away.length_squared() > 0.0 else -_charge_dir)
+			velocity = push_dir * POST_CONTACT_PUSHBACK_SPEED
 		else:
 			velocity = Vector2.ZERO
 	else:
@@ -533,7 +541,12 @@ func _spawn_charge_hitbox() -> Hitbox:
 	# the player's Vigor mitigation at hit-spawn time.
 	var hit_dmg: int = DamageScript.compute_mob_damage(mob_def, _player_vigor())
 	var hb: Hitbox = HitboxScript.new()
-	hb.configure(hit_dmg, _charge_dir * CHARGE_KNOCKBACK, CHARGE_HITBOX_LIFETIME, Hitbox.TEAM_ENEMY, self)
+	hb.configure(
+		hit_dmg,
+		_charge_dir * CHARGE_KNOCKBACK,
+		CHARGE_HITBOX_LIFETIME,
+		Hitbox.TEAM_ENEMY,
+		self)
 	hb.position = _charge_dir * CHARGE_HITBOX_REACH
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	var circle: CircleShape2D = CircleShape2D.new()
@@ -599,9 +612,11 @@ func _play_attack_telegraph() -> void:
 	_attack_telegraph_tween = create_tween()
 	var prop: String = "color" if uses_sprite else "modulate"
 	var hold_dur: float = max(0.0, TELEGRAPH_DURATION - ATTACK_TELEGRAPH_TWEEN_IN * 2.0)
-	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(
+		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
 	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, hold_dur)
-	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
+	_attack_telegraph_tween.tween_property(
+		target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
 	_combat_trace("Charger._play_attack_telegraph",
 		"tween_valid=%s tint=(%.2f,%.2f,%.2f)" % [
 			_attack_telegraph_tween.is_valid(),
@@ -680,7 +695,8 @@ func _play_death_tween() -> void:
 		return
 	_death_tween = create_tween()
 	_death_tween.set_parallel(true)
-	_death_tween.tween_property(self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+	_death_tween.tween_property(
+		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
 	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
 	# Safety-net: parallel timer fires queue_free even if tween_finished hangs.

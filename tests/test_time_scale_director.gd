@@ -90,7 +90,8 @@ func test_autoload_registered_at_root() -> void:
 	assert_not_null(_director,
 		"TimeScaleDirector must be registered as autoload at /root/TimeScaleDirector "
 		+ "(project.godot [autoload] section)")
-	assert_true(_director.has_method("request"), "request(reason, scale, duration, priority) API present")
+	assert_true(_director.has_method("request"),
+		"request(reason, scale, duration, priority) API present")
 	assert_true(_director.has_method("release"), "release(reason) API present")
 	assert_true(_director.has_method("freeze"), "freeze(duration, reason) API present")
 	assert_true(_director.has_method("reset"), "reset() API present")

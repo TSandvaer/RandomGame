@@ -132,7 +132,9 @@ func get_mob_scene(mob_id: StringName) -> PackedScene:
 		var path: String = _REGISTRATIONS[mob_id]["scene"]
 		var scene: PackedScene = load(path) as PackedScene
 		if scene == null:
-			_emit_warning("[MobRegistry] failed to load PackedScene at %s for id '%s'" % [path, String(mob_id)],
+			_emit_warning(
+				"[MobRegistry] failed to load PackedScene at %s for id '%s'"
+					% [path, String(mob_id)],
 				"load_failure")
 			return null
 		_scene_cache[mob_id] = scene
@@ -158,7 +160,9 @@ func apply_stratum_scaling(mob_def: MobDef, stratum_id: StringName) -> MobDef:
 		return null
 	var multipliers: Dictionary = _STRATUM_SCALING.get(stratum_id, {"hp": 1.0, "damage": 1.0})
 	if not _STRATUM_SCALING.has(stratum_id):
-		_emit_warning("[MobRegistry] unknown stratum_id '%s' — using baseline 1.0/1.0" % String(stratum_id),
+		_emit_warning(
+			"[MobRegistry] unknown stratum_id '%s' — using baseline 1.0/1.0"
+				% String(stratum_id),
 			"unknown_stratum_id")
 	# Allocate a fresh MobDef and copy every field from the source. We do NOT
 	# mutate `mob_def` itself — calling this twice on the same source returns

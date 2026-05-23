@@ -293,7 +293,9 @@ func _on_body_entered(body: Node) -> void:
 	if _state == STATE_UNLOCKED:
 		if not _traversed_emitted:
 			_traversed_emitted = true
-			_combat_trace("RoomGate.gate_traversed", "player walked through open door — emitting gate_traversed")
+			_combat_trace(
+				"RoomGate.gate_traversed",
+				"player walked through open door — emitting gate_traversed")
 			gate_traversed.emit()
 		return
 	# Only first-cross into a locked room matters; ignore re-entries in other states.
@@ -406,7 +408,10 @@ func _unlock() -> void:
 		return
 	_unlocked_emitted = true
 	_state = STATE_UNLOCKED
-	_combat_trace("RoomGate._unlock", "gate_unlocked emitting — door visual opens; waiting for player door-walk to fire gate_traversed")
+	_combat_trace(
+		"RoomGate._unlock",
+		"gate_unlocked emitting — door visual opens; waiting for player door-walk"
+			+ " to fire gate_traversed")
 	gate_unlocked.emit()
 	# **Knockback-overlap fix (ticket 86c9ujf5v / 86c9ujf14).**
 	# Godot 4 `body_entered` fires once per non-overlap → overlap TRANSITION.

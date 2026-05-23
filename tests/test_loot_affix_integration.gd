@@ -146,7 +146,8 @@ func test_item_instance_save_roundtrip_preserves_affixes() -> void:
 	var item_resolver: Callable = func(id: StringName) -> Resource: return item_lookup.get(id, null)
 	var affix_resolver: Callable = func(id: StringName) -> Resource: return affix_lookup.get(id, null)
 
-	var rebuilt: ItemInstance = ItemInstanceScript.from_save_dict(serialized, item_resolver, affix_resolver)
+	var rebuilt: ItemInstance = ItemInstanceScript.from_save_dict(
+		serialized, item_resolver, affix_resolver)
 	assert_not_null(rebuilt, "rebuild succeeds")
 	assert_eq(rebuilt.def, item)
 	assert_eq(rebuilt.rolled_tier, ItemDef.Tier.T2)

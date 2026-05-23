@@ -143,7 +143,8 @@ func test_player_swing_wedge_lifetime_matches_hitbox_light() -> void:
 	p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT)
 	var wedge: ColorRect = _find_wedge(p)
 	assert_not_null(wedge)
-	assert_eq(float(wedge.get_meta("lifetime")), Player.LIGHT_HITBOX_LIFETIME, "light wedge lifetime = 0.10s")
+	assert_eq(float(wedge.get_meta("lifetime")), Player.LIGHT_HITBOX_LIFETIME,
+		"light wedge lifetime = 0.10s")
 	assert_eq(StringName(wedge.get_meta("kind")), Player.ATTACK_LIGHT, "metadata records kind")
 
 
@@ -152,7 +153,8 @@ func test_player_swing_wedge_lifetime_matches_hitbox_heavy() -> void:
 	p.try_attack(Player.ATTACK_HEAVY, Vector2.DOWN)
 	var wedge: ColorRect = _find_wedge(p)
 	assert_not_null(wedge)
-	assert_eq(float(wedge.get_meta("lifetime")), Player.HEAVY_HITBOX_LIFETIME, "heavy wedge lifetime = 0.14s")
+	assert_eq(float(wedge.get_meta("lifetime")), Player.HEAVY_HITBOX_LIFETIME,
+		"heavy wedge lifetime = 0.14s")
 
 
 # --- 5: wedge fades to alpha 0 over its lifetime + frees ----------------
@@ -219,7 +221,10 @@ func test_player_swing_flash_tint_is_html5_safe() -> void:
 	# without HDR clamping. Total per-channel delta >= 0.20 ensures the
 	# warm-yellow shift is perceptible against the orange player Sprite.
 	var default_modulate: Color = Color(1.0, 1.0, 1.0, 1.0)
-	var delta: float = abs(tint.r - default_modulate.r) + abs(tint.g - default_modulate.g) + abs(tint.b - default_modulate.b)
+	var delta: float = (
+		abs(tint.r - default_modulate.r)
+		+ abs(tint.g - default_modulate.g)
+		+ abs(tint.b - default_modulate.b))
 	assert_gte(delta, 0.20, "tint delta vs default modulate >= 0.20 (perceptible flash)")
 
 

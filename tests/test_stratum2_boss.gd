@@ -51,7 +51,9 @@ func test_phase_2_retains_breath_cone_attack() -> void:
 
 
 func test_phase_2_adds_slam_attack() -> void:
-	pending("awaiting W3-T4 — phase 2 introduces slam attack (mirror M1 boss phase-2 new-attack pattern)")
+	pending(
+		"awaiting W3-T4 — phase 2 introduces slam attack"
+			+ " (mirror M1 boss phase-2 new-attack pattern)")
 
 
 # ---- W3-T4-AC5 — Phase transition at 33% HP fires phase_changed(3) --
@@ -107,7 +109,9 @@ func test_hit_spam_phase_changed_emits_once_per_boundary() -> void:
 # ---- W3-T4-AC11 — EDGE: boss takes damage during phase-transition slow-mo (should NOT)
 
 func test_boss_stagger_immune_during_phase_transition() -> void:
-	pending("awaiting W3-T4 — take_damage during phase-transition window rejects (mirror M1 boss test 11)")
+	pending(
+		"awaiting W3-T4 — take_damage during phase-transition window rejects"
+			+ " (mirror M1 boss test 11)")
 
 
 # ---- W3-T4-AC12 — EDGE: player dies mid-boss-fight, room state resets

@@ -162,7 +162,8 @@ func _ready() -> void:
 	# 7. Boot line — `[procgen-spike] ready` is the spec's activation
 	#    detection regex.
 	print(
-		"[procgen-spike] ready zone=%s world_seed=%d zone_seed=%d chunks=%d bounds=(%.0f,%.0f,%.0f,%.0f) mating_errors=%d"
+		("[procgen-spike] ready zone=%s world_seed=%d zone_seed=%d chunks=%d"
+			+ " bounds=(%.0f,%.0f,%.0f,%.0f) mating_errors=%d")
 		% [
 			String(zone.zone_id), SPIKE_WORLD_SEED, zone_seed,
 			_assembled.chunk_count(),

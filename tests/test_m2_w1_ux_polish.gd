@@ -400,7 +400,8 @@ func test_t3_badge_plate_and_text_colors() -> void:
 	# `get_minimum_size().x`, so a wider font can never silently overflow.
 	var label_min: Vector2 = label.get_minimum_size()
 	assert_true(label.position.x + label_min.x <= plate.size.x + 0.01,
-		"badge label right edge %.1f fits within plate width %.1f — EQUIPPED + ✓ shape fit horizontally (AC-CB2)"
+		("badge label right edge %.1f fits within plate width %.1f — EQUIPPED + ✓ shape"
+			+ " fit horizontally (AC-CB2)")
 			% [label.position.x + label_min.x, plate.size.x])
 	# The checkmark shape must also fit inside the plate width, sitting before
 	# the label with the configured gap.

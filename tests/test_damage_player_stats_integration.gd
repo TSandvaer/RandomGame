@@ -97,16 +97,19 @@ func test_player_attack_damage_scales_with_player_stats_edge() -> void:
 	var w: ItemDef = _make_weapon(10)
 	p.set_equipped_weapon(w)
 	# With edge=0 in PlayerStats, light damage = weapon_base = 10.
-	var dmg_zero: int = DamageScript.compute_player_damage(p.get_equipped_weapon(), p.get_edge(), Player.ATTACK_LIGHT)
+	var dmg_zero: int = DamageScript.compute_player_damage(
+		p.get_equipped_weapon(), p.get_edge(), Player.ATTACK_LIGHT)
 	assert_eq(dmg_zero, 10, "edge=0 light = 10 (no edge bonus)")
 	# Allocate +5 edge, recompute. Per Damage.EDGE_PER_POINT=0.05:
 	#   10 * (1 + 5*0.05) * 1 = 10 * 1.25 = 12.5 -> floor 12.
 	_ps().add_stat(&"edge", 5)
-	var dmg_five: int = DamageScript.compute_player_damage(p.get_equipped_weapon(), p.get_edge(), Player.ATTACK_LIGHT)
+	var dmg_five: int = DamageScript.compute_player_damage(
+		p.get_equipped_weapon(), p.get_edge(), Player.ATTACK_LIGHT)
 	assert_eq(dmg_five, 12,
 		"edge=5 boosts light damage to floor(10*1.25)=12")
 	# Heavy at edge=5: 10 * 1.25 * 1.6 = 20.
-	var dmg_heavy: int = DamageScript.compute_player_damage(p.get_equipped_weapon(), p.get_edge(), Player.ATTACK_HEAVY)
+	var dmg_heavy: int = DamageScript.compute_player_damage(
+		p.get_equipped_weapon(), p.get_edge(), Player.ATTACK_HEAVY)
 	assert_eq(dmg_heavy, 20, "edge=5 heavy -> 20")
 
 

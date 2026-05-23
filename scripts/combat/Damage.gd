@@ -7,7 +7,8 @@ extends RefCounted
 ##
 ## **Player damage formula:**
 ##
-##     player_damage = floor(weapon_base * (1 + edge_bonus * EDGE_PER_POINT) * (1 + attack_type_mult))
+##     player_damage = floor(
+##         weapon_base * (1 + edge_bonus * EDGE_PER_POINT) * (1 + attack_type_mult))
 ##
 ##     - weapon_base: from equipped weapon's `ItemBaseStats.damage` (per Drew's
 ##       content schema). Falls back to FIST_DAMAGE (1) when weapon == null.
@@ -116,7 +117,10 @@ static func compute_player_damage(weapon: ItemDef, edge: int, attack_type: Strin
 		attack_mult = HEAVY_MULT
 	# Unknown tags fall through as light. Tests pin this.
 
-	var raw: float = float(weapon_base) * (1.0 + float(clean_edge) * EDGE_PER_POINT) * (1.0 + attack_mult)
+	var raw: float = (
+		float(weapon_base)
+		* (1.0 + float(clean_edge) * EDGE_PER_POINT)
+		* (1.0 + attack_mult))
 	# Floor — consistent with damage_base / hp_base int contract.
 	return int(floor(raw))
 

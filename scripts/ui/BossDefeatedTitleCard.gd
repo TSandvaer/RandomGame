@@ -246,11 +246,15 @@ func _start_tween() -> void:
 	# Fade in — modulate.a only. RGB stays at (1, 1, 1) — never modulate
 	# above 1.0 on any channel per `.claude/docs/html5-export.md` § HDR
 	# clamp.
-	_tween.tween_property(_root, "modulate:a", 1.0, FADE_IN_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	(_tween.tween_property(_root, "modulate:a", 1.0, FADE_IN_DURATION)
+		.set_trans(Tween.TRANS_QUAD)
+		.set_ease(Tween.EASE_OUT))
 	# Hold — explicit interval keeps the tween chain readable.
 	_tween.tween_interval(HOLD_DURATION)
 	# Fade out — symmetric easing.
-	_tween.tween_property(_root, "modulate:a", 0.0, FADE_OUT_DURATION).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	(_tween.tween_property(_root, "modulate:a", 0.0, FADE_OUT_DURATION)
+		.set_trans(Tween.TRANS_QUAD)
+		.set_ease(Tween.EASE_IN))
 	# Completion callback: emit dismiss signal then queue_free. NEVER
 	# call into Area2D monitoring mutations or `add_child` here — per
 	# `.claude/docs/combat-architecture.md` § "physics-flush rule", a

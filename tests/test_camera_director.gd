@@ -105,8 +105,10 @@ func test_autoload_registered_at_root() -> void:
 	assert_true(_director.has_method("set_world_bounds"), "set_world_bounds API present (W1)")
 	assert_true(_director.has_method("clear_world_bounds"), "clear_world_bounds API present (W1)")
 	assert_true(_director.has_method("get_world_bounds"), "get_world_bounds API present (W1)")
-	assert_true(_director.has_signal("follow_target_changed"), "follow_target_changed signal present (W1)")
-	assert_true(_director.has_signal("world_bounds_changed"), "world_bounds_changed signal present (W1)")
+	assert_true(_director.has_signal("follow_target_changed"),
+		"follow_target_changed signal present (W1)")
+	assert_true(_director.has_signal("world_bounds_changed"),
+		"world_bounds_changed signal present (W1)")
 
 
 func test_boot_state_is_clean_default_zoom_following_player() -> void:

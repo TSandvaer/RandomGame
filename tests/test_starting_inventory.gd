@@ -53,7 +53,9 @@ func _make_iron_sword_instance() -> ItemInstance:
 	return ItemInstance.new(def, def.tier)
 
 
-func _make_weapon_instance(id: StringName = &"test_sword", damage_override: int = 5) -> ItemInstance:
+func _make_weapon_instance(
+		id: StringName = &"test_sword",
+		damage_override: int = 5) -> ItemInstance:
 	var def: ItemDef = ContentFactory.make_item_def({
 		"id": id,
 		"slot": ItemDef.Slot.WEAPON,

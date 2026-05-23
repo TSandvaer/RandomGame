@@ -207,12 +207,17 @@ func affix_resolver_callable() -> Callable:
 ## `root` — used by the `KNOWN_ITEM_SUBDIRS` second-pass scan in `load_all()`
 ## where a missing subdir is expected (the recursive scan already covered
 ## the same files on platforms where DirAccess works correctly).
-func _scan_dir_recursive(root: String, on_resource: Callable, quiet_on_open_fail: bool = false) -> void:
+func _scan_dir_recursive(
+		root: String,
+		on_resource: Callable,
+		quiet_on_open_fail: bool = false) -> void:
 	var dir: DirAccess = DirAccess.open(root)
 	if dir == null:
 		if not quiet_on_open_fail:
 			# Not fatal — content dir is optional in tests / minimal builds.
-			push_warning("[ContentRegistry] cannot open dir %s (err %d)" % [root, DirAccess.get_open_error()])
+			push_warning(
+				"[ContentRegistry] cannot open dir %s (err %d)"
+					% [root, DirAccess.get_open_error()])
 		return
 	dir.list_dir_begin()
 	var entry: String = dir.get_next()
@@ -246,7 +251,9 @@ func _on_item_resource_found(res: Resource, path: String) -> void:
 	# subdir scan + STARTER_ITEM_PATHS preload). Only different-instance
 	# id-collision warrants a warning.
 	if _items.has(def.id) and _items[def.id] != def:
-		push_warning("[ContentRegistry] duplicate ItemDef id '%s' at %s (overrides earlier)" % [def.id, path])
+		push_warning(
+			"[ContentRegistry] duplicate ItemDef id '%s' at %s (overrides earlier)"
+				% [def.id, path])
 	_items[def.id] = def
 
 
@@ -258,5 +265,7 @@ func _on_affix_resource_found(res: Resource, path: String) -> void:
 		push_warning("[ContentRegistry] AffixDef at %s has empty id — skipped" % path)
 		return
 	if _affixes.has(def.id) and _affixes[def.id] != def:
-		push_warning("[ContentRegistry] duplicate AffixDef id '%s' at %s (overrides earlier)" % [def.id, path])
+		push_warning(
+			"[ContentRegistry] duplicate AffixDef id '%s' at %s (overrides earlier)"
+				% [def.id, path])
 	_affixes[def.id] = def

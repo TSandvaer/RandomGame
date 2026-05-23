@@ -271,7 +271,9 @@ func migrate(data: Dictionary, from_version: int) -> Dictionary:
 		# warn. Could also refuse-load and trigger a new-character flow.
 		# Routed through WarningBus so the universal-warning gate (ticket
 		# 86c9uf0mm Half B) catches this in GUT tests.
-		_emit_warning("[Save] save schema_version %d is newer than runtime %d — loading as-is" % [from_version, SCHEMA_VERSION],
+		_emit_warning(
+			"[Save] save schema_version %d is newer than runtime %d — loading as-is"
+				% [from_version, SCHEMA_VERSION],
 			"schema_newer_than_runtime")
 		return data
 	var out: Dictionary = data.duplicate(true)
@@ -529,7 +531,9 @@ func _write_readme() -> void:
 		# universal-warning gate on every test that exercises save_game in
 		# a context where the user dir can't be written, but the underlying
 		# bug isn't a save-correctness issue. Reconsider on a future ticket.
-		push_warning("[Save] could not write README at %s (err %d)" % [README_PATH, FileAccess.get_open_error()])
+		push_warning(
+			"[Save] could not write README at %s (err %d)"
+				% [README_PATH, FileAccess.get_open_error()])
 		return
 	f.store_string(contents)
 	f.close()

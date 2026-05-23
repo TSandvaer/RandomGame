@@ -240,7 +240,8 @@ func test_migration_v0_to_current_schema_emits_no_warnings() -> void:
 	assert_true(loaded.has("meta"), "migration added 'meta' block (v0→v1)")
 	assert_true(loaded["character"].has("xp_to_next"), "migration added 'xp_to_next' (v1→v2)")
 	assert_true(loaded["character"].has("stats"), "migration added 'stats' block (v2→v3)")
-	assert_true(loaded["character"].has("unspent_stat_points"), "migration added 'unspent_stat_points' (v2→v3)")
+	assert_true(loaded["character"].has("unspent_stat_points"),
+		"migration added 'unspent_stat_points' (v2→v3)")
 	assert_true(loaded["character"].has("first_boss_kill_seen"),
 		"migration added 'first_boss_kill_seen' (v3→v4)")
 	assert_true(loaded["character"].has("world_seed"),

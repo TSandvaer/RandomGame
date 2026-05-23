@@ -77,7 +77,8 @@ func _drive_to_charging(c: Charger) -> void:
 # ---- 1: spawn HP from MobDef + spec defaults --------------------------
 
 func test_spawns_with_full_hp_from_mobdef() -> void:
-	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 70, "damage_base": 8, "move_speed": 180.0})
+	var def: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 70, "damage_base": 8, "move_speed": 180.0})
 	var c: Charger = _make_charger_with_def(def)
 	assert_eq(c.get_hp(), 70, "starts at hp_base")
 	assert_eq(c.get_max_hp(), 70, "max_hp = hp_base at spawn")
@@ -88,7 +89,8 @@ func test_spawns_with_full_hp_from_mobdef() -> void:
 
 func test_default_stats_when_no_mobdef() -> void:
 	var c: Charger = _make_charger()
-	# Spec: 70 HP, 5 base damage (rebalanced M1 RC soak-4 — was 8), 1.5x player walk speed (120 * 1.5 = 180).
+	# Spec: 70 HP, 5 base damage (rebalanced M1 RC soak-4 — was 8),
+	# 1.5x player walk speed (120 * 1.5 = 180).
 	assert_eq(c.get_hp(), 70)
 	assert_eq(c.get_max_hp(), 70)
 	assert_eq(c.damage_base, 5)
@@ -159,7 +161,8 @@ func test_full_state_machine_path() -> void:
 	# Recovering -> Spotted again when player back in range (re-engage).
 	p.global_position = Vector2(200.0, 0.0)
 	c._physics_process(Charger.RECOVERY_DURATION + 0.001)
-	assert_eq(c.get_state(), Charger.STATE_SPOTTED, "recovery ends with player in range -> spotted again")
+	assert_eq(c.get_state(), Charger.STATE_SPOTTED,
+		"recovery ends with player in range -> spotted again")
 
 
 func test_recovery_returns_to_idle_when_player_out_of_range() -> void:
@@ -216,7 +219,8 @@ func test_charge_direction_locks_at_telegraph_start() -> void:
 # ---- 6: velocity during charge ---------------------------------------
 
 func test_velocity_during_charge_is_dir_times_speed() -> void:
-	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 70, "damage_base": 8, "move_speed": 180.0})
+	var def: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 70, "damage_base": 8, "move_speed": 180.0})
 	var c: Charger = _make_charger_with_def(def)
 	var p: FakePlayer = FakePlayer.new()
 	add_child_autofree(p)
@@ -412,7 +416,8 @@ func test_charge_contact_hitbox_is_enemy_team() -> void:
 
 func test_apply_mob_def_rebinds_runtime_stats() -> void:
 	var c: Charger = _make_charger()
-	var hot_swap: MobDef = ContentFactory.make_mob_def({"hp_base": 200, "damage_base": 25, "move_speed": 240.0})
+	var hot_swap: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 200, "damage_base": 25, "move_speed": 240.0})
 	c.apply_mob_def(hot_swap)
 	assert_eq(c.get_hp(), 200)
 	assert_eq(c.get_max_hp(), 200)

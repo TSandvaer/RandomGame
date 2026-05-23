@@ -345,7 +345,8 @@ func _play_death_tween() -> void:
 		return
 	_death_tween = create_tween()
 	_death_tween.set_parallel(true)
-	_death_tween.tween_property(self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+	_death_tween.tween_property(
+		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
 	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
 	# HTML5 safety-net per Grunt._play_death_tween — parallel SceneTreeTimer
@@ -442,8 +443,11 @@ func _play_hit_flash() -> void:
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_HOLD)
 		_hit_flash_tween.tween_property(sprite_rect, "color", _sprite_color_at_rest, HIT_FLASH_OUT)
 		_combat_trace("PracticeDummy._play_hit_flash",
-			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f)" %
-			[_hit_flash_tween.is_valid(), _sprite_color_at_rest.r, _sprite_color_at_rest.g, _sprite_color_at_rest.b])
+			"sprite tween_valid=%s rest=(%.2f,%.2f,%.2f)" % [
+				_hit_flash_tween.is_valid(),
+				_sprite_color_at_rest.r,
+				_sprite_color_at_rest.g,
+				_sprite_color_at_rest.b])
 	else:
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(self, "modulate", Color(1, 1, 1, 1), HIT_FLASH_HOLD)

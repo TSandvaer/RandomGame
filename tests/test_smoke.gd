@@ -43,7 +43,8 @@ func test_input_actions_exist() -> void:
 		"toggle_inventory",
 	]
 	for action: String in required_actions:
-		assert_true(InputMap.has_action(action), "Input action '%s' must be defined in project.godot" % action)
+		assert_true(InputMap.has_action(action),
+			"Input action '%s' must be defined in project.godot" % action)
 
 
 func test_physics_layers_named() -> void:

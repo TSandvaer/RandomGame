@@ -116,7 +116,8 @@ func _ready() -> void:
 	if parent_node != null:
 		parent_name = String(parent_node.name)
 	_combat_trace("Pickup._ready_diag",
-		"cs_disabled=%s cs_shape=%s shape_set=%s parent=%s is_inside_tree=%s local_pos=(%.0f,%.0f) global_pos=(%.0f,%.0f)" % [
+		("cs_disabled=%s cs_shape=%s shape_set=%s parent=%s is_inside_tree=%s"
+			+ " local_pos=(%.0f,%.0f) global_pos=(%.0f,%.0f)") % [
 			cs_disabled, cs_shape_kind, cs_shape_set,
 			parent_name, str(is_inside_tree()),
 			position.x, position.y,
@@ -198,7 +199,8 @@ func _activate_and_check_initial_overlap() -> void:
 		cs_disabled = str(cs.disabled)
 		cs_shape_set = str(cs.shape != null)
 	_combat_trace("Pickup._activate_diag",
-		"overlapping_bodies=%d overlapping_areas=%d cs_disabled=%s cs_shape_set=%s monitoring=%s monitorable=%s" % [
+		("overlapping_bodies=%d overlapping_areas=%d cs_disabled=%s cs_shape_set=%s"
+			+ " monitoring=%s monitorable=%s") % [
 			get_overlapping_bodies().size(),
 			get_overlapping_areas().size(),
 			cs_disabled, cs_shape_set,

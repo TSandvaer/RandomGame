@@ -11,7 +11,8 @@ extends GutTest
 ##     surfaces the resolved text within 1 frame.
 ##   - HTML5 safety — every painted ColorRect color asserted strictly sub-1.0
 ##     per channel (HDR-clamp invariant per `.claude/docs/html5-export.md`).
-##     Polygon2D-tree-walk assertion mirrors `test_m2_w1_ux_polish.gd::test_t2_toast_has_zero_polygon2d_and_subone_colors`.
+##     Polygon2D-tree-walk assertion mirrors
+##     `test_m2_w1_ux_polish.gd::test_t2_toast_has_zero_polygon2d_and_subone_colors`.
 
 const OverlayScript: Script = preload("res://scripts/ui/TutorialPromptOverlay.gd")
 
@@ -130,7 +131,8 @@ func test_html5_safety_no_polygon2d_and_subone_colors() -> void:
 	while not queue.is_empty():
 		var n: Node = queue.pop_back()
 		assert_false(n is Polygon2D,
-			"TutorialPromptOverlay tree must contain zero Polygon2D nodes (HTML5 ban per .claude/docs/html5-export.md)")
+			"TutorialPromptOverlay tree must contain zero Polygon2D nodes"
+				+ " (HTML5 ban per .claude/docs/html5-export.md)")
 		for c in n.get_children():
 			queue.append(c)
 	# Plate color sub-1.0 per channel.

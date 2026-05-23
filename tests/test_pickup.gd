@@ -225,7 +225,8 @@ func test_activate_monitoring_flips_after_physics_frame_not_synchronously() -> v
 	await get_tree().physics_frame
 	await get_tree().process_frame
 	assert_true(pickup.monitoring,
-		"REGRESSION-86c9unkr2: monitoring flips ON after the double-defer (call_deferred + await physics_frame)")
+		"REGRESSION-86c9unkr2: monitoring flips ON after the double-defer"
+			+ " (call_deferred + await physics_frame)")
 	assert_true(pickup.monitorable, "monitorable parity preserved post-await")
 
 

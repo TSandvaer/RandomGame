@@ -145,7 +145,9 @@ func test_two_grunts_die_in_same_frame_no_panic() -> void:
 	# Death-tween armed on both — PR #136's queue_free decouple should not
 	# be aborted by the panic that the deferred fix prevents.
 	assert_not_null(g_a._death_tween, "grunt A death tween created")
-	assert_not_null(g_b._death_tween, "grunt B death tween created — pre-fix this would be null because the panic aborted before _play_death_tween could run")
+	assert_not_null(g_b._death_tween,
+		"grunt B death tween created — pre-fix this would be null because"
+			+ " the panic aborted before _play_death_tween could run")
 
 	# Wait for the safety-net timer on each mob to fire (DEATH_TWEEN_DURATION
 	# + 0.2s = 0.4s). We poll with physics frames + a real tree timer so the
@@ -158,7 +160,8 @@ func test_two_grunts_die_in_same_frame_no_panic() -> void:
 	# The grunts were autofreed via `add_child_autofree` — wait, here we
 	# add to room (not autofree), so we check explicitly.
 	assert_true(not is_instance_valid(g_a) or g_a.is_queued_for_deletion(),
-		"grunt A reached queue_free via _force_queue_free (PR #136) — pre-fix it would still be alive because the panic aborted the chain")
+		"grunt A reached queue_free via _force_queue_free (PR #136) — pre-fix it"
+			+ " would still be alive because the panic aborted the chain")
 	assert_true(not is_instance_valid(g_b) or g_b.is_queued_for_deletion(),
 		"grunt B reached queue_free")
 

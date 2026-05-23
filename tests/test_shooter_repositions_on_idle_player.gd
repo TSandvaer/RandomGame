@@ -516,10 +516,12 @@ func test_p0_far_corner_scenario_shooter_closes_gap_over_full_cycle() -> void:
 	# Assert > 50px to clearly distinguish pre-fix (~33px) from post-fix (~71px),
 	# allowing for state-transition single-tick gaps in the simulation.
 	assert_gt(gap_closed, 50.0,
-		"REGRESSION CHECK (P0 #2): Shooter must close > 50px gap in one full aim+recovery " +
-		"cycle when the gap remains >> AIM_RANGE throughout. " +
-		"Got gap_closed=%.1f px. Pre-fix would show ~33px (AIMING only — recovery held velocity=ZERO). " % gap_closed +
-		"Post-fix expects ~71px (AIMING + POST_FIRE_RECOVERY both walk toward player at move_speed=60).")
+		("REGRESSION CHECK (P0 #2): Shooter must close > 50px gap in one full"
+			+ " aim+recovery cycle when the gap remains >> AIM_RANGE throughout. "
+			+ "Got gap_closed=%.1f px. Pre-fix would show ~33px (AIMING only —"
+			+ " recovery held velocity=ZERO). "
+			+ "Post-fix expects ~71px (AIMING + POST_FIRE_RECOVERY both walk toward"
+			+ " player at move_speed=60).") % gap_closed)
 
 
 ## P0 #2: velocity direction during POST_FIRE_RECOVERY points toward player.

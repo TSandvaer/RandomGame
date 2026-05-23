@@ -55,7 +55,8 @@ func _hit_grunt(g: Grunt, dmg: int) -> void:
 # ---- 1: full HP at spawn from MobDef ---------------------------------
 
 func test_spawns_with_full_hp_from_mobdef() -> void:
-	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 80, "damage_base": 12, "move_speed": 75.0})
+	var def: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 80, "damage_base": 12, "move_speed": 75.0})
 	var g: Grunt = _make_grunt_with_def(def)
 	assert_eq(g.get_hp(), 80, "starts at hp_base")
 	assert_eq(g.get_max_hp(), 80, "max_hp = hp_base at spawn")
@@ -118,7 +119,8 @@ func test_death_emits_mob_died_once() -> void:
 	assert_eq(args[0], g, "mob_died carries the mob node")
 	assert_almost_eq(args[1].x, 123.0, 0.001)
 	assert_almost_eq(args[1].y, 456.0, 0.001)
-	assert_eq(args[2], def, "mob_died carries the MobDef so loot listeners get loot_table without re-resolving")
+	assert_eq(args[2], def,
+		"mob_died carries the MobDef so loot listeners get loot_table without re-resolving")
 
 
 # ---- 5: state machine transitions idle -> chasing --------------------
@@ -358,7 +360,8 @@ func test_spawned_hitbox_is_enemy_team() -> void:
 func test_apply_mob_def_rebinds_runtime_stats() -> void:
 	var g: Grunt = _make_grunt()
 	# Default 50/5/60 in scope.
-	var hot_swap: MobDef = ContentFactory.make_mob_def({"hp_base": 200, "damage_base": 25, "move_speed": 90.0})
+	var hot_swap: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 200, "damage_base": 25, "move_speed": 90.0})
 	g.apply_mob_def(hot_swap)
 	assert_eq(g.get_hp(), 200)
 	assert_eq(g.get_max_hp(), 200)

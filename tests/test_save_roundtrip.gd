@@ -78,7 +78,12 @@ func test_save_load_preserves_level() -> void:
 func test_save_load_preserves_stash_items() -> void:
 	var data: Dictionary = _save().default_payload()
 	data["stash"] = [
-		{"id": "weapon_iron_sword", "tier": 2, "rolled_affixes": [{"affix_id": "swift", "value": 0.08}], "stack_count": 1},
+		{
+			"id": "weapon_iron_sword",
+			"tier": 2,
+			"rolled_affixes": [{"affix_id": "swift", "value": 0.08}],
+			"stack_count": 1,
+		},
 		{"id": "armor_leather", "tier": 1, "rolled_affixes": [], "stack_count": 1},
 		{"id": "weapon_flame_blade", "tier": 3, "rolled_affixes": [
 			{"affix_id": "vital", "value": 12}, {"affix_id": "keen", "value": 0.05},
@@ -175,7 +180,8 @@ func test_death_rule_keeps_level_xp_equipped() -> void:
 	# Run-only state on death must NOT survive: simulated unequipped inventory
 	# items the player picked up during the run that they hadn't equipped.
 	pre["stash"] = []  # M1 has no stash UI; "carried items" live in equipped per DECISIONS rule
-	# But the death event is the moment of save: per the rule, equipped + level + xp + stat allocations are written; nothing else of the run.
+	# But the death event is the moment of save: per the rule, equipped + level + xp
+	# + stat allocations are written; nothing else of the run.
 	_save().save_game(TEST_SLOT, pre)
 
 	# Simulate "die, restart" — the death save just landed; reload it.

@@ -117,7 +117,9 @@ func test_mouse_facing_update_suppressed_during_attack() -> void:
 	p.set_state(Player.STATE_ATTACK)
 	# Call the update — it MUST early-return without touching _facing.
 	p._update_mouse_facing()
-	assert_eq(p._facing, Vector2.LEFT, "STATE_ATTACK suppresses facing update — swing direction snapshots at spawn (ticket edge case 3)")
+	assert_eq(p._facing, Vector2.LEFT,
+		"STATE_ATTACK suppresses facing update — swing direction snapshots at spawn"
+			+ " (ticket edge case 3)")
 	p.free()
 
 
@@ -183,7 +185,8 @@ func test_sprite_rotation_stays_zero_across_facing() -> void:
 		p._facing = Vector2.from_angle(ang)
 		p._update_sprite_rotation()
 		assert_almost_eq(sprite.rotation, 0.0, 0.001,
-			"Sprite rotation pinned to 0 across _facing angle %.3f rad (directional frames carry orientation)" % ang)
+			("Sprite rotation pinned to 0 across _facing angle %.3f rad"
+				+ " (directional frames carry orientation)") % ang)
 	# Cleanup handled by autofree.
 
 
@@ -239,14 +242,16 @@ func test_swing_wedge_still_rotates_independently_of_sprite_pin() -> void:
 	add_child_autofree(p)
 	p._ready()
 	# Spawn a wedge facing east; expect rotation == 0 (east = 0 rad).
-	var east_wedge: ColorRect = p._spawn_swing_wedge(Player.ATTACK_LIGHT, Vector2.RIGHT, 30.0, 12.0, 0.18)
+	var east_wedge: ColorRect = p._spawn_swing_wedge(
+		Player.ATTACK_LIGHT, Vector2.RIGHT, 30.0, 12.0, 0.18)
 	assert_not_null(east_wedge, "wedge spawned")
 	assert_almost_eq(east_wedge.rotation, 0.0, 0.001,
 		"swing-wedge rotation = dir.angle() = 0 for east — independent of Sprite-node pin")
 	# Spawn another wedge facing north; expect rotation == -PI/2.
 	# (This kills the prior east wedge — `_active_swing_wedge` kill-and-restart
 	# semantics. We just want to verify the rotation pre-fade.)
-	var north_wedge: ColorRect = p._spawn_swing_wedge(Player.ATTACK_HEAVY, Vector2.UP, 30.0, 12.0, 0.18)
+	var north_wedge: ColorRect = p._spawn_swing_wedge(
+		Player.ATTACK_HEAVY, Vector2.UP, 30.0, 12.0, 0.18)
 	assert_not_null(north_wedge, "north wedge spawned")
 	assert_almost_eq(north_wedge.rotation, -PI / 2.0, 0.001,
 		"swing-wedge rotation = dir.angle() = -PI/2 for north — pin doesn't suppress it")

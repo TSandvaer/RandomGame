@@ -91,7 +91,8 @@ func test_tier_modifier_overflow_clamps_to_t6() -> void:
 	var t: LootTableDef = ContentFactory.make_loot_table({"entries": [entry]})
 	var drops: Array[ItemInstance] = r.roll(t)
 	assert_eq(drops.size(), 1)
-	assert_eq(drops[0].rolled_tier, ItemDef.Tier.T6, "tier modifier overflow clamps to T6, not crashes")
+	assert_eq(drops[0].rolled_tier, ItemDef.Tier.T6,
+		"tier modifier overflow clamps to T6, not crashes")
 
 
 # ---- 6: Tier modifier underflow clamps to T1 -----------------------
@@ -243,7 +244,8 @@ func test_weighted_pick_distribution_respects_weights() -> void:
 			heavy_count += 1
 	var heavy_frac: float = float(heavy_count) / float(total)
 	# Expected 0.75; allow 0.7..0.8 band — generous for low N flakiness.
-	assert_between(heavy_frac, 0.70, 0.80, "heavy weight (3 vs 1) -> ~75% picks (got %.3f)" % heavy_frac)
+	assert_between(heavy_frac, 0.70, 0.80,
+		"heavy weight (3 vs 1) -> ~75% picks (got %.3f)" % heavy_frac)
 
 
 # ---- Roll modes side-by-side ---------------------------------------
@@ -265,7 +267,8 @@ func test_independent_mode_produces_zero_to_n_items() -> void:
 		var sz: int = r.roll(t).size()
 		seen_sizes[sz] = true
 	for expected: int in [0, 1, 2, 3]:
-		assert_true(seen_sizes.has(expected), "independent mode produces drops of size %d at least once" % expected)
+		assert_true(seen_sizes.has(expected),
+			"independent mode produces drops of size %d at least once" % expected)
 
 
 func test_weighted_pick_mode_produces_exactly_n() -> void:
