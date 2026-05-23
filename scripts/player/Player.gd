@@ -388,6 +388,36 @@ var is_regenerating: bool = false
 # rounding across frames with variable delta.
 var _regen_carry: float = 0.0
 
+# ---- M3 Tier 3 W2 quest persistence (ticket 86c9y7ydg / W2-T6) ----------
+##
+## **Single-active-bounty structural lock** per W2-T7 §9 v6 trigger guard
+## addendum. The player may carry at most ONE active QuestState at a time.
+## QuestActionRouter rejects `accept_bounty` actions when this field is
+## non-null (`WarningBus.warn(..., "quest")`); the rejection is structural,
+## not a bug. Multi-concurrent-bounty is deferred to v6.
+##
+## **Save round-trip**: serialised via `to_save_dict()` into
+## `data.character.active_bounty` (as a Dictionary, or null when no
+## active bounty). Restored via `restore_from_save_dict()` on load.
+## Schema is additive per `team/devon-dev/save-schema-v5-tier3-additions.md`
+## §2.5 — uses `has()`-guarded backfill in `Save._migrate_v4_to_v5`.
+##
+## Typed as `Variant` (rather than `QuestState`) so the field can hold
+## either a QuestState reference OR `null` (Godot 4 GDScript doesn't admit
+## `QuestState | null` union typing). Consumers do `is QuestState` checks.
+var active_bounty: Variant = null
+
+## Append-only list of completed-quest StringName ids. Stable across
+## patches per `m3-design-seeds.md §3.9` (a future rename of a shipped
+## quest_id would orphan player saves; W3+ quest-content authors pin ids
+## at first ship).
+##
+## **Save round-trip**: serialised into `data.character.completed_bounties`
+## via `to_save_dict()`. JSON-serialised as Array[String]; load layer
+## stringifies back via the QuestStateResolver._completed_contains helper
+## (the comparison is robust to either StringName or String shapes).
+var completed_bounties: Array = []
+
 
 func _ready() -> void:
 	# Seed the saved layer mask from whatever the scene authored. Tests may
@@ -1983,3 +2013,80 @@ func _play_hit_flash() -> void:
 			"Player._play_hit_flash",
 			"modulate-fallback tween_valid=%s" % _hit_flash_tween.is_valid()
 		)
+
+
+# ---- M3 Tier 3 W2 quest persistence I/O (ticket 86c9y7ydg / W2-T6) --------
+##
+## Symmetric `to_save_dict` / `restore_from_save_dict` for the `active_bounty`
+## + `completed_bounties` fields. Save.gd writes/reads these into
+## `data.character.active_bounty` (Dictionary or null) and
+## `data.character.completed_bounties` (Array[String]).
+##
+## **Why on Player.gd (not PlayerStats.gd)** — these are quest-system state,
+## not stat-allocation state. PlayerStats owns V/F/E + unspent points; the
+## bounty fields are conceptually closer to inventory/run-state. Adding the
+## methods here matches the `restore_full_hp` / inventory restore precedent
+## (Main reads `data.character.*` + dispatches to the right consumer).
+
+
+## Serialise the player's quest state into a partial Dictionary for the
+## save's `data.character` block. Caller (Save.gd / Main) merges the
+## returned keys into the character payload alongside `stats` /
+## `unspent_stat_points` / etc.
+##
+## Shape:
+##   {
+##     "active_bounty": <QuestState.to_dict()> or null,
+##     "completed_bounties": Array[String],
+##   }
+##
+## **`active_bounty` is null when no bounty is active** — the save layer
+## persists the null verbatim (JSON nulls round-trip cleanly).
+func to_save_dict() -> Dictionary:
+	var out: Dictionary = {}
+	if active_bounty is QuestState:
+		out["active_bounty"] = (active_bounty as QuestState).to_dict()
+	else:
+		out["active_bounty"] = null
+	# Stringify the completed_bounties array for JSON round-trip. The on-disk
+	# shape is Array[String]; in-memory we accept either StringName or String
+	# entries (QuestStateResolver._completed_contains normalises). Stringify
+	# defensively so a save written from in-memory StringName entries round-
+	# trips identically.
+	var completed_strings: Array = []
+	for entry in completed_bounties:
+		completed_strings.append(String(entry))
+	out["completed_bounties"] = completed_strings
+	return out
+
+
+## Restore quest state from a `data.character` block. Tolerates missing
+## sub-keys (Tier-3-naive saves backfilled by `Save._migrate_v4_to_v5`
+## already supply defaults; this method's tolerance is belt-and-suspenders
+## for hand-edited or partial-payload restore paths).
+##
+## Idempotent — calling twice with the same payload yields the same in-
+## memory state. Does NOT emit signals (matches PlayerStats.restore_from_character
+## convention — pure deserialisation).
+func restore_from_save_dict(character: Dictionary) -> void:
+	# active_bounty — null OR Dictionary (per QuestState.from_dict contract).
+	# Missing key defaults to null (no active bounty).
+	if character.has("active_bounty"):
+		var ab_payload: Variant = character["active_bounty"]
+		if ab_payload == null:
+			active_bounty = null
+		else:
+			active_bounty = QuestState.from_dict(ab_payload)
+			# QuestState.from_dict returns null on malformed payload; that's
+			# the same shape as "no active bounty" so we treat it identically.
+	else:
+		active_bounty = null
+	# completed_bounties — Array, defaults to empty. Defensive: convert
+	# every entry to StringName for in-memory canonicalisation (matches
+	# QuestStateResolver's comparison shape).
+	completed_bounties = []
+	if character.has("completed_bounties"):
+		var arr: Variant = character["completed_bounties"]
+		if arr is Array:
+			for entry in (arr as Array):
+				completed_bounties.append(StringName(String(entry)))

@@ -117,6 +117,17 @@ const DEFAULT_PAYLOAD: Dictionary = {
 		# `default_payload()`. See `scripts/levels/FloorAssembler.gd`
 		# § "Seed-derivation contract" for the consumer side.
 		"world_seed": 0,
+		# M3 Tier 3 W2-T6 (2026-05-23, ticket `86c9y7ydg`): per-character
+		# quest state. `active_bounty` is a Dictionary (QuestState.to_dict)
+		# or null when the player has no active bounty; `completed_bounties`
+		# is an Array of StringName quest_ids (JSON-serialised as
+		# Array[String]; restored as StringName by Player.restore_from_save_dict).
+		# Both ride additively on schema v5 — the v5 schema version was
+		# bumped in W2-T4 for the world_seed canonical promotion; W2-T6
+		# adds these fields without a further bump per
+		# `team/devon-dev/save-schema-v5-tier3-additions.md §5`.
+		"active_bounty": null,
+		"completed_bounties": [],
 	},
 	"stash": [],  # list of item dicts
 	"equipped": {},  # slot -> item dict
@@ -300,6 +311,16 @@ func migrate(data: Dictionary, from_version: int) -> Dictionary:
 		out = _migrate_v3_to_v4(out)
 	if from_version < 5:
 		out = _migrate_v4_to_v5(out)
+	# ---- v5-additive Tier 3 backfill (W2-T6, ticket 86c9y7ydg) ----------
+	# Runs ON EVERY load regardless of from_version, including v5-already
+	# saves that pre-date the W2-T6 ship. Per
+	# `team/devon-dev/save-schema-v5-tier3-additions.md §5`: all Tier 3
+	# additions ride additively on schema v5 (no v6 bump). The schema
+	# layer can't gate the backfill on "is this save POST-W2-T6 or PRE-?"
+	# because both are schema_version=5 on disk — only field-presence
+	# distinguishes. So we run the has()-guarded backfill unconditionally;
+	# idempotent on already-W2-T6 saves (every guard is a `not has(...)`).
+	out = _backfill_v5_tier3_quest_fields(out)
 	return out
 
 
@@ -496,6 +517,50 @@ func _migrate_v4_to_v5(data: Dictionary) -> Dictionary:
 		# the next migration pass — which can't happen at v5 HEAD — would
 		# re-roll. In practice the seed will be non-zero on first try.)
 		character["world_seed"] = randi()
+	return data
+
+
+## v5-additive Tier 3 backfill (W2-T6, ticket `86c9y7ydg`).
+##
+## **Pattern**: v4-style `has()`-guarded additive backfill applied to v5
+## saves WITHOUT bumping SCHEMA_VERSION (per
+## `team/devon-dev/save-schema-v5-tier3-additions.md §5` — all Tier 3
+## additions are additive within schema v5). The dispatch brief explicitly
+## states: "Use existing v4 `_upgrade_payload` has()-guard pattern, NOT
+## `_migrate_v5_to_v5_tier3` (that's forward-looking only)."
+##
+## **What this backfills**: two W2-T6 fields under `character.*`:
+##   - `active_bounty` — defaults to null on absent. Tier-3-naive saves
+##     have no concept of quest state; the player starts post-load with
+##     no active bounty.
+##   - `completed_bounties` — defaults to [] on absent. Tier-3-naive saves
+##     have no completed-quest history; the player's completion list
+##     starts empty.
+##
+## **Idempotent**: every backfill is gated by `not character.has(<key>)`,
+## so running on an already-W2-T6 save is a no-op.
+##
+## **Why this runs unconditionally in `migrate()` (not inside
+## `_migrate_v4_to_v5`)**: a save written by a pre-W2-T6 build at
+## schema_version=5 lacks both keys. When such a save loads on a
+## post-W2-T6 runtime, `from_version == 5` so the
+## `if from_version < 5: _migrate_v4_to_v5` branch is skipped. Running
+## this backfill unconditionally at the end of `migrate()` catches every
+## load path: legacy v0..v4 (routes through `_migrate_v4_to_v5` then this),
+## pre-W2-T6 v5 (only this), and post-W2-T6 v5 (no-op).
+##
+## **Not a schema bump**: SCHEMA_VERSION stays at 5. The save envelope's
+## `schema_version` on disk remains `5` before and after this backfill
+## fires. Field-presence distinguishes pre-W2-T6 v5 from post-W2-T6 v5,
+## not version-number.
+func _backfill_v5_tier3_quest_fields(data: Dictionary) -> Dictionary:
+	if not data.has("character") or not (data["character"] is Dictionary):
+		data["character"] = DEFAULT_PAYLOAD["character"].duplicate(true)
+	var character: Dictionary = data["character"]
+	if not character.has("active_bounty"):
+		character["active_bounty"] = null
+	if not character.has("completed_bounties"):
+		character["completed_bounties"] = []
 	return data
 
 
