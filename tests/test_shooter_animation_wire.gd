@@ -15,6 +15,7 @@ extends GutTest
 ##       die → die_<dir> (from `_die` directly)
 
 const ShooterScript: Script = preload("res://scripts/mobs/Shooter.gd")
+const SHOOTER_SCENE: PackedScene = preload("res://scenes/mobs/Shooter.tscn")
 const SPRITE_FRAMES_PATH: String = "res://assets/sprites/shooter/Shooter.tres"
 const ANIM_DIRS: Array[String] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 const ANIM_STATES: Array[String] = ["walk", "telegraph", "atk", "hit", "die"]
@@ -30,7 +31,7 @@ class FakePlayer:
 
 
 func _make_scene_shooter() -> Shooter:
-	var packed: PackedScene = load("res://scenes/mobs/Shooter.tscn")
+	var packed: PackedScene = SHOOTER_SCENE
 	var s: Shooter = packed.instantiate() as Shooter
 	add_child_autofree(s)
 	return s
@@ -39,7 +40,7 @@ func _make_scene_shooter() -> Shooter:
 func _make_scene_shooter_in_room() -> Array:
 	var room: Node2D = autofree(Node2D.new())
 	add_child(room)
-	var packed: PackedScene = load("res://scenes/mobs/Shooter.tscn")
+	var packed: PackedScene = SHOOTER_SCENE
 	var s: Shooter = packed.instantiate() as Shooter
 	room.add_child(s)
 	return [s, room]

@@ -8,6 +8,7 @@ extends GutTest
 
 const BossRoomScript: Script = preload("res://scripts/levels/Stratum1BossRoom.gd")
 const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
+const BOSS_ROOM_SCENE: PackedScene = preload("res://scenes/levels/Stratum1BossRoom.tscn")
 
 # ---- Test isolation ---------------------------------------------------
 # M3 Tier 2 Wave 1 T2/T3 — Stratum1Boss fires TimeScaleDirector requests on
@@ -53,7 +54,7 @@ class FakePlayerBody:
 
 
 func _make_room() -> Stratum1BossRoom:
-	var packed: PackedScene = load("res://scenes/levels/Stratum1BossRoom.tscn")
+	var packed: PackedScene = BOSS_ROOM_SCENE
 	var room: Stratum1BossRoom = packed.instantiate()
 	add_child_autofree(room)
 	return room
@@ -63,7 +64,7 @@ func _make_room() -> Stratum1BossRoom:
 
 
 func test_boss_room_scene_loads() -> void:
-	var packed: PackedScene = load("res://scenes/levels/Stratum1BossRoom.tscn")
+	var packed: PackedScene = BOSS_ROOM_SCENE
 	assert_not_null(packed, "Stratum1BossRoom.tscn must load")
 	var instance: Node = packed.instantiate()
 	assert_true(instance is Stratum1BossRoom, "root is Stratum1BossRoom typed")

@@ -39,6 +39,9 @@ const PHYS_DELTA: float = 1.0 / 60.0
 # Stage 2b: Room01 spawns a PracticeDummy (not Grunt). Preload the script so
 # the AC1 spawn-roster assertion can `m is PracticeDummy`.
 const PracticeDummyScript: Script = preload("res://scripts/mobs/PracticeDummy.gd")
+const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const IRON_SWORD_DEF: Resource = preload("res://resources/items/weapons/iron_sword.tres")
+const SWIFT_AFFIX_DEF: Resource = preload("res://resources/affixes/swift.tres")
 
 const TEST_SLOT: int = 994
 
@@ -51,7 +54,7 @@ const BOSS_KILL_BUDGET_TICKS: int = 1800
 
 
 func _instantiate_main() -> Node:
-	var packed: PackedScene = load("res://scenes/Main.tscn")
+	var packed: PackedScene = MAIN_SCENE
 	assert_not_null(packed, "Main.tscn must load")
 	var main: Node = packed.instantiate()
 	# Reset autoloads so we start each test on a clean slate. (Production
@@ -600,8 +603,8 @@ func test_save_load_round_trips_inventory_items_via_production_resolvers() -> vo
 	await get_tree().process_frame
 	# Load real ItemDef + AffixDef from disk. Match the iron_sword fixture
 	# Drew authored at res://resources/items/weapons/iron_sword.tres.
-	var iron: ItemDef = load("res://resources/items/weapons/iron_sword.tres") as ItemDef
-	var swift: AffixDef = load("res://resources/affixes/swift.tres") as AffixDef
+	var iron: ItemDef = IRON_SWORD_DEF as ItemDef
+	var swift: AffixDef = SWIFT_AFFIX_DEF as AffixDef
 	assert_not_null(iron, "fixture: iron_sword.tres must load (test relies on real content)")
 	assert_not_null(swift, "fixture: swift.tres must load")
 	# Sanity: the production resolver exposed by Main resolves these ids. If
@@ -717,8 +720,8 @@ func test_main_get_resolvers_match_resolvers_used_by_load() -> void:
 	# fails here.
 	var main: Main = _instantiate_main() as Main
 	await get_tree().process_frame
-	var iron: ItemDef = load("res://resources/items/weapons/iron_sword.tres") as ItemDef
-	var swift: AffixDef = load("res://resources/affixes/swift.tres") as AffixDef
+	var iron: ItemDef = IRON_SWORD_DEF as ItemDef
+	var swift: AffixDef = SWIFT_AFFIX_DEF as AffixDef
 	assert_not_null(iron)
 	assert_not_null(swift)
 	var registry: ContentRegistry = main.get_content_registry()
@@ -773,7 +776,7 @@ func test_load_on_boot_restores_state() -> void:
 	_reset_autoloads()
 	# Instantiate Main. Cannot use _instantiate_main() helper because it
 	# deletes the save before mounting.
-	var packed: PackedScene = load("res://scenes/Main.tscn")
+	var packed: PackedScene = MAIN_SCENE
 	var main: Main = packed.instantiate() as Main
 	add_child_autofree(main)
 	await get_tree().process_frame

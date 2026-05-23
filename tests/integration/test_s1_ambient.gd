@@ -47,6 +47,7 @@ extends GutTest
 
 const STREAM_PATH_S1_AMBIENT: String = "res://audio/ambient/stratum1/amb-stratum1-room.ogg"
 const STREAM_PATH_S2_AMBIENT: String = "res://audio/ambient/stratum2/amb-stratum2-room.ogg"
+const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 
 const RESUME_DB: float = -4.4  # 60% nominal — Uma s1-ambient.md §"Volume / loudness targets"
 const RESUME_DB_EPSILON: float = 0.05
@@ -418,7 +419,7 @@ func test_main_load_room_at_index_fires_play_stratum1_ambient_for_non_boss_rooms
 	# index 0) and assert play_stratum1_ambient was called. This is the
 	# regression guard against the wiring getting dropped from
 	# `_load_room_at_index`.
-	var packed: PackedScene = load("res://scenes/Main.tscn")
+	var packed: PackedScene = MAIN_SCENE
 	assert_not_null(packed, "Main.tscn must load")
 	var main: Node = packed.instantiate()
 	# Clean slate save so Main doesn't restore stale state.
@@ -450,7 +451,7 @@ func test_main_load_room_at_index_skips_ambient_for_boss_room() -> void:
 	# The ambient is stopped by Stratum1BossRoom.entry_sequence_started
 	# handler; this test pins that Main.gd doesn't pre-trigger the bed
 	# at room load (which would race the entry-sequence stop).
-	var packed: PackedScene = load("res://scenes/Main.tscn")
+	var packed: PackedScene = MAIN_SCENE
 	var main: Node = packed.instantiate()
 	var save_node: Node = Engine.get_main_loop().root.get_node_or_null("Save")
 	if save_node != null and save_node.has_save(0):

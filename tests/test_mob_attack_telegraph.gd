@@ -22,6 +22,7 @@ const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 const ChargerScript: Script = preload("res://scripts/mobs/Charger.gd")
 const ShooterScript: Script = preload("res://scripts/mobs/Shooter.gd")
 const MobDefScript: Script = preload("res://scripts/content/MobDef.gd")
+const Stratum1BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 
 # ---- Helpers ------------------------------------------------------------
 
@@ -337,8 +338,7 @@ func test_stratum1_boss_melee_telegraph_creates_tween() -> void:
 	# Boss melee path: skip_intro_for_tests so we start in IDLE not DORMANT,
 	# then put the player in MELEE_RANGE and tick — boss should enter
 	# STATE_TELEGRAPHING_MELEE and create the visual telegraph tween.
-	const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
-	var b: Stratum1Boss = BossScript.new()
+	var b: Stratum1Boss = Stratum1BossScript.new()
 	b.skip_intro_for_tests = true
 	add_child_autofree(b)
 	var p: FakePlayer = FakePlayer.new()
@@ -362,10 +362,8 @@ func test_stratum1_boss_melee_telegraph_creates_tween() -> void:
 func test_stratum1_boss_slam_telegraph_creates_tween() -> void:
 	# Boss slam path: requires phase 2 (slam unlocks at PHASE_2). Drive into
 	# phase 2 by damaging boss past 66% threshold + tick past transition.
-	const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
-	const MobDefScript: Script = preload("res://scripts/content/MobDef.gd")
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 600})
-	var b: Stratum1Boss = BossScript.new()
+	var b: Stratum1Boss = Stratum1BossScript.new()
 	b.skip_intro_for_tests = true
 	b.mob_def = def
 	add_child_autofree(b)

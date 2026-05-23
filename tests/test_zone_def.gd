@@ -15,6 +15,15 @@ extends GutTest
 const ZoneDefScript: Script = preload("res://resources/level/ZoneDef.gd")
 const ZoneAnchorScript: Script = preload("res://resources/level/ZoneAnchor.gd")
 
+
+# `.tres` files containing nested scripted sub-resources (9 ZoneAnchor
+# sub-resources here) fail to resolve via parse-time `preload(...)` — the
+# const binds to null. Route through runtime `load(...)` via this helper
+# instead. See `.claude/docs/test-conventions.md` § "preload of .tres with
+# nested scripted sub-resources fails at parse-time (PR #357 lesson)".
+func _load_outer_cloister_zone() -> ZoneDef:
+	return load("res://resources/level/zones/s1_z1_outer_cloister.tres")
+
 # ---- Helpers ---------------------------------------------------------
 
 
@@ -239,7 +248,7 @@ func test_zone_has_anchor_finds_by_room_id() -> void:
 
 
 func test_authored_s1_z1_outer_cloister_loads() -> void:
-	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var z: ZoneDef = _load_outer_cloister_zone()
 	assert_not_null(z, "s1_z1_outer_cloister.tres must load as ZoneDef")
 	assert_eq(z.zone_id, &"s1_z1_outer_cloister")
 	assert_eq(z.display_name, "Outer Cloister")
@@ -247,7 +256,7 @@ func test_authored_s1_z1_outer_cloister_loads() -> void:
 
 
 func test_authored_s1_z1_outer_cloister_validates() -> void:
-	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var z: ZoneDef = _load_outer_cloister_zone()
 	var errors: Array[String] = z.validate()
 	assert_eq(errors.size(), 0, "s1_z1_outer_cloister.tres must validate cleanly: %s" % str(errors))
 
@@ -257,7 +266,7 @@ func test_authored_s1_z1_outer_cloister_has_nine_anchors() -> void:
 	# all 8 S1 chunks (room08 used twice: boss_room + exit) for a total
 	# of 9 anchors. The spike's original 5-anchor count is preserved in
 	# git history as the pre-retrofit shape.
-	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var z: ZoneDef = _load_outer_cloister_zone()
 	assert_eq(
 		z.anchors.size(),
 		9,
@@ -286,7 +295,7 @@ func test_authored_s1_z1_outer_cloister_anchor_chunks_resolve() -> void:
 	# Each anchor's chunk_id must reference a real LevelChunkDef under
 	# resources/level_chunks/. Acts as a content cross-check + catches
 	# typos in the worked example.
-	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var z: ZoneDef = _load_outer_cloister_zone()
 	for a: ZoneAnchor in z.anchors:
 		var path: String = "res://resources/level_chunks/%s.tres" % str(a.chunk_id)
 		var chunk: Resource = load(path)
@@ -301,7 +310,7 @@ func test_authored_s1_z1_outer_cloister_pool_chunks_resolve() -> void:
 	# W2-T3 retrofit (`86c9y1045`) — pool shrank from 4 to 3 per the SI-8
 	# (b) "light procedural fill" commitment (smaller pool + slot range
 	# [0,1] vs spike's [1,3]).
-	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var z: ZoneDef = _load_outer_cloister_zone()
 	assert_eq(
 		z.procedural_slot_pool.size(),
 		3,
@@ -320,7 +329,7 @@ func test_authored_s1_z1_outer_cloister_exit_targets_s2() -> void:
 	# at S2's first zone. Until S2 zones land in W3, the assembler treats
 	# unresolved target_zone_ids as terminal exits (documented in
 	# level-chunks.md § "Cross-zone transitions").
-	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var z: ZoneDef = _load_outer_cloister_zone()
 	var exits: Array[ZoneAnchor] = z.get_anchors_of_kind(&"exit")
 	assert_eq(exits.size(), 1)
 	assert_eq(

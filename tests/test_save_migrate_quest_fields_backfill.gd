@@ -11,6 +11,8 @@ extends GutTest
 ## broader round-trip + Case 3 idempotence pin lives in the sibling.
 
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
+const PlayerScript: Script = preload("res://scripts/player/Player.gd")
+const QSScript: Script = preload("res://scripts/quests/QuestState.gd")
 
 const TEST_SLOT: int = 997
 
@@ -170,11 +172,9 @@ func test_player_restore_from_save_dict_round_trips_active_bounty() -> void:
 	# This is a CONTRACT pin for the symmetric serialise→deserialise
 	# property — not an integration test against the Save autoload. The
 	# Save round-trip is covered in test_quest_state_save_roundtrip.gd.
-	var PlayerScript: Script = preload("res://scripts/player/Player.gd")
 	var p: Node = PlayerScript.new()
 	add_child_autofree(p)
 	# Seed Player runtime state.
-	var QSScript: Script = preload("res://scripts/quests/QuestState.gd")
 	var qs: QuestState = QSScript.new()
 	qs.quest_id = &"s1_recover_stoker_proof"
 	qs.accepted_at_tick = 50_000
@@ -216,11 +216,9 @@ func test_player_restore_from_save_dict_round_trips_active_bounty() -> void:
 func test_player_restore_from_null_active_bounty_clears_field() -> void:
 	# Restoring a character block with active_bounty=null sets Player.active_bounty
 	# to null (clean reset path; matches the migrated-from-v3 case).
-	var PlayerScript: Script = preload("res://scripts/player/Player.gd")
 	var p: Node = PlayerScript.new()
 	add_child_autofree(p)
 	# Seed with a non-null bounty, then restore from a null-bounty snapshot.
-	var QSScript: Script = preload("res://scripts/quests/QuestState.gd")
 	var qs: QuestState = QSScript.new()
 	qs.quest_id = &"stale_bounty"
 	p.set("active_bounty", qs)
@@ -240,11 +238,9 @@ func test_player_restore_tolerates_missing_quest_keys() -> void:
 	# A character block lacking both keys (e.g. a pre-W2-T6 save loaded
 	# before backfill — defensive belt-and-suspenders) restores to default
 	# state (null + []).
-	var PlayerScript: Script = preload("res://scripts/player/Player.gd")
 	var p: Node = PlayerScript.new()
 	add_child_autofree(p)
 	# Seed with non-default state.
-	var QSScript: Script = preload("res://scripts/quests/QuestState.gd")
 	var qs: QuestState = QSScript.new()
 	qs.quest_id = &"stale_bounty"
 	p.set("active_bounty", qs)

@@ -15,12 +15,13 @@ extends GutTest
 
 const ExitScript: Script = preload("res://scripts/levels/StratumExit.gd")
 const BossRoomScript: Script = preload("res://scripts/levels/Stratum1BossRoom.gd")
+const STRATUM_EXIT_SCENE: PackedScene = preload("res://scenes/levels/StratumExit.tscn")
 
 # ---- Helpers ----------------------------------------------------------
 
 
 func _make_exit() -> StratumExit:
-	var packed: PackedScene = load("res://scenes/levels/StratumExit.tscn")
+	var packed: PackedScene = STRATUM_EXIT_SCENE
 	var exit: StratumExit = packed.instantiate()
 	add_child_autofree(exit)
 	return exit
@@ -42,7 +43,7 @@ func _make_room() -> Stratum1BossRoom:
 
 
 func test_stratum_exit_scene_loads() -> void:
-	var packed: PackedScene = load("res://scenes/levels/StratumExit.tscn")
+	var packed: PackedScene = STRATUM_EXIT_SCENE
 	assert_not_null(packed, "StratumExit.tscn must load")
 	var instance: Node = packed.instantiate()
 	assert_true(instance is StratumExit, "root is StratumExit typed")

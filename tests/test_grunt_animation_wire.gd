@@ -20,6 +20,7 @@ extends GutTest
 ##     `hit_<dir>` plays from `take_damage` directly (not state-driven).
 
 const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
+const GRUNT_SCENE: PackedScene = preload("res://scenes/mobs/Grunt.tscn")
 const SPRITE_FRAMES_PATH: String = "res://assets/sprites/grunt/Grunt.tres"
 const ANIM_DIRS: Array[String] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 const ANIM_STATES: Array[String] = ["walk", "atk", "atk_telegraph", "hit", "die"]
@@ -35,7 +36,7 @@ class FakePlayer:
 
 
 func _make_scene_grunt() -> Grunt:
-	var packed: PackedScene = load("res://scenes/mobs/Grunt.tscn")
+	var packed: PackedScene = GRUNT_SCENE
 	var g: Grunt = packed.instantiate() as Grunt
 	add_child_autofree(g)
 	return g
@@ -46,7 +47,7 @@ func _make_scene_grunt_in_room() -> Array:
 	# for the deferred ember-particle add).
 	var room: Node2D = autofree(Node2D.new())
 	add_child(room)
-	var packed: PackedScene = load("res://scenes/mobs/Grunt.tscn")
+	var packed: PackedScene = GRUNT_SCENE
 	var g: Grunt = packed.instantiate() as Grunt
 	room.add_child(g)
 	return [g, room]

@@ -25,6 +25,7 @@ extends GutTest
 ## hit, bare-instanced `_play_anim` no-op safety.
 
 const StokerScript: Script = preload("res://scripts/mobs/Stoker.gd")
+const STOKER_SCENE: PackedScene = preload("res://scenes/mobs/Stoker.tscn")
 const SPRITE_FRAMES_PATH: String = "res://assets/sprites/stoker/Stoker.tres"
 const ANIM_DIRS: Array[String] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 const ANIM_STATES: Array[String] = ["walk", "atk", "atk_telegraph", "hit", "die"]
@@ -64,7 +65,7 @@ class FakePlayer:
 
 
 func _make_scene_stoker() -> Stoker:
-	var packed: PackedScene = load("res://scenes/mobs/Stoker.tscn")
+	var packed: PackedScene = STOKER_SCENE
 	var s: Stoker = packed.instantiate() as Stoker
 	add_child_autofree(s)
 	return s
@@ -75,7 +76,7 @@ func _make_scene_stoker_in_room() -> Array:
 	# parent for the deferred ember-particle add).
 	var room: Node2D = autofree(Node2D.new())
 	add_child(room)
-	var packed: PackedScene = load("res://scenes/mobs/Stoker.tscn")
+	var packed: PackedScene = STOKER_SCENE
 	var s: Stoker = packed.instantiate() as Stoker
 	room.add_child(s)
 	return [s, room]

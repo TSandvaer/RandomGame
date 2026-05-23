@@ -12,10 +12,11 @@ extends GutTest
 const Stratum1Room01Script: Script = preload("res://scripts/levels/Stratum1Room01.gd")
 const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 const PracticeDummyScript: Script = preload("res://scripts/mobs/PracticeDummy.gd")
+const ROOM_01_SCENE: PackedScene = preload("res://scenes/levels/Stratum1Room01.tscn")
 
 
 func test_stratum1_room01_scene_loads() -> void:
-	var packed: PackedScene = load("res://scenes/levels/Stratum1Room01.tscn")
+	var packed: PackedScene = ROOM_01_SCENE
 	assert_not_null(packed, "Stratum1Room01.tscn must load")
 	var instance: Node = packed.instantiate()
 	assert_not_null(instance)
@@ -24,7 +25,7 @@ func test_stratum1_room01_scene_loads() -> void:
 
 
 func test_stratum1_room01_assembles_via_assembler() -> void:
-	var packed: PackedScene = load("res://scenes/levels/Stratum1Room01.tscn")
+	var packed: PackedScene = ROOM_01_SCENE
 	var room: Stratum1Room01 = packed.instantiate()
 	add_child_autofree(room)
 	# _ready ran on add_child — assembly should be present.
@@ -35,7 +36,7 @@ func test_stratum1_room01_assembles_via_assembler() -> void:
 
 func test_stratum1_room01_bounds_match_canvas() -> void:
 	# Bounds must fit Uma's 480x270 internal canvas (single-screen room).
-	var packed: PackedScene = load("res://scenes/levels/Stratum1Room01.tscn")
+	var packed: PackedScene = ROOM_01_SCENE
 	var room: Stratum1Room01 = packed.instantiate()
 	add_child_autofree(room)
 	var bounds: Rect2 = room.get_bounds_px()
@@ -47,7 +48,7 @@ func test_stratum1_room01_bounds_match_canvas() -> void:
 func test_stratum1_room01_spawns_practice_dummy() -> void:
 	# Stage 2b: Room01 spawns a single PracticeDummy (not grunts) per
 	# Uma's player-journey Beat 4-5 spec. Grunts moved to Room02 onward.
-	var packed: PackedScene = load("res://scenes/levels/Stratum1Room01.tscn")
+	var packed: PackedScene = ROOM_01_SCENE
 	var room: Stratum1Room01 = packed.instantiate()
 	add_child_autofree(room)
 	var mobs: Array[Node] = room.get_spawned_mobs()
@@ -64,7 +65,7 @@ func test_stratum1_room01_spawns_practice_dummy() -> void:
 
 
 func test_stratum1_room01_dummy_positioned_inside_bounds() -> void:
-	var packed: PackedScene = load("res://scenes/levels/Stratum1Room01.tscn")
+	var packed: PackedScene = ROOM_01_SCENE
 	var room: Stratum1Room01 = packed.instantiate()
 	add_child_autofree(room)
 	var bounds: Rect2 = room.get_bounds_px()
@@ -78,7 +79,7 @@ func test_stratum1_room01_dummy_positioned_inside_bounds() -> void:
 
 func test_stratum1_room01_chunk_def_canonical() -> void:
 	# Sanity: the .tscn references the canonical s1_room01.tres.
-	var packed: PackedScene = load("res://scenes/levels/Stratum1Room01.tscn")
+	var packed: PackedScene = ROOM_01_SCENE
 	var room: Stratum1Room01 = packed.instantiate()
 	add_child_autofree(room)
 	assert_not_null(room.chunk_def)

@@ -12,6 +12,7 @@ const LevelChunkDefScript: Script = preload("res://scripts/levels/LevelChunkDef.
 const MobSpawnPointScript: Script = preload("res://scripts/levels/MobSpawnPoint.gd")
 const ChunkPortScript: Script = preload("res://scripts/levels/ChunkPort.gd")
 const LevelAssemblerScript: Script = preload("res://scripts/levels/LevelAssembler.gd")
+const S1_ROOM01_CHUNK: Resource = preload("res://resources/level_chunks/s1_room01.tres")
 
 # ---- Helpers ---------------------------------------------------------
 
@@ -219,7 +220,7 @@ func test_assemble_single_falls_back_to_chunk_centre_without_entry_port() -> voi
 
 
 func test_authored_s1_room01_chunk_loads() -> void:
-	var c: LevelChunkDef = load("res://resources/level_chunks/s1_room01.tres") as LevelChunkDef
+	var c: LevelChunkDef = S1_ROOM01_CHUNK as LevelChunkDef
 	assert_not_null(c, "s1_room01.tres must load as LevelChunkDef")
 	assert_eq(c.id, &"s1_room01")
 	# Must validate cleanly per testing bar.
@@ -236,7 +237,7 @@ func test_authored_s1_room01_uses_uma_canvas_constraints() -> void:
 	# Per Uma's visual-direction.md (DECISIONS.md 2026-05-02):
 	#   - 32 px internal tile size.
 	#   - 480x270 internal canvas — chunks stay <= 480 wide and <= 270 tall.
-	var c: LevelChunkDef = load("res://resources/level_chunks/s1_room01.tres") as LevelChunkDef
+	var c: LevelChunkDef = S1_ROOM01_CHUNK as LevelChunkDef
 	assert_eq(c.tile_size_px, 32, "Uma's 32 px internal tile lock")
 	var size_px: Vector2i = c.size_px()
 	assert_lte(size_px.x, 480, "chunk width fits the 480 px logical canvas")
@@ -248,7 +249,7 @@ func test_authored_s1_room01_spawns_practice_dummy_only() -> void:
 	# tutorial entity per Uma's player-journey Beats 4-5. The grunt fight
 	# moved to Room02 onward. Any other mob_id in this chunk is a content
 	# regression — practice_dummy is the only valid Room01 entity at M2 W1.
-	var c: LevelChunkDef = load("res://resources/level_chunks/s1_room01.tres") as LevelChunkDef
+	var c: LevelChunkDef = S1_ROOM01_CHUNK as LevelChunkDef
 	for ms: MobSpawnPoint in c.mob_spawns:
 		assert_eq(
 			ms.mob_id, &"practice_dummy", "Stage 2b: Room01 spawns only practice_dummy (was: grunt)"

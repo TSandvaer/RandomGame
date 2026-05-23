@@ -34,6 +34,7 @@ extends GutTest
 
 const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
+const IRON_SWORD_DEF: Resource = preload("res://resources/items/weapons/iron_sword.tres")
 
 # ---- Autoload accessors -------------------------------------------------
 
@@ -49,7 +50,7 @@ func _inv() -> Node:
 
 func _make_iron_sword_instance() -> ItemInstance:
 	# The real iron_sword the PracticeDummy drops (damage=6).
-	var def: ItemDef = load("res://resources/items/weapons/iron_sword.tres") as ItemDef
+	var def: ItemDef = IRON_SWORD_DEF as ItemDef
 	assert_not_null(def, "iron_sword.tres must load")
 	return ItemInstance.new(def, def.tier)
 
@@ -255,7 +256,7 @@ func test_pickup_auto_equip_produces_weapon_scaled_damage() -> void:
 
 
 func test_iron_sword_tres_loads_and_resolves() -> void:
-	var def: ItemDef = load("res://resources/items/weapons/iron_sword.tres") as ItemDef
+	var def: ItemDef = IRON_SWORD_DEF as ItemDef
 	assert_not_null(def, "iron_sword.tres loads as ItemDef")
 	assert_eq(def.id, &"iron_sword")
 	assert_eq(int(def.slot), int(ItemDef.Slot.WEAPON), "iron_sword slot is WEAPON")
