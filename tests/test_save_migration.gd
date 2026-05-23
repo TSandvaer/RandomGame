@@ -162,11 +162,13 @@ func test_save_migrated_v0_then_reload_round_trips() -> void:
 	var raw: String = f.get_as_text()
 	f.close()
 	var parsed: Dictionary = JSON.parse_string(raw)
-	# Schema bumped to 4 on 2026-05-22 (added first_boss_kill_seen per M3-T2-W3-T17).
+	# Schema bumped to 5 on 2026-05-23 (W2-T4 ticket 86c9y108t — promoted
+	# `character.world_seed` from v4-additive to v5-canonical layer +
+	# added one-time re-roll of the `0` sentinel for legacy v4 characters).
 	# When SCHEMA_VERSION bumps, update this number AND add the new
 	# migration test in test_save.gd.
-	assert_eq(int(parsed["schema_version"]), 4,
-		"on-disk envelope upgraded to current schema (v4) after migration + save")
+	assert_eq(int(parsed["schema_version"]), 5,
+		"on-disk envelope upgraded to current schema (v5) after migration + save")
 	# And reload one more time — fields are stable.
 	var reloaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_eq(reloaded["character"]["level"], 4, "level stable across v0 → migrate → save → reload")
@@ -344,22 +346,29 @@ func test_v3_migration_chains_through_to_v4() -> void:
 	assert_eq(loaded["character"]["unspent_stat_points"], 2)
 	assert_true(bool(loaded["character"]["first_level_up_seen"]),
 		"v3 first_level_up_seen preserved (not overwritten by v4 migration)")
-	# Re-save and verify on-disk schema bumped to 4.
+	# v3 -> v4 -> v5 chain — the v5 step (W2-T4) re-rolls the world_seed
+	# sentinel (`0`, backfilled by v3 -> v4) to a non-zero value.
+	assert_true(loaded["character"].has("world_seed"),
+		"v3 → v5 chain preserves world_seed key")
+	assert_ne(int(loaded["character"]["world_seed"]), 0,
+		"v3 → v4 → v5 chain re-rolls the `0` sentinel; loaded seed is non-zero")
+	# Re-save and verify on-disk schema bumped to 5 (W2-T4).
 	_save().save_game(TEST_SLOT, loaded)
 	var path: String = _save().save_path(TEST_SLOT)
 	var f2: FileAccess = FileAccess.open(path, FileAccess.READ)
 	var raw2: String = f2.get_as_text()
 	f2.close()
 	var parsed: Dictionary = JSON.parse_string(raw2)
-	assert_eq(int(parsed["schema_version"]), 4,
-		"on-disk envelope upgraded to v4 after v3 → v4 migration + save")
+	assert_eq(int(parsed["schema_version"]), 5,
+		"on-disk envelope upgraded to v5 after v3 → v4 → v5 migration + save")
 
 
-func test_v0_migration_chains_through_to_v4() -> void:
+func test_v0_migration_chains_through_to_v5() -> void:
 	# Full-chain stress test: v0 fixture migrates v0 → v1 → v2 → v3 → v4
-	# and lands with every intermediate-version field present, plus the
-	# new v4 field. Catches drift in the migration chain — if any step
-	# silently drops a field, this test fails before T18+ does.
+	# → v5 and lands with every intermediate-version field present, plus
+	# the v4 + v5 new fields. Catches drift in the migration chain — if
+	# any step silently drops a field, this test fails before downstream
+	# consumers do.
 	_install_fixture_at_slot(FIXTURE_V0, TEST_SLOT)
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	# v0 -> v1: meta + equipped added.
@@ -371,13 +380,19 @@ func test_v0_migration_chains_through_to_v4() -> void:
 	assert_true(loaded["character"].has("stats"), "v2 → v3 added stats block")
 	assert_true(loaded["character"].has("unspent_stat_points"), "v2 → v3 added unspent_stat_points")
 	assert_true(loaded["character"].has("first_level_up_seen"), "v2 → v3 added first_level_up_seen")
-	# v3 -> v4: first_boss_kill_seen added.
+	# v3 -> v4: first_boss_kill_seen added; world_seed backfilled to `0`.
 	assert_true(loaded["character"].has("first_boss_kill_seen"),
 		"v3 → v4 added first_boss_kill_seen")
 	assert_false(bool(loaded["character"]["first_boss_kill_seen"]),
 		"v3 → v4 default-false (first kill of migrated character still unskippable)")
+	assert_true(loaded["character"].has("world_seed"),
+		"v3 → v4 backfilled world_seed key")
+	# v4 -> v5: world_seed re-rolled from `0` sentinel to non-zero (W2-T4
+	# canonical promotion; ticket 86c9y108t).
+	assert_ne(int(loaded["character"]["world_seed"]), 0,
+		"v4 → v5 re-rolls the `0` sentinel to a non-zero seed (W2-T4)")
 	# Original v0 fields survive the full chain.
-	assert_eq(loaded["character"]["level"], 4, "v0 level survives full v0→v4 chain")
+	assert_eq(loaded["character"]["level"], 4, "v0 level survives full v0→v5 chain")
 	assert_eq(loaded["character"]["xp"], 1850)
 	assert_eq(loaded["stash"].size(), 2)
 
@@ -387,6 +402,14 @@ func test_v4_migration_is_idempotent() -> void:
 	# already has first_boss_kill_seen) must be a no-op — never reset a
 	# true value to false. Tests Save._migrate_v3_to_v4 idempotence per
 	# the existing `if not character.has(...)` guard idiom.
+	#
+	# W2-T4 amendment (2026-05-23): with v5 in the chain, a v4 envelope
+	# also runs through `_migrate_v4_to_v5`. The veteran fixture now
+	# includes a non-zero `world_seed` so the v4 -> v5 step is a no-op
+	# on that field too (preserves immutability post-roll). A separate
+	# test (`test_migrate_v4_save_with_nonzero_seed_preserves_world_seed`
+	# in test_save.gd) covers the same property end-to-end.
+	var veteran_seed: int = 0xFEEDFACE
 	var v4_envelope: Dictionary = {
 		"schema_version": 4,
 		"saved_at": "2026-05-22T11:00:00",
@@ -405,6 +428,7 @@ func test_v4_migration_is_idempotent() -> void:
 				"first_boss_kill_seen": true,  # Veteran — should survive the migration cycle.
 				"hp_current": 130,
 				"hp_max": 130,
+				"world_seed": veteran_seed,  # already-rolled; v4 -> v5 must preserve.
 			},
 			"stash": [],
 			"equipped": {},
@@ -421,6 +445,9 @@ func test_v4_migration_is_idempotent() -> void:
 	# their skip privilege on schema-version rollback / partial load.
 	assert_true(bool(loaded["character"]["first_boss_kill_seen"]),
 		"already-v4 first_boss_kill_seen=true survives the no-op migration")
+	# v4 -> v5 step preserves a non-zero world_seed (immutability post-roll).
+	assert_eq(int(loaded["character"]["world_seed"]), veteran_seed,
+		"already-rolled world_seed survives v4 -> v5 no-op migration")
 	assert_true(bool(loaded["character"]["first_level_up_seen"]),
 		"already-v4 first_level_up_seen=true survives the no-op migration")
 	assert_eq(loaded["character"]["level"], 5)

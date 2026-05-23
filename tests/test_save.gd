@@ -115,11 +115,15 @@ func test_envelope_carries_schema_version_and_saved_at() -> void:
 	f.close()
 	var parsed: Variant = JSON.parse_string(raw)
 	assert_true(parsed is Dictionary)
-	# Schema is at v4 as of 2026-05-22 (added first_boss_kill_seen for the
-	# boss-intro skip rule per M3-T2-W3-T17, ticket 86c9wjzjf). Additive
-	# v4 extension 2026-05-22 added `character.world_seed` (M3 Tier 3 W1
-	# procgen spike Part B, ticket 86c9xub9p) — no schema bump.
-	assert_eq(int(parsed["schema_version"]), 4, "envelope contains schema_version=4")
+	# Schema is at v5 as of 2026-05-23 (W2-T4, ticket 86c9y108t — promoted
+	# `character.world_seed` from v4-additive to v5-canonical layer + added
+	# one-time re-roll of the `0` sentinel for legacy v4 characters via
+	# `_migrate_v4_to_v5`). Earlier history:
+	#   v4 (2026-05-22): added first_boss_kill_seen for boss-intro skip rule
+	#                    (M3-T2-W3-T17, ticket 86c9wjzjf).
+	#   v4-additive (2026-05-22): added character.world_seed sentinel `0`
+	#                             (M3 Tier 3 W1 procgen spike Part B, 86c9xub9p).
+	assert_eq(int(parsed["schema_version"]), 5, "envelope contains schema_version=5")
 	assert_true(parsed.has("saved_at"))
 	assert_true(parsed.has("data"))
 
@@ -240,6 +244,226 @@ func test_migrate_handles_save_from_future_schema() -> void:
 	assert_eq(loaded["character"]["level"], 99)
 	# Unknown field passes through, never crashes.
 	assert_true(loaded.has("unknown_future_field"))
+
+
+# --- Forward-compat migration: v4 -> v5 (W2-T4, ticket 86c9y108t) ---------
+##
+## v5 promotes `character.world_seed` from the v4-additive layer (sentinel
+## `0` backfill) to the v5-canonical layer (one-time re-roll of legacy
+## sentinel). See `scripts/save/Save.gd::_migrate_v4_to_v5` for the
+## promotion semantics + idempotence argument.
+
+func test_migrate_v4_save_with_zero_sentinel_rerolls_world_seed() -> void:
+	# A v4 save where `character.world_seed == 0` (the v3->v4 backfill
+	# sentinel meaning "this character predates the seed roll") must get
+	# a fresh non-zero `randi()` seed on first v5 load. This is the
+	# load-bearing v5 promotion behaviour.
+	var v4_envelope: Dictionary = {
+		"schema_version": 4,
+		"saved_at": "2026-05-22T11:00:00",
+		"data": {
+			"character": {
+				"name": "Legacy-Knight",
+				"level": 3, "xp": 600, "xp_to_next": 519,
+				"vigor": 1, "focus": 0, "edge": 0,
+				"stats": {"vigor": 1, "focus": 0, "edge": 0},
+				"unspent_stat_points": 0,
+				"first_level_up_seen": true,
+				"first_boss_kill_seen": false,
+				"hp_current": 90, "hp_max": 100,
+				"world_seed": 0,  # the v4-additive sentinel
+			},
+			"stash": [], "equipped": {},
+			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 0.0},
+		},
+	}
+	var f: FileAccess = FileAccess.open(_save().save_path(TEST_SLOT), FileAccess.WRITE)
+	f.store_string(JSON.stringify(v4_envelope))
+	f.close()
+
+	var loaded: Dictionary = _save().load_game(TEST_SLOT)
+	assert_true(loaded["character"].has("world_seed"),
+		"v4 -> v5 migration preserves world_seed key")
+	# probability of randi() returning exactly 0 is 1/2^32 (~2.3e-10)
+	assert_ne(int(loaded["character"]["world_seed"]), 0,
+		"v4 -> v5 migration re-rolls the `0` sentinel to a non-zero value")
+	# Untouched fields preserved bit-identical.
+	assert_eq(loaded["character"]["name"], "Legacy-Knight")
+	assert_eq(loaded["character"]["level"], 3)
+	assert_eq(loaded["character"]["first_boss_kill_seen"], false)
+
+
+func test_migrate_v4_save_with_nonzero_seed_preserves_world_seed() -> void:
+	# A v4 save where the character already has a non-zero seed (e.g.
+	# rolled by a fresh-character flow on a v4 build) must NOT be
+	# overwritten by the v5 migration. This is the immutability-post-roll
+	# discipline — once rolled, never re-rolled.
+	var existing_seed: int = 0xCAFEBABE
+	var v4_envelope: Dictionary = {
+		"schema_version": 4,
+		"saved_at": "2026-05-22T12:00:00",
+		"data": {
+			"character": {
+				"name": "Already-Rolled",
+				"level": 1, "xp": 0, "xp_to_next": 100,
+				"vigor": 0, "focus": 0, "edge": 0,
+				"stats": {"vigor": 0, "focus": 0, "edge": 0},
+				"unspent_stat_points": 0,
+				"first_level_up_seen": false,
+				"first_boss_kill_seen": false,
+				"hp_current": 100, "hp_max": 100,
+				"world_seed": existing_seed,
+			},
+			"stash": [], "equipped": {},
+			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 0.0},
+		},
+	}
+	var f: FileAccess = FileAccess.open(_save().save_path(TEST_SLOT), FileAccess.WRITE)
+	f.store_string(JSON.stringify(v4_envelope))
+	f.close()
+
+	var loaded: Dictionary = _save().load_game(TEST_SLOT)
+	assert_eq(int(loaded["character"]["world_seed"]), existing_seed,
+		"v4 -> v5 migration preserves a non-zero world_seed (immutability post-roll)")
+
+
+func test_migrate_v5_save_is_idempotent_on_world_seed() -> void:
+	# Hand-author a v5-shaped save (schema_version=5, non-zero seed) and
+	# load it. The migration chain runs `if from_version < 5` which is
+	# false, so `_migrate_v4_to_v5` does NOT execute. The seed must
+	# survive bit-identical. Belt-and-suspenders test for "schema bumped
+	# without code re-running migration on already-current saves."
+	var existing_seed: int = 0xDEADBEEF
+	var v5_envelope: Dictionary = {
+		"schema_version": 5,
+		"saved_at": "2026-05-23T09:00:00",
+		"data": {
+			"character": {
+				"name": "Native-v5",
+				"level": 1, "xp": 0, "xp_to_next": 100,
+				"vigor": 0, "focus": 0, "edge": 0,
+				"stats": {"vigor": 0, "focus": 0, "edge": 0},
+				"unspent_stat_points": 0,
+				"first_level_up_seen": false,
+				"first_boss_kill_seen": false,
+				"hp_current": 100, "hp_max": 100,
+				"world_seed": existing_seed,
+			},
+			"stash": [], "equipped": {},
+			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 0.0},
+		},
+	}
+	var f: FileAccess = FileAccess.open(_save().save_path(TEST_SLOT), FileAccess.WRITE)
+	f.store_string(JSON.stringify(v5_envelope))
+	f.close()
+
+	var loaded: Dictionary = _save().load_game(TEST_SLOT)
+	assert_eq(int(loaded["character"]["world_seed"]), existing_seed,
+		"v5 -> v5 (no-op) migration preserves world_seed bit-identical")
+	# Double-trip: save + reload + verify still bit-identical.
+	assert_true(_save().save_game(TEST_SLOT, loaded))
+	var reloaded: Dictionary = _save().load_game(TEST_SLOT)
+	assert_eq(int(reloaded["character"]["world_seed"]), existing_seed,
+		"v5 -> v5 double-trip preserves world_seed (no spurious re-roll on resave)")
+
+
+func test_migrate_v3_save_chains_through_to_v5_with_nonzero_seed() -> void:
+	# Full chain: a v3 save (no world_seed at all) migrates v3 -> v4
+	# (back-fills `world_seed = 0` sentinel) -> v5 (re-rolls the sentinel
+	# to non-zero). End state: a non-zero world_seed plus every
+	# intermediate-version field present.
+	var v3_envelope: Dictionary = {
+		"schema_version": 3,
+		"saved_at": "2026-05-02T10:00:00",
+		"data": {
+			"character": {
+				"name": "Mid-game-Knight",
+				"level": 3, "xp": 600, "xp_to_next": 519,
+				"vigor": 1, "focus": 1, "edge": 0,
+				"stats": {"vigor": 1, "focus": 1, "edge": 0},
+				"unspent_stat_points": 2,
+				"first_level_up_seen": true,
+				"hp_current": 80, "hp_max": 100,
+			},
+			"stash": [], "equipped": {},
+			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 100.0},
+		},
+	}
+	var f: FileAccess = FileAccess.open(_save().save_path(TEST_SLOT), FileAccess.WRITE)
+	f.store_string(JSON.stringify(v3_envelope))
+	f.close()
+
+	var loaded: Dictionary = _save().load_game(TEST_SLOT)
+	# v3 -> v4 added first_boss_kill_seen + world_seed (sentinel `0`).
+	assert_true(loaded["character"].has("first_boss_kill_seen"),
+		"v3 -> v4 added first_boss_kill_seen")
+	assert_true(loaded["character"].has("world_seed"),
+		"v3 -> v4 -> v5 chain preserves world_seed key")
+	# v4 -> v5 re-rolled the sentinel.
+	assert_ne(int(loaded["character"]["world_seed"]), 0,
+		"v4 -> v5 chain re-rolls the `0` sentinel; loaded seed is non-zero")
+	# Untouched v3 fields preserved bit-identical through the chain.
+	assert_eq(loaded["character"]["level"], 3)
+	assert_eq(loaded["character"]["xp"], 600)
+	assert_eq(loaded["character"]["unspent_stat_points"], 2)
+	assert_true(bool(loaded["character"]["first_level_up_seen"]))
+
+
+func test_two_consecutive_v4_migrations_roll_different_world_seeds() -> void:
+	# Sanity check on the migration's RNG: two independent legacy v4
+	# saves (both with world_seed=0) must re-roll to DIFFERENT non-zero
+	# values. If they came back identical, the migration is silently
+	# seeding randi() with the same value (e.g. test-mode determinism
+	# regression), and the Diablo-shape per-character-variance promise
+	# would be silently dead even though INV-1 above would pass.
+	#
+	# Probability of two randi() calls returning the same 32-bit value is
+	# ~2^-32 ≈ 2e-10. Negligible across CI runs.
+	var slot_a: int = TEST_SLOT
+	var slot_b: int = TEST_SLOT + 1
+	# Clean slot_b too (before_each only cleans slot_a).
+	if _save().has_save(slot_b):
+		_save().delete_save(slot_b)
+	var tmp_b: String = _save().save_path(slot_b) + ".tmp"
+	if FileAccess.file_exists(tmp_b):
+		DirAccess.remove_absolute(tmp_b)
+	var v4_template: Dictionary = {
+		"schema_version": 4,
+		"saved_at": "2026-05-22T13:00:00",
+		"data": {
+			"character": {
+				"name": "Template",
+				"level": 1, "xp": 0, "xp_to_next": 100,
+				"vigor": 0, "focus": 0, "edge": 0,
+				"stats": {"vigor": 0, "focus": 0, "edge": 0},
+				"unspent_stat_points": 0,
+				"first_level_up_seen": false,
+				"first_boss_kill_seen": false,
+				"hp_current": 100, "hp_max": 100,
+				"world_seed": 0,
+			},
+			"stash": [], "equipped": {},
+			"meta": {"runs_completed": 0, "deepest_stratum": 1, "total_playtime_sec": 0.0},
+		},
+	}
+	# Install at both slots.
+	var fa: FileAccess = FileAccess.open(_save().save_path(slot_a), FileAccess.WRITE)
+	fa.store_string(JSON.stringify(v4_template))
+	fa.close()
+	var fb: FileAccess = FileAccess.open(_save().save_path(slot_b), FileAccess.WRITE)
+	fb.store_string(JSON.stringify(v4_template))
+	fb.close()
+
+	var loaded_a: Dictionary = _save().load_game(slot_a)
+	var loaded_b: Dictionary = _save().load_game(slot_b)
+	var seed_a: int = int(loaded_a["character"]["world_seed"])
+	var seed_b: int = int(loaded_b["character"]["world_seed"])
+	assert_ne(seed_a, 0)
+	assert_ne(seed_b, 0)
+	assert_ne(seed_a, seed_b,
+		"two independent v4 migrations roll DIFFERENT non-zero seeds (per-character variance preserved)")
+	# Clean slot_b.
+	_save().delete_save(slot_b)
 
 
 # --- Corruption resilience -----------------------------------------------
