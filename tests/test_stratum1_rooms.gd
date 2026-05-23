@@ -43,8 +43,8 @@ const EXPECTED_MOB_COUNTS: Dictionary = {
 	&"s1_room08": 4,
 }
 
-
 # ---- Helpers ---------------------------------------------------------
+
 
 func _load_room(scene_path: String) -> MultiMobRoom:
 	var packed: PackedScene = load(scene_path)
@@ -71,6 +71,7 @@ func _load_room_with_fixtures(scene_path: String) -> MultiMobRoom:
 
 
 # ---- 1. Each room loads cleanly -------------------------------------
+
 
 func test_room02_scene_loads() -> void:
 	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room02"])
@@ -117,6 +118,7 @@ func test_room08_scene_loads() -> void:
 
 # ---- 2. Mob spawn points populate correctly per LevelChunkDef -------
 
+
 func test_each_room_spawn_count_matches_chunk_def() -> void:
 	for room_id: StringName in ROOM_SCENES.keys():
 		var room: MultiMobRoom = _load_room(ROOM_SCENES[room_id])
@@ -124,7 +126,9 @@ func test_each_room_spawn_count_matches_chunk_def() -> void:
 		var actual: int = room.get_spawned_mobs().size()
 		assert_eq(actual, expected, "%s mob count" % String(room_id))
 		# Cross-check: chunk_def.mob_spawns.size() also matches.
-		assert_eq(room.chunk_def.mob_spawns.size(), expected, "%s chunk_def mob_spawns" % String(room_id))
+		assert_eq(
+			room.chunk_def.mob_spawns.size(), expected, "%s chunk_def mob_spawns" % String(room_id)
+		)
 
 
 func test_room02_spawns_two_grunts() -> void:
@@ -161,11 +165,13 @@ func test_room06_includes_healing_fountain() -> void:
 	# HealingFountain is spawned in the deferred `_assemble_room_fixtures`
 	# pass (ticket 86c9tqvxx) — drain a frame before asserting it exists.
 	var room: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s1_room06"])
-	assert_not_null(room.get_healing_fountain(),
-		"room06 places a healing fountain (mid-stratum reward)")
+	assert_not_null(
+		room.get_healing_fountain(), "room06 places a healing fountain (mid-stratum reward)"
+	)
 
 
 # ---- 2b. RoomGate registration — the AC4 blocker (ticket 86c9tqvxx) --
+
 
 func test_room02_gate_registers_both_grunts_after_deferred_pass() -> void:
 	# **The ticket 86c9tqvxx regression gate.** Drives the REAL MultiMobRoom
@@ -196,9 +202,14 @@ func test_room02_gate_registers_both_grunts_after_deferred_pass() -> void:
 
 	var mobs: Array[Node] = room.get_spawned_mobs()
 	assert_eq(mobs.size(), 2, "Room02 spawned its 2 grunts")
-	assert_eq(gate.mobs_alive(), 2,
-		"RoomGate registered BOTH grunts — mobs_alive must equal the spawned " +
-		"mob count after the deferred _assemble_room_fixtures pass (ticket 86c9tqvxx)")
+	assert_eq(
+		gate.mobs_alive(),
+		2,
+		(
+			"RoomGate registered BOTH grunts — mobs_alive must equal the spawned "
+			+ "mob count after the deferred _assemble_room_fixtures pass (ticket 86c9tqvxx)"
+		)
+	)
 
 
 func test_all_gated_rooms_register_full_mob_roster() -> void:
@@ -211,8 +222,11 @@ func test_all_gated_rooms_register_full_mob_roster() -> void:
 		var gate: RoomGate = room.get_room_gate()
 		assert_not_null(gate, "%s spawns a RoomGate" % String(room_id))
 		var expected: int = int(EXPECTED_MOB_COUNTS[room_id])
-		assert_eq(gate.mobs_alive(), expected,
-			"%s gate registered all %d spawned mobs" % [String(room_id), expected])
+		assert_eq(
+			gate.mobs_alive(),
+			expected,
+			"%s gate registered all %d spawned mobs" % [String(room_id), expected]
+		)
 
 
 func test_room08_gate_registers_mixed_mob_types() -> void:
@@ -241,8 +255,11 @@ func test_room08_gate_registers_mixed_mob_types() -> void:
 	assert_eq(grunt_count, 1, "Room08 roster includes 1 grunt")
 	assert_eq(charger_count, 1, "Room08 roster includes 1 charger")
 	assert_eq(shooter_count, 2, "Room08 roster includes 2 shooters")
-	assert_eq(gate.mobs_alive(), 4,
-		"RoomGate tracked all 4 mixed-type mobs (grunt + charger + 2 shooters)")
+	assert_eq(
+		gate.mobs_alive(),
+		4,
+		"RoomGate tracked all 4 mixed-type mobs (grunt + charger + 2 shooters)"
+	)
 
 
 func test_room_reentered_after_free_reregisters_cleanly() -> void:
@@ -262,8 +279,11 @@ func test_room_reentered_after_free_reregisters_cleanly() -> void:
 	var second: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s1_room02"])
 	var gate2: RoomGate = second.get_room_gate()
 	assert_not_null(gate2, "re-entered Room02 spawns its own fresh RoomGate")
-	assert_eq(gate2.mobs_alive(), 2,
-		"re-entered Room02 instance registered its own 2 grunts cleanly (no stale state)")
+	assert_eq(
+		gate2.mobs_alive(),
+		2,
+		"re-entered Room02 instance registered its own 2 grunts cleanly (no stale state)"
+	)
 
 
 func test_room08_pre_boss_density() -> void:
@@ -309,11 +329,14 @@ func test_mobs_positioned_inside_bounds() -> void:
 		var bounds: Rect2 = room.get_bounds_px()
 		for m: Node in room.get_spawned_mobs():
 			var n: Node2D = m
-			assert_true(bounds.has_point(n.position),
-				"%s mob at %s inside bounds %s" % [String(room_id), str(n.position), str(bounds)])
+			assert_true(
+				bounds.has_point(n.position),
+				"%s mob at %s inside bounds %s" % [String(room_id), str(n.position), str(bounds)]
+			)
 
 
 # ---- 3. Total mob count across rooms 2-8 within bounds --------------
+
 
 func test_total_mob_count_in_reasonable_bounds() -> void:
 	# Per dispatch: 14-30 mobs total across rooms 2-8. Authored count is
@@ -344,6 +367,7 @@ func test_difficulty_curve_roughly_increases() -> void:
 
 # ---- 4. Connectivity: Room 1 -> ... -> Room 8 has continuous ports --
 
+
 func test_room_chain_has_continuous_ports() -> void:
 	# Each room (except r01 — the M1-era entry chunk; see room01 east-seam
 	# note below) must have an entry port to receive the player from the
@@ -365,8 +389,15 @@ func test_room_chain_has_continuous_ports() -> void:
 	# We verify each chunk has the right port shape; physical assembly
 	# (placing rooms next to each other in world space) is M2 — for now
 	# the existence of the ports is the contract.
-	var chain: Array[StringName] = [&"s1_room02", &"s1_room03", &"s1_room04", &"s1_room05",
-		&"s1_room06", &"s1_room07", &"s1_room08"]
+	var chain: Array[StringName] = [
+		&"s1_room02",
+		&"s1_room03",
+		&"s1_room04",
+		&"s1_room05",
+		&"s1_room06",
+		&"s1_room07",
+		&"s1_room08"
+	]
 	for room_id: StringName in chain:
 		var c: LevelChunkDef = load(CHUNK_TRES[room_id]) as LevelChunkDef
 		assert_not_null(c.get_entry_port(), "%s has an entry port" % String(room_id))
@@ -392,20 +423,32 @@ func test_entry_and_exit_ports_align_along_main_axis() -> void:
 	# the M1 left-to-right traversal axis. If a future content author moves
 	# a port to north/south for puzzle reasons, this test will fail loudly
 	# and force a discussion (probably worth bumping to a "main axis" tag).
-	var chain: Array[StringName] = [&"s1_room02", &"s1_room03", &"s1_room04", &"s1_room05",
-		&"s1_room06", &"s1_room07", &"s1_room08"]
+	var chain: Array[StringName] = [
+		&"s1_room02",
+		&"s1_room03",
+		&"s1_room04",
+		&"s1_room05",
+		&"s1_room06",
+		&"s1_room07",
+		&"s1_room08"
+	]
 	for room_id: StringName in chain:
 		var c: LevelChunkDef = load(CHUNK_TRES[room_id]) as LevelChunkDef
 		for p: ChunkPort in c.ports:
 			if p.tag == &"entry":
-				assert_eq(p.direction, ChunkPort.Direction.WEST,
-					"%s entry on WEST edge" % String(room_id))
+				assert_eq(
+					p.direction, ChunkPort.Direction.WEST, "%s entry on WEST edge" % String(room_id)
+				)
 			elif p.tag == &"exit" or p.tag == &"boss_door":
-				assert_eq(p.direction, ChunkPort.Direction.EAST,
-					"%s outgoing port on EAST edge" % String(room_id))
+				assert_eq(
+					p.direction,
+					ChunkPort.Direction.EAST,
+					"%s outgoing port on EAST edge" % String(room_id)
+				)
 
 
 # ---- Mob archetype mix -------------------------------------------
+
 
 func test_mob_archetypes_used_across_stratum() -> void:
 	# Sponsor wants varied mob mixes — this test pins that all three

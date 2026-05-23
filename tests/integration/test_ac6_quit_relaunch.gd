@@ -34,8 +34,8 @@ const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
 const TEST_SLOT: int = 996
 
-
 # ---- Helpers / setup --------------------------------------------------
+
 
 func _save() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("Save")
@@ -109,10 +109,13 @@ func _restore_from_payload(data: Dictionary) -> void:
 	_levels().set_state(int(character.get("level", 1)), int(character.get("xp", 0)))
 	_stats().restore_from_character(character)
 	var registry: ContentRegistry = ContentRegistry.new().load_all()
-	_inventory().restore_from_save(
-		data,
-		registry.item_resolver_callable(),
-		registry.affix_resolver_callable(),
+	(
+		_inventory()
+		. restore_from_save(
+			data,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
 	)
 	_stratum().restore_from_save_data(data)
 
@@ -137,6 +140,7 @@ func _simulate_quit_relaunch() -> Dictionary:
 
 # ---- 1: level + xp survive quit/relaunch ------------------------------
 
+
 func test_level_and_xp_restored() -> void:
 	# Set up: player has gained xp into level 2.
 	_levels().set_state(2, 75)
@@ -148,6 +152,7 @@ func test_level_and_xp_restored() -> void:
 
 
 # ---- 2: V/F/E stat allocations restored -------------------------------
+
 
 func test_stats_restored() -> void:
 	# Set up: player has spent points (vigor=2, focus=1, edge=3) and has
@@ -165,6 +170,7 @@ func test_stats_restored() -> void:
 
 # ---- 3: stratum progression (cleared rooms) restored ------------------
 
+
 func test_stratum_progression_restored() -> void:
 	# Player cleared three rooms before quitting.
 	_stratum().mark_cleared(&"s1_room01")
@@ -181,6 +187,7 @@ func test_stratum_progression_restored() -> void:
 
 # ---- 4: empty / fresh state round-trips cleanly -----------------------
 
+
 func test_fresh_state_round_trips() -> void:
 	# Edge case: a brand-new character (level 1, 0 xp, 0/0/0 stats, empty
 	# inventory, no rooms cleared) must survive a quit/relaunch with no
@@ -195,6 +202,7 @@ func test_fresh_state_round_trips() -> void:
 
 
 # ---- 5: deepest_stratum + meta survive --------------------------------
+
 
 func test_meta_block_survives() -> void:
 	# AC6 implicit: the meta block (runs_completed, deepest_stratum,
@@ -216,13 +224,15 @@ func test_meta_block_survives() -> void:
 	# Save + load.
 	assert_true(_save().save_game(TEST_SLOT, pre))
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_eq(loaded["meta"]["runs_completed"], 3,
-		"AC6: meta.runs_completed survives full snapshot path")
+	assert_eq(
+		loaded["meta"]["runs_completed"], 3, "AC6: meta.runs_completed survives full snapshot path"
+	)
 	assert_eq(loaded["meta"]["deepest_stratum"], 1)
 	assert_almost_eq(float(loaded["meta"]["total_playtime_sec"]), 1234.5, 1e-6)
 
 
 # ---- 6: equipped (slot) data survives full path -----------------------
+
 
 func test_equipped_slot_data_persists_via_save() -> void:
 	# AC6: equipped state survives quit/relaunch. We assert at the JSON
@@ -234,14 +244,19 @@ func test_equipped_slot_data_persists_via_save() -> void:
 	# the *autoload* snapshot path, not a hand-built dict.
 	var data: Dictionary = _save().default_payload()
 	data["equipped"] = {
-		"weapon": {
-			"id": "weapon_iron_sword", "tier": 2,
+		"weapon":
+		{
+			"id": "weapon_iron_sword",
+			"tier": 2,
 			"rolled_affixes": [{"affix_id": "swift", "value": 0.08}],
 			"stack_count": 1,
 		},
-		"armor": {
-			"id": "armor_leather", "tier": 1,
-			"rolled_affixes": [], "stack_count": 1,
+		"armor":
+		{
+			"id": "armor_leather",
+			"tier": 1,
+			"rolled_affixes": [],
+			"stack_count": 1,
 		},
 	}
 	# Layer the autoload snapshots on top. Inventory snapshot will REPLACE
@@ -257,17 +272,23 @@ func test_equipped_slot_data_persists_via_save() -> void:
 	# and does not exercise the autoload path).
 	assert_true(_save().save_game(TEST_SLOT, data))
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_eq(loaded["equipped"]["weapon"]["id"], "weapon_iron_sword",
-		"AC6: equipped weapon survives autoload-driven save")
+	assert_eq(
+		loaded["equipped"]["weapon"]["id"],
+		"weapon_iron_sword",
+		"AC6: equipped weapon survives autoload-driven save"
+	)
 	assert_eq(loaded["equipped"]["weapon"]["tier"], 2)
 	assert_almost_eq(
 		float(loaded["equipped"]["weapon"]["rolled_affixes"][0]["value"]),
-		0.08, 1e-6,
-		"AC6: weapon affix rolls survive quit/relaunch with float fidelity")
+		0.08,
+		1e-6,
+		"AC6: weapon affix rolls survive quit/relaunch with float fidelity"
+	)
 	assert_eq(loaded["equipped"]["armor"]["id"], "armor_leather")
 
 
 # ---- 7: state matches exactly across all 4 autoloads in one shot -----
+
 
 func test_full_state_round_trip() -> void:
 	# The big one: every dimension of saved state simultaneously, all
@@ -297,6 +318,7 @@ func test_full_state_round_trip() -> void:
 
 
 # ---- 8: relaunch with no save -> empty default state -----------------
+
 
 func test_relaunch_with_no_save_keeps_defaults() -> void:
 	# AC6 sub-case: cold-start (no save file) + Continue path returns {}.

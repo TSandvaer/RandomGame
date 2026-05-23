@@ -11,16 +11,19 @@ extends GutTest
 ## Why this is in Phase A and gets written first: a green CI on a project
 ## that fails to boot is silently broken. This is the cheapest catch.
 
-
 # --- tu-boot-01 ----------------------------------------------------------
+
 
 func test_main_scene_path_matches_project_setting() -> void:
 	# Catches accidental rename / move of Main.tscn that would silently
 	# break first-launch (the .tscn itself loads fine; only project.godot
 	# `run/main_scene` knows the bootstrap path).
 	var main_scene_path: String = ProjectSettings.get_setting("application/run/main_scene", "")
-	assert_eq(main_scene_path, "res://scenes/Main.tscn",
-		"project.godot run/main_scene must point to res://scenes/Main.tscn")
+	assert_eq(
+		main_scene_path,
+		"res://scenes/Main.tscn",
+		"project.godot run/main_scene must point to res://scenes/Main.tscn"
+	)
 
 
 func test_main_scene_instantiates() -> void:
@@ -46,6 +49,7 @@ func test_main_scene_instantiates() -> void:
 
 
 # --- tu-boot-02 ----------------------------------------------------------
+
 
 func test_engine_main_loop_is_alive() -> void:
 	# In a GUT cmdline run the engine's main loop is the SceneTree wrapping

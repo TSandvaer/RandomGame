@@ -23,8 +23,8 @@ const ChargerScript: Script = preload("res://scripts/mobs/Charger.gd")
 const ShooterScript: Script = preload("res://scripts/mobs/Shooter.gd")
 const MobDefScript: Script = preload("res://scripts/content/MobDef.gd")
 
-
 # ---- Helpers ------------------------------------------------------------
+
 
 class FakePlayer:
 	extends Node2D
@@ -52,6 +52,7 @@ func _make_shooter() -> Shooter:
 
 # ---- (a) Grunt: STATE_TELEGRAPHING_LIGHT fires before swing_spawned -----
 
+
 func test_grunt_enters_telegraph_state_before_swing() -> void:
 	var g: Grunt = _make_grunt()
 	var p: FakePlayer = FakePlayer.new()
@@ -64,12 +65,17 @@ func test_grunt_enters_telegraph_state_before_swing() -> void:
 	g._physics_process(0.016)
 	# First physics tick while player is in range: should enter STATE_TELEGRAPHING_LIGHT
 	# (NOT STATE_ATTACKING directly — the telegraph state is the NEW contract).
-	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_LIGHT,
-		"grunt enters TELEGRAPHING_LIGHT when player is in attack range (not immediate swing)")
-	assert_signal_emitted(g, "light_telegraph_started",
-		"light_telegraph_started fires when telegraph begins")
-	assert_signal_not_emitted(g, "swing_spawned",
-		"swing_spawned must NOT fire until telegraph window elapses")
+	assert_eq(
+		g.get_state(),
+		Grunt.STATE_TELEGRAPHING_LIGHT,
+		"grunt enters TELEGRAPHING_LIGHT when player is in attack range (not immediate swing)"
+	)
+	assert_signal_emitted(
+		g, "light_telegraph_started", "light_telegraph_started fires when telegraph begins"
+	)
+	assert_signal_not_emitted(
+		g, "swing_spawned", "swing_spawned must NOT fire until telegraph window elapses"
+	)
 
 
 func test_grunt_swing_fires_after_telegraph_window() -> void:
@@ -87,22 +93,26 @@ func test_grunt_swing_fires_after_telegraph_window() -> void:
 	# Tick past the telegraph window.
 	watch_signals(g)
 	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.01)
-	assert_signal_emitted(g, "swing_spawned",
-		"swing_spawned fires after LIGHT_TELEGRAPH_DURATION elapses")
+	assert_signal_emitted(
+		g, "swing_spawned", "swing_spawned fires after LIGHT_TELEGRAPH_DURATION elapses"
+	)
 	var params: Array = get_signal_parameters(g, "swing_spawned", 0)
-	assert_eq(params[0], Grunt.SWING_KIND_LIGHT,
-		"swing kind is LIGHT after the light telegraph")
+	assert_eq(params[0], Grunt.SWING_KIND_LIGHT, "swing kind is LIGHT after the light telegraph")
 
 
 # ---- (b) Grunt: telegraph tint is non-white (visible-draw-node delta) --
+
 
 func test_grunt_attack_telegraph_tint_is_not_white() -> void:
 	# Assert the tint constant is meaningfully different from the rest color
 	# (white = Color(1,1,1,1)). This is the Tier 1 bar assertion — prevents
 	# the white-on-white cascade no-op that landed in PR #115.
 	var tint: Color = Grunt.ATTACK_TELEGRAPH_TINT
-	assert_ne(tint, Color(1.0, 1.0, 1.0, 1.0),
-		"ATTACK_TELEGRAPH_TINT must differ from white rest-color (Tier 1 bar — visible delta)")
+	assert_ne(
+		tint,
+		Color(1.0, 1.0, 1.0, 1.0),
+		"ATTACK_TELEGRAPH_TINT must differ from white rest-color (Tier 1 bar — visible delta)"
+	)
 
 
 func test_grunt_telegraph_tween_created_on_enter() -> void:
@@ -125,6 +135,7 @@ func test_grunt_telegraph_tween_created_on_enter() -> void:
 
 # ---- (c) Charger: telegraph fires visual tween during windup -----------
 
+
 func test_charger_telegraph_tween_created_in_telegraphing_state() -> void:
 	var c: Charger = _make_charger()
 	var p: FakePlayer = FakePlayer.new()
@@ -138,10 +149,10 @@ func test_charger_telegraph_tween_created_in_telegraphing_state() -> void:
 	c._physics_process(0.016)
 	# Spotted -> telegraphing.
 	c._physics_process(Charger.SPOTTED_HOLD + 0.001)
-	assert_eq(c.get_state(), Charger.STATE_TELEGRAPHING,
-		"charger entered TELEGRAPHING state")
-	assert_signal_emitted(c, "charge_telegraph_started",
-		"charge_telegraph_started fires on entering TELEGRAPHING")
+	assert_eq(c.get_state(), Charger.STATE_TELEGRAPHING, "charger entered TELEGRAPHING state")
+	assert_signal_emitted(
+		c, "charge_telegraph_started", "charge_telegraph_started fires on entering TELEGRAPHING"
+	)
 	# The visual tween must be created at telegraph start (not at charge start).
 	var tween: Tween = c._attack_telegraph_tween
 	assert_not_null(tween, "_attack_telegraph_tween non-null in TELEGRAPHING")
@@ -150,11 +161,15 @@ func test_charger_telegraph_tween_created_in_telegraphing_state() -> void:
 
 
 func test_charger_attack_telegraph_tint_is_not_white() -> void:
-	assert_ne(Charger.ATTACK_TELEGRAPH_TINT, Color(1.0, 1.0, 1.0, 1.0),
-		"Charger ATTACK_TELEGRAPH_TINT must differ from white (Tier 1 bar)")
+	assert_ne(
+		Charger.ATTACK_TELEGRAPH_TINT,
+		Color(1.0, 1.0, 1.0, 1.0),
+		"Charger ATTACK_TELEGRAPH_TINT must differ from white (Tier 1 bar)"
+	)
 
 
 # ---- (d) Shooter: telegraph tween fires when entering STATE_AIMING -----
+
 
 func test_shooter_telegraph_tween_created_on_aiming() -> void:
 	var s: Shooter = _make_shooter()
@@ -168,10 +183,8 @@ func test_shooter_telegraph_tween_created_on_aiming() -> void:
 	# Idle -> spotted -> aiming.
 	s._physics_process(0.016)
 	s._physics_process(Shooter.SPOTTED_HOLD + 0.001)
-	assert_eq(s.get_state(), Shooter.STATE_AIMING,
-		"shooter in STATE_AIMING after spotted hold")
-	assert_signal_emitted(s, "aim_started",
-		"aim_started fires on entering STATE_AIMING")
+	assert_eq(s.get_state(), Shooter.STATE_AIMING, "shooter in STATE_AIMING after spotted hold")
+	assert_signal_emitted(s, "aim_started", "aim_started fires on entering STATE_AIMING")
 	var tween: Tween = s._attack_telegraph_tween
 	assert_not_null(tween, "_attack_telegraph_tween non-null in STATE_AIMING")
 	if tween != null:
@@ -179,11 +192,15 @@ func test_shooter_telegraph_tween_created_on_aiming() -> void:
 
 
 func test_shooter_attack_telegraph_tint_is_not_white() -> void:
-	assert_ne(Shooter.ATTACK_TELEGRAPH_TINT, Color(1.0, 1.0, 1.0, 1.0),
-		"Shooter ATTACK_TELEGRAPH_TINT must differ from white (Tier 1 bar)")
+	assert_ne(
+		Shooter.ATTACK_TELEGRAPH_TINT,
+		Color(1.0, 1.0, 1.0, 1.0),
+		"Shooter ATTACK_TELEGRAPH_TINT must differ from white (Tier 1 bar)"
+	)
 
 
 # ---- (e) EDGE: Grunt telegraph is re-entry-idempotent ------------------
+
 
 func test_grunt_telegraph_no_double_start_on_reentry() -> void:
 	var g: Grunt = _make_grunt()
@@ -200,13 +217,18 @@ func test_grunt_telegraph_no_double_start_on_reentry() -> void:
 	# Tick again — player still in range, still telegraphing. Must not
 	# re-emit light_telegraph_started or restart the tween.
 	g._physics_process(0.016)
-	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_LIGHT,
-		"stays in TELEGRAPHING_LIGHT on second tick")
-	assert_signal_not_emitted(g, "light_telegraph_started",
-		"light_telegraph_started must not re-emit if already telegraphing (re-entry guard)")
+	assert_eq(
+		g.get_state(), Grunt.STATE_TELEGRAPHING_LIGHT, "stays in TELEGRAPHING_LIGHT on second tick"
+	)
+	assert_signal_not_emitted(
+		g,
+		"light_telegraph_started",
+		"light_telegraph_started must not re-emit if already telegraphing (re-entry guard)"
+	)
 
 
 # ---- (f) EDGE: Grunt dies mid-telegraph — no swing from corpse ---------
+
 
 func test_grunt_dies_during_light_telegraph_no_swing() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 50})
@@ -230,13 +252,16 @@ func test_grunt_dies_during_light_telegraph_no_swing() -> void:
 
 	# Tick past where the telegraph would have fired the swing.
 	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.5)
-	assert_signal_not_emitted(g, "swing_spawned",
-		"no light swing fires from a dead grunt — telegraph is cancelled on death")
-	assert_signal_emit_count(g, "mob_died", 1,
-		"mob_died fired exactly once")
+	assert_signal_not_emitted(
+		g,
+		"swing_spawned",
+		"no light swing fires from a dead grunt — telegraph is cancelled on death"
+	)
+	assert_signal_emit_count(g, "mob_died", 1, "mob_died fired exactly once")
 
 
 # ---- (g) EDGE: tint channels are HTML5-safe (all < 1.0 on R/G/B) ------
+
 
 func test_grunt_telegraph_tint_channels_are_html5_safe() -> void:
 	# WebGL2/sRGB clamps color to [0, 1]. All channels must be <= 1.0 so the
@@ -254,8 +279,10 @@ func test_grunt_telegraph_tint_channels_are_html5_safe() -> void:
 	assert_true(tint.a <= 1.0, "Grunt tint.a <= 1.0 (HTML5 safe)")
 	# At least one non-alpha channel must be strictly < 1.0 so the visible
 	# delta from white rest-color is non-zero (Tier 1 visible-delta bar).
-	assert_true(tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
-		"Grunt tint must have at least one RGB channel < 1.0 (visible delta from white)")
+	assert_true(
+		tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
+		"Grunt tint must have at least one RGB channel < 1.0 (visible delta from white)"
+	)
 
 
 func test_charger_telegraph_tint_channels_are_html5_safe() -> void:
@@ -264,8 +291,10 @@ func test_charger_telegraph_tint_channels_are_html5_safe() -> void:
 	assert_true(tint.g <= 1.0, "Charger tint.g <= 1.0")
 	assert_true(tint.b <= 1.0, "Charger tint.b <= 1.0")
 	assert_true(tint.a <= 1.0, "Charger tint.a <= 1.0")
-	assert_true(tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
-		"Charger tint must have at least one RGB channel < 1.0 (visible delta)")
+	assert_true(
+		tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
+		"Charger tint must have at least one RGB channel < 1.0 (visible delta)"
+	)
 
 
 func test_shooter_telegraph_tint_channels_are_html5_safe() -> void:
@@ -274,16 +303,22 @@ func test_shooter_telegraph_tint_channels_are_html5_safe() -> void:
 	assert_true(tint.g <= 1.0, "Shooter tint.g <= 1.0")
 	assert_true(tint.b <= 1.0, "Shooter tint.b <= 1.0")
 	assert_true(tint.a <= 1.0, "Shooter tint.a <= 1.0")
-	assert_true(tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
-		"Shooter tint must have at least one RGB channel < 1.0 (visible delta)")
+	assert_true(
+		tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
+		"Shooter tint must have at least one RGB channel < 1.0 (visible delta)"
+	)
 
 
 # ---- Stratum1Boss: telegraph fires on melee + slam wind-up paths --------
 
+
 func test_stratum1_boss_attack_telegraph_tint_is_not_white() -> void:
 	# Tier 1 visible-delta bar — boss tint differs from white rest color.
-	assert_ne(Stratum1Boss.ATTACK_TELEGRAPH_TINT, Color(1.0, 1.0, 1.0, 1.0),
-		"Boss ATTACK_TELEGRAPH_TINT must differ from white (Tier 1 bar)")
+	assert_ne(
+		Stratum1Boss.ATTACK_TELEGRAPH_TINT,
+		Color(1.0, 1.0, 1.0, 1.0),
+		"Boss ATTACK_TELEGRAPH_TINT must differ from white (Tier 1 bar)"
+	)
 
 
 func test_stratum1_boss_telegraph_tint_channels_are_html5_safe() -> void:
@@ -292,8 +327,10 @@ func test_stratum1_boss_telegraph_tint_channels_are_html5_safe() -> void:
 	assert_true(tint.g <= 1.0, "Boss tint.g <= 1.0")
 	assert_true(tint.b <= 1.0, "Boss tint.b <= 1.0")
 	assert_true(tint.a <= 1.0, "Boss tint.a <= 1.0")
-	assert_true(tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
-		"Boss tint must have at least one RGB channel < 1.0 (visible delta)")
+	assert_true(
+		tint.r < 1.0 or tint.g < 1.0 or tint.b < 1.0,
+		"Boss tint must have at least one RGB channel < 1.0 (visible delta)"
+	)
 
 
 func test_stratum1_boss_melee_telegraph_creates_tween() -> void:
@@ -311,8 +348,11 @@ func test_stratum1_boss_melee_telegraph_creates_tween() -> void:
 	b.set_player(p)
 
 	b._physics_process(0.016)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
-		"boss enters TELEGRAPHING_MELEE when player in melee range")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_TELEGRAPHING_MELEE,
+		"boss enters TELEGRAPHING_MELEE when player in melee range"
+	)
 	var tween: Tween = b._attack_telegraph_tween
 	assert_not_null(tween, "_attack_telegraph_tween non-null in TELEGRAPHING_MELEE")
 	if tween != null:
@@ -343,8 +383,11 @@ func test_stratum1_boss_slam_telegraph_creates_tween() -> void:
 	p.global_position = Vector2(50.0, 0.0)  # > MELEE_RANGE (36), < SLAM_RADIUS
 	b._physics_process(0.016)
 	# Boss should pick slam telegraph (phase 2 + slam range + cooldown clear).
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_SLAM,
-		"boss enters TELEGRAPHING_SLAM in phase 2 at slam range")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_TELEGRAPHING_SLAM,
+		"boss enters TELEGRAPHING_SLAM in phase 2 at slam range"
+	)
 	var tween: Tween = b._attack_telegraph_tween
 	assert_not_null(tween, "_attack_telegraph_tween non-null in TELEGRAPHING_SLAM")
 	if tween != null:

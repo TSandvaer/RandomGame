@@ -42,6 +42,7 @@ func after_each() -> void:
 
 # ---- Smoke ----------------------------------------------------------
 
+
 func test_resource_scripts_load_and_instantiate() -> void:
 	var tree: Resource = TreeScript.new()
 	assert_not_null(tree, "DialogueTreeDef.new() returns non-null")
@@ -53,6 +54,7 @@ func test_resource_scripts_load_and_instantiate() -> void:
 
 # ---- AC2: resolve_branch happy path --------------------------------
 
+
 func test_resolve_branch_returns_quest_state_branch_when_present() -> void:
 	var tree: DialogueTreeDef = _make_tree_with_two_branches()
 	var branch: DialogueBranch = tree.resolve_branch(&"quest_active")
@@ -61,6 +63,7 @@ func test_resolve_branch_returns_quest_state_branch_when_present() -> void:
 
 
 # ---- AC3: resolve_branch falls back to default --------------------
+
 
 func test_resolve_branch_falls_back_to_default_when_quest_state_absent() -> void:
 	var tree: DialogueTreeDef = _make_tree_with_two_branches()
@@ -72,31 +75,31 @@ func test_resolve_branch_falls_back_to_default_when_quest_state_absent() -> void
 
 # ---- AC4: resolve_branch returns null on unresolvable ----------
 
+
 func test_resolve_branch_returns_null_when_neither_state_nor_default_present() -> void:
 	var tree: DialogueTreeDef = TreeScript.new()
 	tree.npc_id = &"empty_npc"
 	tree.default_branch_key = &"nonexistent"
 	tree.branches = {}
 	var branch: DialogueBranch = tree.resolve_branch(&"flavor")
-	assert_null(branch,
-		"unresolvable resolve_branch returns null (controller emits the warning, not the resource)")
+	assert_null(
+		branch,
+		"unresolvable resolve_branch returns null (controller emits the warning, not the resource)"
+	)
 
 
 # ---- AC5: shipped fixtures load + schema invariants ----------
+
 
 func test_all_fixtures_load_as_DialogueTreeDef() -> void:
 	for path in FIXTURE_PATHS:
 		var res: Resource = load(path)
 		assert_not_null(res, "fixture loads: %s" % path)
-		assert_true(res is DialogueTreeDef,
-			"fixture is DialogueTreeDef instance: %s" % path)
+		assert_true(res is DialogueTreeDef, "fixture is DialogueTreeDef instance: %s" % path)
 		var tree: DialogueTreeDef = res as DialogueTreeDef
-		assert_ne(String(tree.npc_id), "",
-			"fixture has non-empty npc_id: %s" % path)
-		assert_ne(tree.display_name, "",
-			"fixture has non-empty display_name: %s" % path)
-		assert_gt(tree.branches.size(), 0,
-			"fixture has at least one branch: %s" % path)
+		assert_ne(String(tree.npc_id), "", "fixture has non-empty npc_id: %s" % path)
+		assert_ne(tree.display_name, "", "fixture has non-empty display_name: %s" % path)
+		assert_gt(tree.branches.size(), 0, "fixture has at least one branch: %s" % path)
 
 
 func test_all_fixture_branches_are_DialogueBranch() -> void:
@@ -109,9 +112,13 @@ func test_all_fixture_branches_are_DialogueBranch() -> void:
 		var tree: DialogueTreeDef = load(path) as DialogueTreeDef
 		for key_v: Variant in tree.branches.keys():
 			var entry: Variant = tree.branches[key_v]
-			assert_true(entry is DialogueBranch,
-				"branch entry %s in %s is DialogueBranch (got: %s)" %
-					[str(key_v), path, str(typeof(entry))])
+			assert_true(
+				entry is DialogueBranch,
+				(
+					"branch entry %s in %s is DialogueBranch (got: %s)"
+					% [str(key_v), path, str(typeof(entry))]
+				)
+			)
 
 
 func test_all_fixture_responses_are_DialogueResponse() -> void:
@@ -123,11 +130,14 @@ func test_all_fixture_responses_are_DialogueResponse() -> void:
 			if branch == null:
 				continue
 			for r: Variant in branch.responses:
-				assert_true(r is DialogueResponse,
-					"response in branch %s of %s is DialogueResponse" % [str(key_v), path])
+				assert_true(
+					r is DialogueResponse,
+					"response in branch %s of %s is DialogueResponse" % [str(key_v), path]
+				)
 
 
 # ---- Helpers --------------------------------------------------------
+
 
 func _make_tree_with_two_branches() -> DialogueTreeDef:
 	var flavor: DialogueBranch = BranchScript.new()

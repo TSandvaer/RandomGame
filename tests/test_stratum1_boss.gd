@@ -33,12 +33,12 @@ const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 const MobLootSpawnerScript: Script = preload("res://scripts/loot/MobLootSpawner.gd")
 const LootRollerScript: Script = preload("res://scripts/loot/LootRoller.gd")
 
-
 # ---- Test isolation ---------------------------------------------------
 # M3 Tier 2 Wave 1 T2/T3 (PR for tickets 86c9wjy1t / 86c9wjy46) — Stratum1Boss
 # now fires TimeScaleDirector requests on hit / die / phase-transition. Tests
 # that take the boss to 0 HP or cross a phase boundary leak director state
 # (and therefore Engine.time_scale) into subsequent tests. Reset on both ends.
+
 
 func before_each() -> void:
 	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
@@ -55,6 +55,7 @@ func after_each() -> void:
 
 
 # ---- Helpers ----------------------------------------------------------
+
 
 class FakePlayer:
 	extends Node2D
@@ -89,9 +90,11 @@ func _hit(b: Stratum1Boss, dmg: int) -> void:
 
 # ---- 1: full HP at spawn from MobDef --------------------------------
 
+
 func test_spawns_with_full_hp_from_mobdef() -> void:
 	var def: MobDef = ContentFactory.make_mob_def(
-		{"hp_base": 600, "damage_base": 15, "move_speed": 80.0})
+		{"hp_base": 600, "damage_base": 15, "move_speed": 80.0}
+	)
 	var b: Stratum1Boss = _make_boss_with_def(def)
 	assert_eq(b.get_hp(), 600, "starts at hp_base")
 	assert_eq(b.get_max_hp(), 600, "max_hp = hp_base at spawn")
@@ -111,6 +114,7 @@ func test_default_hp_when_no_mobdef() -> void:
 
 # ---- 2: phase-1 melee attack telegraphs + lands damage --------------
 
+
 func test_phase1_melee_telegraphs_then_swings() -> void:
 	var b: Stratum1Boss = _make_boss()
 	var p: FakePlayer = FakePlayer.new()
@@ -120,8 +124,7 @@ func test_phase1_melee_telegraphs_then_swings() -> void:
 	b.set_player(p)
 	# First tick — boss enters melee telegraph.
 	b._physics_process(0.016)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
-		"boss winds up melee in range")
+	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE, "boss winds up melee in range")
 	# Tick past windup — swing fires.
 	watch_signals(b)
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.01)
@@ -140,11 +143,11 @@ func test_phase1_does_not_use_slam() -> void:
 	p.global_position = Vector2(40.0, 0.0)  # in slam radius, outside melee
 	b.set_player(p)
 	b._physics_process(0.016)
-	assert_ne(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_SLAM,
-		"phase 1 does not slam")
+	assert_ne(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_SLAM, "phase 1 does not slam")
 
 
 # ---- 3: phase transition at 66% fires phase_changed(2) ---------------
+
 
 func test_phase_transition_at_66pct_emits_phase_changed_2() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 600})
@@ -165,6 +168,7 @@ func test_phase_transition_at_66pct_emits_phase_changed_2() -> void:
 
 # ---- 4: phase 2 accesses melee + slam --------------------------------
 
+
 func test_phase2_can_use_slam() -> void:
 	var b: Stratum1Boss = _make_boss()
 	var p: FakePlayer = FakePlayer.new()
@@ -181,8 +185,9 @@ func test_phase2_can_use_slam() -> void:
 	p.global_position = Vector2(50.0, 0.0)  # > MELEE_RANGE (36), < SLAM_RADIUS (80)
 	# Force chase state then tick.
 	b._physics_process(0.016)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_SLAM,
-		"phase 2 picks slam at slam-range")
+	assert_eq(
+		b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_SLAM, "phase 2 picks slam at slam-range"
+	)
 
 
 func test_phase2_melee_still_works() -> void:
@@ -203,11 +208,15 @@ func test_phase2_melee_still_works() -> void:
 	# real combat.
 	b._slam_cooldown_left = Stratum1Boss.SLAM_COOLDOWN
 	b._physics_process(0.016)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
-		"phase 2 falls back to melee when slam on cooldown")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_TELEGRAPHING_MELEE,
+		"phase 2 falls back to melee when slam on cooldown"
+	)
 
 
 # ---- 5: phase transition at 33% fires phase_changed(3) ---------------
+
 
 func test_phase_transition_at_33pct_emits_phase_changed_3() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 600})
@@ -230,6 +239,7 @@ func test_phase_transition_at_33pct_emits_phase_changed_3() -> void:
 
 # ---- 6: phase 3 enrage --------------------------------------------------
 
+
 func test_phase3_enrage_speeds_up_movement() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 600, "move_speed": 80.0})
 	var b: Stratum1Boss = _make_boss_with_def(def)
@@ -241,8 +251,12 @@ func test_phase3_enrage_speeds_up_movement() -> void:
 	assert_eq(b.get_phase(), Stratum1Boss.PHASE_3)
 	assert_true(b.is_enraged())
 	# Speed scaled by 1.5x (ENRAGE_SPEED_MULT).
-	assert_almost_eq(b.move_speed, 80.0 * Stratum1Boss.ENRAGE_SPEED_MULT, 0.001,
-		"phase 3 enrage applies 1.5x movement speed")
+	assert_almost_eq(
+		b.move_speed,
+		80.0 * Stratum1Boss.ENRAGE_SPEED_MULT,
+		0.001,
+		"phase 3 enrage applies 1.5x movement speed"
+	)
 
 
 func test_phase3_no_new_attack_mechanic() -> void:
@@ -258,6 +272,7 @@ func test_phase3_no_new_attack_mechanic() -> void:
 
 
 # ---- 7: boss death emits boss_died signal -----------------------------
+
 
 func test_death_emits_boss_died_once() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 100})
@@ -302,6 +317,7 @@ func test_death_under_hit_spam_emits_boss_died_once() -> void:
 
 # ---- 8: respects player i-frames ------------------------------------
 
+
 func test_boss_hitbox_misses_player_during_iframes() -> void:
 	# Spawn a real Player and put it through a dodge to clear its
 	# collision_layer. The boss's hitbox masks layer 2 (player); when player
@@ -323,16 +339,19 @@ func test_boss_hitbox_misses_player_during_iframes() -> void:
 	# take damage. The i-frame guarantee is at the LAYER level.
 	# Verify: hitbox masks only player layer; player layer is cleared.
 	assert_eq(hb.collision_mask, Hitbox.LAYER_PLAYER, "enemy hitbox masks player layer only")
-	assert_eq(player.collision_layer, 0,
-		"player layer cleared during dodge — hitbox mask finds nothing")
+	assert_eq(
+		player.collision_layer, 0, "player layer cleared during dodge — hitbox mask finds nothing"
+	)
 
 
 # ---- 9: boss death triggers loot drop from boss_drops table ----------
 
+
 func test_boss_death_drops_loot_via_spawner() -> void:
 	# Build a tiny boss def with a mock loot table: one guaranteed entry.
 	var item: ItemDef = ContentFactory.make_item_def(
-		{"id": &"boss_test_drop", "tier": ItemDef.Tier.T2})
+		{"id": &"boss_test_drop", "tier": ItemDef.Tier.T2}
+	)
 	var entry: LootEntry = ContentFactory.make_loot_entry(item, 1.0, 0)
 	var table: LootTableDef = ContentFactory.make_loot_table({"entries": [entry]})
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 100, "loot_table": table})
@@ -384,6 +403,7 @@ func test_authored_boss_drops_table_loads() -> void:
 
 # ---- 10 EDGE: rapid hit spam doesn't double-trigger phase transitions
 
+
 func test_rapid_hit_spam_does_not_double_trigger_phase_2() -> void:
 	# Hit-spam straddling the 66% boundary must emit phase_changed exactly
 	# once. Lethal damage in a single hit drops past phase 2 + phase 3 + 0.
@@ -422,11 +442,11 @@ func test_phase_latches_are_idempotent_under_repeated_threshold_crossings() -> v
 	_hit(b, 1)
 	# We're not crossing 33% so no phase 3 transition either.
 	b._physics_process(0.016)
-	assert_signal_emit_count(b, "phase_changed", 0,
-		"no phase_changed re-emission after latch")
+	assert_signal_emit_count(b, "phase_changed", 0, "no phase_changed re-emission after latch")
 
 
 # ---- 11 EDGE: damage during phase-transition is rejected ------------
+
 
 func test_no_damage_taken_during_phase_transition() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 600})
@@ -439,14 +459,17 @@ func test_no_damage_taken_during_phase_transition() -> void:
 	watch_signals(b)
 	for i in 5:
 		_hit(b, 100)
-	assert_eq(b.get_hp(), hp_at_transition_start,
-		"no damage applied during phase-transition (stagger immune)")
+	assert_eq(
+		b.get_hp(),
+		hp_at_transition_start,
+		"no damage applied during phase-transition (stagger immune)"
+	)
 	# `damaged` signal must not have fired during the transition.
-	assert_signal_emit_count(b, "damaged", 0,
-		"damaged signal blocked during transition")
+	assert_signal_emit_count(b, "damaged", 0, "damaged signal blocked during transition")
 
 
 # ---- 12 EDGE: room-state reset re-seeds boss to full HP --------------
+
 
 func test_boss_resets_to_full_hp_via_apply_mob_def() -> void:
 	# When the player dies mid-fight, the room reset path re-applies the
@@ -470,6 +493,7 @@ func test_boss_resets_to_full_hp_via_apply_mob_def() -> void:
 
 # ---- DORMANT state: intro fairness (Uma BI-19) ----------------------
 
+
 func test_dormant_boss_ignores_damage() -> void:
 	# Boss does NOT take damage during intro Beats 1–4 (per Uma's spec).
 	var b: Stratum1Boss = _make_dormant_boss()
@@ -491,8 +515,7 @@ func test_dormant_boss_does_not_act() -> void:
 	for i in 10:
 		b._physics_process(0.016)
 	assert_eq(b.get_state(), Stratum1Boss.STATE_DORMANT)
-	assert_signal_emit_count(b, "swing_spawned", 0,
-		"dormant boss never swings")
+	assert_signal_emit_count(b, "swing_spawned", 0, "dormant boss never swings")
 
 
 func test_wake_transitions_to_waking_then_idle() -> void:
@@ -504,15 +527,20 @@ func test_wake_transitions_to_waking_then_idle() -> void:
 	var b: Stratum1Boss = _make_dormant_boss()
 	watch_signals(b)
 	b.wake()
-	assert_eq(b.get_state(), Stratum1Boss.STATE_WAKING,
-		"wake() lands the boss in WAKING for the ~417ms wake-anim window")
-	assert_signal_emit_count(b, "boss_woke", 1,
-		"boss_woke fires once on wake entry (Beat 3)")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_WAKING,
+		"wake() lands the boss in WAKING for the ~417ms wake-anim window"
+	)
+	assert_signal_emit_count(b, "boss_woke", 1, "boss_woke fires once on wake entry (Beat 3)")
 	# Tick past WAKE_DURATION → boss transitions to IDLE.
 	for _i in 30:  # 30 * 0.016 = 480 ms > WAKE_DURATION 417 ms
 		b._physics_process(0.016)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_IDLE,
-		"after WAKE_DURATION elapsed in physics ticks, boss reaches IDLE")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_IDLE,
+		"after WAKE_DURATION elapsed in physics ticks, boss reaches IDLE"
+	)
 
 
 func test_wake_is_idempotent() -> void:
@@ -523,8 +551,9 @@ func test_wake_is_idempotent() -> void:
 	b.wake()
 	watch_signals(b)
 	b.wake()
-	assert_signal_emit_count(b, "boss_woke", 0,
-		"second wake() call is no-op (state already WAKING, not DORMANT)")
+	assert_signal_emit_count(
+		b, "boss_woke", 0, "second wake() call is no-op (state already WAKING, not DORMANT)"
+	)
 
 
 func test_take_damage_during_waking_is_ignored() -> void:
@@ -536,8 +565,7 @@ func test_take_damage_during_waking_is_ignored() -> void:
 	assert_eq(b.get_state(), Stratum1Boss.STATE_WAKING, "precondition: WAKING")
 	var hp_before: int = b.get_hp()
 	b.take_damage(50, Vector2.ZERO, null)
-	assert_eq(b.get_hp(), hp_before,
-		"damage is rejected during WAKING (immunity matches DORMANT)")
+	assert_eq(b.get_hp(), hp_before, "damage is rejected during WAKING (immunity matches DORMANT)")
 
 
 func test_take_damage_lands_after_wake_window_closes() -> void:
@@ -551,8 +579,7 @@ func test_take_damage_lands_after_wake_window_closes() -> void:
 	assert_eq(b.get_state(), Stratum1Boss.STATE_IDLE, "precondition: IDLE")
 	var hp_before: int = b.get_hp()
 	b.take_damage(50, Vector2.ZERO, null)
-	assert_lt(b.get_hp(), hp_before,
-		"damage lands after the wake-anim window closes")
+	assert_lt(b.get_hp(), hp_before, "damage lands after the wake-anim window closes")
 
 
 func test_complete_wake_for_test_helper_advances_to_idle() -> void:
@@ -565,23 +592,32 @@ func test_complete_wake_for_test_helper_advances_to_idle() -> void:
 	b.wake()
 	assert_eq(b.get_state(), Stratum1Boss.STATE_WAKING, "precondition: WAKING")
 	b.complete_wake_for_test()
-	assert_eq(b.get_state(), Stratum1Boss.STATE_IDLE,
-		"complete_wake_for_test fast-forwards WAKING -> IDLE")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_IDLE,
+		"complete_wake_for_test fast-forwards WAKING -> IDLE"
+	)
 	# Idempotent — calling on a non-WAKING boss is a no-op (does not move
 	# IDLE -> DORMANT or perturb other states).
 	b.complete_wake_for_test()
-	assert_eq(b.get_state(), Stratum1Boss.STATE_IDLE,
-		"complete_wake_for_test is idempotent (no-op on non-WAKING boss)")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_IDLE,
+		"complete_wake_for_test is idempotent (no-op on non-WAKING boss)"
+	)
 
 
 # ---- Layers / hitbox contract -----------------------------------------
 
+
 func test_collision_layer_is_enemy() -> void:
 	var b: Stratum1Boss = _make_boss()
-	assert_eq(b.collision_layer, Stratum1Boss.LAYER_ENEMY,
-		"boss sits on enemy layer (bit 4)")
-	assert_eq(b.collision_mask, Stratum1Boss.LAYER_WORLD | Stratum1Boss.LAYER_PLAYER,
-		"mask = world + player")
+	assert_eq(b.collision_layer, Stratum1Boss.LAYER_ENEMY, "boss sits on enemy layer (bit 4)")
+	assert_eq(
+		b.collision_mask,
+		Stratum1Boss.LAYER_WORLD | Stratum1Boss.LAYER_PLAYER,
+		"mask = world + player"
+	)
 
 
 func test_spawned_hitbox_is_enemy_team() -> void:
@@ -592,9 +628,7 @@ func test_spawned_hitbox_is_enemy_team() -> void:
 	p.global_position = Vector2(20.0, 0.0)
 	b.set_player(p)
 	var captured: Array = [null]
-	b.swing_spawned.connect(func(_kind: StringName, hb: Node) -> void:
-		captured[0] = hb
-	)
+	b.swing_spawned.connect(func(_kind: StringName, hb: Node) -> void: captured[0] = hb)
 	# Drive past the telegraph so the swing fires.
 	b._physics_process(0.016)
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.01)
@@ -607,6 +641,7 @@ func test_spawned_hitbox_is_enemy_team() -> void:
 
 # ---- Negative damage clamp -------------------------------------------
 
+
 func test_negative_damage_does_not_heal() -> void:
 	var b: Stratum1Boss = _make_boss()
 	b.take_damage(-100, Vector2.ZERO, null)
@@ -615,6 +650,7 @@ func test_negative_damage_does_not_heal() -> void:
 
 
 # ---- Death cancels in-flight attacks ---------------------------------
+
 
 func test_dies_during_telegraph_no_swing_from_corpse() -> void:
 	# Boss in mid-telegraph, then killed — no swing fires after death.
@@ -631,17 +667,20 @@ func test_dies_during_telegraph_no_swing_from_corpse() -> void:
 	b._physics_process(Stratum1Boss.PHASE_TRANSITION_DURATION + 0.01)
 	# Now in phase 3 with 33 HP. Trigger a melee telegraph.
 	b._physics_process(0.016)
-	assert_true(b.get_state() == Stratum1Boss.STATE_TELEGRAPHING_MELEE
-		or b.get_state() == Stratum1Boss.STATE_TELEGRAPHING_SLAM,
-		"boss is winding up an attack")
+	assert_true(
+		(
+			b.get_state() == Stratum1Boss.STATE_TELEGRAPHING_MELEE
+			or b.get_state() == Stratum1Boss.STATE_TELEGRAPHING_SLAM
+		),
+		"boss is winding up an attack"
+	)
 	watch_signals(b)
 	# Lethal hit.
 	_hit(b, 33)
 	assert_true(b.is_dead())
 	# Tick well past where the telegraph would have fired.
 	b._physics_process(1.0)
-	assert_signal_emit_count(b, "swing_spawned", 0,
-		"no swing fires from corpse")
+	assert_signal_emit_count(b, "swing_spawned", 0, "no swing fires from corpse")
 	assert_signal_emit_count(b, "boss_died", 1)
 
 
@@ -666,6 +705,7 @@ func test_dies_during_telegraph_no_swing_from_corpse() -> void:
 # `_activate_and_check_initial_overlaps` which is what the deferred call from
 # `_ready` would invoke in production.
 
+
 func test_boss_melee_hitbox_has_correct_layer_and_mask() -> void:
 	# REGRESSION-86c9ujq8d finding 1: boss hitbox layer/mask matches
 	# DECISIONS.md layer convention. A mismatch silently prevents body_entered
@@ -680,9 +720,10 @@ func test_boss_melee_hitbox_has_correct_layer_and_mask() -> void:
 	# Array-wrapper pattern: typed outer var cannot be written by a lambda in
 	# GDScript 4 (lambda updates its own local binding, not the outer var).
 	var captured: Array = [null]
-	b.swing_spawned.connect(func(kind: StringName, hb: Node) -> void:
-		if kind == Stratum1Boss.SWING_KIND_MELEE:
-			captured[0] = hb
+	b.swing_spawned.connect(
+		func(kind: StringName, hb: Node) -> void:
+			if kind == Stratum1Boss.SWING_KIND_MELEE:
+				captured[0] = hb
 	)
 	# Advance into telegraphing then fire.
 	b._physics_process(0.016)  # → STATE_TELEGRAPHING_MELEE
@@ -691,15 +732,22 @@ func test_boss_melee_hitbox_has_correct_layer_and_mask() -> void:
 	var spawned_hitbox: Hitbox = captured[0] as Hitbox
 	# Layer/mask checks — see DECISIONS.md 2026-05-01.
 	# enemy_hitbox layer: bit 5 = 1<<4 = 16.
-	assert_eq(spawned_hitbox.collision_layer, 1 << 4,
-		"REGRESSION-86c9ujq8d: boss hitbox on enemy_hitbox layer (bit 5 = 16)")
+	assert_eq(
+		spawned_hitbox.collision_layer,
+		1 << 4,
+		"REGRESSION-86c9ujq8d: boss hitbox on enemy_hitbox layer (bit 5 = 16)"
+	)
 	# player mask: bit 2 = 1<<1 = 2.
-	assert_eq(spawned_hitbox.collision_mask, 1 << 1,
-		"REGRESSION-86c9ujq8d: boss hitbox masks player layer (bit 2 = 2) — " +
-		"body_entered fires against player collision_layer=2")
+	assert_eq(
+		spawned_hitbox.collision_mask,
+		1 << 1,
+		(
+			"REGRESSION-86c9ujq8d: boss hitbox masks player layer (bit 2 = 2) — "
+			+ "body_entered fires against player collision_layer=2"
+		)
+	)
 	# Confirm team is TEAM_ENEMY.
-	assert_eq(spawned_hitbox.team, Hitbox.TEAM_ENEMY,
-		"boss hitbox team=TEAM_ENEMY")
+	assert_eq(spawned_hitbox.team, Hitbox.TEAM_ENEMY, "boss hitbox team=TEAM_ENEMY")
 
 
 func test_boss_wake_enables_hit_detection_on_player() -> void:
@@ -725,9 +773,10 @@ func test_boss_wake_enables_hit_detection_on_player() -> void:
 	# Array-wrapper pattern: typed outer var cannot be written by a lambda in
 	# GDScript 4 (lambda updates its own local binding, not the outer var).
 	var captured: Array = [null]
-	b.swing_spawned.connect(func(kind: StringName, hb: Node) -> void:
-		if kind == Stratum1Boss.SWING_KIND_MELEE:
-			captured[0] = hb
+	b.swing_spawned.connect(
+		func(kind: StringName, hb: Node) -> void:
+			if kind == Stratum1Boss.SWING_KIND_MELEE:
+				captured[0] = hb
 	)
 	b.global_position = Vector2.ZERO
 	b.set_player(fp)
@@ -736,6 +785,11 @@ func test_boss_wake_enables_hit_detection_on_player() -> void:
 	assert_not_null(captured[0], "hitbox spawned")
 	var spawned_hitbox: Hitbox = captured[0] as Hitbox
 	# Confirm hitbox damage is > 0 (boss does deal damage on hit).
-	assert_gt(spawned_hitbox.damage, 0,
-		"REGRESSION-86c9ujq8d: boss melee hitbox carries positive damage — " +
-		"boss deals non-zero damage when hitbox connects with player")
+	assert_gt(
+		spawned_hitbox.damage,
+		0,
+		(
+			"REGRESSION-86c9ujq8d: boss melee hitbox carries positive damage — "
+			+ "boss deals non-zero damage when hitbox connects with player"
+		)
+	)

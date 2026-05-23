@@ -39,6 +39,7 @@ func _find_wedge(p: Player) -> ColorRect:
 
 # --- 1: light-attack swing wedge spawns with correct sizing/alpha --------
 
+
 func test_player_swing_wedge_spawns_on_attack() -> void:
 	var p: Player = _make_player_in_tree()
 	watch_signals(p)
@@ -83,6 +84,7 @@ func test_player_swing_wedge_spawns_on_attack() -> void:
 
 # --- 2: heavy-attack swing wedge has heavier sizing + alpha ---------------
 
+
 func test_player_swing_wedge_heavy_uses_heavy_tuning() -> void:
 	var p: Player = _make_player_in_tree()
 	p.try_attack(Player.ATTACK_HEAVY, Vector2.UP)
@@ -91,12 +93,15 @@ func test_player_swing_wedge_heavy_uses_heavy_tuning() -> void:
 	assert_not_null(wedge)
 	# Heavy reach + radius applied.
 	assert_almost_eq(wedge.size.x, Player.HEAVY_REACH, 0.001, "size.x = HEAVY_REACH")
-	assert_almost_eq(wedge.size.y, Player.HEAVY_HITBOX_RADIUS * 2.0, 0.001, "size.y = HEAVY radius*2")
+	assert_almost_eq(
+		wedge.size.y, Player.HEAVY_HITBOX_RADIUS * 2.0, 0.001, "size.y = HEAVY radius*2"
+	)
 	# Heavy alpha is more punchy at 0.70.
 	assert_almost_eq(wedge.color.a, 0.70, 0.001, "heavy wedge alpha = 0.70")
 
 
 # --- 3: wedge orientation matches facing direction -----------------------
+
 
 func test_player_swing_wedge_direction_matches_facing() -> void:
 	var p: Player = _make_player_in_tree()
@@ -135,6 +140,7 @@ func test_player_swing_wedge_direction_uses_facing_when_dir_zero() -> void:
 
 # --- 4: wedge lifetime matches hitbox lifetime ---------------------------
 
+
 func test_player_swing_wedge_lifetime_matches_hitbox_light() -> void:
 	# Lifetime is recorded as Node metadata at spawn so tests can verify
 	# the contract without poking Tween internals (Tween has no public
@@ -143,8 +149,11 @@ func test_player_swing_wedge_lifetime_matches_hitbox_light() -> void:
 	p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT)
 	var wedge: ColorRect = _find_wedge(p)
 	assert_not_null(wedge)
-	assert_eq(float(wedge.get_meta("lifetime")), Player.LIGHT_HITBOX_LIFETIME,
-		"light wedge lifetime = 0.10s")
+	assert_eq(
+		float(wedge.get_meta("lifetime")),
+		Player.LIGHT_HITBOX_LIFETIME,
+		"light wedge lifetime = 0.10s"
+	)
 	assert_eq(StringName(wedge.get_meta("kind")), Player.ATTACK_LIGHT, "metadata records kind")
 
 
@@ -153,11 +162,15 @@ func test_player_swing_wedge_lifetime_matches_hitbox_heavy() -> void:
 	p.try_attack(Player.ATTACK_HEAVY, Vector2.DOWN)
 	var wedge: ColorRect = _find_wedge(p)
 	assert_not_null(wedge)
-	assert_eq(float(wedge.get_meta("lifetime")), Player.HEAVY_HITBOX_LIFETIME,
-		"heavy wedge lifetime = 0.14s")
+	assert_eq(
+		float(wedge.get_meta("lifetime")),
+		Player.HEAVY_HITBOX_LIFETIME,
+		"heavy wedge lifetime = 0.14s"
+	)
 
 
 # --- 5: wedge fades to alpha 0 over its lifetime + frees ----------------
+
 
 func test_player_swing_wedge_fades_and_frees() -> void:
 	# After spawning, await enough time for the fade tween (lifetime) +
@@ -176,6 +189,7 @@ func test_player_swing_wedge_fades_and_frees() -> void:
 
 
 # --- 6: 60ms modulate flash on attack ------------------------------------
+
 
 func test_player_modulate_flash_60ms_total() -> void:
 	# Assert the flash tween is created with the correct shape: a 2-step
@@ -202,6 +216,7 @@ func test_player_modulate_flash_60ms_total() -> void:
 
 # --- 6b: Bug B regression — flash tint is HTML5-safe (channels in [0, 1]) -
 
+
 func test_player_swing_flash_tint_is_html5_safe() -> void:
 	# Bug B regression (Sponsor soak `embergrave-html5-f62991f`): the OLD
 	# code shipped `Color(1.4, 1.0, 0.7, 1)`, an HDR overbright tint. WebGL2 /
@@ -224,7 +239,8 @@ func test_player_swing_flash_tint_is_html5_safe() -> void:
 	var delta: float = (
 		abs(tint.r - default_modulate.r)
 		+ abs(tint.g - default_modulate.g)
-		+ abs(tint.b - default_modulate.b))
+		+ abs(tint.b - default_modulate.b)
+	)
 	assert_gte(delta, 0.20, "tint delta vs default modulate >= 0.20 (perceptible flash)")
 
 
@@ -264,6 +280,7 @@ func test_player_modulate_flash_same_duration_for_heavy_and_light() -> void:
 
 # --- 7: kill-and-restart — second attack replaces first wedge -----------
 
+
 func test_player_swing_wedge_replaced_on_second_attack() -> void:
 	# A second attack fired during the first attack's recovery should
 	# replace the wedge — Uma's spec §1: "if a second attack is fired
@@ -288,6 +305,7 @@ func test_player_swing_wedge_replaced_on_second_attack() -> void:
 
 # --- 8: rejected attack does NOT spawn a wedge ---------------------------
 
+
 func test_no_wedge_on_rejected_attack() -> void:
 	# An attack rejected mid-dodge or in-recovery returns null and must
 	# not paint a wedge cue. Otherwise the cue lies about whether a swing
@@ -303,6 +321,7 @@ func test_no_wedge_on_rejected_attack() -> void:
 
 # --- 9: side-effect inventory: dodge interrupts attack recovery still works
 
+
 func test_dodge_interrupt_unaffected_by_visual_feedback() -> void:
 	# Visual-feedback cues are paint-only — they must NOT change the
 	# existing dodge-cancels-attack-recovery rule from
@@ -317,6 +336,7 @@ func test_dodge_interrupt_unaffected_by_visual_feedback() -> void:
 
 
 # --- 10: side-effect inventory: hitbox damage application unchanged -----
+
 
 func test_hitbox_payload_unchanged_by_visual_feedback() -> void:
 	# The wedge spawn must NOT mutate the hitbox damage / lifetime / team.
@@ -339,16 +359,20 @@ func test_hitbox_payload_unchanged_by_visual_feedback() -> void:
 # autoload name and drive physics frames directly. Paired with the trace
 # emit in Player._physics_process.
 
+
 class CombatTraceSpy:
 	extends Node
 	var calls: Array = []  # Array of [tag, msg]
+
 	func combat_trace(tag: String, msg: String = "") -> void:
 		calls.append([tag, msg])
+
 	func has_tag(tag: String) -> bool:
 		for c: Array in calls:
 			if c[0] == tag:
 				return true
 		return false
+
 	func msg_for(tag: String) -> String:
 		for c: Array in calls:
 			if c[0] == tag:
@@ -388,13 +412,22 @@ func test_pos_trace_emits_after_throttle_interval() -> void:
 	var emitted_after: bool = spy.has_tag("Player.pos")
 	var pos_msg: String = spy.msg_for("Player.pos")
 	_restore_debug_flags(spy)
-	assert_false(emitted_early,
-		"Player.pos must NOT emit before POS_TRACE_INTERVAL elapses — the " +
-		"trace is throttled so it stays a cheap no-op on perf")
-	assert_true(emitted_after,
-		"Player.pos must emit once the throttle accumulator passes " +
-		"POS_TRACE_INTERVAL — the AC4 chase helper steers off this line")
+	assert_false(
+		emitted_early,
+		(
+			"Player.pos must NOT emit before POS_TRACE_INTERVAL elapses — the "
+			+ "trace is throttled so it stays a cheap no-op on perf"
+		)
+	)
+	assert_true(
+		emitted_after,
+		(
+			"Player.pos must emit once the throttle accumulator passes "
+			+ "POS_TRACE_INTERVAL — the AC4 chase helper steers off this line"
+		)
+	)
 	# Downstream consequence (Tier 2 bar): the payload carries the world
 	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/.
-	assert_string_contains(pos_msg, "pos=(240,200)",
-		"Player.pos payload must carry the parseable world-coord tuple")
+	assert_string_contains(
+		pos_msg, "pos=(240,200)", "Player.pos payload must carry the parseable world-coord tuple"
+	)

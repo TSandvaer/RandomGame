@@ -41,6 +41,7 @@ func after_each() -> void:
 
 # --- README creation -----------------------------------------------------
 
+
 func test_first_save_writes_readme() -> void:
 	assert_false(FileAccess.file_exists(README_PATH), "no README before first save")
 	assert_true(_save().save_game(TEST_SLOT))
@@ -67,10 +68,11 @@ func test_readme_documents_clear_procedure() -> void:
 	var contents: String = f.get_as_text()
 	f.close()
 	# Must tell the tester how to clear saves for a fresh run.
-	assert_true(contents.to_lower().contains("delete"),
-		"README must explain how to delete saves")
-	assert_true(contents.contains("save_*.json") or contents.contains("save_<slot>.json"),
-		"README must point at the actual save filename pattern")
+	assert_true(contents.to_lower().contains("delete"), "README must explain how to delete saves")
+	assert_true(
+		contents.contains("save_*.json") or contents.contains("save_<slot>.json"),
+		"README must point at the actual save filename pattern"
+	)
 
 
 func test_readme_documents_save_location() -> void:
@@ -81,11 +83,14 @@ func test_readme_documents_save_location() -> void:
 	# Must include the resolved user:// path so testers don't have to
 	# guess where Godot put it on their OS.
 	var resolved: String = ProjectSettings.globalize_path("user://")
-	assert_true(contents.contains(resolved),
-		"README must include the resolved user:// path (got: %s)" % resolved.left(80))
+	assert_true(
+		contents.contains(resolved),
+		"README must include the resolved user:// path (got: %s)" % resolved.left(80)
+	)
 
 
 # --- Idempotency / overwrite --------------------------------------------
+
 
 func test_repeated_saves_do_not_corrupt_readme() -> void:
 	# Three saves in a row; README must remain valid on the third.
@@ -104,5 +109,6 @@ func test_readme_path_constant_matches_save_dir() -> void:
 	# Defensive: if Save.SAVE_DIR ever changes, README_PATH must follow.
 	var dir: String = _save().SAVE_DIR
 	var readme: String = _save().README_PATH
-	assert_true(readme.begins_with(dir),
-		"README_PATH (%s) must live under SAVE_DIR (%s)" % [readme, dir])
+	assert_true(
+		readme.begins_with(dir), "README_PATH (%s) must live under SAVE_DIR (%s)" % [readme, dir]
+	)

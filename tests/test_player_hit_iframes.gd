@@ -34,8 +34,8 @@ extends GutTest
 
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_player_in_tree() -> Player:
 	# Hit-iframe path uses `get_tree().create_timer(...)` — must be in tree.
@@ -46,24 +46,34 @@ func _make_player_in_tree() -> Player:
 
 # ---- 1: non-fatal damage applies + grants iframes ---------------------
 
+
 func test_take_damage_non_fatal_decrements_hp_then_arms_iframes() -> void:
 	var p: Player = _make_player_in_tree()
 	var hp_before: int = p.hp_current
 	assert_gt(hp_before, 10, "test setup: player at non-trivial HP")
-	assert_false(p.is_invulnerable(),
-		"sanity: player not invulnerable before any damage")
+	assert_false(p.is_invulnerable(), "sanity: player not invulnerable before any damage")
 	p.take_damage(5, Vector2.ZERO, null)
-	assert_eq(p.hp_current, hp_before - 5,
-		"non-fatal damage decrements HP by the dealt amount BEFORE iframes arm " +
-		"(damage applies, then iframes are granted — not the other way around)")
-	assert_true(p.is_invulnerable(),
-		"REGRESSION GUARD: post-hit iframes (HIT_IFRAMES_SECS = 0.25) must be " +
-		"active immediately after a non-fatal take_damage. This is the load- " +
-		"bearing AC4 Room 05 balance behaviour — without it the simultaneous- " +
-		"hit cluster from 2 Grunts + 1 Charger collapses the 100 HP pool.")
+	assert_eq(
+		p.hp_current,
+		hp_before - 5,
+		(
+			"non-fatal damage decrements HP by the dealt amount BEFORE iframes arm "
+			+ "(damage applies, then iframes are granted — not the other way around)"
+		)
+	)
+	assert_true(
+		p.is_invulnerable(),
+		(
+			"REGRESSION GUARD: post-hit iframes (HIT_IFRAMES_SECS = 0.25) must be "
+			+ "active immediately after a non-fatal take_damage. This is the load- "
+			+ "bearing AC4 Room 05 balance behaviour — without it the simultaneous- "
+			+ "hit cluster from 2 Grunts + 1 Charger collapses the 100 HP pool."
+		)
+	)
 
 
 # ---- 2: second hit within the window is rejected ----------------------
+
 
 func test_second_hit_within_iframe_window_does_not_damage() -> void:
 	# The whole point of the post-hit iframe window: a second hit landing
@@ -79,12 +89,18 @@ func test_second_hit_within_iframe_window_does_not_damage() -> void:
 	# Second hit attempt within the 0.25s window — short-circuited at the
 	# `if _is_invulnerable: return` guard at the top of take_damage.
 	p.take_damage(99, Vector2.ZERO, null)
-	assert_eq(p.hp_current, hp_after_first,
-		"REGRESSION GUARD: HP must NOT decrement on a second take_damage call " +
-		"while iframes-on-hit are active. Even a 99-dmg one-shot bounces.")
+	assert_eq(
+		p.hp_current,
+		hp_after_first,
+		(
+			"REGRESSION GUARD: HP must NOT decrement on a second take_damage call "
+			+ "while iframes-on-hit are active. Even a 99-dmg one-shot bounces."
+		)
+	)
 
 
 # ---- 3: after timer expires, iframes clear + third hit lands ----------
+
 
 func test_iframes_clear_after_window_and_third_hit_lands() -> void:
 	# Drives the SceneTreeTimer to completion and asserts the timer's
@@ -102,20 +118,32 @@ func test_iframes_clear_after_window_and_third_hit_lands() -> void:
 	# Use a wall-clock wait via `await get_tree().create_timer(...)` —
 	# that's the same mechanism `take_damage` uses, so timing is consistent.
 	await get_tree().create_timer(Player.HIT_IFRAMES_SECS + 0.05).timeout
-	assert_false(p.is_invulnerable(),
-		"REGRESSION GUARD: post-hit iframes must clear once HIT_IFRAMES_SECS " +
-		"elapses. The `_exit_iframes_if_not_dodging` timer callback owns the " +
-		"clear when the player is NOT mid-dodge.")
+	assert_false(
+		p.is_invulnerable(),
+		(
+			"REGRESSION GUARD: post-hit iframes must clear once HIT_IFRAMES_SECS "
+			+ "elapses. The `_exit_iframes_if_not_dodging` timer callback owns the "
+			+ "clear when the player is NOT mid-dodge."
+		)
+	)
 	# Third hit — fresh, no iframes. HP drops by 4.
 	p.take_damage(4, Vector2.ZERO, null)
-	assert_eq(p.hp_current, hp_before - 2 - 4,
-		"third take_damage outside the iframe window lands cleanly — " +
-		"HP decrements by the new dealt amount (4)")
-	assert_true(p.is_invulnerable(),
-		"third hit also re-arms iframes (the mechanism is per-hit, not once-per-life)")
+	assert_eq(
+		p.hp_current,
+		hp_before - 2 - 4,
+		(
+			"third take_damage outside the iframe window lands cleanly — "
+			+ "HP decrements by the new dealt amount (4)"
+		)
+	)
+	assert_true(
+		p.is_invulnerable(),
+		"third hit also re-arms iframes (the mechanism is per-hit, not once-per-life)"
+	)
 
 
 # ---- 4: fatal hit does NOT arm the iframe timer -----------------------
+
 
 func test_fatal_hit_does_not_arm_hit_iframes_timer() -> void:
 	# Per Uma's design §3.B: "death path consumes the frame; no iframes-on-hit
@@ -128,13 +156,18 @@ func test_fatal_hit_does_not_arm_hit_iframes_timer() -> void:
 	var p: Player = _make_player_in_tree()
 	p.take_damage(p.hp_max, Vector2.ZERO, null)
 	assert_true(p.is_dead(), "lethal hit triggers death")
-	assert_false(p.is_invulnerable(),
-		"REGRESSION GUARD: after a fatal hit, the player is dead — NOT " +
-		"invulnerable-yet-alive. The death path's early-return prevents the " +
-		"hit-iframe timer from arming, and `_die`'s defensive clear runs.")
+	assert_false(
+		p.is_invulnerable(),
+		(
+			"REGRESSION GUARD: after a fatal hit, the player is dead — NOT "
+			+ "invulnerable-yet-alive. The death path's early-return prevents the "
+			+ "hit-iframe timer from arming, and `_die`'s defensive clear runs."
+		)
+	)
 
 
 # ---- 5: dodge at hit time blocks the iframe-timer arm (entry guard) ---
+
 
 func test_hit_during_active_dodge_does_not_arm_separate_iframe_timer() -> void:
 	# Dodge sets _is_invulnerable = true via _enter_iframes. The first thing
@@ -151,15 +184,18 @@ func test_hit_during_active_dodge_does_not_arm_separate_iframe_timer() -> void:
 	# Damage call while dodge is active — short-circuited at the top by
 	# `if _is_invulnerable: return`. HP must NOT decrement.
 	p.take_damage(5, Vector2.ZERO, null)
-	assert_eq(p.hp_current, hp_before,
-		"dodge-iframe blocks the hit at the take_damage entry guard")
+	assert_eq(p.hp_current, hp_before, "dodge-iframe blocks the hit at the take_damage entry guard")
 	# Tick dodge to completion. The dodge's own `_exit_iframes` clears the
 	# flag — no competing hit-iframe timer should re-clear or extend it.
 	p._tick_timers(Player.DODGE_DURATION + 0.01)
 	p._process_dodge(0.0)
-	assert_false(p.is_invulnerable(),
-		"after dodge ends, iframes are cleared cleanly — no competing " +
-		"hit-iframe timer firing later (because no timer was armed)")
+	assert_false(
+		p.is_invulnerable(),
+		(
+			"after dodge ends, iframes are cleared cleanly — no competing "
+			+ "hit-iframe timer firing later (because no timer was armed)"
+		)
+	)
 	# Wait slightly longer than HIT_IFRAMES_SECS would have lasted — if a
 	# hit-iframe timer HAD been armed (regression), it would have re-cleared
 	# now and we'd just see the same false. The stronger guard is that
@@ -168,6 +204,7 @@ func test_hit_during_active_dodge_does_not_arm_separate_iframe_timer() -> void:
 
 
 # ---- 6: dodge BEGAN during hit-iframe window — hit-timer guards exit --
+
 
 func test_dodge_started_during_hit_iframes_does_not_clobber_dodge() -> void:
 	# Order: hit → iframes-on-hit timer armed (0.25s) → player presses dodge
@@ -200,25 +237,36 @@ func test_dodge_started_during_hit_iframes_does_not_clobber_dodge() -> void:
 	#    we extended its timer above. `_exit_iframes_if_not_dodging` sees
 	#    STATE_DODGE and SKIPS the clear.
 	await get_tree().create_timer(Player.HIT_IFRAMES_SECS + 0.05).timeout
-	assert_eq(p.get_state(), Player.STATE_DODGE,
-		"player is STILL dodging after hit-iframe timer fired " +
-		"(dodge is 0.30s, hit-iframes are 0.25s — dodge outlasts)")
-	assert_true(p.is_invulnerable(),
-		"REGRESSION GUARD: `_exit_iframes_if_not_dodging` MUST guard against " +
-		"clobbering a still-active dodge. Without the guard, the player would " +
-		"be vulnerable while still visually dodging — a feel + correctness bug " +
-		"flagged in Uma's design §3.B 'Dodge takes precedence'.")
+	assert_eq(
+		p.get_state(),
+		Player.STATE_DODGE,
+		(
+			"player is STILL dodging after hit-iframe timer fired "
+			+ "(dodge is 0.30s, hit-iframes are 0.25s — dodge outlasts)"
+		)
+	)
+	assert_true(
+		p.is_invulnerable(),
+		(
+			"REGRESSION GUARD: `_exit_iframes_if_not_dodging` MUST guard against "
+			+ "clobbering a still-active dodge. Without the guard, the player would "
+			+ "be vulnerable while still visually dodging — a feel + correctness bug "
+			+ "flagged in Uma's design §3.B 'Dodge takes precedence'."
+		)
+	)
 	# 4. Tick dodge to completion — dodge's own _exit_iframes clears the flag.
 	#    We forced `_dodge_time_left = 10.0` above to keep dodge robustly
 	#    active across the hit-iframe-timer firing; now drain it manually so
 	#    `_process_dodge` calls `_exit_dodge` → `_exit_iframes`.
 	p._dodge_time_left = 0.0
 	p._process_dodge(0.0)
-	assert_false(p.is_invulnerable(),
-		"dodge-end clears iframes (the dodge owns the clear in this ordering)")
+	assert_false(
+		p.is_invulnerable(), "dodge-end clears iframes (the dodge owns the clear in this ordering)"
+	)
 
 
 # ---- 7: dodge ends BEFORE hit-iframe timer — clean idempotent state ---
+
 
 func test_dodge_ends_before_hit_iframe_timer_idempotent_safe() -> void:
 	# The reverse ordering: dodge ends FIRST, then the hit-iframe timer fires.
@@ -236,7 +284,11 @@ func test_dodge_ends_before_hit_iframe_timer_idempotent_safe() -> void:
 	# wait the window out, and confirm the second clear is clean.
 	assert_false(p.is_invulnerable())
 	p._exit_iframes()  # idempotent no-op when already not invulnerable
-	assert_false(p.is_invulnerable(),
-		"calling _exit_iframes when not invulnerable is a safe no-op " +
-		"(the dodge-ended-first / hit-iframe-timer-fires-second ordering " +
-		"relies on this idempotency per Uma's design §3.B audit)")
+	assert_false(
+		p.is_invulnerable(),
+		(
+			"calling _exit_iframes when not invulnerable is a safe no-op "
+			+ "(the dodge-ended-first / hit-iframe-timer-fires-second ordering "
+			+ "relies on this idempotency per Uma's design §3.B audit)"
+		)
+	)

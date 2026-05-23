@@ -23,8 +23,8 @@ extends GutTest
 
 const TEST_SLOT: int = 995
 
-
 # ---- Autoload accessors ----------------------------------------------
+
 
 func _save() -> Node:
 	var n: Node = Engine.get_main_loop().root.get_node_or_null("Save")
@@ -127,12 +127,15 @@ func test_save_dict_is_pure_json_round_trippable() -> void:
 	assert_eq(int(character["hp_max"]), 100, "default hp_max=100")
 	# stash and equipped are containers — check shape, not contents (empty).
 	assert_true(parsed_dict["stash"] is Array, "stash is Array after parse")
-	assert_true(parsed_dict["equipped"] is Dictionary,
-		"equipped is Dictionary after parse")
+	assert_true(parsed_dict["equipped"] is Dictionary, "equipped is Dictionary after parse")
 	# Meta block — float survives.
 	var meta: Dictionary = parsed_dict["meta"]
-	assert_almost_eq(float(meta["total_playtime_sec"]), 0.0, 1e-6,
-		"meta.total_playtime_sec float survives JSON round-trip")
+	assert_almost_eq(
+		float(meta["total_playtime_sec"]),
+		0.0,
+		1e-6,
+		"meta.total_playtime_sec float survives JSON round-trip"
+	)
 
 
 # =======================================================================
@@ -155,17 +158,16 @@ func test_full_inventory_snapshot_is_json_round_trippable() -> void:
 	# Round-trip.
 	var s: String = JSON.stringify(data)
 	var parsed: Variant = JSON.parse_string(s)
-	assert_true(parsed is Dictionary,
-		"snapshot+stratum round-trips JSON to Dictionary")
+	assert_true(parsed is Dictionary, "snapshot+stratum round-trips JSON to Dictionary")
 	var parsed_dict: Dictionary = parsed
 	# Verify the structure survived intact.
 	assert_true(parsed_dict.has("stash"), "stash key survives round-trip")
 	assert_true(parsed_dict["stash"] is Array, "stash is Array after parse")
 	assert_true(parsed_dict.has("equipped"), "equipped key survives round-trip")
-	assert_true(parsed_dict["equipped"] is Dictionary,
-		"equipped is Dictionary after parse")
-	assert_true(parsed_dict.has("stratum_progression"),
-		"stratum_progression key survives round-trip")
+	assert_true(parsed_dict["equipped"] is Dictionary, "equipped is Dictionary after parse")
+	assert_true(
+		parsed_dict.has("stratum_progression"), "stratum_progression key survives round-trip"
+	)
 	# Verify cleared rooms preserved as Strings (JSON has no StringName).
 	var sp: Dictionary = parsed_dict["stratum_progression"]
 	var rooms: Array = sp["cleared_rooms"]
@@ -188,14 +190,14 @@ func test_stratum_progression_snapshot_is_json_round_trippable() -> void:
 	_stratum().snapshot_to_save_data(data)
 	var s: String = JSON.stringify(data)
 	var parsed: Variant = JSON.parse_string(s)
-	assert_true(parsed is Dictionary,
-		"snapshot dict round-trips via JSON cleanly")
+	assert_true(parsed is Dictionary, "snapshot dict round-trips via JSON cleanly")
 	var parsed_dict: Dictionary = parsed
 	# StringName -> String coercion in JSON is the audited contract.
 	var rooms: Array = parsed_dict["stratum_progression"]["cleared_rooms"]
 	for r: Variant in rooms:
-		assert_true(r is String,
-			"cleared_rooms entry is String after JSON parse (StringName -> String)")
+		assert_true(
+			r is String, "cleared_rooms entry is String after JSON parse (StringName -> String)"
+		)
 
 
 # =======================================================================
@@ -239,22 +241,33 @@ func test_autoload_ready_is_idempotent() -> void:
 		_stratum().call("_ready")
 	_inventory().call("_ready")
 	# Assert everything we set up survived.
-	assert_eq(_levels().current_level(), pre_level,
-		"Levels._ready() does not reset level (idempotent)")
+	assert_eq(
+		_levels().current_level(), pre_level, "Levels._ready() does not reset level (idempotent)"
+	)
 	assert_eq(_levels().current_xp(), pre_xp, "Levels xp preserved")
-	assert_eq(_player_stats().get_stat(&"vigor"), pre_vigor,
-		"PlayerStats._ready() does not reset vigor")
-	assert_eq(_player_stats().get_unspent_points(), pre_unspent,
-		"PlayerStats unspent preserved")
-	assert_eq(_stratum().cleared_count(), pre_cleared,
-		"StratumProgression._ready() does not wipe cleared rooms")
+	assert_eq(
+		_player_stats().get_stat(&"vigor"), pre_vigor, "PlayerStats._ready() does not reset vigor"
+	)
+	assert_eq(_player_stats().get_unspent_points(), pre_unspent, "PlayerStats unspent preserved")
+	assert_eq(
+		_stratum().cleared_count(),
+		pre_cleared,
+		"StratumProgression._ready() does not wipe cleared rooms"
+	)
 	# Constants don't change.
-	assert_eq(_save().SCHEMA_VERSION, pre_save_schema,
-		"Save.SCHEMA_VERSION is constant across _ready calls")
-	assert_eq(_build_info().short_sha, pre_build_sha,
-		"BuildInfo.short_sha is stable across _ready calls")
-	assert_eq(_inventory().get_capacity(), pre_capacity,
-		"Inventory capacity is constant across _ready calls")
+	assert_eq(
+		_save().SCHEMA_VERSION,
+		pre_save_schema,
+		"Save.SCHEMA_VERSION is constant across _ready calls"
+	)
+	assert_eq(
+		_build_info().short_sha, pre_build_sha, "BuildInfo.short_sha is stable across _ready calls"
+	)
+	assert_eq(
+		_inventory().get_capacity(),
+		pre_capacity,
+		"Inventory capacity is constant across _ready calls"
+	)
 
 
 # =======================================================================
@@ -269,14 +282,16 @@ func test_stratum_progression_restore_from_empty_dict_is_noop() -> void:
 	# Set up some progression to verify restore wipes it.
 	_stratum().mark_cleared(&"will_be_wiped_01")
 	_stratum().mark_cleared(&"will_be_wiped_02")
-	assert_eq(_stratum().cleared_count(), 2,
-		"pre-restore: two rooms marked cleared")
+	assert_eq(_stratum().cleared_count(), 2, "pre-restore: two rooms marked cleared")
 	# Restore from empty dict.
 	_stratum().restore_from_save_data({})
 	# Documented contract: clears existing state then reads the (missing)
 	# stratum_progression key as empty -> ends in zero cleared.
-	assert_eq(_stratum().cleared_count(), 0,
-		"restore_from_save_data({}) yields empty progression (wipes prior + reads missing key as empty)")
+	assert_eq(
+		_stratum().cleared_count(),
+		0,
+		"restore_from_save_data({}) yields empty progression (wipes prior + reads missing key as empty)"
+	)
 
 
 # =======================================================================
@@ -296,8 +311,7 @@ func test_inventory_panel_exit_tree_restores_time_scale() -> void:
 	assert_eq(Engine.time_scale, 0.10, "panel-open sets 0.10")
 	panel.queue_free()
 	await get_tree().process_frame
-	assert_eq(Engine.time_scale, 1.0,
-		"freed-while-open panel restores time_scale via _exit_tree")
+	assert_eq(Engine.time_scale, 1.0, "freed-while-open panel restores time_scale via _exit_tree")
 
 
 # =======================================================================
@@ -311,20 +325,20 @@ func test_inventory_panel_exit_tree_restores_time_scale() -> void:
 ## never writes Engine.time_scale, so the _exit_tree guard only clears
 ## the internal `_open` flag (no state to restore).
 func test_stat_allocation_panel_does_not_modify_time_scale() -> void:
-	assert_eq(Engine.time_scale, 1.0,
-		"baseline: time_scale is 1.0 before panel is created")
+	assert_eq(Engine.time_scale, 1.0, "baseline: time_scale is 1.0 before panel is created")
 	var packed: PackedScene = load("res://scenes/ui/StatAllocationPanel.tscn")
 	var panel: StatAllocationPanel = packed.instantiate()
 	add_child(panel)
-	assert_eq(Engine.time_scale, 1.0,
-		"time_scale is 1.0 after add_child (panel not yet open)")
+	assert_eq(Engine.time_scale, 1.0, "time_scale is 1.0 after add_child (panel not yet open)")
 	panel.open()
-	assert_eq(Engine.time_scale, 1.0,
-		"non-modal panel: time_scale stays 1.0 after open()")
+	assert_eq(Engine.time_scale, 1.0, "non-modal panel: time_scale stays 1.0 after open()")
 	panel.queue_free()
 	await get_tree().process_frame
-	assert_eq(Engine.time_scale, 1.0,
-		"time_scale is 1.0 after panel freed (_exit_tree does not restore because nothing was set)")
+	assert_eq(
+		Engine.time_scale,
+		1.0,
+		"time_scale is 1.0 after panel freed (_exit_tree does not restore because nothing was set)"
+	)
 
 
 # =======================================================================
@@ -345,8 +359,9 @@ func test_build_info_short_sha_is_non_empty_string() -> void:
 	assert_gt(sha.length(), 0, "short_sha is non-empty (got '%s')" % sha)
 	# Also verify display_label format invariant.
 	var label: String = _build_info().display_label
-	assert_true(label.begins_with("build: "),
-		"display_label starts with 'build: ' (got '%s')" % label)
+	assert_true(
+		label.begins_with("build: "), "display_label starts with 'build: ' (got '%s')" % label
+	)
 
 
 # =======================================================================
@@ -362,7 +377,10 @@ func test_build_info_short_sha_is_non_empty_string() -> void:
 func test_save_engine_path_resolves_under_user_dir() -> void:
 	for slot: int in [0, 1, 5, 100, TEST_SLOT, 999]:
 		var path: String = _save().save_path(slot)
-		assert_true(path.begins_with("user://"),
-			"save_path(%d) under user:// (HTML5: OPFS); got '%s'" % [slot, path])
-		assert_true(path.ends_with(".json"),
-			"save_path(%d) ends with .json; got '%s'" % [slot, path])
+		assert_true(
+			path.begins_with("user://"),
+			"save_path(%d) under user:// (HTML5: OPFS); got '%s'" % [slot, path]
+		)
+		assert_true(
+			path.ends_with(".json"), "save_path(%d) ends with .json; got '%s'" % [slot, path]
+		)

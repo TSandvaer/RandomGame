@@ -61,12 +61,12 @@ extends Node2D
 
 ## The player crossed the boss-room threshold. Cinematic layer subscribes
 ## to start the door-slam, ambient-cut, camera-zoom, nameplate-slide.
-signal entry_sequence_started()
+signal entry_sequence_started
 
 ## The 1.8 s entry sequence has elapsed. Boss is about to wake. Cinematic
 ## layer subscribes to ramp camera back to player-anchored and start boss
 ## music. Wake fires immediately after.
-signal entry_sequence_completed()
+signal entry_sequence_completed
 
 ## The boss has been defeated. Cinematic layer subscribes to drive the
 ## `BossDefeatedSequence` (time-freeze, ember dissolve, title card).
@@ -74,7 +74,7 @@ signal boss_defeated(boss: Stratum1Boss, death_position: Vector2)
 
 ## Stratum-exit door has unlocked — player can leave. M1 has only one
 ## stratum so this is the run-clear signal.
-signal stratum_exit_unlocked()
+signal stratum_exit_unlocked
 
 ## M3-T2-W3-T17 (ticket `86c9wjzjf`) — emitted when the player collapses
 ## the entry sequence via a movement-key press during Beats 2–4. Audio
@@ -89,7 +89,7 @@ signal stratum_exit_unlocked()
 ## plays at full duration. The first-ever fight is unskippable — this
 ## signal only fires when `_skip_eligible == true` (driven by save state
 ## `character.first_boss_kill_seen`).
-signal entry_sequence_skipped()
+signal entry_sequence_skipped
 
 # ---- Tuning ------------------------------------------------------------
 
@@ -264,8 +264,10 @@ func _ready() -> void:
 	# read-only / cold-boot surfaces may not have hit the migrate path).
 	_skip_eligible = _load_first_boss_kill_seen()
 	if _skip_eligible:
-		_combat_trace("Stratum1BossRoom._ready",
-			"skip_eligible=true — subsequent boss fight, intro collapsible on movement")
+		_combat_trace(
+			"Stratum1BossRoom._ready",
+			"skip_eligible=true — subsequent boss fight, intro collapsible on movement"
+		)
 	# Defer the Area2D-fixture pass (door-trigger build + StratumExit spawn)
 	# AND the entry-sequence trigger out of the physics-flush window.
 	#
@@ -325,9 +327,13 @@ func _assemble_room_fixtures() -> void:
 	# insertion, `monitoring` reads false here and Sponsor / the Playwright
 	# harness can see it in the console without a native build.
 	if _door_trigger != null:
-		_combat_trace("Stratum1BossRoom._assemble_room_fixtures",
-			"door_trigger built — inside_tree=%s monitoring=%s" % [
-				str(_door_trigger.is_inside_tree()), str(_door_trigger.monitoring)])
+		_combat_trace(
+			"Stratum1BossRoom._assemble_room_fixtures",
+			(
+				"door_trigger built — inside_tree=%s monitoring=%s"
+				% [str(_door_trigger.is_inside_tree()), str(_door_trigger.monitoring)]
+			)
+		)
 	# M2 W1 P0 fix (`86c9q96fv` + `86c9q96ht`): the boss starts STATE_DORMANT
 	# and only wakes via `trigger_entry_sequence()` → 1.8 s timer → `wake()`.
 	# The original wake-gate was the door-trigger Area2D at (240, 250) — but
@@ -360,6 +366,7 @@ func _assemble_room_fixtures() -> void:
 
 
 # ---- Public API -------------------------------------------------------
+
 
 func get_boss() -> Stratum1Boss:
 	return _boss
@@ -447,6 +454,7 @@ func set_skip_eligible_for_test(eligible: bool) -> void:
 
 # ---- Internal --------------------------------------------------------
 
+
 func _build_door_trigger() -> void:
 	_door_trigger = Area2D.new()
 	_door_trigger.name = "BossRoomDoorTrigger"
@@ -522,8 +530,10 @@ func _on_door_trigger_body_entered(body: Node) -> void:
 	# distinguishable in the console — the same Case A / Case B distinction
 	# `RoomGate._on_body_entered` uses. This is the trace the Playwright
 	# boss-room spec asserts on to confirm the physics-flush fix landed.
-	_combat_trace("Stratum1BossRoom._on_door_trigger_body_entered",
-		"body=%s is_character_body=%s" % [str(body), str(body is CharacterBody2D)])
+	_combat_trace(
+		"Stratum1BossRoom._on_door_trigger_body_entered",
+		"body=%s is_character_body=%s" % [str(body), str(body is CharacterBody2D)]
+	)
 	if not body is CharacterBody2D:
 		return
 	trigger_entry_sequence()
@@ -546,8 +556,11 @@ func _complete_entry_sequence() -> void:
 	# Per Uma `boss-intro.md` Beat 4 (T+1.2 → T+1.8); the slide-in tween itself
 	# runs 0.4 s easing out. Fires AFTER `entry_sequence_completed.emit()` so
 	# subscribers see the signal before the nameplate begins animating.
-	if _boss_nameplate != null and is_instance_valid(_boss_nameplate) \
-			and _boss_nameplate.has_method("show_for"):
+	if (
+		_boss_nameplate != null
+		and is_instance_valid(_boss_nameplate)
+		and _boss_nameplate.has_method("show_for")
+	):
 		_boss_nameplate.call("show_for", _boss)
 	# Wake the boss now that Beats 1–4 are over.
 	if _boss != null and not _boss.is_dead():
@@ -597,8 +610,10 @@ func _on_boss_died(boss: Stratum1Boss, death_position: Vector2, _mob_def: MobDef
 	# Same root-cause class as `Stratum1BossRoom._build_door_trigger` (ticket
 	# 86c9tv8uf) and `MobLootSpawner.on_mob_died` (PR #142) — all fixed by
 	# deferring the Area2D monitoring mutation out of the physics-flush window.
-	_combat_trace("Stratum1BossRoom._on_boss_died",
-		"boss_died received — deferring StratumExit.activate() to clear physics flush")
+	_combat_trace(
+		"Stratum1BossRoom._on_boss_died",
+		"boss_died received — deferring StratumExit.activate() to clear physics flush"
+	)
 	if _stratum_exit != null:
 		_stratum_exit.call_deferred("activate")
 	# M3-T2-W3-T17 — promote the character to "skip-eligible" on first kill.
@@ -649,7 +664,9 @@ func _spawn_boss_nameplate() -> void:
 		return
 	var packed: PackedScene = load(boss_nameplate_scene_path) as PackedScene
 	if packed == null:
-		push_warning("[Stratum1BossRoom] BossNameplate scene missing at '%s'" % boss_nameplate_scene_path)
+		push_warning(
+			"[Stratum1BossRoom] BossNameplate scene missing at '%s'" % boss_nameplate_scene_path
+		)
 		return
 	var node: Node = packed.instantiate()
 	if node == null:
@@ -664,7 +681,9 @@ func _spawn_stratum_exit() -> void:
 		return
 	var packed: PackedScene = load(stratum_exit_scene_path) as PackedScene
 	if packed == null:
-		push_error("Stratum1BossRoom: failed to load StratumExit scene at '%s'" % stratum_exit_scene_path)
+		push_error(
+			"Stratum1BossRoom: failed to load StratumExit scene at '%s'" % stratum_exit_scene_path
+		)
 		return
 	var node: Node = packed.instantiate()
 	if not node is StratumExit:
@@ -679,6 +698,7 @@ func _spawn_stratum_exit() -> void:
 
 
 # ---- Diagnostics ------------------------------------------------------
+
 
 ## Returns the actual measured duration (ms) of the entry sequence.
 ## Tests use this to assert the 1.8 s ± tolerance budget.
@@ -704,6 +724,7 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 
 
 # ---- M3-T2-W1-T1 + M3-T2-W2-T10 audio wiring -------------------------
+
 
 ## Wire `entry_sequence_completed` to the BGM crossfade so the boss-room
 ## music kicks in at T+1.8 s post-trigger (Uma `boss-intro.md` Beat 5).
@@ -810,6 +831,7 @@ func _resolve_audio_director() -> Node:
 # adjacent runtime state via `_snapshot_into_save` so the flag write
 # doesn't clobber Player HP / Levels / Inventory.
 
+
 ## Input handler — consumes movement-key press events during the skip
 ## window and dispatches to `_collapse_entry_sequence`. Uses
 ## `_unhandled_input` (not `_input`) because movement keys do NOT
@@ -897,10 +919,13 @@ func _collapse_entry_sequence() -> void:
 	if _entry_timer != null:
 		if _entry_timer.timeout.is_connected(_complete_entry_sequence):
 			_entry_timer.timeout.disconnect(_complete_entry_sequence)
-	_combat_trace("Stratum1BossRoom._collapse_entry_sequence",
-		"skip fired at t=%dms — residual=%.3fs" % [
-			_entry_skipped_time_ms - _entry_started_time_ms,
-			_skip_collapse_residual_s()])
+	_combat_trace(
+		"Stratum1BossRoom._collapse_entry_sequence",
+		(
+			"skip fired at t=%dms — residual=%.3fs"
+			% [_entry_skipped_time_ms - _entry_started_time_ms, _skip_collapse_residual_s()]
+		)
+	)
 	# Emit the skip signal AHEAD of the residual delay so audio + nameplate
 	# consumers can begin their fast-fade tweens immediately. The
 	# `_complete_entry_sequence` call (which fires entry_sequence_completed
@@ -943,6 +968,7 @@ func _skip_collapse_residual_s() -> float:
 ## new push_warning sites; Save.gd's own load path already routes through
 ## WarningBus for schema-newer-than-runtime, which is the only failure
 ## mode we'd surface through this lookup.
+
 
 ## Reads `character.first_boss_kill_seen` from the v4 save. Returns
 ## false on any miss (no save, empty data, missing character block,
@@ -994,6 +1020,7 @@ func _save_autoload() -> Node:
 
 # ---- T16 cinematic climax (M3 Tier 2 Wave 3 — ticket 86c9wjzgh) -------
 
+
 ## T16 F2 orchestration — fires camera zoom + vignette deepen + horn SFX
 ## on `boss_died`. Composes with:
 ##   - `TimeScaleDirector.freeze(0.3)` already fired by `Stratum1Boss._die`
@@ -1036,19 +1063,27 @@ func _play_t16_cinematic_climax(death_position: Vector2) -> void:
 	var cam: Node = _resolve_camera_director()
 	if cam != null and cam.has_method("request_zoom"):
 		cam.request_zoom(T16_CAMERA_ZOOM_TARGET, T16_CAMERA_ZOOM_DURATION, death_position)
-		_combat_trace("Stratum1BossRoom._play_t16_cinematic_climax",
-			"camera request_zoom target=%.2f duration=%.2f anchor=(%.1f,%.1f)" % [
-				T16_CAMERA_ZOOM_TARGET, T16_CAMERA_ZOOM_DURATION,
-				death_position.x, death_position.y
-			])
+		_combat_trace(
+			"Stratum1BossRoom._play_t16_cinematic_climax",
+			(
+				"camera request_zoom target=%.2f duration=%.2f anchor=(%.1f,%.1f)"
+				% [
+					T16_CAMERA_ZOOM_TARGET,
+					T16_CAMERA_ZOOM_DURATION,
+					death_position.x,
+					death_position.y
+				]
+			)
+		)
 	# Vignette: 80% deepen over 0.9 s, ease-in-out-cubic — calls the locked
 	# named convenience method per Uma vignette-spec §"Duration locks per
 	# consumer".
 	var vig: Node = _resolve_vignette()
 	if vig != null and vig.has_method("boss_defeat_climax"):
 		vig.boss_defeat_climax()
-		_combat_trace("Stratum1BossRoom._play_t16_cinematic_climax",
-			"vignette boss_defeat_climax fired")
+		_combat_trace(
+			"Stratum1BossRoom._play_t16_cinematic_climax", "vignette boss_defeat_climax fired"
+		)
 	# Horn SFX — fires alongside the camera zoom + vignette deepen so the
 	# 0.9 s sustained warm horn rises across the same window as the embers.
 	# Cue + asset landed in M3-T2-W3-T16b; AudioDirector emits a

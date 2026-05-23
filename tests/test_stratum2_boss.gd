@@ -17,8 +17,8 @@ extends GutTest
 ## points structure. Tess matches that structure here for cross-stratum
 ## consistency.
 
-
 # ---- W3-T4-AC1 — Boss spawns with full HP, health-bar reflects ------
+
 
 func test_boss_spawns_with_full_hp() -> void:
 	pending("awaiting W3-T4 — assert apply_mob_def(def) seeds full HP on Stratum2Boss")
@@ -30,6 +30,7 @@ func test_boss_health_bar_reflects_full_hp_on_entry() -> void:
 
 # ---- W3-T4-AC2 — Phase-1 attack telegraphs + lands damage -----------
 
+
 func test_phase_1_breath_cone_telegraphs_at_least_half_second() -> void:
 	pending("awaiting W3-T4 — assert telegraph readability ≥ 0.5s before damage hitbox spawns")
 
@@ -40,11 +41,13 @@ func test_phase_1_breath_cone_lands_damage_on_player_contact() -> void:
 
 # ---- W3-T4-AC3 — Phase transition at 66% HP fires phase_changed(2) --
 
+
 func test_phase_transition_at_66_pct_emits_phase_changed_2() -> void:
 	pending("awaiting W3-T4 — mirror of test_stratum1_boss phase-1→phase-2 boundary assertion")
 
 
 # ---- W3-T4-AC4 — Phase 2 has access to phase 1 + phase 2 attacks ----
+
 
 func test_phase_2_retains_breath_cone_attack() -> void:
 	pending("awaiting W3-T4 — phase 2 state can still emit breath-cone")
@@ -52,17 +55,22 @@ func test_phase_2_retains_breath_cone_attack() -> void:
 
 func test_phase_2_adds_slam_attack() -> void:
 	pending(
-		"awaiting W3-T4 — phase 2 introduces slam attack"
-			+ " (mirror M1 boss phase-2 new-attack pattern)")
+		(
+			"awaiting W3-T4 — phase 2 introduces slam attack"
+			+ " (mirror M1 boss phase-2 new-attack pattern)"
+		)
+	)
 
 
 # ---- W3-T4-AC5 — Phase transition at 33% HP fires phase_changed(3) --
+
 
 func test_phase_transition_at_33_pct_emits_phase_changed_3() -> void:
 	pending("awaiting W3-T4 — mirror of test_stratum1_boss phase-2→phase-3 boundary assertion")
 
 
 # ---- W3-T4-AC6 — Phase 3 enrage (1.5× speed, 0.7× recovery, wider cone)
+
 
 func test_phase_3_enrage_speed_multiplier_1_5x() -> void:
 	pending("awaiting W3-T4 — phase 3 movement speed = baseline × 1.5")
@@ -78,11 +86,13 @@ func test_phase_3_breath_cone_widens() -> void:
 
 # ---- W3-T4-AC7 — Boss death emits boss_died signal -------------------
 
+
 func test_boss_death_emits_boss_died_signal_exactly_once() -> void:
 	pending("awaiting W3-T4 — boss_died emits exactly once even under hit spam")
 
 
 # ---- W3-T4-AC8 — Boss respects player i-frames (no damage during dodge)
+
 
 func test_boss_attack_during_player_dodge_iframes_no_damage() -> void:
 	pending("awaiting W3-T4 — dodge iframes reject boss damage (mirror M1 boss test 8)")
@@ -91,10 +101,13 @@ func test_boss_attack_during_player_dodge_iframes_no_damage() -> void:
 func test_boss_attack_during_player_post_hit_iframes_no_damage() -> void:
 	## NEW for W3 — Player iframes-on-hit added in W3-T1 must ALSO be respected.
 	## Boss damage during the 0.25s post-hit iframe window is rejected.
-	pending("awaiting W3-T1 + W3-T4 — post-hit iframes (HIT_IFRAMES_SECS = 0.25) reject boss damage")
+	pending(
+		"awaiting W3-T1 + W3-T4 — post-hit iframes (HIT_IFRAMES_SECS = 0.25) reject boss damage"
+	)
 
 
 # ---- W3-T4-AC9 — Boss death triggers loot drop ----------------------
+
 
 func test_boss_death_triggers_loot_drop_from_boss_drops_table() -> void:
 	pending("awaiting W3-T4 — boss_drops non-empty; LootRoller fires; T3 weapon + T2/T3 gear")
@@ -102,25 +115,32 @@ func test_boss_death_triggers_loot_drop_from_boss_drops_table() -> void:
 
 # ---- W3-T4-AC10 — EDGE: rapid hit spam doesn't double-trigger phases
 
+
 func test_hit_spam_phase_changed_emits_once_per_boundary() -> void:
 	pending("awaiting W3-T4 — phase_changed(N) emits exactly once per phase-N boundary")
 
 
 # ---- W3-T4-AC11 — EDGE: boss takes damage during phase-transition slow-mo (should NOT)
 
+
 func test_boss_stagger_immune_during_phase_transition() -> void:
 	pending(
-		"awaiting W3-T4 — take_damage during phase-transition window rejects"
-			+ " (mirror M1 boss test 11)")
+		(
+			"awaiting W3-T4 — take_damage during phase-transition window rejects"
+			+ " (mirror M1 boss test 11)"
+		)
+	)
 
 
 # ---- W3-T4-AC12 — EDGE: player dies mid-boss-fight, room state resets
+
 
 func test_boss_resets_to_full_hp_on_player_death() -> void:
 	pending("awaiting W3-T4 — controller-level reset via apply_mob_def(def) re-seeds full HP")
 
 
 # ---- Extras for safety (mirror test_stratum1_boss.gd extras) --------
+
 
 func test_dormant_state_ignores_damage() -> void:
 	pending("awaiting W3-T4 — DORMANT take_damage path emits IGNORED dormant (mirror M1 boss)")

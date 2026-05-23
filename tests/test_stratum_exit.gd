@@ -16,8 +16,8 @@ extends GutTest
 const ExitScript: Script = preload("res://scripts/levels/StratumExit.gd")
 const BossRoomScript: Script = preload("res://scripts/levels/Stratum1BossRoom.gd")
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_exit() -> StratumExit:
 	var packed: PackedScene = load("res://scenes/levels/StratumExit.tscn")
@@ -39,6 +39,7 @@ func _make_room() -> Stratum1BossRoom:
 
 
 # ---- Spec test 1: scene loads + spawns inactive ----------------------
+
 
 func test_stratum_exit_scene_loads() -> void:
 	var packed: PackedScene = load("res://scenes/levels/StratumExit.tscn")
@@ -71,6 +72,7 @@ func test_inactive_exit_has_disabled_area_collision() -> void:
 
 
 # ---- Spec test 2: activate() flips to ACTIVE -------------------------
+
 
 func test_activate_flips_to_active_state() -> void:
 	var exit: StratumExit = _make_exit()
@@ -119,11 +121,16 @@ func test_activate_is_idempotent() -> void:
 	exit.activate()
 	exit.activate()
 	exit.activate()
-	assert_signal_emit_count(exit, "exit_activated", 1,
-		"exit_activated emits exactly once even with repeated activate() calls")
+	assert_signal_emit_count(
+		exit,
+		"exit_activated",
+		1,
+		"exit_activated emits exactly once even with repeated activate() calls"
+	)
 
 
 # ---- Spec test 3: overlap + interact fires descend_triggered ---------
+
 
 func test_player_overlap_and_interact_fires_descend() -> void:
 	var exit: StratumExit = _make_exit()
@@ -148,6 +155,7 @@ func test_descend_hides_prompt_after_firing() -> void:
 
 # ---- Spec test 4: rapid interaction spam doesn't double-fire ---------
 
+
 func test_rapid_interact_spam_fires_descend_exactly_once() -> void:
 	var exit: StratumExit = _make_exit()
 	watch_signals(exit)
@@ -159,11 +167,13 @@ func test_rapid_interact_spam_fires_descend_exactly_once() -> void:
 	assert_true(first, "first interact succeeds")
 	assert_false(second, "second interact returns false (already fired)")
 	assert_false(third, "third interact returns false (already fired)")
-	assert_signal_emit_count(exit, "descend_triggered", 1,
-		"descend_triggered emits exactly once even under rapid mash")
+	assert_signal_emit_count(
+		exit, "descend_triggered", 1, "descend_triggered emits exactly once even under rapid mash"
+	)
 
 
 # ---- Spec test 5: inactive exit ignores overlap+interact -------------
+
 
 func test_inactive_exit_overlap_does_nothing() -> void:
 	var exit: StratumExit = _make_exit()
@@ -175,8 +185,9 @@ func test_inactive_exit_overlap_does_nothing() -> void:
 	# Player tries to interact — should be a no-op.
 	var fired: bool = exit.try_interact()
 	assert_false(fired, "try_interact returns false on INACTIVE exit")
-	assert_signal_emit_count(exit, "descend_triggered", 0,
-		"no descend_triggered emit on INACTIVE exit")
+	assert_signal_emit_count(
+		exit, "descend_triggered", 0, "no descend_triggered emit on INACTIVE exit"
+	)
 
 
 func test_overlap_without_active_then_activate_then_interact() -> void:
@@ -190,13 +201,16 @@ func test_overlap_without_active_then_activate_then_interact() -> void:
 	# Boss dies → activate.
 	watch_signals(exit)
 	exit.activate()
-	assert_true(exit.get_prompt_label().visible,
-		"prompt appears the moment activate() runs if player already in range")
+	assert_true(
+		exit.get_prompt_label().visible,
+		"prompt appears the moment activate() runs if player already in range"
+	)
 	exit.try_interact()
 	assert_signal_emitted(exit, "descend_triggered")
 
 
 # ---- Bounds + content sanity -----------------------------------------
+
 
 func test_exit_position_applies_to_node() -> void:
 	# Default scene authoring places portal at (240, 70).
@@ -213,8 +227,7 @@ func test_active_state_swaps_portal_color() -> void:
 	var inactive_color: Color = visual.color
 	exit.activate()
 	var active_color: Color = visual.color
-	assert_ne(inactive_color, active_color,
-		"portal color changes between INACTIVE and ACTIVE")
+	assert_ne(inactive_color, active_color, "portal color changes between INACTIVE and ACTIVE")
 	assert_almost_eq(active_color.r, StratumExit.PORTAL_COLOR_ACTIVE.r, 0.01)
 	assert_almost_eq(active_color.g, StratumExit.PORTAL_COLOR_ACTIVE.g, 0.01)
 
@@ -224,18 +237,18 @@ func test_interaction_area_collision_mask_targets_player() -> void:
 	# The exit's interaction area must mask layer 2.
 	var exit: StratumExit = _make_exit()
 	var area: Area2D = exit.get_interaction_area()
-	assert_eq(area.collision_mask, 1 << 1,
-		"interaction area masks player layer (bit 2) only")
-	assert_eq(area.collision_layer, 0,
-		"interaction area sits on no layer (passive trigger)")
+	assert_eq(area.collision_mask, 1 << 1, "interaction area masks player layer (bit 2) only")
+	assert_eq(area.collision_layer, 0, "interaction area sits on no layer (passive trigger)")
 
 
 # ---- Integration with Stratum1BossRoom -------------------------------
 
+
 func test_room_spawns_stratum_exit_inactive() -> void:
 	var room: Stratum1BossRoom = await _make_room()
-	assert_not_null(room.get_stratum_exit(),
-		"Stratum1BossRoom spawns a StratumExit child on _ready")
+	assert_not_null(
+		room.get_stratum_exit(), "Stratum1BossRoom spawns a StratumExit child on _ready"
+	)
 	var exit: StratumExit = room.get_stratum_exit()
 	assert_false(exit.is_active(), "exit starts INACTIVE — boss not yet dead")
 
@@ -258,8 +271,9 @@ func test_room_activates_exit_on_boss_death() -> void:
 	# call_deferred() from _on_boss_died to avoid the physics-flush ERR_FAIL_COND.
 	# Drain one process frame so the deferred activate() lands before asserting.
 	await get_tree().process_frame
-	assert_true(exit.is_active(),
-		"exit ACTIVE after boss_died propagates through room → exit.activate()")
+	assert_true(
+		exit.is_active(), "exit ACTIVE after boss_died propagates through room → exit.activate()"
+	)
 
 
 func test_room_exit_position_within_arena() -> void:
@@ -301,6 +315,7 @@ func test_room_exit_position_within_arena() -> void:
 #     → prompt stays hidden after activate()
 #     → try_interact() returns false
 
+
 func test_activate_with_pre_existing_player_overlap_shows_prompt_and_allows_interact() -> void:
 	# **REGRESSION-86c9un4nh** — the Sponsor scenario: player walked to the
 	# exit portal while the boss was alive (area inactive, body_entered never
@@ -318,23 +333,35 @@ func test_activate_with_pre_existing_player_overlap_shows_prompt_and_allows_inte
 	# body_entered never fired (monitoring was off). Set overlap state directly
 	# (simulates the deferred _on_body_entered call result from the fix).
 	exit.set_player_overlap_for_test(true)
-	assert_false(exit.get_prompt_label().visible,
-		"precondition: prompt hidden on inactive exit even with player standing inside")
+	assert_false(
+		exit.get_prompt_label().visible,
+		"precondition: prompt hidden on inactive exit even with player standing inside"
+	)
 	# Boss dies → call_deferred("activate") fires one frame later.
 	exit.activate()
-	assert_true(exit.is_active(),
-		"REGRESSION-86c9un4nh: exit active after activate()")
-	assert_true(exit.is_player_in_range(),
-		"REGRESSION-86c9un4nh: _player_in_range true when player was overlapping at activate() time")
-	assert_true(exit.get_prompt_label().visible,
-		"REGRESSION-86c9un4nh: prompt visible immediately when player was in area at activate() time " +
-		"(pre-existing overlap re-check in activate() surfaces the standing player)")
+	assert_true(exit.is_active(), "REGRESSION-86c9un4nh: exit active after activate()")
+	assert_true(
+		exit.is_player_in_range(),
+		"REGRESSION-86c9un4nh: _player_in_range true when player was overlapping at activate() time"
+	)
+	assert_true(
+		exit.get_prompt_label().visible,
+		(
+			"REGRESSION-86c9un4nh: prompt visible immediately when player was in area at activate() time "
+			+ "(pre-existing overlap re-check in activate() surfaces the standing player)"
+		)
+	)
 	# Player presses E — must fire descend_triggered.
 	var fired: bool = exit.try_interact()
-	assert_true(fired,
-		"REGRESSION-86c9un4nh: try_interact succeeds when player was inside at activate() time")
-	assert_signal_emitted(exit, "descend_triggered",
-		"REGRESSION-86c9un4nh: descend_triggered fires — player can exit boss room")
+	assert_true(
+		fired,
+		"REGRESSION-86c9un4nh: try_interact succeeds when player was inside at activate() time"
+	)
+	assert_signal_emitted(
+		exit,
+		"descend_triggered",
+		"REGRESSION-86c9un4nh: descend_triggered fires — player can exit boss room"
+	)
 
 
 func test_activate_without_pre_existing_overlap_prompt_stays_hidden() -> void:
@@ -343,14 +370,17 @@ func test_activate_without_pre_existing_overlap_prompt_stays_hidden() -> void:
 	var exit: StratumExit = _make_exit()
 	exit.activate()
 	assert_true(exit.is_active(), "exit active")
-	assert_false(exit.is_player_in_range(),
-		"REGRESSION-86c9un4nh: _player_in_range false when no body overlapping at activate()")
-	assert_false(exit.get_prompt_label().visible,
-		"REGRESSION-86c9un4nh: prompt hidden until player walks into area after activation")
+	assert_false(
+		exit.is_player_in_range(),
+		"REGRESSION-86c9un4nh: _player_in_range false when no body overlapping at activate()"
+	)
+	assert_false(
+		exit.get_prompt_label().visible,
+		"REGRESSION-86c9un4nh: prompt hidden until player walks into area after activation"
+	)
 	# Player walks in after activation.
 	exit.set_player_overlap_for_test(true)
-	assert_true(exit.get_prompt_label().visible,
-		"prompt shows once player enters active exit area")
+	assert_true(exit.get_prompt_label().visible, "prompt shows once player enters active exit area")
 	assert_true(exit.try_interact(), "try_interact succeeds")
 
 
@@ -362,8 +392,12 @@ func test_activate_idempotent_with_pre_existing_overlap() -> void:
 	exit.set_player_overlap_for_test(true)
 	exit.activate()
 	exit.activate()  # second call must be a no-op
-	assert_signal_emit_count(exit, "exit_activated", 1,
-		"REGRESSION-86c9un4nh: exit_activated emits exactly once even with repeated activate() + overlap")
+	assert_signal_emit_count(
+		exit,
+		"exit_activated",
+		1,
+		"REGRESSION-86c9un4nh: exit_activated emits exactly once even with repeated activate() + overlap"
+	)
 
 
 # ---- REGRESSION-86c9unkr2: double-defer for HTML5 physics-flush silent ERR_FAIL_COND
@@ -387,6 +421,7 @@ func test_activate_idempotent_with_pre_existing_overlap() -> void:
 #      synchronous — the await is the load-bearing fix).
 #   3. `_arm_interaction_area_after_flush` is idempotent / safe-on-freed-node.
 
+
 func test_activate_is_active_flips_synchronously() -> void:
 	# REGRESSION-86c9unkr2: idempotency latch + UI state flip must remain
 	# synchronous so production callers (including Stratum1BossRoom that
@@ -394,9 +429,13 @@ func test_activate_is_active_flips_synchronously() -> void:
 	var exit: StratumExit = _make_exit()
 	exit.activate()
 	# NO await — we expect is_active() true synchronously.
-	assert_true(exit.is_active(),
-		"REGRESSION-86c9unkr2: _is_active flips synchronously in activate()"
-			+ " even with the async monitoring defer below")
+	assert_true(
+		exit.is_active(),
+		(
+			"REGRESSION-86c9unkr2: _is_active flips synchronously in activate()"
+			+ " even with the async monitoring defer below"
+		)
+	)
 
 
 func test_activate_monitoring_flips_after_physics_frame_not_synchronously() -> void:
@@ -410,16 +449,24 @@ func test_activate_monitoring_flips_after_physics_frame_not_synchronously() -> v
 	exit.activate()
 	# Synchronously after activate() returns: monitoring is STILL false
 	# (the await hasn't resolved yet). This is the load-bearing observable.
-	assert_false(area.monitoring,
-		"REGRESSION-86c9unkr2: monitoring stays false synchronously after activate() — " +
-		"the await get_tree().physics_frame defers the actual flip to dodge HTML5 silent ERR_FAIL_COND")
+	assert_false(
+		area.monitoring,
+		(
+			"REGRESSION-86c9unkr2: monitoring stays false synchronously after activate() — "
+			+ "the await get_tree().physics_frame defers the actual flip to dodge HTML5 silent ERR_FAIL_COND"
+		)
+	)
 	# Drain a physics_frame for the await to resolve + a process_frame for
 	# the resumed coroutine to write the field.
 	await get_tree().physics_frame
 	await get_tree().process_frame
-	assert_true(area.monitoring,
-		"REGRESSION-86c9unkr2: monitoring flips ON one physics_frame after activate() — " +
-		"_arm_interaction_area_after_flush resumed and wrote monitoring=true outside the flush")
+	assert_true(
+		area.monitoring,
+		(
+			"REGRESSION-86c9unkr2: monitoring flips ON one physics_frame after activate() — "
+			+ "_arm_interaction_area_after_flush resumed and wrote monitoring=true outside the flush"
+		)
+	)
 	assert_true(area.monitorable, "monitorable parity preserved post-await")
 
 

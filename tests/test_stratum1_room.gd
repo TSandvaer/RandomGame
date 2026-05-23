@@ -57,8 +57,10 @@ func test_stratum1_room01_spawns_practice_dummy() -> void:
 	var dummy: PracticeDummy = first
 	assert_eq(dummy.collision_layer, PracticeDummy.LAYER_ENEMY, "dummy on enemy layer")
 	# Dummy must NOT carry damage_base — non-threatening tutorial entity.
-	assert_false("damage_base" in dummy and int(dummy.get("damage_base")) > 0,
-		"PracticeDummy deals zero damage by design (no damage_base, or 0)")
+	assert_false(
+		"damage_base" in dummy and int(dummy.get("damage_base")) > 0,
+		"PracticeDummy deals zero damage by design (no damage_base, or 0)"
+	)
 
 
 func test_stratum1_room01_dummy_positioned_inside_bounds() -> void:
@@ -68,8 +70,10 @@ func test_stratum1_room01_dummy_positioned_inside_bounds() -> void:
 	var bounds: Rect2 = room.get_bounds_px()
 	for m: Node in room.get_spawned_mobs():
 		var n: Node2D = m
-		assert_true(bounds.has_point(n.position),
-			"dummy at %s inside bounds %s" % [str(n.position), str(bounds)])
+		assert_true(
+			bounds.has_point(n.position),
+			"dummy at %s inside bounds %s" % [str(n.position), str(bounds)]
+		)
 
 
 func test_stratum1_room01_chunk_def_canonical() -> void:

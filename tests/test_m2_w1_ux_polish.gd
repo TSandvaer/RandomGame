@@ -57,20 +57,30 @@ func _make_panel() -> InventoryPanel:
 
 
 func _make_weapon(damage: int = 6, id: StringName = &"polish_weapon") -> ItemInstance:
-	var def: ItemDef = ContentFactory.make_item_def({
-		"id": id,
-		"slot": ItemDef.Slot.WEAPON,
-		"base_stats": ContentFactory.make_item_base_stats({"damage": damage}),
-	})
+	var def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": id,
+				"slot": ItemDef.Slot.WEAPON,
+				"base_stats": ContentFactory.make_item_base_stats({"damage": damage}),
+			}
+		)
+	)
 	return ItemInstance.new(def, ItemDef.Tier.T1)
 
 
 func _make_armor(armor_value: int = 4, id: StringName = &"polish_armor") -> ItemInstance:
-	var def: ItemDef = ContentFactory.make_item_def({
-		"id": id,
-		"slot": ItemDef.Slot.ARMOR,
-		"base_stats": ContentFactory.make_item_base_stats({"armor": armor_value}),
-	})
+	var def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": id,
+				"slot": ItemDef.Slot.ARMOR,
+				"base_stats": ContentFactory.make_item_base_stats({"armor": armor_value}),
+			}
+		)
+	)
 	return ItemInstance.new(def, ItemDef.Tier.T1)
 
 
@@ -93,6 +103,7 @@ func after_each() -> void:
 # TICKET 1 — Stats panel "Damage <N>" (`86c9q5qyd`)
 # ============================================================================
 
+
 # AC1.1 — equipped weapon's damage value renders in the stats BBCode block.
 func test_t1_stats_show_equipped_weapon_damage() -> void:
 	var panel: InventoryPanel = _make_panel()
@@ -103,11 +114,15 @@ func test_t1_stats_show_equipped_weapon_damage() -> void:
 	var label: RichTextLabel = panel.find_child("StatsLabel", true, false) as RichTextLabel
 	assert_not_null(label, "stats RichTextLabel exists")
 	var rendered: String = label.text
-	assert_true(rendered.contains("Damage    6"),
-		"Damage line shows the equipped weapon's damage=6 (got: %s)" % rendered)
+	assert_true(
+		rendered.contains("Damage    6"),
+		"Damage line shows the equipped weapon's damage=6 (got: %s)" % rendered
+	)
 	# Negative — should NOT show the placeholder anymore.
-	assert_false(rendered.contains("Damage    --"),
-		"placeholder Damage -- replaced when a weapon is equipped")
+	assert_false(
+		rendered.contains("Damage    --"),
+		"placeholder Damage -- replaced when a weapon is equipped"
+	)
 
 
 # AC1.2 — fistless fallback shows FIST_DAMAGE with the (fists) tag.
@@ -118,10 +133,14 @@ func test_t1_stats_fistless_fallback_shows_fist_damage() -> void:
 	var label: RichTextLabel = panel.find_child("StatsLabel", true, false) as RichTextLabel
 	var rendered: String = label.text
 	var expected_dmg: int = DamageScript.FIST_DAMAGE
-	assert_true(rendered.contains("Damage    %d" % expected_dmg),
-		"fistless Damage line uses FIST_DAMAGE=%d (got: %s)" % [expected_dmg, rendered])
-	assert_true(rendered.contains("(fists)"),
-		"fistless line carries (fists) tag so the value is unambiguous")
+	assert_true(
+		rendered.contains("Damage    %d" % expected_dmg),
+		"fistless Damage line uses FIST_DAMAGE=%d (got: %s)" % [expected_dmg, rendered]
+	)
+	assert_true(
+		rendered.contains("(fists)"),
+		"fistless line carries (fists) tag so the value is unambiguous"
+	)
 
 
 # AC1.3 — equipping mid-open updates the stats label via signal (not polling).
@@ -137,8 +156,13 @@ func test_t1_stats_update_live_on_equip() -> void:
 	_inv().equip(weapon, &"weapon")
 	# Tier 2 invariant — _on_equipped_changed is connected synchronously, so
 	# the label MUST be updated before this line returns. No await frame.
-	assert_true(label.text.contains("Damage    9"),
-		"equip drives _on_equipped_changed → _refresh_stats → live damage update (got: %s)" % label.text)
+	assert_true(
+		label.text.contains("Damage    9"),
+		(
+			"equip drives _on_equipped_changed → _refresh_stats → live damage update (got: %s)"
+			% label.text
+		)
+	)
 	assert_false(label.text.contains("(fists)"), "fists tag drops when weapon is equipped")
 
 
@@ -152,8 +176,10 @@ func test_t1_stats_revert_to_fists_on_unequip() -> void:
 	var label: RichTextLabel = panel.find_child("StatsLabel", true, false) as RichTextLabel
 	assert_true(label.text.contains("Damage    7"), "pre-unequip damage=7")
 	_inv().unequip(&"weapon")
-	assert_true(label.text.contains("Damage    %d" % DamageScript.FIST_DAMAGE),
-		"unequip reverts to FIST_DAMAGE")
+	assert_true(
+		label.text.contains("Damage    %d" % DamageScript.FIST_DAMAGE),
+		"unequip reverts to FIST_DAMAGE"
+	)
 	assert_true(label.text.contains("(fists)"), "fists tag returns")
 
 
@@ -166,12 +192,9 @@ func test_t1_stats_defense_reads_armor_and_crit_stays_m2() -> void:
 	panel.open()
 	var label: RichTextLabel = panel.find_child("StatsLabel", true, false) as RichTextLabel
 	var rendered: String = label.text
-	assert_true(rendered.contains("Defense   4"),
-		"Defense reads armor=4 (got: %s)" % rendered)
-	assert_true(rendered.contains("Crit      --"),
-		"Crit line is still -- (M2 scope)")
-	assert_true(rendered.contains("(M2)"),
-		"Crit line carries (M2) forward-compat tag")
+	assert_true(rendered.contains("Defense   4"), "Defense reads armor=4 (got: %s)" % rendered)
+	assert_true(rendered.contains("Crit      --"), "Crit line is still -- (M2 scope)")
+	assert_true(rendered.contains("(M2)"), "Crit line carries (M2) forward-compat tag")
 
 
 # Tier 2 integration — bare-weapon (Defense 0) when no armor equipped.
@@ -179,13 +202,16 @@ func test_t1_defense_shows_zero_with_no_armor() -> void:
 	var panel: InventoryPanel = _make_panel()
 	panel.open()
 	var label: RichTextLabel = panel.find_child("StatsLabel", true, false) as RichTextLabel
-	assert_true(label.text.contains("Defense   0"),
-		"no armor → Defense 0 (no parenthetical, per design § Ticket 1)")
+	assert_true(
+		label.text.contains("Defense   0"),
+		"no armor → Defense 0 (no parenthetical, per design § Ticket 1)"
+	)
 
 
 # ============================================================================
 # TICKET 2 — Save-confirmation toast (`86c9q7p38`)
 # ============================================================================
+
 
 # AC2.1 visual-primitive Tier 1 — Save.save_completed fires on success.
 func test_t2_save_completed_signal_fires_on_success() -> void:
@@ -193,8 +219,9 @@ func test_t2_save_completed_signal_fires_on_success() -> void:
 	watch_signals(_save())
 	var ok: bool = _save().save_game(TEST_SLOT)
 	assert_true(ok, "save_game succeeds")
-	assert_signal_emitted(_save(), "save_completed",
-		"save_completed signal fires after a successful save")
+	assert_signal_emitted(
+		_save(), "save_completed", "save_completed signal fires after a successful save"
+	)
 	assert_signal_emit_count(_save(), "save_completed", 1)
 	# Verify payload — slot=TEST_SLOT, ok=true.
 	var params: Array = get_signal_parameters(_save(), "save_completed", 0)
@@ -210,21 +237,21 @@ func test_t2_toast_has_zero_polygon2d_and_subone_colors() -> void:
 	var queue: Array = [toast]
 	while not queue.is_empty():
 		var n: Node = queue.pop_back()
-		assert_false(n is Polygon2D,
-			"SaveToast tree must contain zero Polygon2D nodes (HTML5 ban per .claude/docs/html5-export.md)")
+		assert_false(
+			n is Polygon2D,
+			"SaveToast tree must contain zero Polygon2D nodes (HTML5 ban per .claude/docs/html5-export.md)"
+		)
 		for c in n.get_children():
 			queue.append(c)
 	# Plate + pip + label colors are all sub-1.0 per channel.
 	var plate: ColorRect = toast.get_plate()
 	assert_not_null(plate, "plate exists")
 	for ch in [plate.color.r, plate.color.g, plate.color.b]:
-		assert_lt(ch, 1.0,
-			"plate color channel %f must be strictly sub-1.0 (HDR clamp)" % ch)
+		assert_lt(ch, 1.0, "plate color channel %f must be strictly sub-1.0 (HDR clamp)" % ch)
 	var pip: ColorRect = toast.get_pip()
 	assert_not_null(pip, "pip exists")
 	for ch in [pip.color.r, pip.color.g, pip.color.b]:
-		assert_lt(ch, 1.0,
-			"pip color channel %f must be strictly sub-1.0 (HDR clamp)" % ch)
+		assert_lt(ch, 1.0, "pip color channel %f must be strictly sub-1.0 (HDR clamp)" % ch)
 	# Pip MUST be the canonical positive-affirmation green #7AC773.
 	assert_almost_eq(pip.color.r, EXPECTED_GREEN_R, 0.005, "pip R = 0.478 (#7AC773)")
 	assert_almost_eq(pip.color.g, EXPECTED_GREEN_G, 0.005, "pip G = 0.780 (#7AC773)")
@@ -243,8 +270,11 @@ func test_t2_toast_show_saved_animates_alpha() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	# Mid-fade-in: alpha should be > 0 (some non-zero delta into the fade).
-	assert_gt(toast.modulate.a, 0.0,
-		"after one frame the fade-in tween has produced a non-zero alpha (visible delta)")
+	assert_gt(
+		toast.modulate.a,
+		0.0,
+		"after one frame the fade-in tween has produced a non-zero alpha (visible delta)"
+	)
 
 
 # AC2.4 / AC2.7 Tier 2 integration — Save.save_game() through the live
@@ -257,8 +287,11 @@ func test_t2_toast_responds_to_save_signal_integration() -> void:
 	_save().save_game(TEST_SLOT)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert_gt(toast.modulate.a, 0.0,
-		"save_game(slot) → save_completed → toast.show_saved → alpha rises off 0")
+	assert_gt(
+		toast.modulate.a,
+		0.0,
+		"save_game(slot) → save_completed → toast.show_saved → alpha rises off 0"
+	)
 
 
 # AC2.5 — throttle: a second save while a toast is in flight reuses the
@@ -283,13 +316,18 @@ func test_t2_toast_throttle_reuses_single_widget() -> void:
 	var second_tween: Tween = toast._tween
 	assert_not_null(second_tween, "second tween in place")
 	# Throttle invariant — distinct tween instance after the second call.
-	assert_ne(first_tween, second_tween,
-		"second show_saved replaces the tween reference (throttle: kill + restart)")
-	assert_true(second_tween.is_valid(),
-		"new tween is the active one")
+	assert_ne(
+		first_tween,
+		second_tween,
+		"second show_saved replaces the tween reference (throttle: kill + restart)"
+	)
+	assert_true(second_tween.is_valid(), "new tween is the active one")
 	# Sanity — same toast Control, same plate color (no node duplication).
-	assert_eq(toast.get_plate().color, SaveToastScript.COLOR_PLATE,
-		"throttle preserves the single widget — plate color unchanged")
+	assert_eq(
+		toast.get_plate().color,
+		SaveToastScript.COLOR_PLATE,
+		"throttle preserves the single widget — plate color unchanged"
+	)
 
 
 # AC2.6 — failure path: ok=false fires the signal but the toast does NOT
@@ -300,13 +338,15 @@ func test_t2_failure_path_does_not_show_toast() -> void:
 	# Directly call the signal handler with ok=false.
 	toast._on_save_completed(0, false)
 	await get_tree().process_frame
-	assert_almost_eq(toast.modulate.a, 0.0, 0.001,
-		"ok=false branch does NOT trigger show_saved — alpha stays 0")
+	assert_almost_eq(
+		toast.modulate.a, 0.0, 0.001, "ok=false branch does NOT trigger show_saved — alpha stays 0"
+	)
 
 
 # ============================================================================
 # TICKET 3 — Equipped vs in-grid visual distinction (`86c9q7p48`)
 # ============================================================================
+
 
 # AC3.7 / Tier 1 — visibility flips on `_set_equipped_indicator`.
 func test_t3_indicator_visibility_toggles_with_helper() -> void:
@@ -337,12 +377,15 @@ func test_t3_outline_color_is_canonical_green() -> void:
 	for edge_name in ["OutlineTop", "OutlineBottom", "OutlineLeft", "OutlineRight"]:
 		var edge: ColorRect = btn.get_node(edge_name) as ColorRect
 		assert_not_null(edge, "%s ColorRect exists" % edge_name)
-		assert_almost_eq(edge.color.r, EXPECTED_GREEN_R, 0.005,
-			"%s R = 0.478 (#7AC773)" % edge_name)
-		assert_almost_eq(edge.color.g, EXPECTED_GREEN_G, 0.005,
-			"%s G = 0.780 (#7AC773)" % edge_name)
-		assert_almost_eq(edge.color.b, EXPECTED_GREEN_B, 0.005,
-			"%s B = 0.451 (#7AC773)" % edge_name)
+		assert_almost_eq(
+			edge.color.r, EXPECTED_GREEN_R, 0.005, "%s R = 0.478 (#7AC773)" % edge_name
+		)
+		assert_almost_eq(
+			edge.color.g, EXPECTED_GREEN_G, 0.005, "%s G = 0.780 (#7AC773)" % edge_name
+		)
+		assert_almost_eq(
+			edge.color.b, EXPECTED_GREEN_B, 0.005, "%s B = 0.451 (#7AC773)" % edge_name
+		)
 		# HDR-clamp safety — every channel strictly sub-1.0.
 		for ch in [edge.color.r, edge.color.g, edge.color.b]:
 			assert_lt(ch, 1.0, "%s channel %f sub-1.0 (HTML5 HDR clamp)" % [edge_name, ch])
@@ -361,8 +404,7 @@ func test_t3_badge_plate_and_text_colors() -> void:
 	assert_almost_eq(plate.color.g, EXPECTED_GREEN_G, 0.005, "plate G = 0.780")
 	assert_almost_eq(plate.color.b, EXPECTED_GREEN_B, 0.005, "plate B = 0.451")
 	# Plate is 92% alpha (matches InventoryPanel chrome alpha).
-	assert_almost_eq(plate.color.a, 0.92, 0.005,
-		"plate alpha = 92% (transient-but-real chrome)")
+	assert_almost_eq(plate.color.a, 0.92, 0.005, "plate alpha = 92% (transient-but-real chrome)")
 	# AC-CB1 / AC-CB6 — badge label text reads plain "EQUIPPED" (font-safe
 	# ASCII). The color-blind secondary cue is a separate checkmark SHAPE node
 	# ("BadgeCheck"), NOT a U+2713 glyph inside the text run: the Godot 4.3
@@ -370,24 +412,37 @@ func test_t3_badge_plate_and_text_colors() -> void:
 	# as a notdef "tofu" box in PR #179's first cut (Tess's pr179 captures).
 	var label: Label = plate.get_node("BadgeLabel") as Label
 	assert_not_null(label, "badge label exists")
-	assert_eq(label.text, "EQUIPPED",
-		"badge text reads plain ASCII EQUIPPED (font-safe; ✓ cue is a separate shape)")
+	assert_eq(
+		label.text,
+		"EQUIPPED",
+		"badge text reads plain ASCII EQUIPPED (font-safe; ✓ cue is a separate shape)"
+	)
 	# The checkmark cue is a shape node with two ColorRect strokes — assert it
 	# exists, is sized, and uses the dark high-contrast badge-text color. A
 	# font glyph would have left no such node (the PR #179-first-cut failure
 	# mode); requiring the shape node closes that gap.
 	var check: Control = plate.get_node("BadgeCheck") as Control
 	assert_not_null(check, "badge checkmark shape node exists (CVD secondary cue, AC-CB1/AC-CB6)")
-	assert_eq(check.size, EXPECTED_BADGE_CHECK_SIZE,
-		"checkmark shape is %s px" % [EXPECTED_BADGE_CHECK_SIZE])
+	assert_eq(
+		check.size,
+		EXPECTED_BADGE_CHECK_SIZE,
+		"checkmark shape is %s px" % [EXPECTED_BADGE_CHECK_SIZE]
+	)
 	var check_strokes: Array = check.get_children()
-	assert_eq(check_strokes.size(), 2,
-		"checkmark is built from 2 ColorRect strokes (short + long), not a font glyph")
+	assert_eq(
+		check_strokes.size(),
+		2,
+		"checkmark is built from 2 ColorRect strokes (short + long), not a font glyph"
+	)
 	for stroke_v in check_strokes:
 		var stroke: ColorRect = stroke_v as ColorRect
 		assert_not_null(stroke, "checkmark stroke is a ColorRect (renderer-agnostic primitive)")
-		assert_almost_eq(stroke.color.r, EXPECTED_BADGE_DARK_R, 0.005,
-			"checkmark stroke uses the dark high-contrast badge-text color")
+		assert_almost_eq(
+			stroke.color.r,
+			EXPECTED_BADGE_DARK_R,
+			0.005,
+			"checkmark stroke uses the dark high-contrast badge-text color"
+		)
 	# AC-CB2 / AC-CB5 — the badge content must FIT INSIDE the plate. This is
 	# the exact gap that let PR #179's first cut ship a clipped, illegible
 	# badge past green CI: the old test only asserted `text ==` and a
@@ -399,37 +454,63 @@ func test_t3_badge_plate_and_text_colors() -> void:
 	# renderer/font-agnostic invariant: it scales with the real measured
 	# `get_minimum_size().x`, so a wider font can never silently overflow.
 	var label_min: Vector2 = label.get_minimum_size()
-	assert_true(label.position.x + label_min.x <= plate.size.x + 0.01,
-		("badge label right edge %.1f fits within plate width %.1f — EQUIPPED + ✓ shape"
-			+ " fit horizontally (AC-CB2)")
-			% [label.position.x + label_min.x, plate.size.x])
+	assert_true(
+		label.position.x + label_min.x <= plate.size.x + 0.01,
+		(
+			(
+				"badge label right edge %.1f fits within plate width %.1f — EQUIPPED + ✓ shape"
+				+ " fit horizontally (AC-CB2)"
+			)
+			% [label.position.x + label_min.x, plate.size.x]
+		)
+	)
 	# The checkmark shape must also fit inside the plate width, sitting before
 	# the label with the configured gap.
-	assert_true(check.position.x + check.size.x <= label.position.x + 0.01,
-		"checkmark shape right edge %.1f clears the label start %.1f (no overlap)"
-			% [check.position.x + check.size.x, label.position.x])
+	assert_true(
+		check.position.x + check.size.x <= label.position.x + 0.01,
+		(
+			"checkmark shape right edge %.1f clears the label start %.1f (no overlap)"
+			% [check.position.x + check.size.x, label.position.x]
+		)
+	)
 	# HEIGHT — the plate must be tall enough for the checkmark shape, and the
 	# checkmark must sit fully within it (vertically centred). NOT asserted
 	# against `label.get_minimum_size().y`: that is the font's full ~27 px
 	# line box, not the visible glyph height — the label is vertically
 	# centre-aligned and draws the glyphs centred within the shorter plate.
-	assert_true(plate.size.y >= EXPECTED_BADGE_CHECK_SIZE.y,
-		"badge plate height %.1f >= checkmark height %.1f — ✓ shape fits vertically"
-			% [plate.size.y, EXPECTED_BADGE_CHECK_SIZE.y])
-	assert_true(check.position.y >= -0.01 and check.position.y + check.size.y <= plate.size.y + 0.01,
-		"checkmark shape (y %.1f, h %.1f) sits fully within the %.1f px plate"
-			% [check.position.y, check.size.y, plate.size.y])
+	assert_true(
+		plate.size.y >= EXPECTED_BADGE_CHECK_SIZE.y,
+		(
+			"badge plate height %.1f >= checkmark height %.1f — ✓ shape fits vertically"
+			% [plate.size.y, EXPECTED_BADGE_CHECK_SIZE.y]
+		)
+	)
+	assert_true(
+		check.position.y >= -0.01 and check.position.y + check.size.y <= plate.size.y + 0.01,
+		(
+			"checkmark shape (y %.1f, h %.1f) sits fully within the %.1f px plate"
+			% [check.position.y, check.size.y, plate.size.y]
+		)
+	)
 	# The plate must also stay inside its 96 px host Button (position is pinned
 	# at x=2) so the badge never overhangs the cell edge.
-	assert_true(plate.position.x + plate.size.x <= 96.0,
-		"badge plate right edge %.1f within the 96 px equipped-cell button"
-			% [plate.position.x + plate.size.x])
+	assert_true(
+		plate.position.x + plate.size.x <= 96.0,
+		(
+			"badge plate right edge %.1f within the 96 px equipped-cell button"
+			% [plate.position.x + plate.size.x]
+		)
+	)
 	# And it must not reach down into the centered button-text region: the
 	# plate is pinned at y=2; keep its bottom comfortably in the top quarter
 	# of the 96 px cell so the badge never overlaps the centered item name.
-	assert_true(plate.position.y + plate.size.y <= 24.0,
-		"badge plate bottom edge %.1f stays in the cell's top quarter, clear of the centered item text"
-			% [plate.position.y + plate.size.y])
+	assert_true(
+		plate.position.y + plate.size.y <= 24.0,
+		(
+			"badge plate bottom edge %.1f stays in the cell's top quarter, clear of the centered item text"
+			% [plate.position.y + plate.size.y]
+		)
+	)
 
 
 # AC3.1 / AC3.4 — Tier 2 integration: real Inventory.equip flips outlines on.
@@ -440,17 +521,16 @@ func test_t3_real_equip_drives_indicator_visible() -> void:
 	# Pre-equip — open panel, weapon slot indicator should be hidden.
 	panel.open()
 	var btn: Button = panel._equipped_cells.get(&"weapon", null) as Button
-	assert_false(btn.get_node("OutlineTop").visible,
-		"pre-equip: weapon-slot outline hidden")
-	assert_false(btn.get_node("BadgePlate").visible,
-		"pre-equip: weapon-slot badge hidden")
+	assert_false(btn.get_node("OutlineTop").visible, "pre-equip: weapon-slot outline hidden")
+	assert_false(btn.get_node("BadgePlate").visible, "pre-equip: weapon-slot badge hidden")
 	# Drive real equip — _on_equipped_changed fires _refresh_equipped_row →
 	# _set_equipped_indicator(btn, true).
 	_inv().equip(weapon, &"weapon")
-	assert_true(btn.get_node("OutlineTop").visible,
-		"post-equip: outline visible (signal-driven, no polling)")
-	assert_true(btn.get_node("BadgePlate").visible,
-		"post-equip: badge visible")
+	assert_true(
+		btn.get_node("OutlineTop").visible,
+		"post-equip: outline visible (signal-driven, no polling)"
+	)
+	assert_true(btn.get_node("BadgePlate").visible, "post-equip: badge visible")
 
 
 # AC3.5 — unequip hides indicators.
@@ -463,10 +543,8 @@ func test_t3_unequip_hides_indicator() -> void:
 	var btn: Button = panel._equipped_cells.get(&"weapon", null) as Button
 	assert_true(btn.get_node("OutlineTop").visible, "outline on after equip")
 	_inv().unequip(&"weapon")
-	assert_false(btn.get_node("OutlineTop").visible,
-		"unequip hides outline (signal-driven)")
-	assert_false(btn.get_node("BadgePlate").visible,
-		"unequip hides badge")
+	assert_false(btn.get_node("OutlineTop").visible, "unequip hides outline (signal-driven)")
+	assert_false(btn.get_node("BadgePlate").visible, "unequip hides badge")
 
 
 # AC3.3 — in-grid items get NO outline / badge. (Grid cells live in
@@ -480,10 +558,11 @@ func test_t3_grid_cells_have_no_indicators() -> void:
 	panel.open()
 	var grid_btn: Button = panel._inventory_cells[0]
 	assert_not_null(grid_btn, "grid cell 0 exists")
-	assert_null(grid_btn.get_node_or_null("OutlineTop"),
-		"grid cells have NO outline node — only equipped slots get the indicator")
-	assert_null(grid_btn.get_node_or_null("BadgePlate"),
-		"grid cells have NO badge plate")
+	assert_null(
+		grid_btn.get_node_or_null("OutlineTop"),
+		"grid cells have NO outline node — only equipped slots get the indicator"
+	)
+	assert_null(grid_btn.get_node_or_null("BadgePlate"), "grid cells have NO badge plate")
 
 
 # AC3.6 — Tier 3 F5-reload survival. Equip a weapon, snapshot+restore the
@@ -505,18 +584,20 @@ func test_t3_indicator_survives_save_restore() -> void:
 		if id == &"iron_sword":
 			return iron_sword_def
 		return null
-	var affix_resolver: Callable = func(_id: StringName) -> Resource:
-		return null
+	var affix_resolver: Callable = func(_id: StringName) -> Resource: return null
 	_inv().restore_from_save(data, item_resolver, affix_resolver)
 	# Confirm the equipped state survived the round-trip.
-	assert_not_null(_inv().get_equipped(&"weapon"),
-		"equipped weapon survives save → restore")
+	assert_not_null(_inv().get_equipped(&"weapon"), "equipped weapon survives save → restore")
 	# Step 3 — open panel for the FIRST time (post-restore). Indicator must
 	# render visible immediately on _refresh_equipped_row from open() path.
 	var panel: InventoryPanel = _make_panel()
 	panel.open()
 	var btn: Button = panel._equipped_cells.get(&"weapon", null) as Button
-	assert_true(btn.get_node("OutlineTop").visible,
-		"AC3.6: F5-reload — outline renders on first panel-open after restore")
-	assert_true(btn.get_node("BadgePlate").visible,
-		"AC3.6: F5-reload — badge renders on first panel-open after restore")
+	assert_true(
+		btn.get_node("OutlineTop").visible,
+		"AC3.6: F5-reload — outline renders on first panel-open after restore"
+	)
+	assert_true(
+		btn.get_node("BadgePlate").visible,
+		"AC3.6: F5-reload — badge renders on first panel-open after restore"
+	)

@@ -33,8 +33,8 @@ const EXPECTED_MOB_COUNTS: Dictionary = {
 	&"s2_room03": 3,  # 1 Stoker + 1 Charger + 1 Shooter
 }
 
-
 # ---- Helpers ---------------------------------------------------------
+
 
 func _load_room(scene_path: String) -> MultiMobRoom:
 	var packed: PackedScene = load(scene_path)
@@ -58,6 +58,7 @@ func _load_room_with_fixtures(scene_path: String) -> MultiMobRoom:
 
 # ---- 1. Each room loads cleanly -------------------------------------
 
+
 func test_room02_scene_loads() -> void:
 	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s2_room02"])
 	assert_not_null(room.chunk_def, "chunk_def assigned")
@@ -73,13 +74,16 @@ func test_room03_scene_loads() -> void:
 
 # ---- 2. Mob spawn counts populate correctly per LevelChunkDef -------
 
+
 func test_each_room_spawn_count_matches_chunk_def() -> void:
 	for room_id: StringName in ROOM_SCENES.keys():
 		var room: MultiMobRoom = _load_room(ROOM_SCENES[room_id])
 		var expected: int = int(EXPECTED_MOB_COUNTS[room_id])
 		var actual: int = room.get_spawned_mobs().size()
 		assert_eq(actual, expected, "%s mob count" % String(room_id))
-		assert_eq(room.chunk_def.mob_spawns.size(), expected, "%s chunk_def mob_spawns" % String(room_id))
+		assert_eq(
+			room.chunk_def.mob_spawns.size(), expected, "%s chunk_def mob_spawns" % String(room_id)
+		)
 
 
 func test_room02_spawns_two_stokers_and_one_charger() -> void:
@@ -121,6 +125,7 @@ func test_room03_mixes_stoker_charger_shooter() -> void:
 
 # ---- 2b. RoomGate registration -------------------------------------
 
+
 func test_each_room_gate_registers_full_mob_roster() -> void:
 	# Mirrors test_stratum1_rooms.gd::test_all_gated_rooms_register_full_mob_roster
 	# — every spawned mob must end up registered with the RoomGate so the
@@ -130,11 +135,15 @@ func test_each_room_gate_registers_full_mob_roster() -> void:
 		var gate: RoomGate = room.get_room_gate()
 		assert_not_null(gate, "%s spawns a RoomGate" % String(room_id))
 		var expected: int = int(EXPECTED_MOB_COUNTS[room_id])
-		assert_eq(gate.mobs_alive(), expected,
-			"%s gate registered all %d spawned mobs" % [String(room_id), expected])
+		assert_eq(
+			gate.mobs_alive(),
+			expected,
+			"%s gate registered all %d spawned mobs" % [String(room_id), expected]
+		)
 
 
 # ---- 3. Chunk validation + canvas constraints -----------------------
+
 
 func test_each_chunk_def_validates_cleanly() -> void:
 	for room_id: StringName in CHUNK_TRES.keys():
@@ -161,11 +170,14 @@ func test_mobs_positioned_inside_bounds() -> void:
 		var bounds: Rect2 = room.get_bounds_px()
 		for m: Node in room.get_spawned_mobs():
 			var n: Node2D = m
-			assert_true(bounds.has_point(n.position),
-				"%s mob at %s inside bounds %s" % [String(room_id), str(n.position), str(bounds)])
+			assert_true(
+				bounds.has_point(n.position),
+				"%s mob at %s inside bounds %s" % [String(room_id), str(n.position), str(bounds)]
+			)
 
 
 # ---- 4. Port validation: WEST entry / EAST exit + boss_door handoff -
+
 
 func test_room_chain_has_continuous_ports() -> void:
 	# Both S2 rooms must have a WEST entry. Room02 has a generic EAST exit;
@@ -196,14 +208,19 @@ func test_entry_and_exit_ports_align_along_main_axis() -> void:
 		var c: LevelChunkDef = load(CHUNK_TRES[room_id]) as LevelChunkDef
 		for p: ChunkPort in c.ports:
 			if p.tag == &"entry":
-				assert_eq(p.direction, ChunkPort.Direction.WEST,
-					"%s entry on WEST edge" % String(room_id))
+				assert_eq(
+					p.direction, ChunkPort.Direction.WEST, "%s entry on WEST edge" % String(room_id)
+				)
 			elif p.tag == &"exit" or p.tag == &"boss_door":
-				assert_eq(p.direction, ChunkPort.Direction.EAST,
-					"%s outgoing port on EAST edge" % String(room_id))
+				assert_eq(
+					p.direction,
+					ChunkPort.Direction.EAST,
+					"%s outgoing port on EAST edge" % String(room_id)
+				)
 
 
 # ---- 5. Mob archetype mix -------------------------------------------
+
 
 func test_mob_archetypes_used_across_stratum() -> void:
 	# All three M1 archetypes (grunt/Stoker, charger, shooter) appear
@@ -220,17 +237,20 @@ func test_mob_archetypes_used_across_stratum() -> void:
 
 # ---- 6. Stratum namespace round-trip --------------------------------
 
+
 func test_chunk_ids_round_trip_through_stratum_namespace() -> void:
 	# Pin the contract that Stratum.id_from_chunk_id parses our s2_* chunk
 	# ids correctly. If a future namespace edit breaks this, S2 saves /
 	# stratum-aware loot scaling silently regress.
 	for room_id: StringName in CHUNK_TRES.keys():
 		var sid: int = Stratum.id_from_chunk_id(room_id)
-		assert_eq(sid, Stratum.Id.S2,
-			"%s parses to Stratum.Id.S2 (got %d)" % [String(room_id), sid])
+		assert_eq(
+			sid, Stratum.Id.S2, "%s parses to Stratum.Id.S2 (got %d)" % [String(room_id), sid]
+		)
 
 
 # ---- 7. Total mob count + difficulty curve -------------------------
+
 
 func test_total_mob_count_in_reasonable_bounds() -> void:
 	# 6 total mobs across S2 R02-R03 (3+3). Pin the band so a future
@@ -245,6 +265,7 @@ func test_total_mob_count_in_reasonable_bounds() -> void:
 
 # ---- 8. Re-entry cleanliness (edge probe) -------------------------
 
+
 func test_room_reentered_after_free_reregisters_cleanly() -> void:
 	# Edge probe (per testing bar): a room re-entered after being cleared.
 	# Production frees the old room node and instantiates a fresh one on
@@ -254,16 +275,22 @@ func test_room_reentered_after_free_reregisters_cleanly() -> void:
 	# test_stratum1_rooms.gd::test_room_reentered_after_free_reregisters_cleanly.
 	var first: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s2_room02"])
 	var expected: int = int(EXPECTED_MOB_COUNTS[&"s2_room02"])
-	assert_eq(first.get_room_gate().mobs_alive(), expected,
-		"first Room02 instance registered %d mobs" % expected)
+	assert_eq(
+		first.get_room_gate().mobs_alive(),
+		expected,
+		"first Room02 instance registered %d mobs" % expected
+	)
 	first.queue_free()
 	await get_tree().process_frame
 
 	var second: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s2_room02"])
 	var gate2: RoomGate = second.get_room_gate()
 	assert_not_null(gate2, "re-entered Room02 spawns its own fresh RoomGate")
-	assert_eq(gate2.mobs_alive(), expected,
-		"re-entered Room02 instance registered its own %d mobs cleanly (no stale state)" % expected)
+	assert_eq(
+		gate2.mobs_alive(),
+		expected,
+		"re-entered Room02 instance registered its own %d mobs cleanly (no stale state)" % expected
+	)
 
 
 func test_room03_mixed_roster_gate_registers_all_archetypes() -> void:
@@ -291,5 +318,8 @@ func test_room03_mixed_roster_gate_registers_all_archetypes() -> void:
 	assert_eq(grunt_count, 1, "Room03 roster includes 1 Stoker")
 	assert_eq(charger_count, 1, "Room03 roster includes 1 Charger")
 	assert_eq(shooter_count, 1, "Room03 roster includes 1 Shooter")
-	assert_eq(gate.mobs_alive(), 3,
-		"RoomGate tracked all 3 mixed-archetype mobs (grunt + charger + shooter)")
+	assert_eq(
+		gate.mobs_alive(),
+		3,
+		"RoomGate tracked all 3 mixed-archetype mobs (grunt + charger + shooter)"
+	)

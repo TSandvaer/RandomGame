@@ -23,10 +23,10 @@ const TEAM_PLAYER: StringName = &"player"
 const TEAM_ENEMY: StringName = &"enemy"
 
 # Layer bits — keep in sync with project.godot 2d_physics layers.
-const LAYER_PLAYER: int = 1 << 1            # bit 2 = "player"
-const LAYER_PLAYER_HITBOX: int = 1 << 2     # bit 3 = "player_hitbox"
-const LAYER_ENEMY: int = 1 << 3             # bit 4 = "enemy"
-const LAYER_ENEMY_HITBOX: int = 1 << 4      # bit 5 = "enemy_hitbox"
+const LAYER_PLAYER: int = 1 << 1  # bit 2 = "player"
+const LAYER_PLAYER_HITBOX: int = 1 << 2  # bit 3 = "player_hitbox"
+const LAYER_ENEMY: int = 1 << 3  # bit 4 = "enemy"
+const LAYER_ENEMY_HITBOX: int = 1 << 4  # bit 5 = "enemy_hitbox"
 
 # ---- Configuration (set by spawner) -------------------------------------
 
@@ -106,14 +106,12 @@ func _physics_process(delta: float) -> void:
 
 # ---- Configuration API used by spawners ---------------------------------
 
+
 ## Configure the hitbox in one call. Call before adding to the scene tree
 ## so `_ready` reads the right team/lifetime.
 func configure(
-		p_damage: int,
-		p_knockback: Vector2,
-		p_lifetime: float,
-		p_team: StringName,
-		p_source: Node) -> void:
+	p_damage: int, p_knockback: Vector2, p_lifetime: float, p_team: StringName, p_source: Node
+) -> void:
 	damage = p_damage
 	knockback = p_knockback
 	lifetime = p_lifetime
@@ -128,6 +126,7 @@ func has_already_hit(target: Node) -> bool:
 
 
 # ---- Layer wiring -------------------------------------------------------
+
 
 func _apply_team_layers() -> void:
 	# Reset both, then set per team.
@@ -144,6 +143,7 @@ func _apply_team_layers() -> void:
 
 
 # ---- Hit handling -------------------------------------------------------
+
 
 func _on_body_entered(body: Node) -> void:
 	_try_apply_hit(body)
@@ -198,8 +198,7 @@ func _try_apply_hit(target: Node) -> void:
 	# both expose `take_damage(amount: int, knockback: Vector2, source: Node)`.
 	if target.has_method("take_damage"):
 		target.take_damage(damage, knockback, _source)
-	_combat_trace("Hitbox.hit",
-		"team=%s target=%s damage=%d" % [team, target.name, damage])
+	_combat_trace("Hitbox.hit", "team=%s target=%s damage=%d" % [team, target.name, damage])
 	hit_target.emit(target, damage, _source)
 
 

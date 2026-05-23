@@ -17,11 +17,11 @@ extends Control
 # ---- Palette (Uma `palette.md`) -------------------------------------
 
 const COLOR_PANEL_BG: Color = Color(0.10588235, 0.10196078, 0.12156863, 0.92)  # #1B1A1F @92%
-const COLOR_PANEL_BORDER: Color = Color(0.18431373, 0.16470588, 0.2, 1.0)      # #2F2A33
-const COLOR_EMBER: Color = Color(1.0, 0.4156862745, 0.1647058824, 1.0)         # #FF6A2A
-const COLOR_BODY: Color = Color(0.9098, 0.8941, 0.8392, 1.0)                   # #E8E4D6
-const COLOR_HINT: Color = Color(0.7215686275, 0.6745098039, 0.5568627451, 1.0) # #B8AC8E
-const COLOR_BONE_WHITE: Color = Color(0.788, 0.760, 0.698, 1.0)                # #C9C2B2
+const COLOR_PANEL_BORDER: Color = Color(0.18431373, 0.16470588, 0.2, 1.0)  # #2F2A33
+const COLOR_EMBER: Color = Color(1.0, 0.4156862745, 0.1647058824, 1.0)  # #FF6A2A
+const COLOR_BODY: Color = Color(0.9098, 0.8941, 0.8392, 1.0)  # #E8E4D6
+const COLOR_HINT: Color = Color(0.7215686275, 0.6745098039, 0.5568627451, 1.0)  # #B8AC8E
+const COLOR_BONE_WHITE: Color = Color(0.788, 0.760, 0.698, 1.0)  # #C9C2B2
 
 const TIER_COLORS: Dictionary = {
 	0: Color(0.788, 0.760, 0.698, 1.0),  # T1 #C9C2B2
@@ -29,7 +29,7 @@ const TIER_COLORS: Dictionary = {
 	2: Color(0.353, 0.561, 0.722, 1.0),  # T3 #5A8FB8
 	3: Color(0.545, 0.357, 0.831, 1.0),  # T4 #8B5BD4
 	4: Color(0.878, 0.690, 0.251, 1.0),  # T5 #E0B040
-	5: Color(1.0, 0.416, 0.165, 1.0),    # T6 #FF6A2A
+	5: Color(1.0, 0.416, 0.165, 1.0),  # T6 #FF6A2A
 }
 
 const TIER_LABELS: Dictionary = {
@@ -54,6 +54,7 @@ func _ready() -> void:
 
 
 # ---- Public API ------------------------------------------------------
+
 
 ## Show the tooltip for `item`. Updates content + positions to upper-right.
 ## Call `hide_tooltip()` (or pass null) to hide.
@@ -85,6 +86,7 @@ func get_current_item() -> ItemInstance:
 
 # ---- BBCode build ---------------------------------------------------
 
+
 static func _build_bbcode(item: ItemInstance) -> String:
 	var def: ItemDef = item.def
 	var tier_idx: int = int(item.rolled_tier)
@@ -99,9 +101,16 @@ static func _build_bbcode(item: ItemInstance) -> String:
 	var hex_body: String = _color_to_hex(COLOR_BODY)
 	var hex_hint: String = _color_to_hex(COLOR_HINT)
 
-	out += "[color=%s]%s[/color]   [color=%s]T%d %s[/color]\n" % [
-		hex_tier, item.get_display_name(), hex_bone, tier_idx + 1, tier_label,
-	]
+	out += (
+		"[color=%s]%s[/color]   [color=%s]T%d %s[/color]\n"
+		% [
+			hex_tier,
+			item.get_display_name(),
+			hex_bone,
+			tier_idx + 1,
+			tier_label,
+		]
+	)
 	# Sub-header — slot · type.
 	var slot_name: String = _slot_label(def.slot)
 	out += "[color=%s][i]%s[/i][/color]\n" % [hex_hint, slot_name]
@@ -122,7 +131,9 @@ static func _build_bbcode(item: ItemInstance) -> String:
 			# Drew's lines come back as `Name: +X stat` — normalize to `+ Name…`
 			# for the affix-coloring rule per Uma. We keep Drew's text but
 			# prepend a `+` and color in ember.
-			var prefix: String = "+ " if not line.begins_with("+") and not line.begins_with("-") else ""
+			var prefix: String = (
+				"+ " if not line.begins_with("+") and not line.begins_with("-") else ""
+			)
 			out += "[color=%s]%s%s[/color]\n" % [hex_ember, prefix, line]
 	out += "\n"
 	out += "[color=%s][LMB equip]  [RMB drop][/color]" % hex_hint
@@ -150,6 +161,7 @@ static func _color_to_hex(c: Color) -> String:
 
 
 # ---- UI build -------------------------------------------------------
+
 
 func _build_ui() -> void:
 	# Anchor upper-right of the parent canvas.

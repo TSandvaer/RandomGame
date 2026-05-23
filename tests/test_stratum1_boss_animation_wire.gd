@@ -35,8 +35,13 @@ const ONE_SHOT_STATES: Array[String] = [
 # Per-state FPS map — M3W-4 ran every anim at 8 fps; M3-T2-W1-T8 wake (Uma BI-06
 # ~500ms target band) ships at 12 fps (5 frames -> ~417 ms).
 const STATE_FPS: Dictionary = {
-	"walk": 8.0, "atk": 8.0, "atk_telegraph": 8.0,
-	"slam": 8.0, "slam_telegraph": 8.0, "hit": 8.0, "die": 8.0,
+	"walk": 8.0,
+	"atk": 8.0,
+	"atk_telegraph": 8.0,
+	"slam": 8.0,
+	"slam_telegraph": 8.0,
+	"hit": 8.0,
+	"die": 8.0,
 	"wake": 12.0,
 }
 
@@ -46,6 +51,7 @@ class FakePlayer:
 
 
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_scene_boss() -> Stratum1Boss:
 	var packed: PackedScene = load("res://scenes/mobs/Stratum1Boss.tscn")
@@ -69,6 +75,7 @@ func _make_scene_boss_in_room() -> Array:
 
 # ---- SpriteFrames resource shape --------------------------------------
 
+
 func test_sprite_frames_resource_exposes_all_state_x_direction_keys() -> void:
 	# 8 states × 8 directions = 64 sub-animation keys (wake added in M3-T2-W1-T8).
 	var frames: SpriteFrames = load(SPRITE_FRAMES_PATH) as SpriteFrames
@@ -76,8 +83,9 @@ func test_sprite_frames_resource_exposes_all_state_x_direction_keys() -> void:
 	for state in ANIM_STATES:
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
-			assert_true(frames.has_animation(anim_name),
-				"SpriteFrames exposes animation '%s'" % anim_name)
+			assert_true(
+				frames.has_animation(anim_name), "SpriteFrames exposes animation '%s'" % anim_name
+			)
 
 
 func test_sprite_frames_loop_flags_match_convention() -> void:
@@ -86,13 +94,15 @@ func test_sprite_frames_loop_flags_match_convention() -> void:
 	for state in LOOPING_STATES:
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
-			assert_true(frames.get_animation_loop(anim_name),
-				"'%s' loops (sustained gait)" % anim_name)
+			assert_true(
+				frames.get_animation_loop(anim_name), "'%s' loops (sustained gait)" % anim_name
+			)
 	for state in ONE_SHOT_STATES:
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
-			assert_false(frames.get_animation_loop(anim_name),
-				"'%s' is one-shot (loop=false)" % anim_name)
+			assert_false(
+				frames.get_animation_loop(anim_name), "'%s' is one-shot (loop=false)" % anim_name
+			)
 
 
 func test_sprite_frames_fps_matches_state_fps_map() -> void:
@@ -104,26 +114,34 @@ func test_sprite_frames_fps_matches_state_fps_map() -> void:
 		var expected_fps: float = STATE_FPS[state]
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
-			assert_eq(frames.get_animation_speed(anim_name), expected_fps,
-				"'%s' plays at %.1f fps" % [anim_name, expected_fps])
+			assert_eq(
+				frames.get_animation_speed(anim_name),
+				expected_fps,
+				"'%s' plays at %.1f fps" % [anim_name, expected_fps]
+			)
 
 
 # ---- Scene shape — production .tscn uses AnimatedSprite2D ------------
+
 
 func test_scene_sprite_is_animated_sprite2d_with_sprite_frames() -> void:
 	var b: Stratum1Boss = _make_scene_boss()
 	var sprite_node: Node = b.get_node_or_null("Sprite")
 	assert_not_null(sprite_node, "Stratum1Boss.tscn has a 'Sprite' child")
-	assert_true(sprite_node is AnimatedSprite2D,
-		"Sprite child resolves to AnimatedSprite2D (M3W-4 swap)")
+	assert_true(
+		sprite_node is AnimatedSprite2D, "Sprite child resolves to AnimatedSprite2D (M3W-4 swap)"
+	)
 	var asprite: AnimatedSprite2D = sprite_node as AnimatedSprite2D
-	assert_not_null(asprite.sprite_frames,
-		"AnimatedSprite2D has a SpriteFrames resource assigned")
-	assert_eq(asprite.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
-		"texture_filter = NEAREST (pixel-art hardness preserved)")
+	assert_not_null(asprite.sprite_frames, "AnimatedSprite2D has a SpriteFrames resource assigned")
+	assert_eq(
+		asprite.texture_filter,
+		CanvasItem.TEXTURE_FILTER_NEAREST,
+		"texture_filter = NEAREST (pixel-art hardness preserved)"
+	)
 
 
 # ---- Tier 1 hit-flash tint != rest -----------------------------------
+
 
 func test_hit_flash_tint_differs_from_rest_white_above_threshold() -> void:
 	# Tier 1 color-delta invariant per `.claude/docs/test-conventions.md` —
@@ -131,11 +149,12 @@ func test_hit_flash_tint_differs_from_rest_white_above_threshold() -> void:
 	# tween is not the PR #115/#140 no-op trap.
 	var tint: Color = Stratum1Boss.HIT_FLASH_TINT
 	var rest_white: Color = Color(1, 1, 1, 1)
-	var delta: float = absf(tint.r - rest_white.r) \
-		+ absf(tint.g - rest_white.g) \
-		+ absf(tint.b - rest_white.b)
-	assert_gt(delta, 0.20,
-		"HIT_FLASH_TINT vs rest sum-delta >= 0.20 (visible flash, delta=%.3f)" % delta)
+	var delta: float = (
+		absf(tint.r - rest_white.r) + absf(tint.g - rest_white.g) + absf(tint.b - rest_white.b)
+	)
+	assert_gt(
+		delta, 0.20, "HIT_FLASH_TINT vs rest sum-delta >= 0.20 (visible flash, delta=%.3f)" % delta
+	)
 	# Every channel must be in [0,1] per HTML5 HDR-clamp rule.
 	assert_between(tint.r, 0.0, 1.0, "HIT_FLASH_TINT.r in [0,1] — HTML5 safe")
 	assert_between(tint.g, 0.0, 1.0, "HIT_FLASH_TINT.g in [0,1] — HTML5 safe")
@@ -147,21 +166,31 @@ func test_hit_flash_tint_matches_grunt_practice_dummy_inheritance() -> void:
 	# Per `.claude/docs/combat-architecture.md` §"M3W-1 realized implementation"
 	# inheritance contract: HIT_FLASH_TINT is identical across the M3 mob roster
 	# so the visual grammar reads "I hit something" uniformly. Pin this.
-	assert_eq(Stratum1Boss.HIT_FLASH_TINT, Grunt.HIT_FLASH_TINT,
-		"Stratum1Boss.HIT_FLASH_TINT == Grunt.HIT_FLASH_TINT (M3W-1 contract)")
-	assert_eq(Stratum1Boss.HIT_FLASH_TINT, PracticeDummy.HIT_FLASH_TINT,
-		"Stratum1Boss.HIT_FLASH_TINT == PracticeDummy.HIT_FLASH_TINT (M3W-1 contract)")
+	assert_eq(
+		Stratum1Boss.HIT_FLASH_TINT,
+		Grunt.HIT_FLASH_TINT,
+		"Stratum1Boss.HIT_FLASH_TINT == Grunt.HIT_FLASH_TINT (M3W-1 contract)"
+	)
+	assert_eq(
+		Stratum1Boss.HIT_FLASH_TINT,
+		PracticeDummy.HIT_FLASH_TINT,
+		"Stratum1Boss.HIT_FLASH_TINT == PracticeDummy.HIT_FLASH_TINT (M3W-1 contract)"
+	)
 
 
 # ---- State-driven anim playback --------------------------------------
+
 
 func test_take_damage_plays_hit_anim() -> void:
 	var b: Stratum1Boss = _make_scene_boss()
 	var asprite: AnimatedSprite2D = b.get_node("Sprite") as AnimatedSprite2D
 	# No player → facing defaults to "s".
 	b.take_damage(1, Vector2.ZERO, null)
-	assert_eq(asprite.animation, StringName("hit_s"),
-		"take_damage plays 'hit_<dir>' on the AnimatedSprite2D")
+	assert_eq(
+		asprite.animation,
+		StringName("hit_s"),
+		"take_damage plays 'hit_<dir>' on the AnimatedSprite2D"
+	)
 
 
 func test_die_plays_die_anim() -> void:
@@ -171,8 +200,9 @@ func test_die_plays_die_anim() -> void:
 	# Deal lethal damage in one shot — boss max HP is 600 default.
 	b.take_damage(b.hp_max, Vector2.ZERO, null)
 	assert_true(b.is_dead(), "boss dead after lethal hit (precondition)")
-	assert_eq(asprite.animation, StringName("die_s"),
-		"_die plays 'die_<dir>' on the AnimatedSprite2D")
+	assert_eq(
+		asprite.animation, StringName("die_s"), "_die plays 'die_<dir>' on the AnimatedSprite2D"
+	)
 
 
 func test_chase_state_plays_walk_anim() -> void:
@@ -190,8 +220,9 @@ func test_chase_state_plays_walk_anim() -> void:
 	await get_tree().physics_frame
 	assert_eq(b.get_state(), Stratum1Boss.STATE_CHASING, "boss entered chase state")
 	# Player is due east → facing suffix = "e".
-	assert_eq(asprite.animation, StringName("walk_e"),
-		"chase state plays 'walk_e' (player is due east)")
+	assert_eq(
+		asprite.animation, StringName("walk_e"), "chase state plays 'walk_e' (player is due east)"
+	)
 
 
 func test_telegraphing_melee_plays_atk_telegraph_anim() -> void:
@@ -206,10 +237,14 @@ func test_telegraphing_melee_plays_atk_telegraph_anim() -> void:
 	b.set_player(fp)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
-		"boss entered melee-telegraph state")
-	assert_eq(asprite.animation, StringName("atk_telegraph_e"),
-		"telegraph state plays 'atk_telegraph_e' (player due east)")
+	assert_eq(
+		b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE, "boss entered melee-telegraph state"
+	)
+	assert_eq(
+		asprite.animation,
+		StringName("atk_telegraph_e"),
+		"telegraph state plays 'atk_telegraph_e' (player due east)"
+	)
 
 
 func test_attacking_state_plays_atk_anim() -> void:
@@ -219,27 +254,33 @@ func test_attacking_state_plays_atk_anim() -> void:
 	var asprite: AnimatedSprite2D = b.get_node("Sprite") as AnimatedSprite2D
 	# Direct state poke so we don't have to run a full melee fire cycle.
 	b._set_state(Stratum1Boss.STATE_ATTACKING)
-	assert_eq(asprite.animation, StringName("atk_s"),
-		"attacking state plays 'atk_<dir>' (no player → defaults to s)")
+	assert_eq(
+		asprite.animation,
+		StringName("atk_s"),
+		"attacking state plays 'atk_<dir>' (no player → defaults to s)"
+	)
 
 
 func test_telegraphing_slam_plays_slam_telegraph_anim() -> void:
 	var b: Stratum1Boss = _make_scene_boss()
 	var asprite: AnimatedSprite2D = b.get_node("Sprite") as AnimatedSprite2D
 	b._set_state(Stratum1Boss.STATE_TELEGRAPHING_SLAM)
-	assert_eq(asprite.animation, StringName("slam_telegraph_s"),
-		"slam-telegraph state plays 'slam_telegraph_<dir>'")
+	assert_eq(
+		asprite.animation,
+		StringName("slam_telegraph_s"),
+		"slam-telegraph state plays 'slam_telegraph_<dir>'"
+	)
 
 
 func test_slam_recovery_plays_slam_anim() -> void:
 	var b: Stratum1Boss = _make_scene_boss()
 	var asprite: AnimatedSprite2D = b.get_node("Sprite") as AnimatedSprite2D
 	b._set_state(Stratum1Boss.STATE_SLAM_RECOVERY)
-	assert_eq(asprite.animation, StringName("slam_s"),
-		"slam-recovery state plays 'slam_<dir>'")
+	assert_eq(asprite.animation, StringName("slam_s"), "slam-recovery state plays 'slam_<dir>'")
 
 
 # ---- Phase 2/3 slam-state animation coverage --------------------------
+
 
 func test_phase_2_boss_slams_plays_slam_telegraph_then_slam() -> void:
 	# Boss in phase 2 with player in slam range — should telegraph slam then
@@ -259,13 +300,20 @@ func test_phase_2_boss_slams_plays_slam_telegraph_then_slam() -> void:
 	# range + cooldown 0 and enter telegraphing_slam.
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_SLAM,
-		"phase 2 boss with player in slam range enters telegraphing_slam")
-	assert_eq(asprite.animation, StringName("slam_telegraph_e"),
-		"slam-telegraph state plays slam_telegraph_<dir>")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_TELEGRAPHING_SLAM,
+		"phase 2 boss with player in slam range enters telegraphing_slam"
+	)
+	assert_eq(
+		asprite.animation,
+		StringName("slam_telegraph_e"),
+		"slam-telegraph state plays slam_telegraph_<dir>"
+	)
 
 
 # ---- Direction-suffix derivation pins (8 octants) ---------------------
+
 
 func test_vec_to_dir_suffix_8_octants() -> void:
 	# Pin every cardinal + diagonal so a future refactor of the atan2 bin
@@ -282,6 +330,7 @@ func test_vec_to_dir_suffix_8_octants() -> void:
 
 # ---- Tween-reference flip on second hit (Tier 1 invariant) -----------
 
+
 func test_hit_flash_tween_reference_flips_on_second_hit() -> void:
 	# Mirror of test_grunt_animation_wire.gd / test_practice_dummy_animated.gd
 	# same-class invariant per `.claude/docs/combat-architecture.md` § "Tier 1
@@ -293,11 +342,15 @@ func test_hit_flash_tween_reference_flips_on_second_hit() -> void:
 	b.take_damage(1, Vector2.ZERO, null)
 	var second_tween: Tween = b._hit_flash_tween
 	assert_not_null(second_tween, "second hit leaves a tween in place")
-	assert_ne(first_tween, second_tween,
-		"second hit kills + restarts (tween reference flipped — Tier 1 invariant)")
+	assert_ne(
+		first_tween,
+		second_tween,
+		"second hit kills + restarts (tween reference flipped — Tier 1 invariant)"
+	)
 
 
 # ---- `_play_anim` no-op safety (bare-instanced boss) ------------------
+
 
 func test_play_anim_is_safe_noop_on_bare_instanced_boss() -> void:
 	# Bare-instanced boss (no Sprite child) — `_play_anim` must no-op, not crash.

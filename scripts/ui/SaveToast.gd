@@ -47,8 +47,8 @@ const COLOR_TEXT: Color = Color(0.9098, 0.8941, 0.8392, 1.0)  # #E8E4D6
 
 const PLATE_SIZE: Vector2 = Vector2(120, 28)
 const PIP_SIZE: Vector2 = Vector2(8, 8)
-const PIP_OFFSET_LEFT: float = 8.0   # left margin inside the plate
-const TEXT_OFFSET_LEFT: float = 24.0 # left of text within the plate
+const PIP_OFFSET_LEFT: float = 8.0  # left margin inside the plate
+const TEXT_OFFSET_LEFT: float = 24.0  # left of text within the plate
 
 ## Anchored bottom-right from the parent CanvasLayer / Control. Negative
 ## offsets pull inward from the screen edge.
@@ -88,6 +88,7 @@ func _ready() -> void:
 
 # ---- Public API (test + integration) ---------------------------------
 
+
 ## Trigger the toast directly. Production code path goes through the
 ## `Save.save_completed` signal; this is the headless-test entry point so
 ## tests can drive the fade chain without standing up the Save autoload.
@@ -126,6 +127,7 @@ func get_label() -> Label:
 
 # ---- Signal handler ----------------------------------------------------
 
+
 ## Connected to `Save.save_completed`. Per design spec, M1 ignores the
 ## failure path (`ok=false`) — failure surface is the existing `push_error`
 ## console line.
@@ -136,6 +138,7 @@ func _on_save_completed(_slot: int, ok: bool) -> void:
 
 
 # ---- UI build ----------------------------------------------------
+
 
 func _build_ui() -> void:
 	# Anchor the toast at the bottom-right of its parent (CanvasLayer-scoped
@@ -175,6 +178,7 @@ func _build_ui() -> void:
 
 
 # ---- Helpers ----------------------------------------------------
+
 
 func _save_node() -> Node:
 	var loop: SceneTree = Engine.get_main_loop() as SceneTree

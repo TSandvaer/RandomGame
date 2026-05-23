@@ -48,8 +48,8 @@ const ChunkPortScript: Script = preload("res://scripts/levels/ChunkPort.gd")
 const SIM_BUDGET_SEC: float = 15.0
 const PHYS_DELTA: float = 1.0 / 60.0
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 ## Build a synthetic chunk_def with a single grunt for AC2 grunt-combat
 ## tests. Stage 2b: the shipping `s1_room01.tres` spawns a PracticeDummy,
@@ -146,6 +146,7 @@ func _walk_in_and_kill(p: Player, grunt: Grunt, room: Stratum1Room01) -> float:
 
 # --- 1: room + grunt + player wire up cleanly ------------------------
 
+
 func test_room_loads_with_at_least_one_grunt() -> void:
 	# The integration starting line. AC2 fails immediately if the room
 	# doesn't spawn anything to fight.
@@ -162,6 +163,7 @@ func test_room_loads_with_at_least_one_grunt() -> void:
 
 # --- 2: player can be added to the room and starts ticking -----------
 
+
 func test_player_spawns_into_room_alive() -> void:
 	var room: Stratum1Room01 = _load_room()
 	var p: Player = _spawn_player_in_room(room)
@@ -171,6 +173,7 @@ func test_player_spawns_into_room_alive() -> void:
 
 
 # --- 3: player walks to grunt + first-kill within sim budget ---------
+
 
 func test_first_kill_within_sim_time_budget() -> void:
 	# The headline AC2 integration. Sim time, not wall-clock — but if this
@@ -189,6 +192,7 @@ func test_first_kill_within_sim_time_budget() -> void:
 
 # --- 4: mob_died fires exactly once during the kill --------------------
 
+
 func test_first_kill_emits_mob_died_exactly_once() -> void:
 	# AC2 + AC5 (no crashes) — the death signal is the single hook that
 	# downstream loot / xp listeners use. If it double-emits during a
@@ -202,6 +206,7 @@ func test_first_kill_emits_mob_died_exactly_once() -> void:
 
 
 # --- 5: player swing damage matches the formula ------------------------
+
 
 func test_first_kill_uses_correct_damage_formula() -> void:
 	# AC2 sub-invariant: the integration is using compute_player_damage,
@@ -221,6 +226,7 @@ func test_first_kill_uses_correct_damage_formula() -> void:
 
 # --- 6: heavy attack also lands and applies heavy tuning ---------------
 
+
 func test_heavy_attack_lands_on_grunt() -> void:
 	# AC2 + AC3 mechanical correctness: heavy attack reach is 36 (vs light
 	# 28); a grunt at 32px is reachable by heavy but not light. Verifies
@@ -237,6 +243,7 @@ func test_heavy_attack_lands_on_grunt() -> void:
 
 
 # --- 7: dead grunt does not respawn via the room script ----------------
+
 
 func test_dead_grunt_stays_dead_across_room_ticks() -> void:
 	# AC2 + AC5: if the room or assembler re-instantiates a slain mob on a
@@ -255,6 +262,7 @@ func test_dead_grunt_stays_dead_across_room_ticks() -> void:
 
 # --- 8: hitbox is on the player team — friendly-fire safety check ----
 
+
 func test_first_kill_hitboxes_are_player_team() -> void:
 	# Integration check that the player-spawned hitbox is on the right team
 	# layer. A misconfigured layer would either no-op (mask wrong) or
@@ -270,6 +278,7 @@ func test_first_kill_hitboxes_are_player_team() -> void:
 
 
 # ---- Internal helpers -------------------------------------------------
+
 
 func _first_grunt(room: Stratum1Room01) -> Grunt:
 	for m: Node in room.get_spawned_mobs():

@@ -13,8 +13,8 @@ extends GutTest
 
 const StratumScript: Script = preload("res://scripts/levels/Stratum.gd")
 
-
 # ---- 1. Enum + ALL_IDS exhaustiveness -------------------------------
+
 
 func test_all_ids_lists_every_known_stratum() -> void:
 	# If this fails because the count changed, ALSO update the per-id
@@ -48,6 +48,7 @@ func test_id_enum_values_match_int_constants() -> void:
 
 # ---- 2. is_known() bounds ------------------------------------------
 
+
 func test_is_known_accepts_all_registered_ids() -> void:
 	for id in Stratum.ALL_IDS:
 		assert_true(Stratum.is_known(id), "id %d known" % id)
@@ -74,6 +75,7 @@ func test_is_known_rejects_above_range() -> void:
 
 
 # ---- 3. prefix() / id_from_prefix() round-trip ----------------------
+
 
 func test_prefix_roundtrip_for_every_id() -> void:
 	# Stratum.S1 -> "s1" -> Stratum.S1. This is the contract that lets
@@ -111,6 +113,7 @@ func test_id_from_prefix_unknown_returns_zero() -> void:
 
 # ---- 4. display_name --------------------------------------------------
 
+
 func test_display_name_for_every_id() -> void:
 	for id in Stratum.ALL_IDS:
 		var n: String = Stratum.display_name(id)
@@ -125,6 +128,7 @@ func test_display_name_unknown_id_returns_empty() -> void:
 
 # ---- 5. next() descent ordering -------------------------------------
 
+
 func test_next_walks_through_full_chain() -> void:
 	# Walking next() from S1 must land on S2, S3, ... S8 then 0 (no more).
 	var current: int = Stratum.Id.S1
@@ -136,8 +140,7 @@ func test_next_walks_through_full_chain() -> void:
 		visited.append(nxt)
 		current = nxt
 	# Visited every stratum in order, in exactly ALL_IDS.size() steps.
-	assert_eq(visited.size(), Stratum.ALL_IDS.size(),
-		"next() chain length matches ALL_IDS")
+	assert_eq(visited.size(), Stratum.ALL_IDS.size(), "next() chain length matches ALL_IDS")
 	for i in range(visited.size()):
 		assert_eq(visited[i], Stratum.ALL_IDS[i], "next() chain step %d" % i)
 
@@ -155,6 +158,7 @@ func test_next_unknown_returns_zero() -> void:
 
 
 # ---- 6. id_from_chunk_id parsing ------------------------------------
+
 
 func test_id_from_chunk_id_for_authored_s1_chunks() -> void:
 	# These are the actual chunk ids used in M1 .tres files. Pinning the
@@ -179,17 +183,18 @@ func test_id_from_chunk_id_malformed_returns_zero() -> void:
 	# return 0 — never a coincidental "looks like S1 because it starts
 	# with 's'".
 	assert_eq(Stratum.id_from_chunk_id(&""), 0, "empty -> 0")
-	assert_eq(Stratum.id_from_chunk_id(&"no_underscore_at_zero"), 0,
-		"underscore at 0 not allowed (would be empty prefix)")
-	assert_eq(Stratum.id_from_chunk_id(&"_room01"), 0,
-		"leading underscore -> empty prefix -> 0")
-	assert_eq(Stratum.id_from_chunk_id(&"s99_room01"), 0,
-		"unknown prefix -> 0")
-	assert_eq(Stratum.id_from_chunk_id(&"foo_bar"), 0,
-		"unknown prefix -> 0")
+	assert_eq(
+		Stratum.id_from_chunk_id(&"no_underscore_at_zero"),
+		0,
+		"underscore at 0 not allowed (would be empty prefix)"
+	)
+	assert_eq(Stratum.id_from_chunk_id(&"_room01"), 0, "leading underscore -> empty prefix -> 0")
+	assert_eq(Stratum.id_from_chunk_id(&"s99_room01"), 0, "unknown prefix -> 0")
+	assert_eq(Stratum.id_from_chunk_id(&"foo_bar"), 0, "unknown prefix -> 0")
 
 
 # ---- 7. ALL_IDS / Id.* listing consistency --------------------------
+
 
 func test_every_id_enum_value_appears_in_all_ids() -> void:
 	# Belt-and-braces: ALL_IDS must be exhaustive vs the Id enum. If
@@ -204,7 +209,6 @@ func test_every_id_enum_value_appears_in_all_ids() -> void:
 		Stratum.Id.S7,
 		Stratum.Id.S8,
 	]
-	assert_eq(enum_values.size(), Stratum.ALL_IDS.size(),
-		"every Id.S* appears in ALL_IDS")
+	assert_eq(enum_values.size(), Stratum.ALL_IDS.size(), "every Id.S* appears in ALL_IDS")
 	for v in enum_values:
 		assert_true(v in Stratum.ALL_IDS, "Id %d in ALL_IDS" % v)

@@ -37,8 +37,8 @@ const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_grunt_in_tree(at: Vector2 = Vector2.ZERO) -> Grunt:
 	# Bare-instantiated grunt picks up Grunt._apply_layers() so collision_layer
@@ -86,6 +86,7 @@ func _await_physics_settles() -> void:
 
 # ---- 1: Hitbox spawned ON TOP of grunt damages it ---------------------
 
+
 func test_hitbox_spawning_on_overlapping_grunt_damages_it() -> void:
 	# Sponsor-repro shape: hitbox spawns inside the grunt's collision body.
 	# Pre-fix this asserts hp unchanged because body_entered never fires.
@@ -96,14 +97,21 @@ func test_hitbox_spawning_on_overlapping_grunt_damages_it() -> void:
 	var hb: Hitbox = _make_player_team_hitbox_at(grunt.global_position, 18.0)
 	# Hitbox is short-lived; let physics + the deferred check run.
 	await _await_physics_settles()
-	assert_lt(grunt.get_hp(), hp_before,
-		"REGRESSION-86c9m36zh: hitbox spawned overlapping grunt must damage it (hp %d -> %d)"
-			% [hp_before, grunt.get_hp()])
-	assert_eq(grunt.get_hp(), hp_before - hb.damage,
-		"hit applied with the configured damage payload (5)")
+	assert_lt(
+		grunt.get_hp(),
+		hp_before,
+		(
+			"REGRESSION-86c9m36zh: hitbox spawned overlapping grunt must damage it (hp %d -> %d)"
+			% [hp_before, grunt.get_hp()]
+		)
+	)
+	assert_eq(
+		grunt.get_hp(), hp_before - hb.damage, "hit applied with the configured damage payload (5)"
+	)
 
 
 # ---- 2: Player.try_attack against an already-touching grunt ----------
+
 
 func test_player_try_attack_lands_against_touching_grunt() -> void:
 	# Highest-fidelity Sponsor repro: instantiate the actual Player + Grunt,
@@ -141,12 +149,21 @@ func test_player_try_attack_lands_against_touching_grunt() -> void:
 	# offset) and let physics catch up.
 	hb.global_position = grunt.global_position
 	await _await_physics_settles()
-	assert_lt(grunt.get_hp(), hp_before,
-		("REGRESSION-86c9m36zh: Player.try_attack against a touching grunt"
-			+ " must damage it (hp %d -> %d)") % [hp_before, grunt.get_hp()])
+	assert_lt(
+		grunt.get_hp(),
+		hp_before,
+		(
+			(
+				"REGRESSION-86c9m36zh: Player.try_attack against a touching grunt"
+				+ " must damage it (hp %d -> %d)"
+			)
+			% [hp_before, grunt.get_hp()]
+		)
+	)
 
 
 # ---- 3: hit_target signal fires for pre-existing overlaps -------------
+
 
 func test_hit_target_signal_fires_for_initial_overlap() -> void:
 	# The hit_target signal is Hitbox's contract for hooks (VFX, audio,
@@ -157,11 +174,16 @@ func test_hit_target_signal_fires_for_initial_overlap() -> void:
 	var hb: Hitbox = _make_player_team_hitbox_at(grunt.global_position, 18.0)
 	watch_signals(hb)
 	await _await_physics_settles()
-	assert_signal_emit_count(hb, "hit_target", 1,
-		"REGRESSION-86c9m36zh: hit_target fires exactly once for an initial overlap")
+	assert_signal_emit_count(
+		hb,
+		"hit_target",
+		1,
+		"REGRESSION-86c9m36zh: hit_target fires exactly once for an initial overlap"
+	)
 
 
 # ---- 4: single-hit-per-target invariant survives the initial sweep ----
+
 
 func test_initial_overlap_then_body_entered_does_not_double_hit() -> void:
 	# Edge case: ensure the deferred initial-overlap check does NOT cause
@@ -177,12 +199,18 @@ func test_initial_overlap_then_body_entered_does_not_double_hit() -> void:
 	await _await_physics_settles()
 	hb._on_body_entered(grunt)
 	hb._on_body_entered(grunt)
-	assert_eq(grunt.get_hp(), hp_before - hb.damage,
-		"single-hit-per-target invariant holds: deferred initial sweep"
-			+ " + redundant body_entered = one hit total")
+	assert_eq(
+		grunt.get_hp(),
+		hp_before - hb.damage,
+		(
+			"single-hit-per-target invariant holds: deferred initial sweep"
+			+ " + redundant body_entered = one hit total"
+		)
+	)
 
 
 # ---- 5: empty-overlap case (no false hits) ---------------------------
+
 
 func test_no_overlap_no_hit() -> void:
 	# Sanity: if the hitbox spawns with NOTHING overlapping it, no signal

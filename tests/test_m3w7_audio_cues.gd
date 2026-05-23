@@ -68,11 +68,13 @@ func after_each() -> void:
 
 # ---- Helpers ----------------------------------------------------------
 
+
 func _get_audio_director() -> Node:
 	return get_tree().root.get_node_or_null("AudioDirector")
 
 
 # ---- Section 1: AudioDirector public API exists -----------------------
+
 
 func test_audio_director_autoload_registered() -> void:
 	var ad: Node = _get_audio_director()
@@ -81,17 +83,22 @@ func test_audio_director_autoload_registered() -> void:
 
 func test_play_sfx_method_exists() -> void:
 	var ad: Node = _get_audio_director()
-	assert_true(ad.has_method("play_sfx"),
-		"AudioDirector exposes `play_sfx(cue_id)` for M3W-7 signal handlers")
+	assert_true(
+		ad.has_method("play_sfx"),
+		"AudioDirector exposes `play_sfx(cue_id)` for M3W-7 signal handlers"
+	)
 
 
 func test_get_last_sfx_id_method_exists() -> void:
 	var ad: Node = _get_audio_director()
-	assert_true(ad.has_method("get_last_sfx_id"),
-		"AudioDirector exposes `get_last_sfx_id()` as paired-test surface")
+	assert_true(
+		ad.has_method("get_last_sfx_id"),
+		"AudioDirector exposes `get_last_sfx_id()` as paired-test surface"
+	)
 
 
 # ---- Section 2: SFX_PATHS covers every required cue --------------------
+
 
 func test_sfx_paths_covers_every_required_cue() -> void:
 	# Every cue id the wiring sites use must be present in SFX_PATHS. If a
@@ -108,11 +115,14 @@ func test_sfx_paths_covers_every_required_cue() -> void:
 		&"sfx-attack-impact",
 	]
 	for cue_id in required:
-		assert_true(AudioDirectorScript.SFX_PATHS.has(cue_id),
-			"SFX_PATHS missing cue_id '%s' — wiring sites will hit UNKNOWN trace" % cue_id)
+		assert_true(
+			AudioDirectorScript.SFX_PATHS.has(cue_id),
+			"SFX_PATHS missing cue_id '%s' — wiring sites will hit UNKNOWN trace" % cue_id
+		)
 
 
 # ---- Section 3: Every shipped SFX asset loads --------------------------
+
 
 func test_every_sfx_asset_loads_as_audio_stream() -> void:
 	# Direct ResourceLoader.load() of each path must succeed. This is the
@@ -123,22 +133,24 @@ func test_every_sfx_asset_loads_as_audio_stream() -> void:
 	for cue_id in AudioDirectorScript.SFX_PATHS:
 		var path: String = AudioDirectorScript.SFX_PATHS[cue_id]
 		var stream: Resource = load(path)
-		assert_not_null(stream,
-			"%s loads as a Resource at %s" % [cue_id, path])
-		assert_true(stream is AudioStream,
-			"%s is an AudioStream subclass (got %s)" % [cue_id, stream.get_class()])
+		assert_not_null(stream, "%s loads as a Resource at %s" % [cue_id, path])
+		assert_true(
+			stream is AudioStream,
+			"%s is an AudioStream subclass (got %s)" % [cue_id, stream.get_class()]
+		)
 
 
 # ---- Section 4: play_sfx advances pool index + records last id --------
 
+
 func test_play_sfx_known_id_records_last_sfx_id() -> void:
 	var ad: Node = _get_audio_director()
 	# Pre-condition — fresh reset.
-	assert_eq(ad.get_last_sfx_id(), StringName(""),
-		"reset_sfx_pool_index_for_test clears last_sfx_id")
+	assert_eq(
+		ad.get_last_sfx_id(), StringName(""), "reset_sfx_pool_index_for_test clears last_sfx_id"
+	)
 	ad.play_sfx(&"sfx-mob-hit")
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-mob-hit"),
-		"play_sfx records last_sfx_id")
+	assert_eq(ad.get_last_sfx_id(), StringName("sfx-mob-hit"), "play_sfx records last_sfx_id")
 
 
 func test_play_sfx_unknown_id_is_safe_noop() -> void:
@@ -147,16 +159,14 @@ func test_play_sfx_unknown_id_is_safe_noop() -> void:
 	var ad: Node = _get_audio_director()
 	ad.play_sfx(&"this-cue-does-not-exist")
 	# last_sfx_id stays the empty-string sentinel since no cue was played.
-	assert_eq(ad.get_last_sfx_id(), StringName(""),
-		"play_sfx(unknown) does not record a cue id")
+	assert_eq(ad.get_last_sfx_id(), StringName(""), "play_sfx(unknown) does not record a cue id")
 
 
 func test_play_sfx_pool_size_is_positive() -> void:
 	var ad: Node = _get_audio_director()
 	var pool_size: int = ad.get_sfx_pool_size()
 	assert_gt(pool_size, 0, "AudioDirector built a non-empty SFX pool")
-	assert_eq(pool_size, AudioDirectorScript.SFX_POOL_SIZE,
-		"pool size equals SFX_POOL_SIZE const")
+	assert_eq(pool_size, AudioDirectorScript.SFX_POOL_SIZE, "pool size equals SFX_POOL_SIZE const")
 
 
 # ---- Section 5: Per-character signal handler routing ------------------
@@ -165,6 +175,7 @@ func test_play_sfx_pool_size_is_positive() -> void:
 # Signal.connect + a tiny handler, so this is a unit test of the contract,
 # not an integration test.
 
+
 func test_player_attack_spawned_light_plays_attack_light_cue() -> void:
 	var player: Player = preload("res://scripts/player/Player.gd").new()
 	add_child_autofree(player)
@@ -172,8 +183,11 @@ func test_player_attack_spawned_light_plays_attack_light_cue() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	player.attack_spawned.emit(Player.ATTACK_LIGHT, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-player-attack-light"),
-		"Player.attack_spawned(light) routes to sfx-player-attack-light")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-player-attack-light"),
+		"Player.attack_spawned(light) routes to sfx-player-attack-light"
+	)
 
 
 func test_player_attack_spawned_heavy_plays_attack_heavy_cue() -> void:
@@ -182,8 +196,11 @@ func test_player_attack_spawned_heavy_plays_attack_heavy_cue() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	player.attack_spawned.emit(Player.ATTACK_HEAVY, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-player-attack-heavy"),
-		"Player.attack_spawned(heavy) routes to sfx-player-attack-heavy")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-player-attack-heavy"),
+		"Player.attack_spawned(heavy) routes to sfx-player-attack-heavy"
+	)
 
 
 func test_player_damaged_positive_plays_player_hit_cue() -> void:
@@ -192,8 +209,11 @@ func test_player_damaged_positive_plays_player_hit_cue() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	player.damaged.emit(3, 47, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-player-hit"),
-		"Player.damaged(>0) routes to sfx-player-hit")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-player-hit"),
+		"Player.damaged(>0) routes to sfx-player-hit"
+	)
 
 
 func test_player_damaged_zero_is_silent() -> void:
@@ -205,8 +225,7 @@ func test_player_damaged_zero_is_silent() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	player.damaged.emit(0, 50, null)
-	assert_eq(ad.get_last_sfx_id(), StringName(""),
-		"Player.damaged(0) is silent (no cue played)")
+	assert_eq(ad.get_last_sfx_id(), StringName(""), "Player.damaged(0) is silent (no cue played)")
 
 
 func test_player_dodge_started_plays_dodge_cue() -> void:
@@ -219,8 +238,11 @@ func test_player_dodge_started_plays_dodge_cue() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	player.dodge_started.emit()
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-player-dodge"),
-		"Player.dodge_started routes to sfx-player-dodge (per AD-05)")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-player-dodge"),
+		"Player.dodge_started routes to sfx-player-dodge (per AD-05)"
+	)
 
 
 func test_player_iframes_started_alone_is_silent() -> void:
@@ -236,10 +258,15 @@ func test_player_iframes_started_alone_is_silent() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	player.iframes_started.emit()
-	assert_eq(ad.get_last_sfx_id(), StringName(""),
-		"Player.iframes_started alone (post-hit-iframe-grant path) is silent — " +
-		"REGRESSION GUARD: dodge-whoosh fires ONLY from dodge_started per " +
-		"audio-direction.md §AD-05 and ticket 86c9vbhf1")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName(""),
+		(
+			"Player.iframes_started alone (post-hit-iframe-grant path) is silent — "
+			+ "REGRESSION GUARD: dodge-whoosh fires ONLY from dodge_started per "
+			+ "audio-direction.md §AD-05 and ticket 86c9vbhf1"
+		)
+	)
 
 
 func test_grunt_damaged_plays_mob_hit() -> void:
@@ -248,8 +275,9 @@ func test_grunt_damaged_plays_mob_hit() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	g.damaged.emit(3, 47, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-mob-hit"),
-		"Grunt.damaged(>0) routes to sfx-mob-hit")
+	assert_eq(
+		ad.get_last_sfx_id(), StringName("sfx-mob-hit"), "Grunt.damaged(>0) routes to sfx-mob-hit"
+	)
 
 
 func test_grunt_mob_died_plays_mob_die() -> void:
@@ -258,8 +286,9 @@ func test_grunt_mob_died_plays_mob_die() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	g.mob_died.emit(g, Vector2.ZERO, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-mob-die"),
-		"Grunt.mob_died routes to sfx-mob-die")
+	assert_eq(
+		ad.get_last_sfx_id(), StringName("sfx-mob-die"), "Grunt.mob_died routes to sfx-mob-die"
+	)
 
 
 func test_grunt_light_telegraph_plays_telegraph_cue() -> void:
@@ -268,8 +297,11 @@ func test_grunt_light_telegraph_plays_telegraph_cue() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	g.light_telegraph_started.emit()
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-attack-telegraph"),
-		"Grunt.light_telegraph_started routes to sfx-attack-telegraph")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-attack-telegraph"),
+		"Grunt.light_telegraph_started routes to sfx-attack-telegraph"
+	)
 
 
 func test_grunt_swing_spawned_plays_impact_cue() -> void:
@@ -278,8 +310,11 @@ func test_grunt_swing_spawned_plays_impact_cue() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	g.swing_spawned.emit(Grunt.SWING_KIND_LIGHT, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-attack-impact"),
-		"Grunt.swing_spawned routes to sfx-attack-impact")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-attack-impact"),
+		"Grunt.swing_spawned routes to sfx-attack-impact"
+	)
 
 
 func test_charger_damaged_plays_mob_hit() -> void:
@@ -288,8 +323,9 @@ func test_charger_damaged_plays_mob_hit() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	c.damaged.emit(3, 27, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-mob-hit"),
-		"Charger.damaged(>0) routes to sfx-mob-hit")
+	assert_eq(
+		ad.get_last_sfx_id(), StringName("sfx-mob-hit"), "Charger.damaged(>0) routes to sfx-mob-hit"
+	)
 
 
 func test_charger_charge_telegraph_plays_telegraph_cue() -> void:
@@ -298,8 +334,11 @@ func test_charger_charge_telegraph_plays_telegraph_cue() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	c.charge_telegraph_started.emit(Vector2.RIGHT)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-attack-telegraph"),
-		"Charger.charge_telegraph_started routes to sfx-attack-telegraph")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-attack-telegraph"),
+		"Charger.charge_telegraph_started routes to sfx-attack-telegraph"
+	)
 
 
 func test_charger_charge_hit_spawned_plays_impact_cue() -> void:
@@ -308,8 +347,11 @@ func test_charger_charge_hit_spawned_plays_impact_cue() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	c.charge_hit_spawned.emit(null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-attack-impact"),
-		"Charger.charge_hit_spawned routes to sfx-attack-impact")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-attack-impact"),
+		"Charger.charge_hit_spawned routes to sfx-attack-impact"
+	)
 
 
 func test_shooter_aim_started_plays_telegraph_cue() -> void:
@@ -318,8 +360,11 @@ func test_shooter_aim_started_plays_telegraph_cue() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	s.aim_started.emit(Vector2.RIGHT)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-attack-telegraph"),
-		"Shooter.aim_started routes to sfx-attack-telegraph")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-attack-telegraph"),
+		"Shooter.aim_started routes to sfx-attack-telegraph"
+	)
 
 
 func test_shooter_projectile_fired_plays_impact_cue() -> void:
@@ -328,8 +373,11 @@ func test_shooter_projectile_fired_plays_impact_cue() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	s.projectile_fired.emit(null, Vector2.RIGHT)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-attack-impact"),
-		"Shooter.projectile_fired routes to sfx-attack-impact")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-attack-impact"),
+		"Shooter.projectile_fired routes to sfx-attack-impact"
+	)
 
 
 func test_boss_damaged_plays_mob_hit() -> void:
@@ -338,8 +386,11 @@ func test_boss_damaged_plays_mob_hit() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	b.damaged.emit(6, 594, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-mob-hit"),
-		"Stratum1Boss.damaged(>0) routes to sfx-mob-hit")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-mob-hit"),
+		"Stratum1Boss.damaged(>0) routes to sfx-mob-hit"
+	)
 
 
 func test_boss_died_plays_boss_die_not_mob_die() -> void:
@@ -350,8 +401,11 @@ func test_boss_died_plays_boss_die_not_mob_die() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	b.boss_died.emit(b, Vector2.ZERO, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-boss-die"),
-		"Stratum1Boss.boss_died routes to sfx-boss-die (heavier than mob-die)")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-boss-die"),
+		"Stratum1Boss.boss_died routes to sfx-boss-die (heavier than mob-die)"
+	)
 
 
 func test_boss_swing_spawned_melee_plays_impact() -> void:
@@ -360,8 +414,11 @@ func test_boss_swing_spawned_melee_plays_impact() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	b.swing_spawned.emit(Stratum1Boss.SWING_KIND_MELEE, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-attack-impact"),
-		"Boss melee swing routes to sfx-attack-impact")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-attack-impact"),
+		"Boss melee swing routes to sfx-attack-impact"
+	)
 
 
 func test_boss_swing_spawned_slam_telegraph_plays_telegraph() -> void:
@@ -370,8 +427,11 @@ func test_boss_swing_spawned_slam_telegraph_plays_telegraph() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	b.swing_spawned.emit(Stratum1Boss.SWING_KIND_SLAM_TELEGRAPH, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-attack-telegraph"),
-		"Boss slam_telegraph routes to sfx-attack-telegraph (windup, not impact)")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-attack-telegraph"),
+		"Boss slam_telegraph routes to sfx-attack-telegraph (windup, not impact)"
+	)
 
 
 func test_boss_swing_spawned_slam_hit_plays_impact() -> void:
@@ -380,13 +440,17 @@ func test_boss_swing_spawned_slam_hit_plays_impact() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	b.swing_spawned.emit(Stratum1Boss.SWING_KIND_SLAM_HIT, null)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-attack-impact"),
-		"Boss slam_hit routes to sfx-attack-impact (contact, not telegraph)")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-attack-impact"),
+		"Boss slam_hit routes to sfx-attack-impact (contact, not telegraph)"
+	)
 
 
 # ---- Section 5b: M3-T2-W1-T7 phase-break + boss-wake stings ----------
 # Maps to Uma `boss-intro.md` BI-06 (boss-wake stinger) + BI-18 (phase-break
 # tritone sting). Wired in `Stratum1Boss._wire_audio_cues`.
+
 
 func test_boss_woke_plays_boss_wake_stinger() -> void:
 	# Uma BI-06: low brass + impact stinger fires once on boss wake
@@ -396,8 +460,11 @@ func test_boss_woke_plays_boss_wake_stinger() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	b.boss_woke.emit()
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-boss-wake"),
-		"Stratum1Boss.boss_woke routes to sfx-boss-wake (Uma BI-06)")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-boss-wake"),
+		"Stratum1Boss.boss_woke routes to sfx-boss-wake (Uma BI-06)"
+	)
 
 
 func test_phase_changed_plays_phase_break_sting() -> void:
@@ -409,23 +476,33 @@ func test_phase_changed_plays_phase_break_sting() -> void:
 	# Test P2 boundary.
 	ad.reset_sfx_pool_index_for_test()
 	b.phase_changed.emit(Stratum1Boss.PHASE_2)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-phase-break"),
-		"Stratum1Boss.phase_changed(P2) routes to sfx-phase-break (Uma BI-18)")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-phase-break"),
+		"Stratum1Boss.phase_changed(P2) routes to sfx-phase-break (Uma BI-18)"
+	)
 	# Test P3 boundary as well — handler is phase-agnostic.
 	ad.reset_sfx_pool_index_for_test()
 	b.phase_changed.emit(Stratum1Boss.PHASE_3)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-phase-break"),
-		"Stratum1Boss.phase_changed(P3) routes to sfx-phase-break (Uma BI-18)")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-phase-break"),
+		"Stratum1Boss.phase_changed(P3) routes to sfx-phase-break (Uma BI-18)"
+	)
 
 
 func test_boss_wake_and_phase_break_cues_exist_in_sfx_paths() -> void:
 	# Regression guard against the cue-id ↔ SFX_PATHS map drift class. If a
 	# future PR renames the cue id without updating the map, this test
 	# fails before the silent-trace shows up in soak.
-	assert_true(AudioDirectorScript.SFX_PATHS.has(&"sfx-phase-break"),
-		"SFX_PATHS contains sfx-phase-break (M3-T2-W1-T7)")
-	assert_true(AudioDirectorScript.SFX_PATHS.has(&"sfx-boss-wake"),
-		"SFX_PATHS contains sfx-boss-wake (M3-T2-W1-T7)")
+	assert_true(
+		AudioDirectorScript.SFX_PATHS.has(&"sfx-phase-break"),
+		"SFX_PATHS contains sfx-phase-break (M3-T2-W1-T7)"
+	)
+	assert_true(
+		AudioDirectorScript.SFX_PATHS.has(&"sfx-boss-wake"),
+		"SFX_PATHS contains sfx-boss-wake (M3-T2-W1-T7)"
+	)
 
 
 # ---- Section 5c: M3-T2-W3-T16b boss-kill horn (Beat F2 cinematic) -----
@@ -450,29 +527,39 @@ func test_boss_wake_and_phase_break_cues_exist_in_sfx_paths() -> void:
 # duration" — invisible to existing tests (which were authored before this
 # cue existed) and otherwise only catchable by Sponsor's interactive soak.
 
+
 func test_sfx_boss_kill_horn_cue_id_constant_matches_wiring_string() -> void:
 	# Drew's `Stratum1BossRoom.gd::T16_HORN_SFX_CUE_ID` is the consumer-side
 	# StringName. The constant value MUST equal the producer-side
 	# `AudioDirector.SFX_BOSS_KILL_HORN` StringName, or play_sfx hits the
 	# UNKNOWN safe-no-op branch and the horn is silent. Pin both sides.
-	assert_eq(String(AudioDirectorScript.SFX_BOSS_KILL_HORN),
+	assert_eq(
+		String(AudioDirectorScript.SFX_BOSS_KILL_HORN),
 		"sfx-boss-kill-horn",
-		"AudioDirector.SFX_BOSS_KILL_HORN string == 'sfx-boss-kill-horn'")
+		"AudioDirector.SFX_BOSS_KILL_HORN string == 'sfx-boss-kill-horn'"
+	)
 	# Cross-check Drew's consumer-side string. Stratum1BossRoom defines
 	# `T16_HORN_SFX_CUE_ID` (StringName); they must agree.
 	var BossRoomScript: Script = preload("res://scripts/levels/Stratum1BossRoom.gd")
-	assert_eq(String(BossRoomScript.T16_HORN_SFX_CUE_ID),
+	assert_eq(
+		String(BossRoomScript.T16_HORN_SFX_CUE_ID),
 		"sfx-boss-kill-horn",
-		"Stratum1BossRoom.T16_HORN_SFX_CUE_ID matches the producer-side cue id")
+		"Stratum1BossRoom.T16_HORN_SFX_CUE_ID matches the producer-side cue id"
+	)
 
 
 func test_sfx_boss_kill_horn_in_sfx_paths() -> void:
 	# Regression guard against the cue-id ↔ SFX_PATHS map drift class.
-	assert_true(AudioDirectorScript.SFX_PATHS.has(&"sfx-boss-kill-horn"),
-		"SFX_PATHS contains sfx-boss-kill-horn (M3-T2-W3-T16b)")
+	assert_true(
+		AudioDirectorScript.SFX_PATHS.has(&"sfx-boss-kill-horn"),
+		"SFX_PATHS contains sfx-boss-kill-horn (M3-T2-W3-T16b)"
+	)
 	var path: String = AudioDirectorScript.SFX_PATHS[&"sfx-boss-kill-horn"]
-	assert_eq(path, "res://audio/sfx/mobs/sfx-boss-kill-horn.ogg",
-		"SFX_PATHS entry points to audio/sfx/mobs/ (audio-direction.md §4 folder rule)")
+	assert_eq(
+		path,
+		"res://audio/sfx/mobs/sfx-boss-kill-horn.ogg",
+		"SFX_PATHS entry points to audio/sfx/mobs/ (audio-direction.md §4 folder rule)"
+	)
 
 
 func test_sfx_boss_kill_horn_asset_loads_and_duration_matches_spec() -> void:
@@ -483,13 +570,18 @@ func test_sfx_boss_kill_horn_asset_loads_and_duration_matches_spec() -> void:
 	# silence-at-T+1.2s contract depends on the 0.9 s duration landing.
 	var path: String = AudioDirectorScript.SFX_PATHS[&"sfx-boss-kill-horn"]
 	var stream: Resource = load(path)
-	assert_not_null(stream,
-		"sfx-boss-kill-horn loads at %s" % path)
-	assert_true(stream is AudioStream,
-		"sfx-boss-kill-horn is an AudioStream subclass (got %s)" % stream.get_class())
+	assert_not_null(stream, "sfx-boss-kill-horn loads at %s" % path)
+	assert_true(
+		stream is AudioStream,
+		"sfx-boss-kill-horn is an AudioStream subclass (got %s)" % stream.get_class()
+	)
 	var length_s: float = (stream as AudioStream).get_length()
-	assert_between(length_s, 0.85, 0.95,
-		"sfx-boss-kill-horn duration %.3f s within F2 spec window (0.85..0.95)" % length_s)
+	assert_between(
+		length_s,
+		0.85,
+		0.95,
+		"sfx-boss-kill-horn duration %.3f s within F2 spec window (0.85..0.95)" % length_s
+	)
 
 
 func test_play_sfx_boss_kill_horn_records_last_sfx_id() -> void:
@@ -499,11 +591,15 @@ func test_play_sfx_boss_kill_horn_records_last_sfx_id() -> void:
 	var ad: Node = _get_audio_director()
 	ad.reset_sfx_pool_index_for_test()
 	ad.play_sfx(AudioDirectorScript.SFX_BOSS_KILL_HORN)
-	assert_eq(ad.get_last_sfx_id(), StringName("sfx-boss-kill-horn"),
-		"play_sfx(SFX_BOSS_KILL_HORN) records last_sfx_id (Beat F2 cinematic horn)")
+	assert_eq(
+		ad.get_last_sfx_id(),
+		StringName("sfx-boss-kill-horn"),
+		"play_sfx(SFX_BOSS_KILL_HORN) records last_sfx_id (Beat F2 cinematic horn)"
+	)
 
 
 # ---- Section 6: Wiring is idempotent (re-`_ready` doesn't double-connect)
+
 
 func test_grunt_re_ready_does_not_double_connect() -> void:
 	# `_ready` runs once per add_to_tree, but tests that re-_ready a mob (or
@@ -515,10 +611,16 @@ func test_grunt_re_ready_does_not_double_connect() -> void:
 	# again is the test seam — idempotent guard.
 	g._wire_audio_cues()
 	g._wire_audio_cues()
-	assert_eq(g.damaged.get_connections().size(), 1,
-		"damaged signal has exactly 1 audio handler after triple-wire")
-	assert_eq(g.mob_died.get_connections().size(), 1,
-		"mob_died signal has exactly 1 audio handler after triple-wire")
+	assert_eq(
+		g.damaged.get_connections().size(),
+		1,
+		"damaged signal has exactly 1 audio handler after triple-wire"
+	)
+	assert_eq(
+		g.mob_died.get_connections().size(),
+		1,
+		"mob_died signal has exactly 1 audio handler after triple-wire"
+	)
 
 
 func test_boss_wake_and_phase_break_wiring_idempotent_on_triple_wire() -> void:
@@ -531,7 +633,13 @@ func test_boss_wake_and_phase_break_wiring_idempotent_on_triple_wire() -> void:
 	add_child_autofree(b)
 	b._wire_audio_cues()
 	b._wire_audio_cues()
-	assert_eq(b.phase_changed.get_connections().size(), 1,
-		"phase_changed has exactly 1 audio handler after triple-wire")
-	assert_eq(b.boss_woke.get_connections().size(), 1,
-		"boss_woke has exactly 1 audio handler after triple-wire")
+	assert_eq(
+		b.phase_changed.get_connections().size(),
+		1,
+		"phase_changed has exactly 1 audio handler after triple-wire"
+	)
+	assert_eq(
+		b.boss_woke.get_connections().size(),
+		1,
+		"boss_woke has exactly 1 audio handler after triple-wire"
+	)

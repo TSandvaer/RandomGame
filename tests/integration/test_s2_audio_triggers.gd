@@ -35,8 +35,8 @@ const STREAM_PATH_S2_AMBIENT: String = "res://audio/ambient/stratum2/amb-stratum
 
 const TEST_SLOT: int = 993
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _audio_director() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("AudioDirector")
@@ -61,6 +61,7 @@ func before_each() -> void:
 
 # ---- Autoload contract ------------------------------------------------
 
+
 func test_audio_director_autoload_registered() -> void:
 	var ad: Node = _audio_director()
 	assert_not_null(ad, "AudioDirector must be registered as autoload")
@@ -82,11 +83,14 @@ func test_audio_director_exposes_full_public_api() -> void:
 		"get_last_ambient_path",
 		"complete_pending_fades_for_test",
 	]:
-		assert_true(ad.has_method(method),
-			"AudioDirector must expose %s() (Devon's wiring contract)" % method)
+		assert_true(
+			ad.has_method(method),
+			"AudioDirector must expose %s() (Devon's wiring contract)" % method
+		)
 
 
 # ---- S2 entry triggers ----------------------------------------------
+
 
 func test_play_stratum2_bgm_loads_correct_stream_on_bgm_bus() -> void:
 	var ad: Node = _audio_director()
@@ -95,16 +99,21 @@ func test_play_stratum2_bgm_loads_correct_stream_on_bgm_bus() -> void:
 	ad.complete_pending_fades_for_test()
 	var player: AudioStreamPlayer = ad.get_bgm_player()
 	assert_not_null(player, "BGM AudioStreamPlayer must exist")
-	assert_eq(player.bus, "BGM",
-		"BGM player must route to the BGM bus (audio-direction.md §3)")
+	assert_eq(player.bus, "BGM", "BGM player must route to the BGM bus (audio-direction.md §3)")
 	# Stream identity — confirm the right OGG is loaded. Compare via
 	# resource_path because the stream object is loaded lazily and identity
 	# may not match a fresh `load()` call.
 	assert_not_null(player.stream, "BGM player must have a stream assigned")
-	assert_eq(player.stream.resource_path, STREAM_PATH_S2_BGM,
-		"play_stratum2_bgm must load mus-stratum2-bgm.ogg")
-	assert_eq(ad.get_last_bgm_path(), STREAM_PATH_S2_BGM,
-		"AudioDirector.get_last_bgm_path() must reflect the played cue")
+	assert_eq(
+		player.stream.resource_path,
+		STREAM_PATH_S2_BGM,
+		"play_stratum2_bgm must load mus-stratum2-bgm.ogg"
+	)
+	assert_eq(
+		ad.get_last_bgm_path(),
+		STREAM_PATH_S2_BGM,
+		"AudioDirector.get_last_bgm_path() must reflect the played cue"
+	)
 
 
 func test_play_stratum2_ambient_loads_correct_stream_on_ambient_bus() -> void:
@@ -114,11 +123,13 @@ func test_play_stratum2_ambient_loads_correct_stream_on_ambient_bus() -> void:
 	ad.complete_pending_fades_for_test()
 	var player: AudioStreamPlayer = ad.get_ambient_player()
 	assert_not_null(player, "Ambient AudioStreamPlayer must exist")
-	assert_eq(player.bus, "Ambient",
-		"Ambient player must route to the Ambient bus")
+	assert_eq(player.bus, "Ambient", "Ambient player must route to the Ambient bus")
 	assert_not_null(player.stream)
-	assert_eq(player.stream.resource_path, STREAM_PATH_S2_AMBIENT,
-		"play_stratum2_ambient must load amb-stratum2-room.ogg")
+	assert_eq(
+		player.stream.resource_path,
+		STREAM_PATH_S2_AMBIENT,
+		"play_stratum2_ambient must load amb-stratum2-room.ogg"
+	)
 	assert_eq(ad.get_last_ambient_path(), STREAM_PATH_S2_AMBIENT)
 
 
@@ -129,13 +140,18 @@ func test_play_stratum2_entry_fires_both_bgm_and_ambient() -> void:
 	assert_not_null(ad)
 	ad.play_stratum2_entry()
 	ad.complete_pending_fades_for_test()
-	assert_eq(ad.get_last_bgm_path(), STREAM_PATH_S2_BGM,
-		"play_stratum2_entry() must trigger S2 BGM")
-	assert_eq(ad.get_last_ambient_path(), STREAM_PATH_S2_AMBIENT,
-		"play_stratum2_entry() must trigger S2 Ambient")
+	assert_eq(
+		ad.get_last_bgm_path(), STREAM_PATH_S2_BGM, "play_stratum2_entry() must trigger S2 BGM"
+	)
+	assert_eq(
+		ad.get_last_ambient_path(),
+		STREAM_PATH_S2_AMBIENT,
+		"play_stratum2_entry() must trigger S2 Ambient"
+	)
 
 
 # ---- Boss-room crossfade (Uma's unique-music decision) --------------
+
 
 func test_crossfade_to_boss_stratum2_loads_unique_boss_music_not_s1_reuse() -> void:
 	# Honors Uma's DECISIONS.md 2026-05-15 entry — boss room plays
@@ -149,14 +165,19 @@ func test_crossfade_to_boss_stratum2_loads_unique_boss_music_not_s1_reuse() -> v
 	# Then crossfade to boss music.
 	ad.crossfade_to_boss_stratum2(50)
 	ad.complete_pending_fades_for_test()
-	assert_eq(ad.get_last_bgm_path(), STREAM_PATH_S2_BOSS,
-		"crossfade_to_boss_stratum2 must target mus-boss-stratum2.ogg")
+	assert_eq(
+		ad.get_last_bgm_path(),
+		STREAM_PATH_S2_BOSS,
+		"crossfade_to_boss_stratum2 must target mus-boss-stratum2.ogg"
+	)
 	# Negative assertion: explicitly NOT the S1 boss music. Belt-and-
 	# suspenders against a future regression that points the constant
 	# back at S1 reuse.
-	assert_ne(ad.get_last_bgm_path(),
+	assert_ne(
+		ad.get_last_bgm_path(),
 		"res://audio/music/stratum1/mus-boss-stratum1.ogg",
-		"Boss room MUST play unique S2 music (DECISIONS.md 2026-05-15)")
+		"Boss room MUST play unique S2 music (DECISIONS.md 2026-05-15)"
+	)
 
 
 func test_crossfade_leaves_bgm_player_with_boss_music_after_swap() -> void:
@@ -168,11 +189,15 @@ func test_crossfade_leaves_bgm_player_with_boss_music_after_swap() -> void:
 	ad.complete_pending_fades_for_test()
 	var active_player: AudioStreamPlayer = ad.get_bgm_player()
 	assert_not_null(active_player.stream)
-	assert_eq(active_player.stream.resource_path, STREAM_PATH_S2_BOSS,
-		"After crossfade, the active BGM player owns the boss stream")
+	assert_eq(
+		active_player.stream.resource_path,
+		STREAM_PATH_S2_BOSS,
+		"After crossfade, the active BGM player owns the boss stream"
+	)
 
 
 # ---- Global stop -----------------------------------------------------
+
 
 func test_stop_all_music_halts_bgm_and_ambient() -> void:
 	var ad: Node = _audio_director()
@@ -194,6 +219,7 @@ func test_stop_all_music_halts_bgm_and_ambient() -> void:
 
 # ---- Main.gd descend wiring ------------------------------------------
 
+
 func test_main_descend_restart_run_fires_s2_audio() -> void:
 	# Drive the Main scene's descend path and assert the S2 entry trigger
 	# fired. This is the regression guard against the wiring getting
@@ -208,8 +234,10 @@ func test_main_descend_restart_run_fires_s2_audio() -> void:
 	add_child_autofree(main)
 	# Force the descend handler — bypasses the StratumExit physics-overlap
 	# flow that headless tests can't drive reliably.
-	assert_true(main.has_method("force_descend_for_test"),
-		"Main must expose force_descend_for_test() for QA hooks")
+	assert_true(
+		main.has_method("force_descend_for_test"),
+		"Main must expose force_descend_for_test() for QA hooks"
+	)
 	# This pushes the descend screen — drive its restart_run signal too.
 	main.force_descend_for_test()
 	# Now simulate the player's "Return to Stratum 1" click via the
@@ -221,13 +249,20 @@ func test_main_descend_restart_run_fires_s2_audio() -> void:
 	await wait_frames(3)
 	var ad: Node = _audio_director()
 	ad.complete_pending_fades_for_test()
-	assert_eq(ad.get_last_bgm_path(), STREAM_PATH_S2_BGM,
-		"Main._on_descend_restart_run must trigger S2 BGM via AudioDirector")
-	assert_eq(ad.get_last_ambient_path(), STREAM_PATH_S2_AMBIENT,
-		"Main._on_descend_restart_run must trigger S2 Ambient via AudioDirector")
+	assert_eq(
+		ad.get_last_bgm_path(),
+		STREAM_PATH_S2_BGM,
+		"Main._on_descend_restart_run must trigger S2 BGM via AudioDirector"
+	)
+	assert_eq(
+		ad.get_last_ambient_path(),
+		STREAM_PATH_S2_AMBIENT,
+		"Main._on_descend_restart_run must trigger S2 Ambient via AudioDirector"
+	)
 
 
 # ---- Idempotence -----------------------------------------------------
+
 
 func test_play_stratum2_bgm_is_idempotent_when_already_playing() -> void:
 	# Calling twice should not glitch the playback (no second .play() that
@@ -239,5 +274,6 @@ func test_play_stratum2_bgm_is_idempotent_when_already_playing() -> void:
 	var stream_before: AudioStream = ad.get_bgm_player().stream
 	ad.play_stratum2_bgm(1)
 	var stream_after: AudioStream = ad.get_bgm_player().stream
-	assert_eq(stream_before, stream_after,
-		"Repeated play_stratum2_bgm calls must not swap the stream")
+	assert_eq(
+		stream_before, stream_after, "Repeated play_stratum2_bgm calls must not swap the stream"
+	)

@@ -53,14 +53,17 @@ func set_parent_for_pickups(n: Node) -> void:
 func on_mob_died(_mob: Node, death_pos: Vector2, mob_def: MobDef) -> Array[Node]:
 	var spawned: Array[Node] = []
 	if mob_def == null or mob_def.loot_table == null:
-		_emit_trace("on_mob_died",
-			"SKIPPED no_loot mob_def=%s loot_table=%s" % [
-				str(mob_def), str(null if mob_def == null else mob_def.loot_table)])
+		_emit_trace(
+			"on_mob_died",
+			(
+				"SKIPPED no_loot mob_def=%s loot_table=%s"
+				% [str(mob_def), str(null if mob_def == null else mob_def.loot_table)]
+			)
+		)
 		return spawned
 	var rolls: Array[ItemInstance] = roller.roll(mob_def.loot_table)
 	if rolls.is_empty():
-		_emit_trace("on_mob_died",
-			"SKIPPED empty_roll mob_def_id=%s" % str(mob_def.id))
+		_emit_trace("on_mob_died", "SKIPPED empty_roll mob_def_id=%s" % str(mob_def.id))
 		return spawned
 	# Spread pickups in a small ring so they don't all stack on one pixel.
 	var angle_step: float = TAU / max(1, rolls.size())
@@ -71,9 +74,13 @@ func on_mob_died(_mob: Node, death_pos: Vector2, mob_def: MobDef) -> Array[Node]
 	# lines per boss death. Future regressions in that family will surface the
 	# same way: two lines for the same mob_id within the same frame.
 	var parent_name: String = "<null>" if parent_for_pickups == null else str(parent_for_pickups)
-	_emit_trace("on_mob_died",
-		"SPAWNING mob_id=%s rolls=%d parent=%s pos=(%.0f,%.0f)" % [
-			str(mob_def.id), rolls.size(), parent_name, death_pos.x, death_pos.y])
+	_emit_trace(
+		"on_mob_died",
+		(
+			"SPAWNING mob_id=%s rolls=%d parent=%s pos=(%.0f,%.0f)"
+			% [str(mob_def.id), rolls.size(), parent_name, death_pos.x, death_pos.y]
+		)
+	)
 	for i in rolls.size():
 		var item: ItemInstance = rolls[i]
 		var offset: Vector2 = Vector2.RIGHT.rotated(angle_step * float(i)) * 12.0
@@ -124,9 +131,9 @@ func on_mob_died(_mob: Node, death_pos: Vector2, mob_def: MobDef) -> Array[Node]
 ##
 ## Returns the configured Pickup (never null — caller supplies the ItemInstance).
 static func _test_force_spawn_pickup(
-		item: ItemInstance,
-		world_pos: Vector2,
-		parent: Node,
+	item: ItemInstance,
+	world_pos: Vector2,
+	parent: Node,
 ) -> Pickup:
 	var pickup: Pickup = PickupScene.instantiate()
 	pickup.configure(item)

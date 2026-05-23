@@ -67,6 +67,7 @@ func after_each() -> void:
 
 # ---- AC1: state-machine lifecycle pin -------------------------------
 
+
 func test_lifecycle_open_advance_select_close() -> void:
 	var tree: DialogueTreeDef = _make_two_branch_tree_with_responses()
 	var dc: Node = _controller()
@@ -92,8 +93,9 @@ func test_lifecycle_open_advance_select_close() -> void:
 	assert_eq(_response_selected_log.size(), 1, "response_selected fired")
 	# branch_opened fired again for the new branch
 	assert_eq(_branch_opened_log.size(), 2, "branch_opened fired for navigation")
-	assert_eq(_branch_opened_log[1]["branch_key"], &"quest_active",
-		"navigated to quest_active branch")
+	assert_eq(
+		_branch_opened_log[1]["branch_key"], &"quest_active", "navigated to quest_active branch"
+	)
 	# quest_active branch has 1 line + 0 responses → advance closes
 	dc.advance_line()
 	assert_false(dc.is_active(), "is_active() false after close")
@@ -102,12 +104,16 @@ func test_lifecycle_open_advance_select_close() -> void:
 
 # ---- AC2: branch resolution + default fallback ------------------
 
+
 func test_open_resolves_quest_state_branch() -> void:
 	var tree: DialogueTreeDef = _make_two_branch_tree_with_responses()
 	var dc: Node = _controller()
 	dc.open(tree, &"quest_active")
-	assert_eq(_branch_opened_log[0]["branch_key"], &"quest_active",
-		"opened with quest_active resolved to quest_active branch")
+	assert_eq(
+		_branch_opened_log[0]["branch_key"],
+		&"quest_active",
+		"opened with quest_active resolved to quest_active branch"
+	)
 
 
 func test_open_falls_back_to_default_branch() -> void:
@@ -115,11 +121,13 @@ func test_open_falls_back_to_default_branch() -> void:
 	var dc: Node = _controller()
 	# Tree has no quest_completed branch — should fall back to default (flavor).
 	dc.open(tree, &"quest_completed")
-	assert_eq(_branch_opened_log[0]["branch_key"], &"flavor",
-		"fell back to default_branch_key (flavor)")
+	assert_eq(
+		_branch_opened_log[0]["branch_key"], &"flavor", "fell back to default_branch_key (flavor)"
+	)
 
 
 # ---- AC3: quest_action side-effect channel --------------------
+
 
 func test_quest_action_emits_before_navigation() -> void:
 	var tree: DialogueTreeDef = _make_tree_with_quest_action_response()
@@ -130,19 +138,25 @@ func test_quest_action_emits_before_navigation() -> void:
 	# Select the response with quest_action = &"accept_bounty:test"
 	dc.select_response(0)
 	assert_eq(_quest_action_log.size(), 1, "quest_action_invoked fired once")
-	assert_eq(_quest_action_log[0]["action_id"], &"accept_bounty:test",
-		"quest_action_invoked carries the action id verbatim")
-	assert_eq(_quest_action_log[0]["npc_id"], &"action_test_npc",
-		"quest_action_invoked carries the npc_id")
+	assert_eq(
+		_quest_action_log[0]["action_id"],
+		&"accept_bounty:test",
+		"quest_action_invoked carries the action id verbatim"
+	)
+	assert_eq(
+		_quest_action_log[0]["npc_id"],
+		&"action_test_npc",
+		"quest_action_invoked carries the npc_id"
+	)
 	# Pin firing order: quest_action emits BEFORE branch_opened (navigation).
 	# response_selected also fires; both fire before navigation's branch_opened.
 	# So branch_opened count post-select = 2 (the initial open + the
 	# response-navigation one).
-	assert_eq(_branch_opened_log.size(), 2,
-		"branch_opened fired again after select (navigation)")
+	assert_eq(_branch_opened_log.size(), 2, "branch_opened fired again after select (navigation)")
 
 
 # ---- AC4: choice-index bounds rejection -------------------
+
 
 func test_select_response_negative_index_rejected() -> void:
 	var tree: DialogueTreeDef = _make_tree_with_quest_action_response()
@@ -170,6 +184,7 @@ func test_select_response_out_of_range_index_rejected() -> void:
 
 # ---- AC5: is_active() drives Player attack-input gate ----------
 
+
 func test_is_active_initially_false() -> void:
 	var dc: Node = _controller()
 	# Force-closed in before_each. Pin the idle state.
@@ -187,6 +202,7 @@ func test_is_active_true_after_open_false_after_close() -> void:
 
 # ---- AC6: single-session guard ------------------------------
 
+
 func test_second_open_rejected_when_session_active() -> void:
 	var tree: DialogueTreeDef = _make_two_branch_tree_with_responses()
 	var dc: Node = _controller()
@@ -200,6 +216,7 @@ func test_second_open_rejected_when_session_active() -> void:
 
 # ---- AC7: unknown-branch navigation closes + warns ----------
 
+
 func test_unknown_next_branch_key_closes_with_warning() -> void:
 	var tree: DialogueTreeDef = _make_tree_with_bad_next_branch()
 	var dc: Node = _controller()
@@ -212,6 +229,7 @@ func test_unknown_next_branch_key_closes_with_warning() -> void:
 
 
 # ---- AC8: empty-lines + responses-only branch presents immediately ----
+
 
 func test_branch_with_no_lines_presents_responses_immediately() -> void:
 	var choice_only: DialogueBranch = BranchScript.new()
@@ -228,11 +246,15 @@ func test_branch_with_no_lines_presents_responses_immediately() -> void:
 	var dc: Node = _controller()
 	dc.open(tree, &"flavor")
 	assert_eq(_line_displayed_log.size(), 0, "no line_displayed on empty-lines branch")
-	assert_eq(_responses_presented_log.size(), 1,
-		"responses_presented fired immediately on open of empty-lines branch")
+	assert_eq(
+		_responses_presented_log.size(),
+		1,
+		"responses_presented fired immediately on open of empty-lines branch"
+	)
 
 
 # ---- Open with null tree rejected ---------------------------
+
 
 func test_open_with_null_tree_rejected() -> void:
 	var dc: Node = _controller()
@@ -243,6 +265,7 @@ func test_open_with_null_tree_rejected() -> void:
 
 
 # ---- Open with unresolvable branch rejected -----------------
+
 
 func test_open_with_unresolvable_branch_rejected() -> void:
 	var tree: DialogueTreeDef = TreeScript.new()
@@ -257,6 +280,7 @@ func test_open_with_unresolvable_branch_rejected() -> void:
 
 
 # ---- Helpers --------------------------------------------------------
+
 
 func _controller() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("DialogueController")
@@ -317,6 +341,7 @@ func _on_dialogue_closed(npc_id: StringName) -> void:
 
 
 # Tree factories -------------------------------------------------------
+
 
 ## Two branches: flavor (2 lines, 1 response → navigates to quest_active),
 ## quest_active (1 line, 0 responses → closes on advance).

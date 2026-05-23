@@ -26,12 +26,12 @@ const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
 const PHYS_DELTA: float = 1.0 / 60.0
 
-
 # ---- Test isolation ---------------------------------------------------
 # M3 Tier 2 Wave 1 T2/T3 — Stratum1Boss now fires TimeScaleDirector requests
 # (hit-pause, final-freeze, phase-transition slow-mo). Tests in this file
 # drive boss damage + phase-transition; without reset the leaked scale=0.0
 # poisons downstream test files (e.g. test_hp_regen.gd's shimmer tween).
+
 
 func before_each() -> void:
 	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
@@ -48,6 +48,7 @@ func after_each() -> void:
 
 
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_player_at(pos: Vector2) -> Player:
 	var p: Player = PlayerScript.new()
@@ -83,6 +84,7 @@ func _drive_charger_to_charging(c: Charger) -> void:
 
 # ---- AC: Charger does NOT stick to player after contact attack --------
 
+
 func test_charger_separates_from_player_after_contact_attack() -> void:
 	## Sponsor scenario: boss attacks player standing still → boss glued to player.
 	## Charger equivalent: charge hits stationary player → charger enters recovery
@@ -97,8 +99,11 @@ func test_charger_separates_from_player_after_contact_attack() -> void:
 
 	# Drive into charging state.
 	_drive_charger_to_charging(c)
-	assert_eq(c.get_state(), Charger.STATE_CHARGING,
-		"precondition: charger must be in CHARGING before contact test")
+	assert_eq(
+		c.get_state(),
+		Charger.STATE_CHARGING,
+		"precondition: charger must be in CHARGING before contact test"
+	)
 
 	# Place charger right at contact threshold (CHARGE_HITBOX_RADIUS=20 + REACH=12 = 32 px).
 	c.global_position = Vector2(-28.0, 0.0)  # dist = 28, < 32 → contact
@@ -107,19 +112,28 @@ func test_charger_separates_from_player_after_contact_attack() -> void:
 	# Drive contact tick — _maybe_charge_hit_player fires, _enter_recovery called.
 	c._physics_process(PHYS_DELTA)
 
-	assert_eq(c.get_state(), Charger.STATE_RECOVERING,
-		"charger must be in RECOVERING after player contact")
+	assert_eq(
+		c.get_state(),
+		Charger.STATE_RECOVERING,
+		"charger must be in RECOVERING after player contact"
+	)
 
 	# PRE-FIX: velocity was Vector2.ZERO — no separation, mob sticks.
 	# POST-FIX: velocity is non-zero and directed away from player.
-	assert_gt(c.velocity.length(), 0.0,
-		"charger velocity must be non-zero after contact so move_and_slide separates bodies")
+	assert_gt(
+		c.velocity.length(),
+		0.0,
+		"charger velocity must be non-zero after contact so move_and_slide separates bodies"
+	)
 
 	var away_dir: Vector2 = (c.global_position - p.global_position).normalized()
 	var pushback_dir: Vector2 = c.velocity.normalized()
 	var dot: float = pushback_dir.dot(away_dir)
-	assert_gt(dot, 0.0,
-		"charger pushback must point away from player to effect separation (dot=%.3f)" % dot)
+	assert_gt(
+		dot,
+		0.0,
+		"charger pushback must point away from player to effect separation (dot=%.3f)" % dot
+	)
 
 
 func test_charger_recovery_is_rooted_after_pushback_tick() -> void:
@@ -140,11 +154,15 @@ func test_charger_recovery_is_rooted_after_pushback_tick() -> void:
 
 	# Mid-recovery tick — must be rooted.
 	c._physics_process(PHYS_DELTA)
-	assert_eq(c.velocity, Vector2.ZERO,
-		"charger is rooted (velocity=ZERO) during recovery after one-tick pushback")
+	assert_eq(
+		c.velocity,
+		Vector2.ZERO,
+		"charger is rooted (velocity=ZERO) during recovery after one-tick pushback"
+	)
 
 
 # ---- AC: Stratum1Boss does NOT stick to player after melee contact ----
+
 
 func test_boss_separates_from_player_after_melee_swing() -> void:
 	## Direct Sponsor scenario: boss melee swings player at close range →
@@ -159,24 +177,32 @@ func test_boss_separates_from_player_after_melee_swing() -> void:
 
 	# Tick 1 — chase → begin_melee_telegraph.
 	b._physics_process(PHYS_DELTA)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
-		"precondition: boss must telegraph before swing")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_TELEGRAPHING_MELEE,
+		"precondition: boss must telegraph before swing"
+	)
 
 	# Tick 2 — telegraph expires → _fire_melee_swing.
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.001)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING,
-		"boss enters attack-recovery after melee swing")
+	assert_eq(
+		b.get_state(), Stratum1Boss.STATE_ATTACKING, "boss enters attack-recovery after melee swing"
+	)
 
 	# PRE-FIX: velocity was ZERO → no separation on this tick → sticking.
 	# POST-FIX: velocity is non-zero, directed away from player.
-	assert_gt(b.velocity.length(), 0.0,
-		"boss velocity must be non-zero after swing-fire so move_and_slide separates bodies")
+	assert_gt(
+		b.velocity.length(),
+		0.0,
+		"boss velocity must be non-zero after swing-fire so move_and_slide separates bodies"
+	)
 
 	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
 	var pushback_dir: Vector2 = b.velocity.normalized()
 	var dot: float = pushback_dir.dot(away_dir)
-	assert_gt(dot, 0.0,
-		"boss pushback must point away from player to effect separation (dot=%.3f)" % dot)
+	assert_gt(
+		dot, 0.0, "boss pushback must point away from player to effect separation (dot=%.3f)" % dot
+	)
 
 
 func test_boss_attack_recovery_is_rooted_after_pushback_tick() -> void:
@@ -194,11 +220,15 @@ func test_boss_attack_recovery_is_rooted_after_pushback_tick() -> void:
 
 	# Subsequent tick — attack recovery handler must zero velocity.
 	b._physics_process(PHYS_DELTA)
-	assert_eq(b.velocity, Vector2.ZERO,
-		"boss is rooted (velocity=ZERO) during attack recovery after one-tick pushback")
+	assert_eq(
+		b.velocity,
+		Vector2.ZERO,
+		"boss is rooted (velocity=ZERO) during attack recovery after one-tick pushback"
+	)
 
 
 # ---- AC: Player escape after contact does not re-trigger stick --------
+
 
 func test_charger_does_not_follow_player_during_recovery() -> void:
 	## Simulates Sponsor's exact scenario: player moves AWAY from mob during
@@ -222,10 +252,16 @@ func test_charger_does_not_follow_player_during_recovery() -> void:
 	# Multiple mid-recovery ticks — charger must stay rooted.
 	for _i: int in range(5):
 		c._physics_process(PHYS_DELTA)
-		assert_eq(c.velocity, Vector2.ZERO,
-			"charger stays rooted (no follow) while player escapes during recovery")
-		assert_eq(c.get_state(), Charger.STATE_RECOVERING,
-			"charger remains in RECOVERING state while timer counts down")
+		assert_eq(
+			c.velocity,
+			Vector2.ZERO,
+			"charger stays rooted (no follow) while player escapes during recovery"
+		)
+		assert_eq(
+			c.get_state(),
+			Charger.STATE_RECOVERING,
+			"charger remains in RECOVERING state while timer counts down"
+		)
 
 
 # ---- AC: Boss separation symmetric across all four approach directions ---
@@ -257,13 +293,17 @@ func test_charger_does_not_follow_player_during_recovery() -> void:
 # additionally assert `motion_mode == FLOATING` directly so the regression
 # is caught even if a future scene file overrides the property.
 
+
 func test_boss_motion_mode_is_floating_after_ready() -> void:
 	## Direct property assertion: the canonical Godot 4 top-down 2D
 	## CharacterBody2D motion_mode is FLOATING. GROUNDED is the engine
 	## default and would re-introduce the south-approach floor-snap bug.
 	var b: Stratum1Boss = _make_boss_at(Vector2.ZERO)
-	assert_eq(b.motion_mode, CharacterBody2D.MOTION_MODE_FLOATING,
-		"boss motion_mode must be FLOATING after _ready() so move_and_slide treats every axis equally")
+	assert_eq(
+		b.motion_mode,
+		CharacterBody2D.MOTION_MODE_FLOATING,
+		"boss motion_mode must be FLOATING after _ready() so move_and_slide treats every axis equally"
+	)
 
 
 func test_boss_separates_from_player_approached_from_south() -> void:
@@ -284,27 +324,41 @@ func test_boss_separates_from_player_approached_from_south() -> void:
 
 	# Tick 1: chase → telegraph.
 	b._physics_process(PHYS_DELTA)
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_MELEE,
-		"precondition: south-approach also triggers melee telegraph"
-			+ " (no direction-asymmetry in trigger logic)")
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_TELEGRAPHING_MELEE,
+		(
+			"precondition: south-approach also triggers melee telegraph"
+			+ " (no direction-asymmetry in trigger logic)"
+		)
+	)
 
 	# Tick 2: telegraph expires → swing fires → pushback applied.
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.001)
 	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING)
 
-	assert_gt(b.velocity.length(), 0.0,
-		"south-approach: boss velocity must be non-zero after swing-fire (separation from player)")
+	assert_gt(
+		b.velocity.length(),
+		0.0,
+		"south-approach: boss velocity must be non-zero after swing-fire (separation from player)"
+	)
 
 	# Pushback must point NORTH (away from player below). i.e. velocity.y < 0.
-	assert_lt(b.velocity.y, 0.0,
-		"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)"
-			% [b.velocity.x, b.velocity.y])
+	assert_lt(
+		b.velocity.y,
+		0.0,
+		(
+			"south-approach: pushback must point NORTH (negative Y) — got velocity=(%.2f,%.2f)"
+			% [b.velocity.x, b.velocity.y]
+		)
+	)
 
 	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
 	var pushback_dir: Vector2 = b.velocity.normalized()
 	var dot: float = pushback_dir.dot(away_dir)
-	assert_gt(dot, 0.0,
-		"south-approach: pushback aligned with away-from-player vector (dot=%.3f)" % dot)
+	assert_gt(
+		dot, 0.0, "south-approach: pushback aligned with away-from-player vector (dot=%.3f)" % dot
+	)
 
 
 func test_boss_separates_from_player_approached_from_north() -> void:
@@ -323,11 +377,17 @@ func test_boss_separates_from_player_approached_from_north() -> void:
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.001)
 	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING)
 
-	assert_gt(b.velocity.length(), 0.0,
-		"north-approach: boss velocity must be non-zero after swing-fire")
-	assert_gt(b.velocity.y, 0.0,
-		"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)"
-			% [b.velocity.x, b.velocity.y])
+	assert_gt(
+		b.velocity.length(), 0.0, "north-approach: boss velocity must be non-zero after swing-fire"
+	)
+	assert_gt(
+		b.velocity.y,
+		0.0,
+		(
+			"north-approach: pushback must point SOUTH (positive Y) — got velocity=(%.2f,%.2f)"
+			% [b.velocity.x, b.velocity.y]
+		)
+	)
 
 	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
 	var dot: float = b.velocity.normalized().dot(away_dir)
@@ -346,11 +406,17 @@ func test_boss_separates_from_player_approached_from_west() -> void:
 	b._physics_process(Stratum1Boss.MELEE_TELEGRAPH_DURATION + 0.001)
 	assert_eq(b.get_state(), Stratum1Boss.STATE_ATTACKING)
 
-	assert_gt(b.velocity.length(), 0.0,
-		"west-approach: boss velocity must be non-zero after swing-fire")
-	assert_gt(b.velocity.x, 0.0,
-		"west-approach: pushback must point EAST (positive X) — got velocity=(%.2f,%.2f)"
-			% [b.velocity.x, b.velocity.y])
+	assert_gt(
+		b.velocity.length(), 0.0, "west-approach: boss velocity must be non-zero after swing-fire"
+	)
+	assert_gt(
+		b.velocity.x,
+		0.0,
+		(
+			"west-approach: pushback must point EAST (positive X) — got velocity=(%.2f,%.2f)"
+			% [b.velocity.x, b.velocity.y]
+		)
+	)
 
 	var away_dir: Vector2 = (b.global_position - p.global_position).normalized()
 	var dot: float = b.velocity.normalized().dot(away_dir)
@@ -362,8 +428,8 @@ func test_boss_separates_from_player_approached_from_west() -> void:
 # cardinal approach angles are covered by paired tests so any future
 # direction-asymmetry surfaces immediately.
 
-
 # ---- AC: Slam recovery is rooted (boss Phase 2+) ---------------------
+
 
 func test_boss_slam_recovery_velocity_is_zero() -> void:
 	## Slam uses a separate recovery state. Assert it also doesn't cause sticking
@@ -380,9 +446,12 @@ func test_boss_slam_recovery_velocity_is_zero() -> void:
 	assert_eq(b.get_phase(), Stratum1Boss.PHASE_2)
 
 	# Player within slam range (40px < 80px). Slam cooldown clear on phase entry.
-	b._physics_process(PHYS_DELTA)   # chase → slam_telegraph
-	assert_eq(b.get_state(), Stratum1Boss.STATE_TELEGRAPHING_SLAM,
-		"phase 2 boss picks slam when player inside slam radius")
+	b._physics_process(PHYS_DELTA)  # chase → slam_telegraph
+	assert_eq(
+		b.get_state(),
+		Stratum1Boss.STATE_TELEGRAPHING_SLAM,
+		"phase 2 boss picks slam when player inside slam radius"
+	)
 
 	# Slam fires.
 	b._physics_process(Stratum1Boss.SLAM_TELEGRAPH_DURATION + 0.001)
@@ -390,5 +459,6 @@ func test_boss_slam_recovery_velocity_is_zero() -> void:
 
 	# Slam recovery handler: velocity = ZERO (slam already knockbacked player away).
 	b._physics_process(PHYS_DELTA)
-	assert_eq(b.velocity, Vector2.ZERO,
-		"boss velocity is zero during slam recovery (no drift/stick)")
+	assert_eq(
+		b.velocity, Vector2.ZERO, "boss velocity is zero during slam recovery (no drift/stick)"
+	)

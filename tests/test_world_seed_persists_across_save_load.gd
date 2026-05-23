@@ -46,7 +46,6 @@ const ZoneAnchorScript: Script = preload("res://resources/level/ZoneAnchor.gd")
 const LevelChunkDefScript: Script = preload("res://scripts/levels/LevelChunkDef.gd")
 const ChunkPortScript: Script = preload("res://scripts/levels/ChunkPort.gd")
 
-
 var _warn_guard: NoWarningGuard
 
 
@@ -81,12 +80,17 @@ func _save() -> Node:
 
 func test_default_payload_rolls_non_zero_world_seed() -> void:
 	var payload: Dictionary = _save().default_payload()
-	assert_true(payload["character"].has("world_seed"),
-		"default character payload includes world_seed field")
+	assert_true(
+		payload["character"].has("world_seed"),
+		"default character payload includes world_seed field"
+	)
 	# randi() returns [0, 2^32); probability of hitting exactly 0 is 1/2^32.
 	# Treating this as a contract: a new character's seed is non-zero.
-	assert_ne(int(payload["character"]["world_seed"]), 0,
-		"default_payload() rolls a non-zero world_seed (sentinel `0` is migration-only)")
+	assert_ne(
+		int(payload["character"]["world_seed"]),
+		0,
+		"default_payload() rolls a non-zero world_seed (sentinel `0` is migration-only)"
+	)
 
 
 # -----------------------------------------------------------------------
@@ -100,14 +104,19 @@ func test_world_seed_persists_through_save_load_round_trip() -> void:
 	assert_ne(seed_before, 0, "preflight: rolled seed is non-zero")
 
 	# Save and reload.
-	assert_true(_save().save_game(TEST_SLOT, original),
-		"save_game succeeds with rolled-seed payload")
+	assert_true(
+		_save().save_game(TEST_SLOT, original), "save_game succeeds with rolled-seed payload"
+	)
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_false(loaded.is_empty(), "loaded payload is non-empty")
-	assert_true(loaded["character"].has("world_seed"),
-		"loaded character payload preserves world_seed key")
-	assert_eq(int(loaded["character"]["world_seed"]), seed_before,
-		"world_seed round-trips bit-identically through save → load")
+	assert_true(
+		loaded["character"].has("world_seed"), "loaded character payload preserves world_seed key"
+	)
+	assert_eq(
+		int(loaded["character"]["world_seed"]),
+		seed_before,
+		"world_seed round-trips bit-identically through save → load"
+	)
 
 
 func test_world_seed_persists_through_double_round_trip() -> void:
@@ -118,13 +127,19 @@ func test_world_seed_persists_through_double_round_trip() -> void:
 
 	assert_true(_save().save_game(TEST_SLOT, original))
 	var loaded_once: Dictionary = _save().load_game(TEST_SLOT)
-	assert_eq(int(loaded_once["character"]["world_seed"]), seed_before,
-		"world_seed survives first round-trip")
+	assert_eq(
+		int(loaded_once["character"]["world_seed"]),
+		seed_before,
+		"world_seed survives first round-trip"
+	)
 
 	assert_true(_save().save_game(TEST_SLOT, loaded_once))
 	var loaded_twice: Dictionary = _save().load_game(TEST_SLOT)
-	assert_eq(int(loaded_twice["character"]["world_seed"]), seed_before,
-		"world_seed survives second round-trip (idempotent on re-save)")
+	assert_eq(
+		int(loaded_twice["character"]["world_seed"]),
+		seed_before,
+		"world_seed survives second round-trip (idempotent on re-save)"
+	)
 
 
 # -----------------------------------------------------------------------
@@ -143,8 +158,11 @@ func test_two_consecutive_default_payloads_roll_different_world_seeds() -> void:
 	# run will pass.
 	var a: Dictionary = _save().default_payload()
 	var b: Dictionary = _save().default_payload()
-	assert_ne(int(a["character"]["world_seed"]), int(b["character"]["world_seed"]),
-		"two consecutive default_payload() calls roll different world_seeds")
+	assert_ne(
+		int(a["character"]["world_seed"]),
+		int(b["character"]["world_seed"]),
+		"two consecutive default_payload() calls roll different world_seeds"
+	)
 
 
 # -----------------------------------------------------------------------
@@ -171,17 +189,22 @@ func test_v3_migration_rerolls_world_seed_via_v5_canonical_promotion() -> void:
 	var v3_envelope: Dictionary = {
 		"schema_version": 3,
 		"saved_at": "2026-05-02T10:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Ember-Knight",
 				"level": 2,
 				"xp": 100,
 				"xp_to_next": 282,
-				"vigor": 0, "focus": 0, "edge": 0,
+				"vigor": 0,
+				"focus": 0,
+				"edge": 0,
 				"stats": {"vigor": 0, "focus": 0, "edge": 0},
 				"unspent_stat_points": 0,
 				"first_level_up_seen": false,
-				"hp_current": 100, "hp_max": 100,
+				"hp_current": 100,
+				"hp_max": 100,
 			},
 			"stash": [],
 			"equipped": {},
@@ -193,16 +216,19 @@ func test_v3_migration_rerolls_world_seed_via_v5_canonical_promotion() -> void:
 	f.close()
 
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_true(loaded["character"].has("world_seed"),
-		"v3 → v4 → v5 chain preserves world_seed key")
+	assert_true(
+		loaded["character"].has("world_seed"), "v3 → v4 → v5 chain preserves world_seed key"
+	)
 	var rolled: int = int(loaded["character"]["world_seed"])
-	assert_ne(rolled, 0,
-		"v4 → v5 re-rolls the `0` sentinel to a non-zero value (W2-T4)")
+	assert_ne(rolled, 0, "v4 → v5 re-rolls the `0` sentinel to a non-zero value (W2-T4)")
 	# Subsequent save/load is immutable — no spurious second re-roll.
 	assert_true(_save().save_game(TEST_SLOT, loaded))
 	var reloaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_eq(int(reloaded["character"]["world_seed"]), rolled,
-		"world_seed is immutable post-re-roll (no random second roll on existing characters)")
+	assert_eq(
+		int(reloaded["character"]["world_seed"]),
+		rolled,
+		"world_seed is immutable post-re-roll (no random second roll on existing characters)"
+	)
 
 
 func test_v3_migration_preserves_non_default_character_fields() -> void:
@@ -211,19 +237,25 @@ func test_v3_migration_preserves_non_default_character_fields() -> void:
 	var v3_envelope: Dictionary = {
 		"schema_version": 3,
 		"saved_at": "2026-05-02T10:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Devon-Test",
 				"level": 4,
 				"xp": 999,
 				"xp_to_next": 800,
-				"vigor": 3, "focus": 1, "edge": 2,
+				"vigor": 3,
+				"focus": 1,
+				"edge": 2,
 				"stats": {"vigor": 3, "focus": 1, "edge": 2},
 				"unspent_stat_points": 1,
 				"first_level_up_seen": true,
-				"hp_current": 75, "hp_max": 100,
+				"hp_current": 75,
+				"hp_max": 100,
 			},
-			"stash": [{"id": "weapon_iron_sword", "tier": 2, "rolled_affixes": [], "stack_count": 1}],
+			"stash":
+			[{"id": "weapon_iron_sword", "tier": 2, "rolled_affixes": [], "stack_count": 1}],
 			"equipped": {},
 			"meta": {"runs_completed": 3, "deepest_stratum": 2, "total_playtime_sec": 1234.5},
 		},
@@ -235,8 +267,11 @@ func test_v3_migration_preserves_non_default_character_fields() -> void:
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	# world_seed added + re-rolled to non-zero (W2-T4).
 	assert_true(loaded["character"].has("world_seed"))
-	assert_ne(int(loaded["character"]["world_seed"]), 0,
-		"v3 → v5 chain re-rolls the sentinel to non-zero (W2-T4 canonical promotion)")
+	assert_ne(
+		int(loaded["character"]["world_seed"]),
+		0,
+		"v3 → v5 chain re-rolls the sentinel to non-zero (W2-T4 canonical promotion)"
+	)
 	# Other fields preserved.
 	assert_eq(loaded["character"]["name"], "Devon-Test")
 	assert_eq(loaded["character"]["level"], 4)
@@ -366,21 +401,27 @@ func test_world_seed_drives_identical_assemble_across_save_load() -> void:
 	assert_true(_save().save_game(TEST_SLOT, original))
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	var seed_after_round_trip: int = int(loaded["character"]["world_seed"])
-	assert_eq(seed_after_round_trip, world_seed,
-		"world_seed survives save/load round-trip (precondition for assemble-equality)")
+	assert_eq(
+		seed_after_round_trip,
+		world_seed,
+		"world_seed survives save/load round-trip (precondition for assemble-equality)"
+	)
 
 	# Derive zone seed both before AND after the round-trip; they must
 	# match because derive_zone_seed is pure on (world_seed, zone_id).
 	var zone: ZoneDef = _make_zone()
 	var chunks: Dictionary = _make_chunks()
 	var zone_seed_before: int = FloorAssembler.derive_zone_seed(
-		FloorAssembler.derive_stratum_seed(world_seed, zone.stratum_id),
-		zone.zone_id)
+		FloorAssembler.derive_stratum_seed(world_seed, zone.stratum_id), zone.zone_id
+	)
 	var zone_seed_after: int = FloorAssembler.derive_zone_seed(
-		FloorAssembler.derive_stratum_seed(seed_after_round_trip, zone.stratum_id),
-		zone.zone_id)
-	assert_eq(zone_seed_before, zone_seed_after,
-		"derive_zone_seed cascade is deterministic on round-tripped world_seed")
+		FloorAssembler.derive_stratum_seed(seed_after_round_trip, zone.stratum_id), zone.zone_id
+	)
+	assert_eq(
+		zone_seed_before,
+		zone_seed_after,
+		"derive_zone_seed cascade is deterministic on round-tripped world_seed"
+	)
 
 	# Assemble twice (once with pre-save seed, once with post-load seed)
 	# — the floors MUST be deep-equal.
@@ -388,7 +429,10 @@ func test_world_seed_drives_identical_assemble_across_save_load() -> void:
 	var floor_before: AssembledFloor = assembler.assemble_floor(zone, zone_seed_before, chunks)
 	var floor_after: AssembledFloor = assembler.assemble_floor(zone, zone_seed_after, chunks)
 
-	assert_false(floor_before.is_empty(),
-		"assemble produced a non-empty floor (preflight — chunks resolved)")
-	assert_true(_floors_equal(floor_before, floor_after),
-		"AssembledFloor is identical pre-save vs post-load — same world_seed → same map")
+	assert_false(
+		floor_before.is_empty(), "assemble produced a non-empty floor (preflight — chunks resolved)"
+	)
+	assert_true(
+		_floors_equal(floor_before, floor_after),
+		"AssembledFloor is identical pre-save vs post-load — same world_seed → same map"
+	)

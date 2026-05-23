@@ -44,12 +44,12 @@ extends Area2D
 
 ## Player crossed the gate's Area2D for the first time. Cinematic / audio
 ## hooks may subscribe to play a door-slam sound.
-signal gate_locked()
+signal gate_locked
 
 ## Every registered mob has died (or no mobs were ever registered).
 ## Subscribers (room script, progression tracker) react by opening the
 ## next-room exit / marking the room cleared.
-signal gate_unlocked()
+signal gate_unlocked
 
 ## Player walked through the gate after it was unlocked (UNLOCKED state,
 ## CharacterBody2D body_entered). This is the "door-walk" signal that drives
@@ -60,12 +60,12 @@ signal gate_unlocked()
 ## signals that the player actually chose to walk through. MultiMobRoom
 ## listens here (not gate_unlocked) to emit room_cleared, ensuring the room
 ## counter only advances when the player walks through the open door.
-signal gate_traversed()
+signal gate_traversed
 
 # ---- States ----------------------------------------------------------
 
-const STATE_OPEN: StringName = &"open"        # initial state, before lock-trigger
-const STATE_LOCKED: StringName = &"locked"    # player crossed, mobs alive
+const STATE_OPEN: StringName = &"open"  # initial state, before lock-trigger
+const STATE_LOCKED: StringName = &"locked"  # player crossed, mobs alive
 const STATE_UNLOCKED: StringName = &"unlocked"  # all mobs dead
 
 # ---- Timing ----------------------------------------------------------
@@ -163,6 +163,7 @@ func _ensure_collision_shape() -> void:
 
 # ---- Public API -----------------------------------------------------
 
+
 func get_state() -> StringName:
 	return _state
 
@@ -229,10 +230,13 @@ func register_mob(mob: Node) -> void:
 	# Trace pair (paired with _on_mob_died trace below) pinpoints any future
 	# desync between register and decrement at the [combat-trace] level.
 	# combat_trace gates on `OS.has_feature("web")` so HTML5-only.
-	_combat_trace("RoomGate.register_mob",
-		"mob=%s id=%d mobs_alive=%d connect_err=%d" % [
-			mob.name, mob.get_instance_id(), _mobs_alive, err
-		])
+	_combat_trace(
+		"RoomGate.register_mob",
+		(
+			"mob=%s id=%d mobs_alive=%d connect_err=%d"
+			% [mob.name, mob.get_instance_id(), _mobs_alive, err]
+		)
+	)
 
 
 ## Force-lock the gate from script. Production uses `body_entered`; tests
@@ -265,15 +269,20 @@ func trigger_for_test(_body: Node = null) -> void:
 
 # ---- Internal -------------------------------------------------------
 
+
 func _on_body_entered(body: Node) -> void:
 	# Investigation 86c9qbhm5 (Devon, 2026-05) confirmed body_entered fires
 	# reliably under Playwright when player walks from a known position.
 	# Lightweight trace at entry helps Playwright specs distinguish "gate
 	# never reached" from "gate reached but state-machine wrong" failures.
 	# Combat-trace shim: HTML5-only, no overhead in headless GUT.
-	_combat_trace("RoomGate._on_body_entered", "body=%s state=%s mobs_alive=%d" % [
-		body.get_class() if body != null else "<null>", _state, _mobs_alive
-	])
+	_combat_trace(
+		"RoomGate._on_body_entered",
+		(
+			"body=%s state=%s mobs_alive=%d"
+			% [body.get_class() if body != null else "<null>", _state, _mobs_alive]
+		)
+	)
 	# Bug 1 fix (ticket 86c9q7xgx): only a CharacterBody2D on the player
 	# physics layer should advance this gate. Area2D-derived nodes (Hitbox,
 	# Projectile) cannot trigger body_entered per Godot 4 physics semantics —
@@ -295,7 +304,8 @@ func _on_body_entered(body: Node) -> void:
 			_traversed_emitted = true
 			_combat_trace(
 				"RoomGate.gate_traversed",
-				"player walked through open door — emitting gate_traversed")
+				"player walked through open door — emitting gate_traversed"
+			)
 			gate_traversed.emit()
 		return
 	# Only first-cross into a locked room matters; ignore re-entries in other states.
@@ -328,10 +338,10 @@ func _on_mob_died(mob: Variant, _pos: Variant = null, _def: Variant = null) -> v
 	if mob != null and is_instance_valid(mob):
 		mob_name = str(mob.name) if "name" in mob else "<unnamed>"
 		mob_id = mob.get_instance_id() if mob.has_method("get_instance_id") else 0
-	_combat_trace("RoomGate._on_mob_died",
-		"mob=%s id=%d mobs_alive=%d state=%s" % [
-			mob_name, mob_id, _mobs_alive, _state_name()
-		])
+	_combat_trace(
+		"RoomGate._on_mob_died",
+		"mob=%s id=%d mobs_alive=%d state=%s" % [mob_name, mob_id, _mobs_alive, _state_name()]
+	)
 	if _mobs_alive == 0 and _state == STATE_LOCKED and not _death_wait_in_flight:
 		_death_wait_in_flight = true
 		_start_death_wait()
@@ -410,8 +420,11 @@ func _unlock() -> void:
 	_state = STATE_UNLOCKED
 	_combat_trace(
 		"RoomGate._unlock",
-		"gate_unlocked emitting — door visual opens; waiting for player door-walk"
-			+ " to fire gate_traversed")
+		(
+			"gate_unlocked emitting — door visual opens; waiting for player door-walk"
+			+ " to fire gate_traversed"
+		)
+	)
 	gate_unlocked.emit()
 	# **Knockback-overlap fix (ticket 86c9ujf5v / 86c9ujf14).**
 	# Godot 4 `body_entered` fires once per non-overlap → overlap TRANSITION.
@@ -430,8 +443,10 @@ func _unlock() -> void:
 	if is_inside_tree() and not _traversed_emitted:
 		for body in get_overlapping_bodies():
 			if body is CharacterBody2D:
-				_combat_trace("RoomGate._unlock",
-					"player already overlapping on unlock — deferring gate_traversed (knockback-overlap fix)")
+				_combat_trace(
+					"RoomGate._unlock",
+					"player already overlapping on unlock — deferring gate_traversed (knockback-overlap fix)"
+				)
 				call_deferred("_fire_traversal_if_unlocked")
 				break
 
@@ -446,8 +461,10 @@ func _fire_traversal_if_unlocked() -> void:
 	if _traversed_emitted:
 		return
 	_traversed_emitted = true
-	_combat_trace("RoomGate.gate_traversed",
-		"player walked through open door — emitting gate_traversed (deferred from unlock overlap)")
+	_combat_trace(
+		"RoomGate.gate_traversed",
+		"player walked through open door — emitting gate_traversed (deferred from unlock overlap)"
+	)
 	gate_traversed.emit()
 
 

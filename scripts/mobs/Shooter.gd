@@ -116,7 +116,7 @@ const HIT_FLASH_OUT: float = 0.040
 const DEATH_TWEEN_DURATION: float = 0.200
 const DEATH_PARTICLE_COUNT: int = 6
 const DEATH_TARGET_SCALE: float = 0.6
-const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)   # #FFB066
+const EMBER_LIGHT: Color = Color(1.0, 0.690, 0.400, 1.0)  # #FFB066
 const EMBER_DEEP: Color = Color(0.627, 0.180, 0.031, 1.0)  # #A02E08
 
 ## Hit-flash modulate tint for the AnimatedSprite2D path (M3W-1 / M3W-3 convention).
@@ -221,6 +221,7 @@ func _ready() -> void:
 
 # ---- Public API -------------------------------------------------------
 
+
 func get_state() -> StringName:
 	return _state
 
@@ -261,8 +262,9 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 	var clean_amount: int = max(0, amount)
 	var hp_before: int = hp_current
 	hp_current = max(0, hp_current - clean_amount)
-	_combat_trace("Shooter.take_damage",
-		"amount=%d hp=%d->%d" % [clean_amount, hp_before, hp_current])
+	_combat_trace(
+		"Shooter.take_damage", "amount=%d hp=%d->%d" % [clean_amount, hp_before, hp_current]
+	)
 	damaged.emit(clean_amount, hp_current, source)
 	# Visual: red-wash hit-flash + hit anim, kicked off only when actual damage
 	# was dealt.
@@ -276,6 +278,7 @@ func take_damage(amount: int, knockback: Vector2, source: Node) -> void:
 
 
 # ---- Physics tick -----------------------------------------------------
+
 
 func _physics_process(delta: float) -> void:
 	if _is_dead:
@@ -293,10 +296,13 @@ func _physics_process(delta: float) -> void:
 		var dist_to_player: float = -1.0
 		if _player != null:
 			dist_to_player = (_player.global_position - global_position).length()
-		_combat_trace("Shooter.pos",
-			"pos=(%.0f,%.0f) state=%s hp=%d dist_to_player=%.0f" % [
-				global_position.x, global_position.y, _state, hp_current, dist_to_player
-			])
+		_combat_trace(
+			"Shooter.pos",
+			(
+				"pos=(%.0f,%.0f) state=%s hp=%d dist_to_player=%.0f"
+				% [global_position.x, global_position.y, _state, hp_current, dist_to_player]
+			)
+		)
 
 	match _state:
 		STATE_IDLE:
@@ -318,6 +324,7 @@ func _physics_process(delta: float) -> void:
 
 
 # ---- State handlers ---------------------------------------------------
+
 
 func _process_idle(_delta: float) -> void:
 	velocity = Vector2.ZERO
@@ -362,9 +369,13 @@ func _process_aiming(_delta: float) -> void:
 			# the remaining windup completes standing still — and now the
 			# projectile actually has a chance to reach the player.
 			velocity = _vec_to_player_dir() * move_speed
-			_combat_trace("Shooter._process_aiming",
-				"dist=%.0f > SHOOT_RANGE=%.0f, velocity=(%.0f,%.0f)"
-					% [dist, SHOOT_RANGE, velocity.x, velocity.y])
+			_combat_trace(
+				"Shooter._process_aiming",
+				(
+					"dist=%.0f > SHOOT_RANGE=%.0f, velocity=(%.0f,%.0f)"
+					% [dist, SHOOT_RANGE, velocity.x, velocity.y]
+				)
+			)
 		else:
 			velocity = Vector2.ZERO
 	else:
@@ -400,9 +411,13 @@ func _process_post_fire(_delta: float) -> void:
 		if dist > SHOOT_RANGE:
 			# Still out of effective firing range — keep closing during recovery.
 			velocity = _vec_to_player_dir() * move_speed
-			_combat_trace("Shooter._process_post_fire",
-				"dist=%.0f > SHOOT_RANGE=%.0f, closing gap at move_speed=%.0f"
-					% [dist, SHOOT_RANGE, move_speed])
+			_combat_trace(
+				"Shooter._process_post_fire",
+				(
+					"dist=%.0f > SHOOT_RANGE=%.0f, closing gap at move_speed=%.0f"
+					% [dist, SHOOT_RANGE, move_speed]
+				)
+			)
 		else:
 			velocity = Vector2.ZERO
 	else:
@@ -468,9 +483,13 @@ func _promote_cornered_to_aiming(dist: float) -> void:
 	_cornered_kite_ticks = 0
 	_aim_left = CORNERED_AIM_DURATION
 	_last_aim_dir = _vec_to_player_dir()
-	_combat_trace("Shooter._promote_cornered_to_aiming",
-		"CORNERED dist=%.0f wall-blocked, promote to AIMING (windup=%.2fs)"
-			% [dist, CORNERED_AIM_DURATION])
+	_combat_trace(
+		"Shooter._promote_cornered_to_aiming",
+		(
+			"CORNERED dist=%.0f wall-blocked, promote to AIMING (windup=%.2fs)"
+			% [dist, CORNERED_AIM_DURATION]
+		)
+	)
 	_set_state(STATE_AIMING)
 	aim_started.emit(_last_aim_dir)
 	_play_attack_telegraph()
@@ -480,6 +499,7 @@ func _promote_cornered_to_aiming(dist: float) -> void:
 
 
 # ---- Decision helpers ------------------------------------------------
+
 
 func _pick_post_spotted_state() -> void:
 	if _player == null:
@@ -538,6 +558,7 @@ func _enter_kite() -> void:
 
 # ---- Projectile spawn ------------------------------------------------
 
+
 func _spawn_projectile(dir: Vector2) -> void:
 	var d: Vector2 = dir
 	if d.length_squared() <= 0.0:
@@ -566,7 +587,8 @@ func _spawn_projectile(dir: Vector2) -> void:
 		PROJECTILE_LIFETIME,
 		Projectile.TEAM_ENEMY,
 		self,
-		PROJECTILE_KNOCKBACK)
+		PROJECTILE_KNOCKBACK
+	)
 	# Spawn at the shooter's position. Parent under the shooter's parent so
 	# the projectile outlives the shooter (player should still take the hit
 	# of an in-flight projectile from a corpse — the projectile is its own
@@ -582,6 +604,7 @@ func _spawn_projectile(dir: Vector2) -> void:
 
 
 # ---- Death ------------------------------------------------------------
+
 
 func _die() -> void:
 	if _is_dead:
@@ -607,6 +630,7 @@ func _die() -> void:
 
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
 
+
 ## Attack-telegraph visual (player-journey.md Beat 6 + M1 RC soak-4):
 ## tween the Sprite child's color to red for the aim window (AIM_DURATION).
 ## Sub-1.0 all channels for HTML5 gl_compatibility safety (PR #137 lesson).
@@ -631,15 +655,22 @@ func _play_attack_telegraph() -> void:
 	var prop: String = "color" if uses_sprite else "modulate"
 	var hold_dur: float = max(0.0, AIM_DURATION - ATTACK_TELEGRAPH_TWEEN_IN * 2.0)
 	_attack_telegraph_tween.tween_property(
-		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN)
+		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN
+	)
 	_attack_telegraph_tween.tween_property(target, prop, ATTACK_TELEGRAPH_TINT, hold_dur)
-	_attack_telegraph_tween.tween_property(
-		target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
-	_combat_trace("Shooter._play_attack_telegraph",
-		"tween_valid=%s tint=(%.2f,%.2f,%.2f)" % [
-			_attack_telegraph_tween.is_valid(),
-			ATTACK_TELEGRAPH_TINT.r, ATTACK_TELEGRAPH_TINT.g, ATTACK_TELEGRAPH_TINT.b
-		])
+	_attack_telegraph_tween.tween_property(target, prop, color_at_rest, ATTACK_TELEGRAPH_TWEEN_IN)
+	_combat_trace(
+		"Shooter._play_attack_telegraph",
+		(
+			"tween_valid=%s tint=(%.2f,%.2f,%.2f)"
+			% [
+				_attack_telegraph_tween.is_valid(),
+				ATTACK_TELEGRAPH_TINT.r,
+				ATTACK_TELEGRAPH_TINT.g,
+				ATTACK_TELEGRAPH_TINT.b
+			]
+		)
+	)
 
 
 func _cancel_attack_telegraph_tween() -> void:
@@ -682,13 +713,24 @@ func _play_hit_flash() -> void:
 		var asprite: AnimatedSprite2D = _hit_flash_target as AnimatedSprite2D
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_IN)
 		_hit_flash_tween.tween_property(asprite, "modulate", HIT_FLASH_TINT, HIT_FLASH_HOLD)
-		_hit_flash_tween.tween_property(asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT)
-		_combat_trace("Shooter._play_hit_flash",
-			"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)" % [
-				_hit_flash_tween.is_valid(),
-				HIT_FLASH_TINT.r, HIT_FLASH_TINT.g, HIT_FLASH_TINT.b,
-				_sprite_modulate_at_rest.r, _sprite_modulate_at_rest.g, _sprite_modulate_at_rest.b
-			])
+		_hit_flash_tween.tween_property(
+			asprite, "modulate", _sprite_modulate_at_rest, HIT_FLASH_OUT
+		)
+		_combat_trace(
+			"Shooter._play_hit_flash",
+			(
+				"animated_sprite tween_valid=%s tint=(%.2f,%.2f,%.2f) rest=(%.2f,%.2f,%.2f)"
+				% [
+					_hit_flash_tween.is_valid(),
+					HIT_FLASH_TINT.r,
+					HIT_FLASH_TINT.g,
+					HIT_FLASH_TINT.b,
+					_sprite_modulate_at_rest.r,
+					_sprite_modulate_at_rest.g,
+					_sprite_modulate_at_rest.b
+				]
+			)
+		)
 	elif _hit_flash_uses_sprite:
 		var sprite_rect: ColorRect = _hit_flash_target as ColorRect
 		_hit_flash_tween.tween_property(sprite_rect, "color", Color(1, 1, 1, 1), HIT_FLASH_IN)
@@ -712,7 +754,8 @@ func _play_death_tween() -> void:
 	_death_tween = create_tween()
 	_death_tween.set_parallel(true)
 	_death_tween.tween_property(
-		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION)
+		self, "scale", Vector2(DEATH_TARGET_SCALE, DEATH_TARGET_SCALE), DEATH_TWEEN_DURATION
+	)
 	_death_tween.tween_property(self, "modulate:a", 0.0, DEATH_TWEEN_DURATION)
 	_death_tween.finished.connect(_on_death_tween_finished)
 	# Safety-net: parallel timer fires queue_free even if tween_finished hangs.
@@ -743,6 +786,7 @@ func _combat_trace(tag: String, msg: String = "") -> void:
 
 
 # ---- M3W-7 audio-cue wiring -------------------------------------------
+
 
 ## Connect existing combat signals to AudioDirector SFX plays.
 ##   damaged(amount>0)           → SFX_MOB_HIT
@@ -802,6 +846,7 @@ func _on_projectile_fired_audio(_projectile: Node, _dir: Vector2) -> void:
 
 # ---- Animation playback (M3W-3) --------------------------------------
 
+
 ## Play an animation on the AnimatedSprite2D child. Lazy-resolves the child on
 ## first call. State-key prefixes: `walk`, `telegraph`, `atk`, `hit`, `die`.
 ##
@@ -825,8 +870,9 @@ func _play_anim(state: StringName) -> void:
 	var dir_suffix: String = _compute_facing_dir_suffix()
 	var anim_name: StringName = StringName("%s_%s" % [state, dir_suffix])
 	if not _animated_sprite.sprite_frames.has_animation(anim_name):
-		_combat_trace("Shooter._play_anim",
-			"MISS anim=%s — SpriteFrames lacks this animation key" % anim_name)
+		_combat_trace(
+			"Shooter._play_anim", "MISS anim=%s — SpriteFrames lacks this animation key" % anim_name
+		)
 		return
 	if _animated_sprite.animation == anim_name and _animated_sprite.is_playing():
 		return
@@ -894,6 +940,7 @@ func _spawn_death_particles() -> void:
 
 # ---- Helpers ----------------------------------------------------------
 
+
 func _vec_to_player_dir() -> Vector2:
 	if _player == null:
 		return Vector2.RIGHT
@@ -925,9 +972,13 @@ func _set_state(new_state: StringName) -> void:
 	var dist: float = -1.0
 	if _player != null and is_inside_tree():
 		dist = (_player.global_position - global_position).length()
-	_combat_trace("Shooter._set_state",
-		"%s -> %s dist=%.0f pos=(%.0f,%.0f)"
-			% [old, new_state, dist, global_position.x, global_position.y])
+	_combat_trace(
+		"Shooter._set_state",
+		(
+			"%s -> %s dist=%.0f pos=(%.0f,%.0f)"
+			% [old, new_state, dist, global_position.x, global_position.y]
+		)
+	)
 	# M3W-3 animation playback. State→anim mapping per `Shooter.gd`'s 3-band
 	# engagement design (see `.claude/docs/combat-architecture.md` §"Shooter
 	# state machine"). KITING walks away → walk anim. AIMING is the windup

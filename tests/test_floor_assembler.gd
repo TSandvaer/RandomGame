@@ -58,10 +58,7 @@ func after_each() -> void:
 ## Build a minimal well-formed chunk with WEST entry + EAST exit ports on
 ## row y=4, 15×8 tiles at 32 px. Matches the S1 chunk shape exactly so
 ## fixture chunks mate cleanly out of the box.
-func _make_chunk(
-	id: StringName,
-	exit_tag: StringName = &"exit"
-) -> LevelChunkDef:
+func _make_chunk(id: StringName, exit_tag: StringName = &"exit") -> LevelChunkDef:
 	var c: LevelChunkDef = LevelChunkDefScript.new()
 	c.id = id
 	c.size_tiles = Vector2i(15, 8)
@@ -150,7 +147,7 @@ func _make_fixture_zone() -> Dictionary:
 	var chunks: Dictionary = {
 		&"fx_entry": _make_chunk_entry_plus_east(&"fx_entry"),
 		&"fx_quest": _make_chunk(&"fx_quest"),
-		&"fx_exit":  _make_chunk(&"fx_exit"),
+		&"fx_exit": _make_chunk(&"fx_exit"),
 		&"fx_pool_a": _make_chunk(&"fx_pool_a"),
 		&"fx_pool_b": _make_chunk(&"fx_pool_b"),
 	}
@@ -173,14 +170,20 @@ func test_assemble_same_seed_yields_identical_placement() -> void:
 
 	assert_eq(a.chunk_count(), b.chunk_count(), "chunk count identical")
 	for i: int in range(a.chunk_count()):
-		assert_eq(a.placed_chunks[i].chunk_id, b.placed_chunks[i].chunk_id,
-			"chunk[%d] id identical" % i)
-		assert_eq(a.placed_chunks[i].kind, b.placed_chunks[i].kind,
-			"chunk[%d] kind identical" % i)
-		assert_eq(a.placed_chunks[i].position_px, b.placed_chunks[i].position_px,
-			"chunk[%d] position identical" % i)
-		assert_eq(a.placed_chunks[i].anchor_room_id, b.placed_chunks[i].anchor_room_id,
-			"chunk[%d] anchor_room_id identical" % i)
+		assert_eq(
+			a.placed_chunks[i].chunk_id, b.placed_chunks[i].chunk_id, "chunk[%d] id identical" % i
+		)
+		assert_eq(a.placed_chunks[i].kind, b.placed_chunks[i].kind, "chunk[%d] kind identical" % i)
+		assert_eq(
+			a.placed_chunks[i].position_px,
+			b.placed_chunks[i].position_px,
+			"chunk[%d] position identical" % i
+		)
+		assert_eq(
+			a.placed_chunks[i].anchor_room_id,
+			b.placed_chunks[i].anchor_room_id,
+			"chunk[%d] anchor_room_id identical" % i
+		)
 	assert_eq(a.bounding_box_px, b.bounding_box_px, "bounding box identical")
 	assert_eq(a.seed, b.seed, "seed field identical")
 
@@ -206,8 +209,9 @@ func test_assemble_different_seeds_produce_different_placements() -> void:
 	var unique: Dictionary = {}
 	for v: String in signatures.values():
 		unique[v] = true
-	assert_gt(unique.size(), 1,
-		"8 distinct seeds produced only one placement signature — seeded RNG dead")
+	assert_gt(
+		unique.size(), 1, "8 distinct seeds produced only one placement signature — seeded RNG dead"
+	)
 
 
 # -----------------------------------------------------------------------
@@ -230,14 +234,19 @@ func test_slot_count_between_anchors_within_bounds() -> void:
 		for i: int in range(f.placed_chunks.size()):
 			if f.placed_chunks[i].kind == &"anchor":
 				anchor_indices.append(i)
-		assert_eq(anchor_indices.size(), fx["zone"].anchors.size(),
-			"anchor count must equal input (seed=%d)" % s)
+		assert_eq(
+			anchor_indices.size(),
+			fx["zone"].anchors.size(),
+			"anchor count must equal input (seed=%d)" % s
+		)
 		for gap: int in range(anchor_indices.size() - 1):
 			var run: int = anchor_indices[gap + 1] - anchor_indices[gap] - 1
 			assert_true(
 				run >= min_s and run <= max_s,
-				"gap[%d] for seed=%d had %d procedural slots, expected [%d, %d]"
-				% [gap, s, run, min_s, max_s]
+				(
+					"gap[%d] for seed=%d had %d procedural slots, expected [%d, %d]"
+					% [gap, s, run, min_s, max_s]
+				)
 			)
 
 
@@ -288,8 +297,9 @@ func test_anchors_placed_in_input_order_with_room_ids_preserved() -> void:
 	var expected: Array[StringName] = []
 	for a: ZoneAnchor in fx["zone"].anchors:
 		expected.append(a.room_id)
-	assert_eq(anchor_room_ids, expected,
-		"anchor order + room_ids must mirror input zone_def.anchors")
+	assert_eq(
+		anchor_room_ids, expected, "anchor order + room_ids must mirror input zone_def.anchors"
+	)
 
 
 # -----------------------------------------------------------------------
@@ -324,9 +334,11 @@ func test_chunks_laid_out_left_to_right_no_overlap() -> void:
 		var left: PlacedChunk = f.placed_chunks[i]
 		var right: PlacedChunk = f.placed_chunks[i + 1]
 		var left_right_edge: float = left.position_px.x + float(left.size_px.x)
-		assert_eq(right.position_px.x, left_right_edge,
-			"chunk[%d].right_edge == chunk[%d].left_edge (no overlap, no gap)"
-				% [i, i + 1])
+		assert_eq(
+			right.position_px.x,
+			left_right_edge,
+			"chunk[%d].right_edge == chunk[%d].left_edge (no overlap, no gap)" % [i, i + 1]
+		)
 
 
 # -----------------------------------------------------------------------
@@ -342,8 +354,9 @@ func test_fixture_zone_has_zero_port_mating_errors() -> void:
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	for s: int in [1, 2, 3, 7, 13, 42, 100, 999]:
 		var f: AssembledFloor = asm.assemble_floor(fx["zone"], s, fx["chunks"])
-		assert_true(f.is_well_mated(),
-			"seed=%d produced mating errors: %s" % [s, str(f.port_mating_errors)])
+		assert_true(
+			f.is_well_mated(), "seed=%d produced mating errors: %s" % [s, str(f.port_mating_errors)]
+		)
 
 
 func test_port_mismatch_recorded_not_raised() -> void:
@@ -370,8 +383,11 @@ func test_port_mismatch_recorded_not_raised() -> void:
 	var f: AssembledFloor = asm.assemble_floor(zone, 1, chunks)
 	assert_eq(f.chunk_count(), 2, "both chunks still placed despite mating gap")
 	assert_false(f.is_well_mated(), "mating error must be recorded")
-	assert_eq(f.port_mating_errors.size(), 1,
-		"expected exactly 1 mating error, got: %s" % str(f.port_mating_errors))
+	assert_eq(
+		f.port_mating_errors.size(),
+		1,
+		"expected exactly 1 mating error, got: %s" % str(f.port_mating_errors)
+	)
 
 
 # -----------------------------------------------------------------------
@@ -438,8 +454,10 @@ func test_derive_stratum_seed_is_deterministic() -> void:
 
 	var c: int = FloorAssemblerScript.derive_stratum_seed(0xC001D00D, 2)
 	var d: int = FloorAssemblerScript.derive_stratum_seed(0xDEADBEEF, 1)
-	assert_true(a != c or a != d,
-		"different (world_seed, stratum_id) must produce at least one differing stratum_seed")
+	assert_true(
+		a != c or a != d,
+		"different (world_seed, stratum_id) must produce at least one differing stratum_seed"
+	)
 
 
 func test_derive_zone_seed_is_deterministic() -> void:
@@ -449,8 +467,10 @@ func test_derive_zone_seed_is_deterministic() -> void:
 
 	var c: int = FloorAssemblerScript.derive_zone_seed(0xBEEF, &"s1_z2_other")
 	var d: int = FloorAssemblerScript.derive_zone_seed(0xCAFE, &"s1_z1_outer_cloister")
-	assert_true(a != c or a != d,
-		"different (stratum_seed, zone_id) must produce at least one differing zone_seed")
+	assert_true(
+		a != c or a != d,
+		"different (stratum_seed, zone_id) must produce at least one differing zone_seed"
+	)
 
 
 # -----------------------------------------------------------------------
@@ -468,15 +488,16 @@ func test_assemble_authored_s1_z1_outer_cloister_round_trip() -> void:
 	assert_not_null(zone, "s1_z1_outer_cloister.tres must load as ZoneDef")
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	var seed: int = FloorAssemblerScript.derive_zone_seed(
-		FloorAssemblerScript.derive_stratum_seed(0xC001D00D, 1),
-		zone.zone_id
+		FloorAssemblerScript.derive_stratum_seed(0xC001D00D, 1), zone.zone_id
 	)
 	var f: AssembledFloor = asm.assemble_floor(zone, seed)
 	assert_false(f.is_empty(), "production zone must assemble: %s" % str(f.port_mating_errors))
 	assert_eq(f.anchor_count(), 9, "S1 z1 has 9 anchors (8 unique chunks; room08 boss + exit)")
 	# Procedural count is between (n-1)*min and (n-1)*max = 8*0=0..8*1=8.
-	assert_true(f.procedural_count() >= 0 and f.procedural_count() <= 8,
-		"S1 z1 procedural count %d out of [0, 8]" % f.procedural_count())
+	assert_true(
+		f.procedural_count() >= 0 and f.procedural_count() <= 8,
+		"S1 z1 procedural count %d out of [0, 8]" % f.procedural_count()
+	)
 
 
 func test_assemble_authored_s1_z1_same_seed_identical_across_runs() -> void:
@@ -515,12 +536,18 @@ func test_assemble_authored_s1_z1_room01_east_seam_now_mates() -> void:
 	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	var f: AssembledFloor = asm.assemble_floor(zone, 1)
-	assert_true(f.is_well_mated(),
-		"production S1 z1 zone must mate cleanly after W2 retrofit, got: %s"
-			% str(f.port_mating_errors))
+	assert_true(
+		f.is_well_mated(),
+		(
+			"production S1 z1 zone must mate cleanly after W2 retrofit, got: %s"
+			% str(f.port_mating_errors)
+		)
+	)
 	for err: String in f.port_mating_errors:
-		assert_false(err.find("s1_room01") >= 0,
-			"unexpected s1_room01 mating finding after W2 east-seam fix: %s" % err)
+		assert_false(
+			err.find("s1_room01") >= 0,
+			"unexpected s1_room01 mating finding after W2 east-seam fix: %s" % err
+		)
 
 
 func test_assemble_authored_s1_z1_boss_door_mates_cleanly() -> void:
@@ -535,8 +562,10 @@ func test_assemble_authored_s1_z1_boss_door_mates_cleanly() -> void:
 	# mentions s1_room08 (the boss_door chunk) at the boss/exit seam.
 	var f: AssembledFloor = asm.assemble_floor(zone, 42)
 	for err: String in f.port_mating_errors:
-		assert_false(err.find("s1_room08") >= 0 and err.find("no shared seam row") >= 0,
-			"boss_door tag must mate cleanly; unexpected s1_room08 seam-row error: %s" % err)
+		assert_false(
+			err.find("s1_room08") >= 0 and err.find("no shared seam row") >= 0,
+			"boss_door tag must mate cleanly; unexpected s1_room08 seam-row error: %s" % err
+		)
 
 
 # -----------------------------------------------------------------------
@@ -557,9 +586,10 @@ func test_s1_z1_clean_mating_across_8_seeds() -> void:
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	for s: int in [1, 2, 3, 7, 13, 42, 100, 999]:
 		var f: AssembledFloor = asm.assemble_floor(zone, s)
-		assert_true(f.is_well_mated(),
-			"seed=%d produced mating errors after W2 retrofit: %s"
-				% [s, str(f.port_mating_errors)])
+		assert_true(
+			f.is_well_mated(),
+			"seed=%d produced mating errors after W2 retrofit: %s" % [s, str(f.port_mating_errors)]
+		)
 
 
 func test_s1_z1_all_8_unique_chunks_referenced() -> void:
@@ -572,9 +602,13 @@ func test_s1_z1_all_8_unique_chunks_referenced() -> void:
 		anchor_chunk_ids[a.chunk_id] = true
 	for i: int in range(1, 9):
 		var expected: StringName = StringName("s1_room%02d" % i)
-		assert_true(anchor_chunk_ids.has(expected),
-			"S1 z1 must declare %s as an anchor chunk_id (got anchors %s)"
-				% [str(expected), str(anchor_chunk_ids.keys())])
+		assert_true(
+			anchor_chunk_ids.has(expected),
+			(
+				"S1 z1 must declare %s as an anchor chunk_id (got anchors %s)"
+				% [str(expected), str(anchor_chunk_ids.keys())]
+			)
+		)
 
 
 func test_s1_z1_anchors_have_deterministic_relative_order_across_seeds() -> void:
@@ -593,9 +627,14 @@ func test_s1_z1_anchors_have_deterministic_relative_order_across_seeds() -> void
 		for pc: PlacedChunk in f.placed_chunks:
 			if pc.kind == &"anchor":
 				observed.append(pc.anchor_room_id)
-		assert_eq(observed, expected_room_ids,
-			"seed=%d anchor order must match input zone_def.anchors (got %s, want %s)"
-				% [s, str(observed), str(expected_room_ids)])
+		assert_eq(
+			observed,
+			expected_room_ids,
+			(
+				"seed=%d anchor order must match input zone_def.anchors (got %s, want %s)"
+				% [s, str(observed), str(expected_room_ids)]
+			)
+		)
 
 
 func test_s1_z1_total_chunk_count_in_documented_bounds() -> void:
@@ -607,9 +646,10 @@ func test_s1_z1_total_chunk_count_in_documented_bounds() -> void:
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	for s: int in [1, 2, 3, 7, 13, 42, 100, 999]:
 		var f: AssembledFloor = asm.assemble_floor(zone, s)
-		assert_true(f.chunk_count() >= 9 and f.chunk_count() <= 17,
-			"seed=%d total chunk count %d outside documented [9, 17]"
-				% [s, f.chunk_count()])
+		assert_true(
+			f.chunk_count() >= 9 and f.chunk_count() <= 17,
+			"seed=%d total chunk count %d outside documented [9, 17]" % [s, f.chunk_count()]
+		)
 		assert_eq(f.anchor_count(), 9, "seed=%d anchor count must equal 9" % s)
 
 
@@ -625,14 +665,22 @@ func test_s1_z1_same_seed_bit_identical_across_runs() -> void:
 	var b: AssembledFloor = asm.assemble_floor(zone, seed)
 	assert_eq(a.chunk_count(), b.chunk_count())
 	for i: int in range(a.chunk_count()):
-		assert_eq(a.placed_chunks[i].chunk_id, b.placed_chunks[i].chunk_id,
-			"chunk[%d] chunk_id identical" % i)
-		assert_eq(a.placed_chunks[i].position_px, b.placed_chunks[i].position_px,
-			"chunk[%d] position identical" % i)
-		assert_eq(a.placed_chunks[i].kind, b.placed_chunks[i].kind,
-			"chunk[%d] kind identical" % i)
-		assert_eq(a.placed_chunks[i].anchor_room_id, b.placed_chunks[i].anchor_room_id,
-			"chunk[%d] anchor_room_id identical" % i)
+		assert_eq(
+			a.placed_chunks[i].chunk_id,
+			b.placed_chunks[i].chunk_id,
+			"chunk[%d] chunk_id identical" % i
+		)
+		assert_eq(
+			a.placed_chunks[i].position_px,
+			b.placed_chunks[i].position_px,
+			"chunk[%d] position identical" % i
+		)
+		assert_eq(a.placed_chunks[i].kind, b.placed_chunks[i].kind, "chunk[%d] kind identical" % i)
+		assert_eq(
+			a.placed_chunks[i].anchor_room_id,
+			b.placed_chunks[i].anchor_room_id,
+			"chunk[%d] anchor_room_id identical" % i
+		)
 
 
 func test_s1_z1_per_stratum_seed_isolation() -> void:
@@ -643,15 +691,21 @@ func test_s1_z1_per_stratum_seed_isolation() -> void:
 	var world_seed: int = 0xC001D00D
 	var s1_seed: int = FloorAssemblerScript.derive_stratum_seed(world_seed, 1)
 	var s2_seed: int = FloorAssemblerScript.derive_stratum_seed(world_seed, 2)
-	assert_ne(s1_seed, s2_seed,
-		"S1 and S2 stratum_seeds must differ for the same world_seed (got %d == %d)"
-			% [s1_seed, s2_seed])
+	assert_ne(
+		s1_seed,
+		s2_seed,
+		(
+			"S1 and S2 stratum_seeds must differ for the same world_seed (got %d == %d)"
+			% [s1_seed, s2_seed]
+		)
+	)
 	# And the same stratum_id with the same world_seed must be stable
 	# (already pinned by test_derive_stratum_seed_is_deterministic above,
 	# repeated here for the per-zone-impl narrative).
 	var s1_seed_b: int = FloorAssemblerScript.derive_stratum_seed(world_seed, 1)
-	assert_eq(s1_seed, s1_seed_b,
-		"S1 stratum_seed must be stable for the same (world_seed, stratum_id)")
+	assert_eq(
+		s1_seed, s1_seed_b, "S1 stratum_seed must be stable for the same (world_seed, stratum_id)"
+	)
 
 
 func test_s1_z1_per_zone_seed_isolation() -> void:
@@ -662,12 +716,22 @@ func test_s1_z1_per_zone_seed_isolation() -> void:
 	var stratum_seed: int = FloorAssemblerScript.derive_stratum_seed(0xC001D00D, 1)
 	var z1_seed: int = FloorAssemblerScript.derive_zone_seed(stratum_seed, &"s1_z1_outer_cloister")
 	var z2_seed: int = FloorAssemblerScript.derive_zone_seed(stratum_seed, &"s1_z2_inner_cloister")
-	assert_ne(z1_seed, z2_seed,
-		"Different zone_ids must produce different zone_seeds under the same stratum_seed (got %d == %d)"
-			% [z1_seed, z2_seed])
-	var z1_seed_b: int = FloorAssemblerScript.derive_zone_seed(stratum_seed, &"s1_z1_outer_cloister")
-	assert_eq(z1_seed, z1_seed_b,
-		"Same zone_id must produce the same zone_seed under the same stratum_seed")
+	assert_ne(
+		z1_seed,
+		z2_seed,
+		(
+			"Different zone_ids must produce different zone_seeds under the same stratum_seed (got %d == %d)"
+			% [z1_seed, z2_seed]
+		)
+	)
+	var z1_seed_b: int = FloorAssemblerScript.derive_zone_seed(
+		stratum_seed, &"s1_z1_outer_cloister"
+	)
+	assert_eq(
+		z1_seed,
+		z1_seed_b,
+		"Same zone_id must produce the same zone_seed under the same stratum_seed"
+	)
 
 
 func test_s1_z1_different_seeds_produce_different_layouts() -> void:
@@ -689,8 +753,11 @@ func test_s1_z1_different_seeds_produce_different_layouts() -> void:
 	var unique: Dictionary = {}
 	for v: String in signatures.values():
 		unique[v] = true
-	assert_gt(unique.size(), 1,
-		"8 distinct seeds against S1 z1 produced only one placement signature — variance dead")
+	assert_gt(
+		unique.size(),
+		1,
+		"8 distinct seeds against S1 z1 produced only one placement signature — variance dead"
+	)
 
 
 func test_s1_z1_procedural_pool_chunks_resolve_via_load() -> void:
@@ -702,11 +769,13 @@ func test_s1_z1_procedural_pool_chunks_resolve_via_load() -> void:
 	for chunk_id: StringName in zone.procedural_slot_pool:
 		var path: String = "res://resources/level_chunks/%s.tres" % String(chunk_id)
 		var res: Resource = load(path)
-		assert_not_null(res, "procedural pool chunk_id %s must resolve at %s"
-			% [str(chunk_id), path])
-		assert_true(res is LevelChunkDef,
-			"procedural pool chunk_id %s at %s must be a LevelChunkDef"
-				% [str(chunk_id), path])
+		assert_not_null(
+			res, "procedural pool chunk_id %s must resolve at %s" % [str(chunk_id), path]
+		)
+		assert_true(
+			res is LevelChunkDef,
+			"procedural pool chunk_id %s at %s must be a LevelChunkDef" % [str(chunk_id), path]
+		)
 
 
 func test_s1_z1_all_anchor_chunk_ids_resolve_via_load() -> void:
@@ -720,11 +789,11 @@ func test_s1_z1_all_anchor_chunk_ids_resolve_via_load() -> void:
 		seen[a.chunk_id] = true
 		var path: String = "res://resources/level_chunks/%s.tres" % String(a.chunk_id)
 		var res: Resource = load(path)
-		assert_not_null(res, "anchor chunk_id %s must resolve at %s"
-			% [str(a.chunk_id), path])
-		assert_true(res is LevelChunkDef,
-			"anchor chunk_id %s at %s must be a LevelChunkDef"
-				% [str(a.chunk_id), path])
+		assert_not_null(res, "anchor chunk_id %s must resolve at %s" % [str(a.chunk_id), path])
+		assert_true(
+			res is LevelChunkDef,
+			"anchor chunk_id %s at %s must be a LevelChunkDef" % [str(a.chunk_id), path]
+		)
 
 
 func test_s1_room01_now_has_east_exit_port() -> void:
@@ -739,10 +808,12 @@ func test_s1_room01_now_has_east_exit_port() -> void:
 	for p: ChunkPort in chunk.ports:
 		if int(p.direction) == ChunkPort.Direction.EAST and p.tag == &"exit":
 			has_east_exit = true
-			assert_eq(p.position_tiles, Vector2i(14, 4),
-				"s1_room01 EAST exit port must sit at (14, 4) per W2 fix shape")
-	assert_true(has_east_exit,
-		"s1_room01 must declare an EAST &\"exit\" port (W2-T3 east-seam fix)")
+			assert_eq(
+				p.position_tiles,
+				Vector2i(14, 4),
+				"s1_room01 EAST exit port must sit at (14, 4) per W2 fix shape"
+			)
+	assert_true(has_east_exit, 's1_room01 must declare an EAST &"exit" port (W2-T3 east-seam fix)')
 
 
 func test_s1_z1_zone_def_validates_cleanly() -> void:
@@ -751,6 +822,7 @@ func test_s1_z1_zone_def_validates_cleanly() -> void:
 	# at GUT time instead of at the first player's run.
 	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
 	var errors: Array[String] = zone.validate()
-	assert_true(errors.is_empty(),
-		"production S1 z1 ZoneDef.validate() must return empty array; got: %s"
-			% str(errors))
+	assert_true(
+		errors.is_empty(),
+		"production S1 z1 ZoneDef.validate() must return empty array; got: %s" % str(errors)
+	)

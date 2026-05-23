@@ -57,6 +57,7 @@ func get_display_name() -> String:
 
 # ---- Save serialization ------------------------------------------------
 
+
 ## Serialize to a Dictionary matching the save-format.md §"stash" shape.
 ## Returns {} if the item has no def (defensive — a corrupt instance can't
 ## round-trip, and we don't want to write bogus data into the save).
@@ -67,10 +68,15 @@ func to_save_dict() -> Dictionary:
 	for a: AffixRoll in rolled_affixes:
 		if a == null or a.def == null:
 			continue
-		affixes.append({
-			"affix_id": String(a.def.id),
-			"value": a.rolled_value,
-		})
+		(
+			affixes
+			. append(
+				{
+					"affix_id": String(a.def.id),
+					"value": a.rolled_value,
+				}
+			)
+		)
 	return {
 		"id": String(def.id),
 		"tier": int(rolled_tier),
@@ -92,9 +98,8 @@ func to_save_dict() -> Dictionary:
 ## Resolver signature (Callable):
 ##   func resolve(id: StringName) -> Resource:  # ItemDef or AffixDef
 static func from_save_dict(
-		data: Dictionary,
-		item_resolver: Callable,
-		affix_resolver: Callable) -> ItemInstance:
+	data: Dictionary, item_resolver: Callable, affix_resolver: Callable
+) -> ItemInstance:
 	if data == null or data.is_empty():
 		return null
 	var item_id_v: Variant = data.get("id", "")
@@ -108,8 +113,9 @@ static func from_save_dict(
 		# is invisible to NoWarningGuard. The native `push_warning` is still
 		# fired inside WarningBus.warn — console / HTML5 console.warn /
 		# stderr surfaces are unchanged.
-		_emit_warning("ItemInstance.from_save_dict: unknown item id '%s'" % item_id,
-			"unknown_item_id")
+		_emit_warning(
+			"ItemInstance.from_save_dict: unknown item id '%s'" % item_id, "unknown_item_id"
+		)
 		return null
 	var tier_int: int = int(data.get("tier", int(item_def.tier)))
 	var inst: ItemInstance = ItemInstance.new(item_def, tier_int)
@@ -127,9 +133,12 @@ static func from_save_dict(
 			var aff_def: AffixDef = affix_resolver.call(aff_id) as AffixDef
 			if aff_def == null:
 				_emit_warning(
-					"ItemInstance.from_save_dict: unknown affix id '%s' on item '%s'"
-						% [aff_id, item_id],
-					"unknown_affix_id")
+					(
+						"ItemInstance.from_save_dict: unknown affix id '%s' on item '%s'"
+						% [aff_id, item_id]
+					),
+					"unknown_affix_id"
+				)
 				continue
 			var v: float = float(entry.get("value", 0.0))
 			rolls.append(AffixRoll.new(aff_def, v))
@@ -138,6 +147,7 @@ static func from_save_dict(
 
 
 # ---- Display data for hover tooltips -----------------------------------
+
 
 ## Returns one human-readable line per affix for inventory hover display.
 ## Devon's UI work will wire this; for M1 we just expose the strings.

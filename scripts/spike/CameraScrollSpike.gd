@@ -118,7 +118,6 @@ const DEADZONE: Vector2 = Vector2(40.0, 24.0)
 ## scrolling past the authored content.
 const WORLD_BOUNDS: Rect2 = Rect2(0.0, 0.0, 1440.0, 270.0)
 
-
 # ---- Node refs --------------------------------------------------------
 
 @onready var _marker: CharacterBody2D = $PlayerMarker
@@ -127,8 +126,8 @@ const WORLD_BOUNDS: Rect2 = Rect2(0.0, 0.0, 1440.0, 270.0)
 @onready var _hud_mode_label: Label = $HUD/ModeLabel
 @onready var _hud_build_label: Label = $HUD/BuildLabel
 
-
 # ---- Lifecycle --------------------------------------------------------
+
 
 func _ready() -> void:
 	# Reachability check — abort cleanly if CameraDirector missing.
@@ -153,12 +152,24 @@ func _ready() -> void:
 
 	# Static mode label — reflects the engaged configuration.
 	if _hud_mode_label != null:
-		_hud_mode_label.text = "follow_target ON | deadzone=(%.0f,%.0f) | bounds=(0,0,%.0f,%.0f)" % [
-			DEADZONE.x, DEADZONE.y, WORLD_BOUNDS.size.x, WORLD_BOUNDS.size.y]
+		_hud_mode_label.text = (
+			"follow_target ON | deadzone=(%.0f,%.0f) | bounds=(0,0,%.0f,%.0f)"
+			% [DEADZONE.x, DEADZONE.y, WORLD_BOUNDS.size.x, WORLD_BOUNDS.size.y]
+		)
 
-	print("[CameraScrollSpike] ready spawn=(%.0f,%.0f) deadzone=(%.0f,%.0f) bounds=(0,0,%.0f,%.0f)" % [
-		MARKER_SPAWN.x, MARKER_SPAWN.y, DEADZONE.x, DEADZONE.y,
-		WORLD_BOUNDS.size.x, WORLD_BOUNDS.size.y])
+	print(
+		(
+			"[CameraScrollSpike] ready spawn=(%.0f,%.0f) deadzone=(%.0f,%.0f) bounds=(0,0,%.0f,%.0f)"
+			% [
+				MARKER_SPAWN.x,
+				MARKER_SPAWN.y,
+				DEADZONE.x,
+				DEADZONE.y,
+				WORLD_BOUNDS.size.x,
+				WORLD_BOUNDS.size.y
+			]
+		)
+	)
 
 
 func _exit_tree() -> void:
@@ -200,11 +211,13 @@ func _process(_delta: float) -> void:
 	# Live HUD labels — marker + camera positions for visual verification
 	# of follow + clamp behavior during soak.
 	if _marker != null and _hud_marker_pos_label != null:
-		_hud_marker_pos_label.text = "marker=(%.0f, %.0f)" % [
-			_marker.global_position.x, _marker.global_position.y]
+		_hud_marker_pos_label.text = (
+			"marker=(%.0f, %.0f)" % [_marker.global_position.x, _marker.global_position.y]
+		)
 	var cd: Node = get_tree().root.get_node_or_null("CameraDirector")
 	if cd != null and cd.has_method("get_camera") and _hud_camera_pos_label != null:
 		var cam: Camera2D = cd.get_camera()
 		if cam != null:
-			_hud_camera_pos_label.text = "camera=(%.0f, %.0f)" % [
-				cam.global_position.x, cam.global_position.y]
+			_hud_camera_pos_label.text = (
+				"camera=(%.0f, %.0f)" % [cam.global_position.x, cam.global_position.y]
+			)

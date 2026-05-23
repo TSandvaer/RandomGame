@@ -55,16 +55,16 @@ signal prompt_shown(text: String)
 
 ## Emitted when the prompt has fully faded out (or been replaced and the
 ## old fade is done). Tests + future content can chain on this.
-signal prompt_dismissed()
+signal prompt_dismissed
 
 # ---- Anchor enum -----------------------------------------------------
 
 ## Where on screen the prompt renders. Drew's Stage 2b WASD/dodge/strike
 ## beats use CENTER_TOP per Uma's player-journey Beat 4.
 enum AnchorPos {
-	CENTER_TOP,   # near top of screen, centered horizontally (default for first-input prompts)
-	CENTER,       # middle of screen, centered both axes
-	BOTTOM,       # near bottom of screen, centered horizontally (Uma's "centered low" Beat 4 phrasing)
+	CENTER_TOP,  # near top of screen, centered horizontally (default for first-input prompts)
+	CENTER,  # middle of screen, centered both axes
+	BOTTOM,  # near bottom of screen, centered horizontally (Uma's "centered low" Beat 4 phrasing)
 }
 
 # ---- Geometry constants (Uma's player-journey Beat 4 + general HUD typography) ----
@@ -153,6 +153,7 @@ func _ready() -> void:
 
 # ---- Public API -------------------------------------------------------
 
+
 ## Show a prompt with the given text for `duration` seconds at `anchor`.
 ## Replaces any in-flight prompt (kill + restart fade chain). Per Uma
 ## player-journey rule #6 "One prompt at a time, ever."
@@ -163,9 +164,8 @@ func _ready() -> void:
 ## - `anchor` — which screen edge to anchor against. Default CENTER_TOP per
 ##   Uma's first-input-prompt placement.
 func show_prompt(
-		text: String,
-		duration: float = DEFAULT_DURATION,
-		anchor: AnchorPos = AnchorPos.BOTTOM) -> void:
+	text: String, duration: float = DEFAULT_DURATION, anchor: AnchorPos = AnchorPos.BOTTOM
+) -> void:
 	# Replace-on-new-show: kill in-flight tween, restart from current alpha.
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
@@ -219,6 +219,7 @@ func get_current_anchor() -> AnchorPos:
 
 # ---- Signal handler ---------------------------------------------------
 
+
 ## Connected to `TutorialEventBus.tutorial_beat_requested`. Resolves the
 ## beat_id → text via the bus's beat dictionary and calls `show_prompt`.
 func _on_tutorial_beat_requested(beat_id: StringName, anchor: int) -> void:
@@ -240,6 +241,7 @@ func _on_tutorial_beat_requested(beat_id: StringName, anchor: int) -> void:
 
 
 # ---- UI build ---------------------------------------------------
+
 
 func _build_ui() -> void:
 	# Root Control sized to the plate — the screen-anchor is applied in
@@ -297,6 +299,7 @@ func _apply_anchor(anchor: AnchorPos) -> void:
 
 # ---- Tween-callback method refs --------------------------------
 
+
 ## Emit `prompt_shown(text)` — called from the tween's post-fade-in step.
 ## Bound from `show_prompt` so the payload carries the just-shown prompt.
 func _emit_prompt_shown(text: String) -> void:
@@ -309,6 +312,7 @@ func _emit_prompt_dismissed() -> void:
 
 
 # ---- Helpers ---------------------------------------------------
+
 
 func _bus_node() -> Node:
 	var loop: SceneTree = Engine.get_main_loop() as SceneTree

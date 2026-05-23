@@ -43,45 +43,33 @@ extends Resource
 
 @export var vigor_header: String = "VIGOR"
 @export var vigor_sub_header: String = "toughness · health pool · stamina"
-@export_multiline var vigor_body: String = (
-	"+5 max HP per point\n"
-	+ "+1 HP regen / 10 s per point"
-)
+@export_multiline var vigor_body: String = "+5 max HP per point\n" + "+1 HP regen / 10 s per point"
 @export_multiline var vigor_flavor: String = (
-	"\"Vigor is what stands between you and the next bell. "
-	+ "Stack it when the floor bites.\""
+	'"Vigor is what stands between you and the next bell. ' + 'Stack it when the floor bites."'
 )
 
 # ---- Focus (dodge · cooldowns · steady hands) -------------------------
 
 @export var focus_header: String = "FOCUS"
 @export var focus_sub_header: String = "dodge · cooldowns · steady hands"
-@export_multiline var focus_body: String = (
-	"+0.02 s dodge i-frame per point\n"
-	+ "-1% ability cooldown per point"
-)
+@export_multiline
+var focus_body: String = "+0.02 s dodge i-frame per point\n" + "-1% ability cooldown per point"
 @export_multiline var focus_flavor: String = (
-	"\"Focus narrows the world to the next strike. "
-	+ "The flame burns truer for it.\""
+	'"Focus narrows the world to the next strike. ' + 'The flame burns truer for it."'
 )
 
 # ---- Edge (damage · crit · bite) --------------------------------------
 
 @export var edge_header: String = "EDGE"
 @export var edge_sub_header: String = "damage · crit · bite"
-@export_multiline var edge_body: String = (
-	"+1 damage per point\n"
-	+ "+1% crit chance per point"
-)
-@export_multiline var edge_flavor: String = (
-	"\"Edge is the cruelty in your swing. "
-	+ "Sharper, faster, more often.\""
-)
-
+@export_multiline var edge_body: String = "+1 damage per point\n" + "+1% crit chance per point"
+@export_multiline
+var edge_flavor: String = '"Edge is the cruelty in your swing. ' + 'Sharper, faster, more often."'
 
 # ---- Lookup API -------------------------------------------------------
 # StatAllocationPanel.gd resolves stat-id -> string via these accessors so
 # the panel scene doesn't have to inline the @export property names.
+
 
 ## Returns the stat header (caps: VIGOR / FOCUS / EDGE) for the given stat.
 ## Unknown stat id returns "".

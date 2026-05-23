@@ -30,8 +30,8 @@ extends GutTest
 const STREAM_PATH_S1_BOSS: String = "res://audio/music/stratum1/mus-boss-stratum1.ogg"
 const STREAM_PATH_S2_BOSS: String = "res://audio/music/stratum2/mus-boss-stratum2.ogg"
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _audio_director() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("AudioDirector")
@@ -53,14 +53,19 @@ func before_each() -> void:
 
 # ---- AudioDirector S1 boss API contract -------------------------------
 
+
 func test_audio_director_exposes_crossfade_to_boss_stratum1() -> void:
 	var ad: Node = _audio_director()
 	assert_not_null(ad, "AudioDirector autoload must be registered")
-	assert_true(ad.has_method("crossfade_to_boss_stratum1"),
-		"AudioDirector must expose crossfade_to_boss_stratum1() — " +
-		"the M3-T2-W1-T1 wiring contract. Without this method the " +
-		"Stratum1BossRoom._on_entry_sequence_completed_audio handler " +
-		"silently no-ops and the boss room enters silent.")
+	assert_true(
+		ad.has_method("crossfade_to_boss_stratum1"),
+		(
+			"AudioDirector must expose crossfade_to_boss_stratum1() — "
+			+ "the M3-T2-W1-T1 wiring contract. Without this method the "
+			+ "Stratum1BossRoom._on_entry_sequence_completed_audio handler "
+			+ "silently no-ops and the boss room enters silent."
+		)
+	)
 
 
 func test_mus_boss_stratum1_asset_loads() -> void:
@@ -71,11 +76,11 @@ func test_mus_boss_stratum1_asset_loads() -> void:
 	# broken on packed pcks. If the composer ships a missing/corrupt asset
 	# this test fails immediately at CI time, BEFORE Sponsor's HTML5 soak.
 	var stream: Resource = load(STREAM_PATH_S1_BOSS)
-	assert_not_null(stream,
-		"mus-boss-stratum1.ogg must load at %s" % STREAM_PATH_S1_BOSS)
-	assert_true(stream is AudioStream,
-		"mus-boss-stratum1.ogg must be an AudioStream subclass (got %s)" %
-		stream.get_class())
+	assert_not_null(stream, "mus-boss-stratum1.ogg must load at %s" % STREAM_PATH_S1_BOSS)
+	assert_true(
+		stream is AudioStream,
+		"mus-boss-stratum1.ogg must be an AudioStream subclass (got %s)" % stream.get_class()
+	)
 
 
 func test_crossfade_to_boss_stratum1_loads_correct_stream() -> void:
@@ -86,8 +91,11 @@ func test_crossfade_to_boss_stratum1_loads_correct_stream() -> void:
 	ad.complete_pending_fades_for_test()
 	ad.crossfade_to_boss_stratum1(50)
 	ad.complete_pending_fades_for_test()
-	assert_eq(ad.get_last_bgm_path(), STREAM_PATH_S1_BOSS,
-		"crossfade_to_boss_stratum1 must target mus-boss-stratum1.ogg")
+	assert_eq(
+		ad.get_last_bgm_path(),
+		STREAM_PATH_S1_BOSS,
+		"crossfade_to_boss_stratum1 must target mus-boss-stratum1.ogg"
+	)
 
 
 func test_crossfade_to_boss_stratum1_is_unique_not_s2_reuse() -> void:
@@ -97,10 +105,16 @@ func test_crossfade_to_boss_stratum1_is_unique_not_s2_reuse() -> void:
 	var ad: Node = _audio_director()
 	ad.crossfade_to_boss_stratum1(1)
 	ad.complete_pending_fades_for_test()
-	assert_ne(ad.get_last_bgm_path(), STREAM_PATH_S2_BOSS,
-		"S1 boss room MUST play unique S1 music (DECISIONS.md 2026-05-15)")
-	assert_eq(ad.get_last_bgm_path(), STREAM_PATH_S1_BOSS,
-		"S1 boss room plays mus-boss-stratum1, not mus-boss-stratum2")
+	assert_ne(
+		ad.get_last_bgm_path(),
+		STREAM_PATH_S2_BOSS,
+		"S1 boss room MUST play unique S1 music (DECISIONS.md 2026-05-15)"
+	)
+	assert_eq(
+		ad.get_last_bgm_path(),
+		STREAM_PATH_S1_BOSS,
+		"S1 boss room plays mus-boss-stratum1, not mus-boss-stratum2"
+	)
 
 
 func test_crossfade_to_boss_stratum1_leaves_bgm_player_owning_new_stream() -> void:
@@ -112,10 +126,12 @@ func test_crossfade_to_boss_stratum1_leaves_bgm_player_owning_new_stream() -> vo
 	var active_player: AudioStreamPlayer = ad.get_bgm_player()
 	assert_not_null(active_player)
 	assert_not_null(active_player.stream)
-	assert_eq(active_player.stream.resource_path, STREAM_PATH_S1_BOSS,
-		"After crossfade, the active BGM player owns the S1 boss stream")
-	assert_eq(active_player.bus, "BGM",
-		"S1 boss music routes to the BGM bus")
+	assert_eq(
+		active_player.stream.resource_path,
+		STREAM_PATH_S1_BOSS,
+		"After crossfade, the active BGM player owns the S1 boss stream"
+	)
+	assert_eq(active_player.bus, "BGM", "S1 boss music routes to the BGM bus")
 
 
 func test_crossfade_to_boss_stratum1_is_idempotent() -> void:
@@ -127,11 +143,13 @@ func test_crossfade_to_boss_stratum1_is_idempotent() -> void:
 	var stream_before: AudioStream = ad.get_bgm_player().stream
 	ad.crossfade_to_boss_stratum1(1)
 	var stream_after: AudioStream = ad.get_bgm_player().stream
-	assert_eq(stream_before, stream_after,
-		"Repeated crossfade_to_boss_stratum1 calls must not re-swap")
+	assert_eq(
+		stream_before, stream_after, "Repeated crossfade_to_boss_stratum1 calls must not re-swap"
+	)
 
 
 # ---- Stratum1BossRoom wiring ------------------------------------------
+
 
 func _make_boss_room() -> Stratum1BossRoom:
 	# Constructs a boss room scene without the real boss instance, so the
@@ -159,9 +177,14 @@ func test_stratum1_boss_room_wires_entry_sequence_completed_to_audio() -> void:
 	# `entry_sequence_completed` after _ready is the audio handler.
 	# (Tests may add their own subscribers; we assert ≥ 1.)
 	var connections: Array = room.entry_sequence_completed.get_connections()
-	assert_gte(connections.size(), 1,
-		"Stratum1BossRoom._ready must wire entry_sequence_completed to " +
-		"the audio handler. Found %d connections." % connections.size())
+	assert_gte(
+		connections.size(),
+		1,
+		(
+			"Stratum1BossRoom._ready must wire entry_sequence_completed to "
+			+ "the audio handler. Found %d connections." % connections.size()
+		)
+	)
 
 
 func test_stratum1_boss_room_audio_wiring_is_idempotent() -> void:
@@ -181,9 +204,14 @@ func test_stratum1_boss_room_audio_wiring_is_idempotent() -> void:
 	for c in connections:
 		if c.has("callable") and c["callable"].get_method() == "_on_entry_sequence_completed_audio":
 			audio_handler_count += 1
-	assert_eq(audio_handler_count, 1,
-		"_on_entry_sequence_completed_audio is connected exactly once " +
-		"after triple-wire (got %d connections)" % audio_handler_count)
+	assert_eq(
+		audio_handler_count,
+		1,
+		(
+			"_on_entry_sequence_completed_audio is connected exactly once "
+			+ "after triple-wire (got %d connections)" % audio_handler_count
+		)
+	)
 
 
 func test_entry_sequence_completed_fires_crossfade() -> void:
@@ -197,8 +225,9 @@ func test_entry_sequence_completed_fires_crossfade() -> void:
 	# _last_bgm_path (otherwise the assertion is vacuously satisfied).
 	ad.stop_all_music(1)
 	ad.complete_pending_fades_for_test()
-	assert_ne(ad.get_last_bgm_path(), STREAM_PATH_S1_BOSS,
-		"sanity: pre-condition cleared S1 boss path")
+	assert_ne(
+		ad.get_last_bgm_path(), STREAM_PATH_S1_BOSS, "sanity: pre-condition cleared S1 boss path"
+	)
 	# Spin up a room and fire the signal directly (not via the timer —
 	# tests don't simulate wall-clock waits for the 1.8 s entry sequence).
 	var room: Stratum1BossRoom = _make_boss_room()
@@ -210,6 +239,11 @@ func test_entry_sequence_completed_fires_crossfade() -> void:
 	# Drain the fade tween so _last_bgm_path is observable as the final
 	# state, not mid-transition.
 	ad.complete_pending_fades_for_test()
-	assert_eq(ad.get_last_bgm_path(), STREAM_PATH_S1_BOSS,
-		"entry_sequence_completed must result in S1 boss BGM crossfade " +
-		"(got _last_bgm_path=%s)" % ad.get_last_bgm_path())
+	assert_eq(
+		ad.get_last_bgm_path(),
+		STREAM_PATH_S1_BOSS,
+		(
+			"entry_sequence_completed must result in S1 boss BGM crossfade "
+			+ "(got _last_bgm_path=%s)" % ad.get_last_bgm_path()
+		)
+	)

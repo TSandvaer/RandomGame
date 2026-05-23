@@ -75,7 +75,11 @@ const SLOT_TRINKET: StringName = &"trinket"
 const SLOT_RELIC: StringName = &"relic"
 
 const ALL_SLOTS: Array[StringName] = [
-	SLOT_WEAPON, SLOT_ARMOR, SLOT_OFF_HAND, SLOT_TRINKET, SLOT_RELIC,
+	SLOT_WEAPON,
+	SLOT_ARMOR,
+	SLOT_OFF_HAND,
+	SLOT_TRINKET,
+	SLOT_RELIC,
 ]
 
 const M1_INTERACTIVE_SLOTS: Array[StringName] = [SLOT_WEAPON, SLOT_ARMOR]
@@ -104,6 +108,7 @@ func _ready() -> void:
 
 
 # ---- Public API -------------------------------------------------------
+
 
 ## Add an item to the first empty inventory slot. Returns true on success;
 ## false if `item` is null or the inventory is full. Capacity overflow
@@ -277,6 +282,7 @@ func reset() -> void:
 
 # ---- Save serialization ---------------------------------------------
 
+
 ## Mutates `data` (a save's top-level dict) in place. Sets `data.stash`
 ## (the inventory items) and `data.equipped` (slot -> item dict). Returns
 ## `data` for chaining.
@@ -324,7 +330,9 @@ func restore_from_save(data: Dictionary, item_resolver: Callable, affix_resolver
 			if not (entry_v is Dictionary):
 				continue
 			var entry_dict: Dictionary = entry_v
-			var inst: ItemInstance = ItemInstance.from_save_dict(entry_dict, item_resolver, affix_resolver)
+			var inst: ItemInstance = ItemInstance.from_save_dict(
+				entry_dict, item_resolver, affix_resolver
+			)
 			if inst == null:
 				continue
 			if _items.size() < CAPACITY:
@@ -342,7 +350,9 @@ func restore_from_save(data: Dictionary, item_resolver: Callable, affix_resolver
 			if not (entry_v is Dictionary):
 				continue
 			var entry_dict: Dictionary = entry_v
-			var inst: ItemInstance = ItemInstance.from_save_dict(entry_dict, item_resolver, affix_resolver)
+			var inst: ItemInstance = ItemInstance.from_save_dict(
+				entry_dict, item_resolver, affix_resolver
+			)
 			if inst == null:
 				continue
 			_equipped[slot_n] = inst
@@ -351,6 +361,7 @@ func restore_from_save(data: Dictionary, item_resolver: Callable, affix_resolver
 
 
 # ---- Loot pickup hook --------------------------------------------
+
 
 ## Convenience hook for `Pickup.picked_up(item, pickup)` — single-item
 ## variant. Adds the item to the grid, then **auto-equips the first weapon
@@ -446,6 +457,7 @@ func ingest_rolls(items: Array) -> int:
 
 # ---- Internals -------------------------------------------------------
 
+
 func _unequip_internal(slot: StringName, push_back_to_inventory: bool) -> ItemInstance:
 	var current: ItemInstance = _equipped.get(slot, null) as ItemInstance
 	if current == null:
@@ -507,6 +519,7 @@ func _find_player() -> Node:
 
 # ---- Combat-trace (P0 86c9q96m8) -------------------------------------
 
+
 ## Emit a `[combat-trace] Inventory.equip` line via DebugFlags.combat_trace.
 ## HTML5-only (the gate in `DebugFlags.combat_trace_enabled` returns false on
 ## desktop and headless GUT, so this is a silent no-op there). The line is
@@ -563,8 +576,7 @@ func _emit_add_trace(item: ItemInstance, outcome: String, post_size: int) -> voi
 	var item_id: String = "<null>"
 	if item != null and item.def != null:
 		item_id = String(item.def.id)
-	df.combat_trace("Inventory.add",
-		"item=%s outcome=%s size=%d" % [item_id, outcome, post_size])
+	df.combat_trace("Inventory.add", "item=%s outcome=%s size=%d" % [item_id, outcome, post_size])
 
 
 func _emit_equip_trace(item: ItemInstance, slot: StringName, source: StringName) -> void:
@@ -581,9 +593,15 @@ func _emit_equip_trace(item: ItemInstance, slot: StringName, source: StringName)
 	# Compute damage_after via the same formula Player.try_attack uses, so the
 	# trace value matches what the next swing will deal.
 	var damage_after: int = _compute_post_equip_damage()
-	var msg: String = "item=%s slot=%s source=%s damage_after=%d" % [
-		item_id, slot_str, String(source), damage_after,
-	]
+	var msg: String = (
+		"item=%s slot=%s source=%s damage_after=%d"
+		% [
+			item_id,
+			slot_str,
+			String(source),
+			damage_after,
+		]
+	)
 	df.combat_trace("Inventory.equip", msg)
 
 

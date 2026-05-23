@@ -37,7 +37,7 @@ extends Area2D
 signal picked_up(item: ItemInstance, pickup: Pickup)
 
 const LAYER_PICKUPS: int = 1 << 5  # bit 6
-const LAYER_PLAYER: int = 1 << 1   # bit 2
+const LAYER_PLAYER: int = 1 << 1  # bit 2
 
 var item: ItemInstance = null
 
@@ -85,10 +85,19 @@ func _ready() -> void:
 	var item_id: String = "<null>"
 	if item != null and item.def != null:
 		item_id = String(item.def.id)
-	_combat_trace("Pickup._ready", "item=%s pos=(%.0f,%.0f) layer=%d mask=%d" % [
-		item_id, global_position.x, global_position.y,
-		collision_layer, collision_mask,
-	])
+	_combat_trace(
+		"Pickup._ready",
+		(
+			"item=%s pos=(%.0f,%.0f) layer=%d mask=%d"
+			% [
+				item_id,
+				global_position.x,
+				global_position.y,
+				collision_layer,
+				collision_mask,
+			]
+		)
+	)
 	# Diagnostic-only instrumentation (ticket `86c9uq0ky` — Finding 2 NEW bug
 	# class investigation, 2026-05-16 Sponsor soak of `8e76c74`). PR #241's
 	# double-defer + readback proved `mon_actual=true` post-flip — yet boss-room
@@ -115,14 +124,26 @@ func _ready() -> void:
 	var parent_node: Node = get_parent()
 	if parent_node != null:
 		parent_name = String(parent_node.name)
-	_combat_trace("Pickup._ready_diag",
-		("cs_disabled=%s cs_shape=%s shape_set=%s parent=%s is_inside_tree=%s"
-			+ " local_pos=(%.0f,%.0f) global_pos=(%.0f,%.0f)") % [
-			cs_disabled, cs_shape_kind, cs_shape_set,
-			parent_name, str(is_inside_tree()),
-			position.x, position.y,
-			global_position.x, global_position.y,
-		])
+	_combat_trace(
+		"Pickup._ready_diag",
+		(
+			(
+				"cs_disabled=%s cs_shape=%s shape_set=%s parent=%s is_inside_tree=%s"
+				+ " local_pos=(%.0f,%.0f) global_pos=(%.0f,%.0f)"
+			)
+			% [
+				cs_disabled,
+				cs_shape_kind,
+				cs_shape_set,
+				parent_name,
+				str(is_inside_tree()),
+				position.x,
+				position.y,
+				global_position.x,
+				global_position.y,
+			]
+		)
+	)
 
 
 ## Re-enable monitoring (the encapsulated-monitoring pattern's `_ready`-side
@@ -178,9 +199,13 @@ func _activate_and_check_initial_overlap() -> void:
 		for b in get_overlapping_bodies():
 			if b != null and b.is_in_group("player"):
 				initial_overlaps += 1
-	_combat_trace("Pickup._activate_and_check_initial_overlap",
-		"mon_actual=%s mon_req=true initial_overlap_player_count=%d" % [
-			str(monitoring), initial_overlaps])
+	_combat_trace(
+		"Pickup._activate_and_check_initial_overlap",
+		(
+			"mon_actual=%s mon_req=true initial_overlap_player_count=%d"
+			% [str(monitoring), initial_overlaps]
+		)
+	)
 	# Diagnostic-only instrumentation (ticket `86c9uq0ky`): augments the
 	# existing `mon_actual` line with the full physics-server readback —
 	# overlapping bodies (count of ALL bodies, not just players), overlapping
@@ -198,14 +223,23 @@ func _activate_and_check_initial_overlap() -> void:
 	if cs != null:
 		cs_disabled = str(cs.disabled)
 		cs_shape_set = str(cs.shape != null)
-	_combat_trace("Pickup._activate_diag",
-		("overlapping_bodies=%d overlapping_areas=%d cs_disabled=%s cs_shape_set=%s"
-			+ " monitoring=%s monitorable=%s") % [
-			get_overlapping_bodies().size(),
-			get_overlapping_areas().size(),
-			cs_disabled, cs_shape_set,
-			str(monitoring), str(monitorable),
-		])
+	_combat_trace(
+		"Pickup._activate_diag",
+		(
+			(
+				"overlapping_bodies=%d overlapping_areas=%d cs_disabled=%s cs_shape_set=%s"
+				+ " monitoring=%s monitorable=%s"
+			)
+			% [
+				get_overlapping_bodies().size(),
+				get_overlapping_areas().size(),
+				cs_disabled,
+				cs_shape_set,
+				str(monitoring),
+				str(monitorable),
+			]
+		)
+	)
 	if item == null:
 		return
 	for body in get_overlapping_bodies():
@@ -232,11 +266,19 @@ func _on_body_entered(body: Node) -> void:
 	var item_id: String = "<null>"
 	if item != null and item.def != null:
 		item_id = String(item.def.id)
-	_combat_trace("Pickup._on_body_entered",
-		"body=%s is_player=%s collected=%s item=%s listener_count=%d" % [
-			str(body), str(body != null and body.is_in_group("player")),
-			str(_collected), item_id, picked_up.get_connections().size(),
-		])
+	_combat_trace(
+		"Pickup._on_body_entered",
+		(
+			"body=%s is_player=%s collected=%s item=%s listener_count=%d"
+			% [
+				str(body),
+				str(body != null and body.is_in_group("player")),
+				str(_collected),
+				item_id,
+				picked_up.get_connections().size(),
+			]
+		)
+	)
 	if _collected:
 		# Already collected this frame (initial-overlap pass + a body_entered
 		# event, or two overlapping bodies) — do not double-emit.

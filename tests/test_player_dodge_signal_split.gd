@@ -47,6 +47,7 @@ func after_each() -> void:
 
 # ---- Helpers ----------------------------------------------------------
 
+
 ## The hit-iframe `_enter_iframes` path uses `get_tree().create_timer(...)`
 ## which requires tree membership. Use this for take_damage tests; the
 ## detached-instance pattern from test_player_move.gd is fine for pure
@@ -60,20 +61,29 @@ func _make_player_in_tree() -> Player:
 
 # ---- 1: try_dodge valid → BOTH signals emit ---------------------------
 
+
 func test_try_dodge_valid_emits_both_dodge_started_and_iframes_started() -> void:
 	var p: Player = _make_player_in_tree()
 	watch_signals(p)
 	var ok: bool = p.try_dodge(Vector2.RIGHT)
 	assert_true(ok, "dodge accepted (no cooldown, not mid-dodge)")
-	assert_signal_emit_count(p, "dodge_started", 1,
-		"valid try_dodge emits dodge_started exactly once")
-	assert_signal_emit_count(p, "iframes_started", 1,
-		"valid try_dodge ALSO emits iframes_started (backward-compat — " +
-		"HUD blink, Hitbox damage-table drop, AC4 balance test still " +
-		"depend on it)")
+	assert_signal_emit_count(
+		p, "dodge_started", 1, "valid try_dodge emits dodge_started exactly once"
+	)
+	assert_signal_emit_count(
+		p,
+		"iframes_started",
+		1,
+		(
+			"valid try_dodge ALSO emits iframes_started (backward-compat — "
+			+ "HUD blink, Hitbox damage-table drop, AC4 balance test still "
+			+ "depend on it)"
+		)
+	)
 
 
 # ---- 2: try_dodge rejected → NEITHER signal emits ---------------------
+
 
 func test_try_dodge_rejected_during_active_dodge_emits_no_signals() -> void:
 	# can_dodge() returns false when already in STATE_DODGE → try_dodge
@@ -84,10 +94,12 @@ func test_try_dodge_rejected_during_active_dodge_emits_no_signals() -> void:
 	watch_signals(p)  # start watching AFTER the first emit
 	var ok: bool = p.try_dodge(Vector2.LEFT)
 	assert_false(ok, "second dodge during active dodge rejected")
-	assert_signal_emit_count(p, "dodge_started", 0,
-		"rejected try_dodge does NOT emit dodge_started (gating beats emit)")
-	assert_signal_emit_count(p, "iframes_started", 0,
-		"rejected try_dodge does NOT emit iframes_started either")
+	assert_signal_emit_count(
+		p, "dodge_started", 0, "rejected try_dodge does NOT emit dodge_started (gating beats emit)"
+	)
+	assert_signal_emit_count(
+		p, "iframes_started", 0, "rejected try_dodge does NOT emit iframes_started either"
+	)
 
 
 func test_try_dodge_rejected_during_cooldown_emits_no_signals() -> void:
@@ -101,14 +113,22 @@ func test_try_dodge_rejected_during_cooldown_emits_no_signals() -> void:
 	watch_signals(p)
 	var ok: bool = p.try_dodge(Vector2.LEFT)
 	assert_false(ok, "dodge during cooldown rejected")
-	assert_signal_emit_count(p, "dodge_started", 0,
-		"REGRESSION GUARD: cooldown-rejected try_dodge does NOT emit " +
-		"dodge_started — `can_dodge()` gate runs BEFORE the emit")
-	assert_signal_emit_count(p, "iframes_started", 0,
-		"cooldown-rejected try_dodge does NOT emit iframes_started")
+	assert_signal_emit_count(
+		p,
+		"dodge_started",
+		0,
+		(
+			"REGRESSION GUARD: cooldown-rejected try_dodge does NOT emit "
+			+ "dodge_started — `can_dodge()` gate runs BEFORE the emit"
+		)
+	)
+	assert_signal_emit_count(
+		p, "iframes_started", 0, "cooldown-rejected try_dodge does NOT emit iframes_started"
+	)
 
 
 # ---- 3: take_damage non-fatal → ONLY iframes_started emits ------------
+
 
 func test_take_damage_non_fatal_emits_iframes_started_not_dodge_started() -> void:
 	# The headline ticket-86c9vbhf1 invariant — taking damage MUST NOT emit
@@ -119,16 +139,29 @@ func test_take_damage_non_fatal_emits_iframes_started_not_dodge_started() -> voi
 	var p: Player = _make_player_in_tree()
 	watch_signals(p)
 	p.take_damage(3, Vector2.ZERO, null)
-	assert_signal_emit_count(p, "iframes_started", 1,
-		"non-fatal take_damage emits iframes_started (post-hit invuln grant — " +
-		"Uma's AC4 Room 05 balance pin §3.B, ticket 86c9u4mdc)")
-	assert_signal_emit_count(p, "dodge_started", 0,
-		"HEADLINE REGRESSION GUARD: non-fatal take_damage MUST NOT emit " +
-		"dodge_started — audio-direction.md §AD-05 dodge-whoosh fires ONLY " +
-		"on intentional dodge. Ticket 86c9vbhf1 / PR #278 bug class.")
+	assert_signal_emit_count(
+		p,
+		"iframes_started",
+		1,
+		(
+			"non-fatal take_damage emits iframes_started (post-hit invuln grant — "
+			+ "Uma's AC4 Room 05 balance pin §3.B, ticket 86c9u4mdc)"
+		)
+	)
+	assert_signal_emit_count(
+		p,
+		"dodge_started",
+		0,
+		(
+			"HEADLINE REGRESSION GUARD: non-fatal take_damage MUST NOT emit "
+			+ "dodge_started — audio-direction.md §AD-05 dodge-whoosh fires ONLY "
+			+ "on intentional dodge. Ticket 86c9vbhf1 / PR #278 bug class."
+		)
+	)
 
 
 # ---- 4: take_damage fatal → NEITHER signal emits ----------------------
+
 
 func test_take_damage_fatal_emits_neither_signal() -> void:
 	# Fatal hit (HP→0) consumes the frame via _die() before the post-hit
@@ -138,15 +171,25 @@ func test_take_damage_fatal_emits_neither_signal() -> void:
 	watch_signals(p)
 	p.take_damage(p.hp_max, Vector2.ZERO, null)
 	assert_true(p.is_dead(), "lethal hit triggered death")
-	assert_signal_emit_count(p, "iframes_started", 0,
-		"fatal take_damage does NOT emit iframes_started — death path's " +
-		"early-return before _enter_iframes")
-	assert_signal_emit_count(p, "dodge_started", 0,
-		"fatal take_damage does NOT emit dodge_started — death path " +
-		"never reaches try_dodge")
+	assert_signal_emit_count(
+		p,
+		"iframes_started",
+		0,
+		(
+			"fatal take_damage does NOT emit iframes_started — death path's "
+			+ "early-return before _enter_iframes"
+		)
+	)
+	assert_signal_emit_count(
+		p,
+		"dodge_started",
+		0,
+		"fatal take_damage does NOT emit dodge_started — death path " + "never reaches try_dodge"
+	)
 
 
 # ---- 5: dodge_started fires BEFORE the i-frame window opens -----------
+
 
 func test_dodge_started_fires_before_invulnerable_flag_set() -> void:
 	# The contract per `audio-direction.md §AD-05`: dodge-whoosh lands at
@@ -157,21 +200,24 @@ func test_dodge_started_fires_before_invulnerable_flag_set() -> void:
 	# emit (i.e. _enter_iframes hasn't flipped the flag yet).
 	var p: Player = _make_player_in_tree()
 	var observed_invulnerable_at_emit: Array[bool] = [true]  # boxed
-	var observer: Callable = func() -> void:
-		observed_invulnerable_at_emit[0] = p.is_invulnerable()
+	var observer: Callable = func() -> void: observed_invulnerable_at_emit[0] = p.is_invulnerable()
 	p.dodge_started.connect(observer)
 	assert_false(p.is_invulnerable(), "pre-condition: not invulnerable")
 	assert_true(p.try_dodge(Vector2.RIGHT))
-	assert_false(observed_invulnerable_at_emit[0],
-		"dodge_started fires BEFORE _enter_iframes flips is_invulnerable. " +
-		"Audio cue is sequenced FIRST so the whoosh leads the iframe window " +
-		"by ~0 ms (frame-accurate per AD-05).")
+	assert_false(
+		observed_invulnerable_at_emit[0],
+		(
+			"dodge_started fires BEFORE _enter_iframes flips is_invulnerable. "
+			+ "Audio cue is sequenced FIRST so the whoosh leads the iframe window "
+			+ "by ~0 ms (frame-accurate per AD-05)."
+		)
+	)
 	# Post-condition: after try_dodge returns, the iframe window IS active.
-	assert_true(p.is_invulnerable(),
-		"post-condition: _enter_iframes ran after dodge_started emit")
+	assert_true(p.is_invulnerable(), "post-condition: _enter_iframes ran after dodge_started emit")
 
 
 # ---- 6: try_dodge emits dodge_started exactly once per dodge ----------
+
 
 func test_try_dodge_emits_dodge_started_exactly_once_per_dodge() -> void:
 	# Symmetric to `test_iframes_signal_count_per_dodge_is_one_each` in
@@ -183,11 +229,13 @@ func test_try_dodge_emits_dodge_started_exactly_once_per_dodge() -> void:
 	# Drain the dodge end-to-end.
 	p._dodge_time_left = 0.0
 	p._process_dodge(0.0)
-	assert_signal_emit_count(p, "dodge_started", 1,
-		"exactly one dodge_started per dodge — never zero, never two")
+	assert_signal_emit_count(
+		p, "dodge_started", 1, "exactly one dodge_started per dodge — never zero, never two"
+	)
 
 
 # ---- 7: re-entrant _enter_iframes during dodge does NOT re-emit ------
+
 
 func test_take_damage_during_active_dodge_does_not_emit_either_signal() -> void:
 	# Subtle edge case: take_damage's `if _is_invulnerable: return` guard
@@ -202,7 +250,12 @@ func test_take_damage_during_active_dodge_does_not_emit_either_signal() -> void:
 	# observes the take_damage call.
 	watch_signals(p)
 	p.take_damage(5, Vector2.ZERO, null)
-	assert_signal_emit_count(p, "iframes_started", 0,
-		"take_damage during active dodge short-circuits before _enter_iframes")
-	assert_signal_emit_count(p, "dodge_started", 0,
-		"take_damage NEVER emits dodge_started regardless of state")
+	assert_signal_emit_count(
+		p,
+		"iframes_started",
+		0,
+		"take_damage during active dodge short-circuits before _enter_iframes"
+	)
+	assert_signal_emit_count(
+		p, "dodge_started", 0, "take_damage NEVER emits dodge_started regardless of state"
+	)

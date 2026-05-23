@@ -85,8 +85,8 @@ const FIST_DAMAGE: int = 1
 const ATTACK_LIGHT: StringName = &"light"
 const ATTACK_HEAVY: StringName = &"heavy"
 
-
 # ---- Public API --------------------------------------------------------
+
 
 ## Compute the integer damage a player attack deals.
 ##
@@ -118,9 +118,8 @@ static func compute_player_damage(weapon: ItemDef, edge: int, attack_type: Strin
 	# Unknown tags fall through as light. Tests pin this.
 
 	var raw: float = (
-		float(weapon_base)
-		* (1.0 + float(clean_edge) * EDGE_PER_POINT)
-		* (1.0 + attack_mult))
+		float(weapon_base) * (1.0 + float(clean_edge) * EDGE_PER_POINT) * (1.0 + attack_mult)
+	)
 	# Floor — consistent with damage_base / hp_base int contract.
 	return int(floor(raw))
 

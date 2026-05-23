@@ -94,44 +94,44 @@ func test_player_can_regen_between_room_encounters() -> void:
 	_apply_test_hit(p, 5, dummy_source)
 	_apply_test_hit(p, 5, dummy_source)
 	var hp_after_combat: int = p.hp_current
-	assert_eq(hp_after_combat, initial_hp - 15,
-		"AC-6: Player took 15 damage in simulated combat")
+	assert_eq(hp_after_combat, initial_hp - 15, "AC-6: Player took 15 damage in simulated combat")
 
 	# Simulate player landing one hit (resets attack timer).
 	p._on_hitbox_hit_target(dummy_source, 1, p)
 
 	# Verify regen is not active yet (both timers reset).
-	assert_false(p.is_regenerating,
-		"AC-6: regen must not be active immediately after combat exchange")
+	assert_false(
+		p.is_regenerating, "AC-6: regen must not be active immediately after combat exchange"
+	)
 
 	# --- Phase 2: kite away — advance both timers to just under threshold.
 	# 2.9 s: regen must NOT activate.
 	for _i in int(2.9 / PHYS_DELTA):
 		p._tick_timers(PHYS_DELTA)
-	assert_false(p.is_regenerating,
-		"AC-6: regen must not activate at 2.9 s (threshold is 3.0 s)")
+	assert_false(p.is_regenerating, "AC-6: regen must not activate at 2.9 s (threshold is 3.0 s)")
 
 	# Cross threshold: 0.2 s more → both timers > 3.0 s.
 	for _i in int(0.2 / PHYS_DELTA):
 		p._tick_timers(PHYS_DELTA)
-	assert_true(p.is_regenerating,
-		"AC-6: regen must activate after kiting away for > 3.0 s with no damage or hits")
+	assert_true(
+		p.is_regenerating,
+		"AC-6: regen must activate after kiting away for > 3.0 s with no damage or hits"
+	)
 
 	# --- Phase 3: verify HP rises at ~2 HP/s over 5 simulated seconds.
 	var hp_regen_start: int = p.hp_current
 	for _i in int(5.0 / PHYS_DELTA):
 		p._tick_timers(PHYS_DELTA)
 	var gained: int = p.hp_current - hp_regen_start
-	assert_gte(gained, 9,
-		"AC-6: 5 s regen must gain at least 9 HP (expected 10 at 2.0 HP/s)")
-	assert_lte(gained, 11,
-		"AC-6: 5 s regen must gain at most 11 HP (float precision tolerance ±1)")
+	assert_gte(gained, 9, "AC-6: 5 s regen must gain at least 9 HP (expected 10 at 2.0 HP/s)")
+	assert_lte(gained, 11, "AC-6: 5 s regen must gain at most 11 HP (float precision tolerance ±1)")
 
 	# --- Phase 4: combat interrupts regen.
 	assert_true(p.is_regenerating, "pre-condition for interrupt: regen active")
 	_apply_test_hit(p, 5, dummy_source)
-	assert_false(p.is_regenerating,
-		"AC-6: regen must stop when player takes damage in the next combat round")
+	assert_false(
+		p.is_regenerating, "AC-6: regen must stop when player takes damage in the next combat round"
+	)
 
 
 ## AC-6 integration surface: regen interacts correctly with death/revive.
@@ -152,12 +152,14 @@ func test_regen_resets_on_death_and_revive() -> void:
 
 	# Revive resets timers.
 	p.revive_full_hp()
-	assert_false(p.is_regenerating,
-		"AC-6: regen must be inactive immediately after revive_full_hp()")
+	assert_false(
+		p.is_regenerating, "AC-6: regen must be inactive immediately after revive_full_hp()"
+	)
 	# One tick should not re-activate regen (timers were reset to 0).
 	p._tick_timers(PHYS_DELTA)
-	assert_false(p.is_regenerating,
-		"AC-6: one tick after revive must not re-activate regen (timers at 0)")
+	assert_false(
+		p.is_regenerating, "AC-6: one tick after revive must not re-activate regen (timers at 0)"
+	)
 
 
 ## AC-6 integration: regen state is ephemeral — not saved/loaded.
@@ -184,8 +186,10 @@ func test_regen_state_is_ephemeral_not_persisted() -> void:
 	# they were, which is fine — the HP is restored so regen won't fire anyway
 	# because hp_current == hp_max post-restore).
 	p.revive_full_hp()
-	assert_false(p.is_regenerating,
-		"AC-6: is_regenerating must be false after respawn/revive (ephemeral state)")
+	assert_false(
+		p.is_regenerating,
+		"AC-6: is_regenerating must be false after respawn/revive (ephemeral state)"
+	)
 
 	# Cleanup.
 	var save_node: Node = Engine.get_main_loop().root.get_node_or_null("Save")
@@ -214,5 +218,7 @@ func test_regen_stays_suppressed_under_sustained_damage_spam() -> void:
 		_apply_test_hit(p, 2, src)  # keep HP > 0 (clear iframes between hits)
 
 	# After 5 s of 1-hit-per-second spam, regen must still be inactive.
-	assert_false(p.is_regenerating,
-		"AC-6: regen must stay suppressed when damage hits every 1.0 s (< 3.0 s threshold)")
+	assert_false(
+		p.is_regenerating,
+		"AC-6: regen must stay suppressed when damage hits every 1.0 s (< 3.0 s threshold)"
+	)

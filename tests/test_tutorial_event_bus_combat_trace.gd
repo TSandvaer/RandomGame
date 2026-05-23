@@ -50,6 +50,7 @@ func _bus() -> Node:
 
 # ---- 1: wasd beat — primary regression guard ---------------------------
 
+
 func test_request_beat_wasd_emits_signal_with_trace_wired() -> void:
 	## Primary regression guard for ticket 86c9qbmer:
 	## Adding the DebugFlags.combat_trace() call before emit must NOT break the
@@ -58,18 +59,23 @@ func test_request_beat_wasd_emits_signal_with_trace_wired() -> void:
 	var bus: Node = _bus()
 	watch_signals(bus)
 	bus.request_beat(&"wasd", 0)
-	assert_signal_emitted(bus, "tutorial_beat_requested",
-		"request_beat must emit tutorial_beat_requested even with trace call wired")
-	assert_signal_emit_count(bus, "tutorial_beat_requested", 1,
-		"exactly one emit per request_beat call")
+	assert_signal_emitted(
+		bus,
+		"tutorial_beat_requested",
+		"request_beat must emit tutorial_beat_requested even with trace call wired"
+	)
+	assert_signal_emit_count(
+		bus, "tutorial_beat_requested", 1, "exactly one emit per request_beat call"
+	)
 	var params: Array = get_signal_parameters(bus, "tutorial_beat_requested", 0)
-	assert_eq(params[0], &"wasd",
-		"signal payload beat_id = &'wasd' (trace must not alter the argument)")
-	assert_eq(params[1], 0,
-		"signal payload anchor = 0 (trace must not alter the anchor)")
+	assert_eq(
+		params[0], &"wasd", "signal payload beat_id = &'wasd' (trace must not alter the argument)"
+	)
+	assert_eq(params[1], 0, "signal payload anchor = 0 (trace must not alter the anchor)")
 
 
 # ---- 2: dodge beat payload -----------------------------------------------
+
 
 func test_request_beat_dodge_payload_correct_after_trace_wired() -> void:
 	## Verify the trace call does NOT alter the &"dodge" beat_id or anchor.
@@ -77,50 +83,77 @@ func test_request_beat_dodge_payload_correct_after_trace_wired() -> void:
 	var bus: Node = _bus()
 	watch_signals(bus)
 	bus.request_beat(&"dodge", 2)
-	assert_signal_emitted(bus, "tutorial_beat_requested",
-		"request_beat(&'dodge', 2) must emit tutorial_beat_requested")
+	assert_signal_emitted(
+		bus,
+		"tutorial_beat_requested",
+		"request_beat(&'dodge', 2) must emit tutorial_beat_requested"
+	)
 	var params: Array = get_signal_parameters(bus, "tutorial_beat_requested", 0)
-	assert_eq(params[0], &"dodge",
-		"signal payload beat_id = &'dodge' (trace StringName->String must not mutate it)")
-	assert_eq(params[1], 2,
-		"signal payload anchor = 2 (unchanged through trace call)")
-	assert_eq(bus.resolve_beat_text(&"dodge"), "Space to dodge-roll.",
-		"resolve_beat_text(&'dodge') returns the Uma Beat 4 text")
+	assert_eq(
+		params[0],
+		&"dodge",
+		"signal payload beat_id = &'dodge' (trace StringName->String must not mutate it)"
+	)
+	assert_eq(params[1], 2, "signal payload anchor = 2 (unchanged through trace call)")
+	assert_eq(
+		bus.resolve_beat_text(&"dodge"),
+		"Space to dodge-roll.",
+		"resolve_beat_text(&'dodge') returns the Uma Beat 4 text"
+	)
 
 
 # ---- 3: lmb_strike beat payload ------------------------------------------
+
 
 func test_request_beat_lmb_strike_payload_correct_after_trace_wired() -> void:
 	var bus: Node = _bus()
 	watch_signals(bus)
 	bus.request_beat(&"lmb_strike", 2)
-	assert_signal_emitted(bus, "tutorial_beat_requested",
-		"request_beat(&'lmb_strike', 2) must emit tutorial_beat_requested")
+	assert_signal_emitted(
+		bus,
+		"tutorial_beat_requested",
+		"request_beat(&'lmb_strike', 2) must emit tutorial_beat_requested"
+	)
 	var params: Array = get_signal_parameters(bus, "tutorial_beat_requested", 0)
-	assert_eq(params[0], &"lmb_strike",
-		"signal payload beat_id = &'lmb_strike' (trace must not mutate it)")
+	assert_eq(
+		params[0],
+		&"lmb_strike",
+		"signal payload beat_id = &'lmb_strike' (trace must not mutate it)"
+	)
 	assert_eq(params[1], 2, "signal payload anchor = 2")
-	assert_eq(bus.resolve_beat_text(&"lmb_strike"), "LMB to strike.",
-		"resolve_beat_text(&'lmb_strike') returns the Uma Beat 4 text")
+	assert_eq(
+		bus.resolve_beat_text(&"lmb_strike"),
+		"LMB to strike.",
+		"resolve_beat_text(&'lmb_strike') returns the Uma Beat 4 text"
+	)
 
 
 # ---- 4: rmb_heavy beat payload -------------------------------------------
+
 
 func test_request_beat_rmb_heavy_payload_correct_after_trace_wired() -> void:
 	var bus: Node = _bus()
 	watch_signals(bus)
 	bus.request_beat(&"rmb_heavy", 2)
-	assert_signal_emitted(bus, "tutorial_beat_requested",
-		"request_beat(&'rmb_heavy', 2) must emit tutorial_beat_requested")
+	assert_signal_emitted(
+		bus,
+		"tutorial_beat_requested",
+		"request_beat(&'rmb_heavy', 2) must emit tutorial_beat_requested"
+	)
 	var params: Array = get_signal_parameters(bus, "tutorial_beat_requested", 0)
-	assert_eq(params[0], &"rmb_heavy",
-		"signal payload beat_id = &'rmb_heavy' (trace must not mutate it)")
+	assert_eq(
+		params[0], &"rmb_heavy", "signal payload beat_id = &'rmb_heavy' (trace must not mutate it)"
+	)
 	assert_eq(params[1], 2, "signal payload anchor = 2")
-	assert_eq(bus.resolve_beat_text(&"rmb_heavy"), "RMB for heavy strike.",
-		"resolve_beat_text(&'rmb_heavy') returns the Uma Beat 5 text")
+	assert_eq(
+		bus.resolve_beat_text(&"rmb_heavy"),
+		"RMB for heavy strike.",
+		"resolve_beat_text(&'rmb_heavy') returns the Uma Beat 5 text"
+	)
 
 
 # ---- 5: default anchor (= 0) works correctly ----------------------------
+
 
 func test_request_beat_default_anchor_with_trace_wired() -> void:
 	## request_beat has `anchor: int = 0` default. Verify the default path
@@ -128,14 +161,15 @@ func test_request_beat_default_anchor_with_trace_wired() -> void:
 	var bus: Node = _bus()
 	watch_signals(bus)
 	bus.request_beat(&"dodge")  # no anchor arg — uses default = 0
-	assert_signal_emitted(bus, "tutorial_beat_requested",
-		"request_beat with default anchor must emit the signal")
+	assert_signal_emitted(
+		bus, "tutorial_beat_requested", "request_beat with default anchor must emit the signal"
+	)
 	var params: Array = get_signal_parameters(bus, "tutorial_beat_requested", 0)
-	assert_eq(params[1], 0,
-		"default anchor = 0 must flow through to the signal payload unchanged")
+	assert_eq(params[1], 0, "default anchor = 0 must flow through to the signal payload unchanged")
 
 
 # ---- 6: DebugFlags autoload reachable from bus context ------------------
+
 
 func test_debugflags_autoload_is_accessible() -> void:
 	## Belt-and-suspenders: verify DebugFlags is registered as an autoload.
@@ -146,17 +180,22 @@ func test_debugflags_autoload_is_accessible() -> void:
 	assert_not_null(flags, "DebugFlags autoload must be registered in project.godot")
 	# Verify the combat_trace_enabled() method exists and returns a bool.
 	# In headless GUT (not web), this must return false — the gate is web-only.
-	assert_has_method(flags, "combat_trace",
-		"DebugFlags must expose combat_trace(tag, msg) method")
-	assert_has_method(flags, "combat_trace_enabled",
-		"DebugFlags must expose combat_trace_enabled() method")
+	assert_has_method(flags, "combat_trace", "DebugFlags must expose combat_trace(tag, msg) method")
+	assert_has_method(
+		flags, "combat_trace_enabled", "DebugFlags must expose combat_trace_enabled() method"
+	)
 	var enabled: bool = flags.combat_trace_enabled()
-	assert_false(enabled,
-		"combat_trace_enabled() must return false in headless GUT (not a web build). " +
-		"If this fails, the OS.has_feature('web') gate in DebugFlags regressed.")
+	assert_false(
+		enabled,
+		(
+			"combat_trace_enabled() must return false in headless GUT (not a web build). "
+			+ "If this fails, the OS.has_feature('web') gate in DebugFlags regressed."
+		)
+	)
 
 
 # ---- 7: trace call does not push_error or push_warning ------------------
+
 
 func test_request_beat_produces_no_errors_or_warnings() -> void:
 	## Regression guard: the trace call inside request_beat must not produce

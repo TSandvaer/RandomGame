@@ -214,16 +214,22 @@ func _ready() -> void:
 	_build_sfx_pool()
 	# Boot trace — proves the autoload registered + the bus indices resolved.
 	# Same pattern as DebugFlags.gd's _ready trace.
-	print("[AudioDirector] ready — bgm_bus=%d ambient_bus=%d sfx_bus=%d ui_bus=%d sfx_pool=%d" % [
-		AudioServer.get_bus_index(BUS_BGM),
-		AudioServer.get_bus_index(BUS_AMBIENT),
-		AudioServer.get_bus_index(BUS_SFX),
-		AudioServer.get_bus_index(BUS_UI),
-		_sfx_pool.size(),
-	])
+	print(
+		(
+			"[AudioDirector] ready — bgm_bus=%d ambient_bus=%d sfx_bus=%d ui_bus=%d sfx_pool=%d"
+			% [
+				AudioServer.get_bus_index(BUS_BGM),
+				AudioServer.get_bus_index(BUS_AMBIENT),
+				AudioServer.get_bus_index(BUS_SFX),
+				AudioServer.get_bus_index(BUS_UI),
+				_sfx_pool.size(),
+			]
+		)
+	)
 
 
 # ---- Public API ------------------------------------------------------
+
 
 ## Start S2 BGM with a fade-in on the BGM bus. Idempotent: if S2 BGM is
 ## already the active stream, this is a no-op.
@@ -235,23 +241,29 @@ func play_stratum2_bgm(fade_in_ms: int = DEFAULT_FADE_IN_MS) -> void:
 		return
 	_play_with_fade_in(_bgm_player, stream, fade_in_ms)
 	_last_bgm_path = STREAM_PATH_S2_BGM
-	_combat_trace("AudioDirector.play_stratum2_bgm",
-		"stream=%s fade_in_ms=%d" % [STREAM_PATH_S2_BGM, fade_in_ms])
+	_combat_trace(
+		"AudioDirector.play_stratum2_bgm",
+		"stream=%s fade_in_ms=%d" % [STREAM_PATH_S2_BGM, fade_in_ms]
+	)
 
 
 ## Start S2 Ambient with a fade-in on the Ambient bus. Idempotent.
 func play_stratum2_ambient(fade_in_ms: int = DEFAULT_FADE_IN_MS) -> void:
-	if (_last_ambient_path == STREAM_PATH_S2_AMBIENT
-			and _ambient_player != null
-			and _ambient_player.playing):
+	if (
+		_last_ambient_path == STREAM_PATH_S2_AMBIENT
+		and _ambient_player != null
+		and _ambient_player.playing
+	):
 		return
 	var stream: AudioStream = _get_stream_s2_ambient()
 	if stream == null:
 		return
 	_play_with_fade_in_ambient(_ambient_player, stream, fade_in_ms)
 	_last_ambient_path = STREAM_PATH_S2_AMBIENT
-	_combat_trace("AudioDirector.play_stratum2_ambient",
-		"stream=%s fade_in_ms=%d" % [STREAM_PATH_S2_AMBIENT, fade_in_ms])
+	_combat_trace(
+		"AudioDirector.play_stratum2_ambient",
+		"stream=%s fade_in_ms=%d" % [STREAM_PATH_S2_AMBIENT, fade_in_ms]
+	)
 
 
 ## Convenience: fire the full S1→S2 transition (BGM + Ambient) in one call.
@@ -276,8 +288,10 @@ func crossfade_to_boss_stratum2(fade_ms: int = DEFAULT_CROSSFADE_MS) -> void:
 		return
 	_crossfade_bgm(stream, fade_ms)
 	_last_bgm_path = STREAM_PATH_S2_BOSS
-	_combat_trace("AudioDirector.crossfade_to_boss_stratum2",
-		"stream=%s fade_ms=%d" % [STREAM_PATH_S2_BOSS, fade_ms])
+	_combat_trace(
+		"AudioDirector.crossfade_to_boss_stratum2",
+		"stream=%s fade_ms=%d" % [STREAM_PATH_S2_BOSS, fade_ms]
+	)
 
 
 ## M3-T2-W1-T1 — crossfade BGM to `mus-boss-stratum1` over `fade_ms`.
@@ -304,8 +318,10 @@ func crossfade_to_boss_stratum1(fade_ms: int = DEFAULT_CROSSFADE_MS) -> void:
 		return
 	_crossfade_bgm(stream, fade_ms)
 	_last_bgm_path = STREAM_PATH_S1_BOSS
-	_combat_trace("AudioDirector.crossfade_to_boss_stratum1",
-		"stream=%s fade_ms=%d" % [STREAM_PATH_S1_BOSS, fade_ms])
+	_combat_trace(
+		"AudioDirector.crossfade_to_boss_stratum1",
+		"stream=%s fade_ms=%d" % [STREAM_PATH_S1_BOSS, fade_ms]
+	)
 
 
 ## M3-T2-W2-T10 — start S1 ambient bed with a fade-in on the Ambient bus.
@@ -336,8 +352,9 @@ func crossfade_to_boss_stratum1(fade_ms: int = DEFAULT_CROSSFADE_MS) -> void:
 ## gesture) on a fresh run, OR after first WASD/mouse input on a cold-boot
 ## new game. Per audio-direction.md, the deferred-until-gesture pattern is
 ## the wider M1+ contract — no engine-side AudioContext.resume hook yet.
-func play_stratum1_ambient(fade_in_ms: int = S1_AMBIENT_RESUME_FADE_IN_MS,
-		target_gain_db: float = FULL_DB) -> void:
+func play_stratum1_ambient(
+	fade_in_ms: int = S1_AMBIENT_RESUME_FADE_IN_MS, target_gain_db: float = FULL_DB
+) -> void:
 	# Idempotence guard: same-stream, playing, AND the most-recent tween was
 	# aimed at the same target gain. Compares against `_ambient_target_db`
 	# (intended target) NOT `volume_db` (current mid-tween value) — that's
@@ -345,19 +362,27 @@ func play_stratum1_ambient(fade_in_ms: int = S1_AMBIENT_RESUME_FADE_IN_MS,
 	# "the bed happens to be at X RIGHT NOW mid-fade". Using the target lets
 	# a rapid play+play sequence with the same args no-op cleanly even mid-
 	# fade-in.
-	if _last_ambient_path == STREAM_PATH_S1_AMBIENT and _ambient_player != null \
-			and _ambient_player.playing \
-			and abs(_ambient_target_db - target_gain_db) < 0.05:
+	if (
+		_last_ambient_path == STREAM_PATH_S1_AMBIENT
+		and _ambient_player != null
+		and _ambient_player.playing
+		and abs(_ambient_target_db - target_gain_db) < 0.05
+	):
 		return
 	var stream: AudioStream = _get_stream_s1_ambient()
 	if stream == null:
 		return
-	_play_ambient_with_curve(_ambient_player, stream, fade_in_ms, target_gain_db,
-		Tween.TRANS_QUAD, Tween.EASE_IN_OUT)
+	_play_ambient_with_curve(
+		_ambient_player, stream, fade_in_ms, target_gain_db, Tween.TRANS_QUAD, Tween.EASE_IN_OUT
+	)
 	_last_ambient_path = STREAM_PATH_S1_AMBIENT
-	_combat_trace("AudioDirector.play_stratum1_ambient",
-		"stream=%s fade_in_ms=%d target_db=%.2f" % [
-			STREAM_PATH_S1_AMBIENT, fade_in_ms, target_gain_db])
+	_combat_trace(
+		"AudioDirector.play_stratum1_ambient",
+		(
+			"stream=%s fade_in_ms=%d target_db=%.2f"
+			% [STREAM_PATH_S1_AMBIENT, fade_in_ms, target_gain_db]
+		)
+	)
 
 
 ## M3-T2-W2-T10 — fade out S1 ambient and stop. Used by BI-03 (boss-room
@@ -388,20 +413,25 @@ func stop_stratum1_ambient(fade_out_ms: int = S1_AMBIENT_ENTRY_FADE_OUT_MS) -> v
 	# BGM stop pattern's discipline).
 	var p: AudioStreamPlayer = _ambient_player
 	_ambient_fade_tween = create_tween()
-	_ambient_fade_tween.tween_property(p, "volume_db", SILENCE_DB, duration_sec) \
-		.set_trans(Tween.TRANS_CUBIC) \
-		.set_ease(Tween.EASE_OUT)
-	_ambient_fade_tween.finished.connect(func() -> void:
-		if p != null and p.playing:
-			p.stop()
+	(
+		_ambient_fade_tween
+		. tween_property(p, "volume_db", SILENCE_DB, duration_sec)
+		. set_trans(Tween.TRANS_CUBIC)
+		. set_ease(Tween.EASE_OUT)
+	)
+	_ambient_fade_tween.finished.connect(
+		func() -> void:
+			if p != null and p.playing:
+				p.stop()
 	)
 	_ambient_target_db = SILENCE_DB
 	# Clear last-path NOW (not at finished) so an immediate
 	# `play_stratum1_ambient()` call (e.g. test race) doesn't get idempotent-
 	# no-op'd by stale state.
 	_last_ambient_path = ""
-	_combat_trace("AudioDirector.stop_stratum1_ambient",
-		"fade_out_ms=%d curve=ease_out_cubic" % fade_out_ms)
+	_combat_trace(
+		"AudioDirector.stop_stratum1_ambient", "fade_out_ms=%d curve=ease_out_cubic" % fade_out_ms
+	)
 
 
 ## M3-T2-W2-T10 — F4 post-defeat resume sugar. Wraps `play_stratum1_ambient`
@@ -420,8 +450,7 @@ func stop_stratum1_ambient(fade_out_ms: int = S1_AMBIENT_ENTRY_FADE_OUT_MS) -> v
 ## wiring point. If a tighter signal isn't available, the caller can fall
 ## back to a `SceneTreeTimer(2.4, ignore_time_scale=true)` from
 ## `boss_defeated` — Uma's brief locks this fallback shape.
-func resume_stratum1_ambient_at_60_percent(
-		fade_in_ms: int = S1_AMBIENT_RESUME_FADE_IN_MS) -> void:
+func resume_stratum1_ambient_at_60_percent(fade_in_ms: int = S1_AMBIENT_RESUME_FADE_IN_MS) -> void:
 	play_stratum1_ambient(fade_in_ms, S1_AMBIENT_RESUME_DB)
 
 
@@ -448,8 +477,7 @@ func resume_stratum1_ambient_at_60_percent(
 ## stale rename surfaces in soak traces rather than crashing.
 func play_sfx(cue_id: StringName) -> void:
 	if not SFX_PATHS.has(cue_id):
-		_combat_trace("AudioDirector.play_sfx",
-			"UNKNOWN cue_id=%s — check SFX_PATHS map" % cue_id)
+		_combat_trace("AudioDirector.play_sfx", "UNKNOWN cue_id=%s — check SFX_PATHS map" % cue_id)
 		return
 	var stream: AudioStream = _get_sfx_stream(cue_id)
 	if stream == null:
@@ -460,8 +488,7 @@ func play_sfx(cue_id: StringName) -> void:
 	player.stream = stream
 	player.play()
 	_last_sfx_id = cue_id
-	_combat_trace("AudioDirector.play_sfx",
-		"cue_id=%s pool_index=%d" % [cue_id, _sfx_pool_index])
+	_combat_trace("AudioDirector.play_sfx", "cue_id=%s pool_index=%d" % [cue_id, _sfx_pool_index])
 
 
 ## Stop ALL global music + ambient with a fade-out. Used by player-death
@@ -479,6 +506,7 @@ func stop_all_music(fade_out_ms: int = DEFAULT_FADE_OUT_MS) -> void:
 
 
 # ---- Test surface ----------------------------------------------------
+
 
 ## Returns the BGM AudioStreamPlayer. Used by paired tests to assert which
 ## stream is playing on which bus without find_child traversal.
@@ -576,13 +604,13 @@ func complete_pending_fades_for_test() -> void:
 		# not 0 dB; before this change the snap would drift the F4 assertion
 		# upward by 4.4 dB and the paired test would assert on the wrong value.
 		_ambient_player.volume_db = _ambient_target_db
-	if had_crossfade_in_flight and _bgm_crossfade_player != null \
-			and _bgm_crossfade_player.playing:
+	if had_crossfade_in_flight and _bgm_crossfade_player != null and _bgm_crossfade_player.playing:
 		_bgm_crossfade_player.volume_db = FULL_DB
 		_finalize_crossfade()
 
 
 # ---- Internal --------------------------------------------------------
+
 
 func _build_players() -> void:
 	_bgm_player = AudioStreamPlayer.new()
@@ -783,7 +811,8 @@ func _play_with_fade_in(player: AudioStreamPlayer, stream: AudioStream, fade_ms:
 # Ambient has its own tween slot so a BGM transition doesn't kill an in-flight
 # ambient fade.
 func _play_with_fade_in_ambient(
-		player: AudioStreamPlayer, stream: AudioStream, fade_ms: int) -> void:
+	player: AudioStreamPlayer, stream: AudioStream, fade_ms: int
+) -> void:
 	if player == null or stream == null:
 		return
 	if _ambient_fade_tween != null and _ambient_fade_tween.is_valid():
@@ -813,9 +842,14 @@ func _play_with_fade_in_ambient(
 ## The second case is what makes the F4 resume work cleanly even if the bed
 ## got STOP'd by BI-03 and then re-PLAY'd by the next room load — the
 ## ambient bed seamlessly retargets to the new gain without re-seeding.
-func _play_ambient_with_curve(player: AudioStreamPlayer, stream: AudioStream,
-		fade_ms: int, target_gain_db: float,
-		trans_type: int, ease_type: int) -> void:
+func _play_ambient_with_curve(
+	player: AudioStreamPlayer,
+	stream: AudioStream,
+	fade_ms: int,
+	target_gain_db: float,
+	trans_type: int,
+	ease_type: int
+) -> void:
 	if player == null or stream == null:
 		return
 	if _ambient_fade_tween != null and _ambient_fade_tween.is_valid():
@@ -830,9 +864,12 @@ func _play_ambient_with_curve(player: AudioStreamPlayer, stream: AudioStream,
 		player.play()
 	var duration_sec: float = max(fade_ms, 1) / 1000.0
 	_ambient_fade_tween = create_tween()
-	_ambient_fade_tween.tween_property(player, "volume_db", target_gain_db, duration_sec) \
-		.set_trans(trans_type) \
-		.set_ease(ease_type)
+	(
+		_ambient_fade_tween
+		. tween_property(player, "volume_db", target_gain_db, duration_sec)
+		. set_trans(trans_type)
+		. set_ease(ease_type)
+	)
 	_ambient_target_db = target_gain_db
 
 
@@ -842,13 +879,15 @@ func _fade_out_and_stop(player: AudioStreamPlayer, fade_ms: int) -> void:
 	var duration_sec: float = max(fade_ms, 1) / 1000.0
 	var tween: Tween = create_tween()
 	tween.tween_property(player, "volume_db", SILENCE_DB, duration_sec)
-	tween.finished.connect(func() -> void:
-		if player != null and player.playing:
-			player.stop()
+	tween.finished.connect(
+		func() -> void:
+			if player != null and player.playing:
+				player.stop()
 	)
 
 
 # ---- Diagnostics -----------------------------------------------------
+
 
 ## Routes through DebugFlags.combat_trace (HTML5-only) so Sponsor's DevTools
 ## console (and the Playwright harness) can confirm S2 audio triggers

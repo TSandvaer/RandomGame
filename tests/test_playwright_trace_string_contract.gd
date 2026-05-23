@@ -89,7 +89,6 @@ extends GutTest
 const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 const Stratum1BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 
-
 # ==========================================================================
 # 1 — Grunt.STATE_CHASING == "chasing"
 # ==========================================================================
@@ -103,16 +102,20 @@ const Stratum1BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 # where _state defaults to STATE_IDLE and transitions to STATE_CHASING
 # (= &"chasing") via _process_chase when a player is in aggro range.
 
+
 func test_grunt_state_chasing_string_value_matches_trace_contract() -> void:
 	assert_eq(
-		String(GruntScript.STATE_CHASING), "chasing",
-		"Grunt.STATE_CHASING string value drives the [combat-trace] " +
-		"Grunt.pos | ... state=chasing literal in soak-narrative-" +
-		"regression.spec.ts. If this value changes, the Playwright spec " +
-		"regex stops matching real production traces — but reports " +
-		"'assertion failed' the same way as a real engine bug. Update " +
-		"the spec regex AND this pin in the same PR if the rename is " +
-		"intentional."
+		String(GruntScript.STATE_CHASING),
+		"chasing",
+		(
+			"Grunt.STATE_CHASING string value drives the [combat-trace] "
+			+ "Grunt.pos | ... state=chasing literal in soak-narrative-"
+			+ "regression.spec.ts. If this value changes, the Playwright spec "
+			+ "regex stops matching real production traces — but reports "
+			+ "'assertion failed' the same way as a real engine bug. Update "
+			+ "the spec regex AND this pin in the same PR if the rename is "
+			+ "intentional."
+		)
 	)
 
 
@@ -128,16 +131,20 @@ func test_grunt_state_chasing_string_value_matches_trace_contract() -> void:
 # test.fail()) plans to read this surface, and any future spec that asserts
 # on boss state by literal would silently drift.
 
+
 func test_stratum1boss_state_chasing_string_value_matches_trace_contract() -> void:
 	assert_eq(
-		String(Stratum1BossScript.STATE_CHASING), "chasing",
-		"Stratum1Boss.STATE_CHASING string value matches Grunt." +
-		"STATE_CHASING by convention. Both feed Playwright-asserted " +
-		"state=chasing literals when a future spec drives the boss " +
-		"engage-after-entry probe via the passive-player Hitbox.hit | " +
-		"team=enemy target=Player gate (mob-self-engagement.spec.ts " +
-		"S1 Boss Room block). Symmetric pin — keeps the two values in " +
-		"lockstep so a partial rename doesn't ship."
+		String(Stratum1BossScript.STATE_CHASING),
+		"chasing",
+		(
+			"Stratum1Boss.STATE_CHASING string value matches Grunt."
+			+ "STATE_CHASING by convention. Both feed Playwright-asserted "
+			+ "state=chasing literals when a future spec drives the boss "
+			+ "engage-after-entry probe via the passive-player Hitbox.hit | "
+			+ "team=enemy target=Player gate (mob-self-engagement.spec.ts "
+			+ "S1 Boss Room block). Symmetric pin — keeps the two values in "
+			+ "lockstep so a partial rename doesn't ship."
+		)
 	)
 
 
@@ -159,6 +166,7 @@ func test_stratum1boss_state_chasing_string_value_matches_trace_contract() -> vo
 # fifth beat lands or a key is renamed, this pin surfaces the divergence
 # before the Playwright spec drifts.
 
+
 func test_tutorial_event_bus_beat_keys_match_trace_contract() -> void:
 	var bus: Node = Engine.get_main_loop().root.get_node_or_null("TutorialEventBus")
 	assert_not_null(bus, "TutorialEventBus autoload must be registered")
@@ -172,13 +180,16 @@ func test_tutorial_event_bus_beat_keys_match_trace_contract() -> void:
 	key_strings.sort()
 	var expected: Array = ["dodge", "lmb_strike", "rmb_heavy", "wasd"]
 	assert_eq(
-		key_strings, expected,
-		"TutorialEventBus.BEAT_TEXTS keys drive [combat-trace] " +
-		"TutorialEventBus.request_beat | beat=<id> literals asserted in " +
-		"tutorial-beat-trace.spec.ts. Adding or renaming a key requires " +
-		"updating that spec's beat-trace assertions AND this pin in the " +
-		"same PR. Missing-key drift: a beat the spec asserts is removed; " +
-		"extra-key drift: a fifth beat lands without spec coverage."
+		key_strings,
+		expected,
+		(
+			"TutorialEventBus.BEAT_TEXTS keys drive [combat-trace] "
+			+ "TutorialEventBus.request_beat | beat=<id> literals asserted in "
+			+ "tutorial-beat-trace.spec.ts. Adding or renaming a key requires "
+			+ "updating that spec's beat-trace assertions AND this pin in the "
+			+ "same PR. Missing-key drift: a beat the spec asserts is removed; "
+			+ "extra-key drift: a fifth beat lands without spec coverage."
+		)
 	)
 
 
@@ -203,23 +214,31 @@ func test_tutorial_event_bus_beat_keys_match_trace_contract() -> void:
 # The acceptance shape is the next-best pin: prove the call signature
 # still accepts the strings Playwright greps for.
 
+
 func test_inventory_equip_accepts_all_playwright_asserted_source_tags() -> void:
 	var inv: Node = Engine.get_main_loop().root.get_node_or_null("Inventory")
 	assert_not_null(inv, "Inventory autoload must be registered")
 	inv.reset()
 	# Build three weapon items so each accept-call has a fresh source.
-	var def: ItemDef = ContentFactory.make_item_def({
-		"id": &"drift_pin_weapon",
-		"slot": ItemDef.Slot.WEAPON,
-		"base_stats": ContentFactory.make_item_base_stats({"damage": 2}),
-	})
+	var def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": &"drift_pin_weapon",
+				"slot": ItemDef.Slot.WEAPON,
+				"base_stats": ContentFactory.make_item_base_stats({"damage": 2}),
+			}
+		)
+	)
 	# Tag 1: lmb_click — the default; matches the InventoryPanel click site.
 	var i1: ItemInstance = ItemInstance.new(def, ItemDef.Tier.T1)
 	inv.add(i1)
 	assert_true(
 		inv.equip(i1, &"weapon", &"lmb_click"),
-		"Inventory.equip(item, slot, &\"lmb_click\") must succeed — this is " +
-		"the literal asserted by equip-flow.spec.ts Phase 2.5 (P0 86c9q96m8)."
+		(
+			'Inventory.equip(item, slot, &"lmb_click") must succeed — this is '
+			+ "the literal asserted by equip-flow.spec.ts Phase 2.5 (P0 86c9q96m8)."
+		)
 	)
 	inv.reset()
 	# Tag 2: auto_pickup — the onboarding path; matches the
@@ -228,9 +247,11 @@ func test_inventory_equip_accepts_all_playwright_asserted_source_tags() -> void:
 	inv.add(i2)
 	assert_true(
 		inv.equip(i2, &"weapon", &"auto_pickup"),
-		"Inventory.equip(item, slot, &\"auto_pickup\") must succeed — this " +
-		"is the literal asserted by ac2/ac3/equip-flow/room-traversal-smoke " +
-		"specs (onboarding auto-equip-first-weapon-on-pickup)."
+		(
+			'Inventory.equip(item, slot, &"auto_pickup") must succeed — this '
+			+ "is the literal asserted by ac2/ac3/equip-flow/room-traversal-smoke "
+			+ "specs (onboarding auto-equip-first-weapon-on-pickup)."
+		)
 	)
 	inv.reset()
 	# Tag 3: auto_starter — deprecated (no producer), but the equip() API
@@ -240,10 +261,12 @@ func test_inventory_equip_accepts_all_playwright_asserted_source_tags() -> void:
 	inv.add(i3)
 	assert_true(
 		inv.equip(i3, &"weapon", &"auto_starter"),
-		"Inventory.equip(item, slot, &\"auto_starter\") must STILL succeed — " +
-		"the deprecated PR #146 boot-equip tag has no current producer but " +
-		"equip-flow.spec.ts negative-asserts the LITERAL string in the trace. " +
-		"If equip() ever adds a source whitelist, that decision must update " +
-		"the Playwright spec's negative assertion AND this pin in the same PR."
+		(
+			'Inventory.equip(item, slot, &"auto_starter") must STILL succeed — '
+			+ "the deprecated PR #146 boot-equip tag has no current producer but "
+			+ "equip-flow.spec.ts negative-asserts the LITERAL string in the trace. "
+			+ "If equip() ever adds a source whitelist, that decision must update "
+			+ "the Playwright spec's negative assertion AND this pin in the same PR."
+		)
 	)
 	inv.reset()

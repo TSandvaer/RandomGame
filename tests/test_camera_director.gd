@@ -85,9 +85,11 @@ func _on_zoom_requested(target: float, duration: float, anchor: Vector2) -> void
 
 # ---- AC1: autoload registration + API surface --------------------------
 
+
 func test_autoload_registered_at_root() -> void:
-	assert_not_null(_director,
-		"CameraDirector must be registered as autoload at /root/CameraDirector")
+	assert_not_null(
+		_director, "CameraDirector must be registered as autoload at /root/CameraDirector"
+	)
 	assert_true(_director.has_method("request_zoom"), "request_zoom API present")
 	assert_true(_director.has_method("reset_to_player"), "reset_to_player API present")
 	assert_true(_director.has_method("current_zoom"), "current_zoom API present")
@@ -105,17 +107,17 @@ func test_autoload_registered_at_root() -> void:
 	assert_true(_director.has_method("set_world_bounds"), "set_world_bounds API present (W1)")
 	assert_true(_director.has_method("clear_world_bounds"), "clear_world_bounds API present (W1)")
 	assert_true(_director.has_method("get_world_bounds"), "get_world_bounds API present (W1)")
-	assert_true(_director.has_signal("follow_target_changed"),
-		"follow_target_changed signal present (W1)")
-	assert_true(_director.has_signal("world_bounds_changed"),
-		"world_bounds_changed signal present (W1)")
+	assert_true(
+		_director.has_signal("follow_target_changed"), "follow_target_changed signal present (W1)"
+	)
+	assert_true(
+		_director.has_signal("world_bounds_changed"), "world_bounds_changed signal present (W1)"
+	)
 
 
 func test_boot_state_is_clean_default_zoom_following_player() -> void:
-	assert_almost_eq(_director.current_zoom(), 1.0, 0.001,
-		"boot state → normalized zoom 1.0")
-	assert_true(_director.is_following_player(),
-		"boot state → follow-player mode (anchor zero)")
+	assert_almost_eq(_director.current_zoom(), 1.0, 0.001, "boot state → normalized zoom 1.0")
+	assert_true(_director.is_following_player(), "boot state → follow-player mode (anchor zero)")
 
 
 func test_camera2d_exists_and_is_current() -> void:
@@ -124,22 +126,25 @@ func test_camera2d_exists_and_is_current() -> void:
 	assert_true(cam.is_current(), "Camera2D is current on the viewport")
 	# Default zoom matches BASELINE_ZOOM exactly (the pre-Camera2D viewport-stretch
 	# ratio of 1280/480 = 2.6667). Pixel-perfect parity with pre-T9 rendering.
-	assert_almost_eq(cam.zoom.x, 2.6667, 0.001,
-		"Camera2D.zoom.x == BASELINE_ZOOM.x (pre-T9 visual parity)")
-	assert_almost_eq(cam.zoom.y, 2.6667, 0.001,
-		"Camera2D.zoom.y == BASELINE_ZOOM.y")
+	assert_almost_eq(
+		cam.zoom.x, 2.6667, 0.001, "Camera2D.zoom.x == BASELINE_ZOOM.x (pre-T9 visual parity)"
+	)
+	assert_almost_eq(cam.zoom.y, 2.6667, 0.001, "Camera2D.zoom.y == BASELINE_ZOOM.y")
 
 
 # ---- AC2: request_zoom applies zoom -------------------------------------
 
+
 func test_request_zoom_instant_applies_zoom() -> void:
 	# duration=0 snaps; verifiable without await.
 	_director.request_zoom(1.5, 0.0)
-	assert_almost_eq(_director.current_zoom(), 1.5, 0.001,
-		"current_zoom == 1.5 after instant 1.5× request")
+	assert_almost_eq(
+		_director.current_zoom(), 1.5, 0.001, "current_zoom == 1.5 after instant 1.5× request"
+	)
 	var cam: Camera2D = _director.get_camera()
-	assert_almost_eq(cam.zoom.x, 2.6667 * 1.5, 0.001,
-		"engine Camera2D.zoom.x = BASELINE * 1.5 = 4.0")
+	assert_almost_eq(
+		cam.zoom.x, 2.6667 * 1.5, 0.001, "engine Camera2D.zoom.x = BASELINE * 1.5 = 4.0"
+	)
 
 
 func test_zoom_changed_signal_fires_on_change() -> void:
@@ -159,55 +164,59 @@ func test_zoom_requested_signal_fires_with_payload() -> void:
 
 # ---- AC3: idempotence + replacement -----------------------------------
 
+
 func test_same_params_re_request_is_noop() -> void:
 	_director.request_zoom(1.5, 0.0)
 	_zoom_requests.clear()
 	_zoom_changes.clear()
 	# Second call with same params + already-at-state → no-op.
 	_director.request_zoom(1.5, 0.0)
-	assert_eq(_zoom_requests.size(), 0,
-		"same-params re-request while already-at-state: zoom_requested suppressed")
-	assert_eq(_zoom_changes.size(), 0,
-		"same-params re-request: zoom_changed suppressed (no-op)")
+	assert_eq(
+		_zoom_requests.size(),
+		0,
+		"same-params re-request while already-at-state: zoom_requested suppressed"
+	)
+	assert_eq(_zoom_changes.size(), 0, "same-params re-request: zoom_changed suppressed (no-op)")
 
 
 func test_different_params_re_request_applies_new() -> void:
 	_director.request_zoom(1.5, 0.0)
 	_director.request_zoom(2.0, 0.0)
-	assert_almost_eq(_director.current_zoom(), 2.0, 0.001,
-		"second call's target wins")
+	assert_almost_eq(_director.current_zoom(), 2.0, 0.001, "second call's target wins")
 
 
 # ---- AC4: anchor handling ---------------------------------------------
 
+
 func test_default_anchor_is_player_follow() -> void:
-	assert_true(_director.is_following_player(),
-		"boot/default: following player")
+	assert_true(_director.is_following_player(), "boot/default: following player")
 
 
 func test_non_zero_anchor_pins_camera() -> void:
 	_director.request_zoom(1.0, 0.0, Vector2(100, 80))
-	assert_false(_director.is_following_player(),
-		"non-zero anchor → not following player")
+	assert_false(_director.is_following_player(), "non-zero anchor → not following player")
 	var cam: Camera2D = _director.get_camera()
 	# Instant snap (duration=0) — position equals anchor immediately.
-	assert_eq(cam.global_position, Vector2(100, 80),
-		"camera global_position pinned to anchor (instant snap)")
-	assert_eq(_director.current_anchor(), Vector2(100, 80),
-		"current_anchor reports pinned coord")
+	assert_eq(
+		cam.global_position,
+		Vector2(100, 80),
+		"camera global_position pinned to anchor (instant snap)"
+	)
+	assert_eq(_director.current_anchor(), Vector2(100, 80), "current_anchor reports pinned coord")
 
 
 func test_reset_to_player_returns_to_follow_mode() -> void:
 	_director.request_zoom(1.5, 0.0, Vector2(100, 80))
 	assert_false(_director.is_following_player())
 	_director.reset_to_player(0.0)
-	assert_true(_director.is_following_player(),
-		"reset_to_player → follow mode")
-	assert_almost_eq(_director.current_zoom(), 1.0, 0.001,
-		"reset_to_player → default normalized zoom")
+	assert_true(_director.is_following_player(), "reset_to_player → follow mode")
+	assert_almost_eq(
+		_director.current_zoom(), 1.0, 0.001, "reset_to_player → default normalized zoom"
+	)
 
 
 # ---- AC5: player-follow snaps to player's global_position ---------------
+
 
 func test_player_follow_snaps_to_player_position() -> void:
 	# Create a stand-in player Node2D in the "player" group; verify the
@@ -221,8 +230,11 @@ func test_player_follow_snaps_to_player_position() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var cam: Camera2D = _director.get_camera()
-	assert_eq(cam.global_position, Vector2(123, 456),
-		"camera snaps to player's global_position in follow mode")
+	assert_eq(
+		cam.global_position,
+		Vector2(123, 456),
+		"camera snaps to player's global_position in follow mode"
+	)
 
 
 func test_player_follow_re_resolves_on_player_swap() -> void:
@@ -242,11 +254,15 @@ func test_player_follow_re_resolves_on_player_swap() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var cam: Camera2D = _director.get_camera()
-	assert_eq(cam.global_position, Vector2(300, 400),
-		"camera re-resolves player target across player-swap (room cycle proxy)")
+	assert_eq(
+		cam.global_position,
+		Vector2(300, 400),
+		"camera re-resolves player target across player-swap (room cycle proxy)"
+	)
 
 
 # ---- AC6: HUD-not-zoom invariant (load-bearing) -----------------------
+
 
 func test_hud_canvaslayer_unaffected_by_camera_zoom() -> void:
 	# Mount a CanvasLayer with a child Control at a known screen position.
@@ -268,50 +284,62 @@ func test_hud_canvaslayer_unaffected_by_camera_zoom() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var post_pos: Vector2 = hud_label.get_global_transform_with_canvas().origin
-	assert_eq(pre_pos, post_pos,
-		"CanvasLayer-child render position unchanged after 1.5× camera zoom "
-		+ "(HUD-not-zoom invariant — Godot CanvasLayer immunity)")
+	assert_eq(
+		pre_pos,
+		post_pos,
+		(
+			"CanvasLayer-child render position unchanged after 1.5× camera zoom "
+			+ "(HUD-not-zoom invariant — Godot CanvasLayer immunity)"
+		)
+	)
 	# Reset for next test.
 	_director.reset_to_player(0.0)
 
 
 # ---- AC7: WarningBus routing on misuse --------------------------------
 
+
 func test_out_of_range_scale_clamps_with_warning() -> void:
 	_warn_guard.expect_warning("clamped")
 	_director.request_zoom(10.0, 0.0)  # max is 4.0
-	assert_almost_eq(_director.current_zoom(), 4.0, 0.001,
-		"scale clamped to MAX_NORMALIZED_ZOOM (4.0)")
+	assert_almost_eq(
+		_director.current_zoom(), 4.0, 0.001, "scale clamped to MAX_NORMALIZED_ZOOM (4.0)"
+	)
 
 
 func test_nan_scale_refused_with_warning() -> void:
 	_warn_guard.expect_warning("non-finite")
 	_director.request_zoom(NAN, 0.0)
 	# Stays at boot default — non-finite request was refused.
-	assert_almost_eq(_director.current_zoom(), 1.0, 0.001,
-		"NaN scale refused — current_zoom unchanged")
+	assert_almost_eq(
+		_director.current_zoom(), 1.0, 0.001, "NaN scale refused — current_zoom unchanged"
+	)
 
 
 func test_inf_scale_refused_with_warning() -> void:
 	_warn_guard.expect_warning("non-finite")
 	_director.request_zoom(INF, 0.0)
-	assert_almost_eq(_director.current_zoom(), 1.0, 0.001,
-		"Inf scale refused — current_zoom unchanged")
+	assert_almost_eq(
+		_director.current_zoom(), 1.0, 0.001, "Inf scale refused — current_zoom unchanged"
+	)
 
 
 # ---- AC8: negative duration clamps to 0 (no panic) --------------------
+
 
 func test_negative_duration_clamps_to_zero() -> void:
 	# Negative duration should not crash; the request should still apply
 	# instantly (clamped to 0).
 	_director.request_zoom(1.5, -1.0)
-	assert_almost_eq(_director.current_zoom(), 1.5, 0.001,
-		"negative duration treated as 0 (instant apply)")
+	assert_almost_eq(
+		_director.current_zoom(), 1.5, 0.001, "negative duration treated as 0 (instant apply)"
+	)
 
 
 # ---- AC9: zoom request preserves across room-cycle proxy ---------------
 
 # ---- AC10: Playwright-fixture observability contract -------------------
+
 
 func test_camera_state_observable_for_playwright_fixture() -> void:
 	# The Playwright fixture (`tests/playwright/fixtures/mouse-facing.ts`)
@@ -338,17 +366,28 @@ func test_camera_state_observable_for_playwright_fixture() -> void:
 	await get_tree().process_frame
 	var cam: Camera2D = _director.get_camera()
 	assert_not_null(cam, "get_camera() returns the Camera2D puppet")
-	assert_almost_eq(cam.global_position.x, 240.0, 0.5,
-		"Camera2D.global_position.x snap-follows player (fixture cam pos)")
-	assert_almost_eq(cam.global_position.y, 200.0, 0.5,
-		"Camera2D.global_position.y snap-follows player (fixture cam pos)")
-	assert_almost_eq(cam.zoom.x, 2.6667, 0.001,
-		"Camera2D.zoom.x at BASELINE_ZOOM (fixture engine-zoom value)")
+	assert_almost_eq(
+		cam.global_position.x,
+		240.0,
+		0.5,
+		"Camera2D.global_position.x snap-follows player (fixture cam pos)"
+	)
+	assert_almost_eq(
+		cam.global_position.y,
+		200.0,
+		0.5,
+		"Camera2D.global_position.y snap-follows player (fixture cam pos)"
+	)
+	assert_almost_eq(
+		cam.zoom.x, 2.6667, 0.001, "Camera2D.zoom.x at BASELINE_ZOOM (fixture engine-zoom value)"
+	)
 	# Cadence constant lookup. The fixture's stale-trace guard expects this
 	# to be ≤ 0.5 s so a single helper call always has a fresh state datapoint.
 	var interval: float = _director.STATE_TRACE_INTERVAL
-	assert_true(interval > 0.0 and interval <= 0.5,
-		"STATE_TRACE_INTERVAL within fixture-expected bounds (got %.3f)" % interval)
+	assert_true(
+		interval > 0.0 and interval <= 0.5,
+		"STATE_TRACE_INTERVAL within fixture-expected bounds (got %.3f)" % interval
+	)
 
 
 func test_in_flight_zoom_survives_player_node_freed() -> void:
@@ -369,8 +408,7 @@ func test_in_flight_zoom_survives_player_node_freed() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	# Director didn't crash + state intact.
-	assert_almost_eq(_director.current_zoom(), 1.5, 0.001,
-		"zoom state intact after player freed")
+	assert_almost_eq(_director.current_zoom(), 1.5, 0.001, "zoom state intact after player freed")
 
 
 # ---- M3 Tier 3 W1 — continuous-scroll follow + bounds-clamp -----------
@@ -384,6 +422,7 @@ func test_in_flight_zoom_survives_player_node_freed() -> void:
 #   - HUD-immunity preserved through continuous-scroll path
 #   - WarningBus routing on misuse
 
+
 func _setup_follow_target_at(world_pos: Vector2) -> Node2D:
 	var t: Node2D = Node2D.new()
 	t.name = "FollowTarget"
@@ -393,6 +432,7 @@ func _setup_follow_target_at(world_pos: Vector2) -> Node2D:
 
 
 # ---- Deadzone math (pure-function pins) -------------------------------
+
 
 func test_deadzone_inside_box_camera_holds_x_and_y() -> void:
 	# Target inside deadzone box → camera holds.
@@ -421,12 +461,14 @@ func test_deadzone_target_crosses_x_camera_shifts_to_pin_target_at_edge() -> voi
 	var target: Vector2 = Vector2(160, 100)
 	var result: Vector2 = _director._compute_deadzone_follow_position(cam, target, deadzone)
 	# Camera shifts so target sits at +deadzone.x: cam.x = target.x - 40 = 120.
-	assert_eq(result.x, 120.0,
-		"target crossed +X edge → camera moves so target lands at right deadzone edge")
+	assert_eq(
+		result.x,
+		120.0,
+		"target crossed +X edge → camera moves so target lands at right deadzone edge"
+	)
 	assert_eq(result.y, 100.0, "Y unchanged when target inside deadzone on Y")
 	# Post-condition: target is now exactly AT deadzone edge in X.
-	assert_eq(target.x - result.x, deadzone.x,
-		"post-condition: target.x - cam.x == deadzone.x")
+	assert_eq(target.x - result.x, deadzone.x, "post-condition: target.x - cam.x == deadzone.x")
 
 
 func test_deadzone_target_crosses_negative_x_camera_shifts_left() -> void:
@@ -436,10 +478,12 @@ func test_deadzone_target_crosses_negative_x_camera_shifts_left() -> void:
 	var target: Vector2 = Vector2(40, 100)
 	var result: Vector2 = _director._compute_deadzone_follow_position(cam, target, deadzone)
 	# Camera shifts so target sits at -deadzone.x: cam.x = target.x + 40 = 80.
-	assert_eq(result.x, 80.0,
-		"target crossed -X edge → camera moves so target lands at left deadzone edge")
-	assert_eq(target.x - result.x, -deadzone.x,
-		"post-condition: target.x - cam.x == -deadzone.x")
+	assert_eq(
+		result.x,
+		80.0,
+		"target crossed -X edge → camera moves so target lands at left deadzone edge"
+	)
+	assert_eq(target.x - result.x, -deadzone.x, "post-condition: target.x - cam.x == -deadzone.x")
 
 
 func test_deadzone_axes_independent_x_only_y_held() -> void:
@@ -463,6 +507,7 @@ func test_deadzone_zero_collapses_to_snap_follow() -> void:
 
 # ---- World-bounds clamp math (pure-function pins) ----------------------
 
+
 func test_clamp_inside_bounds_position_unchanged() -> void:
 	# Camera well inside bounds, viewport fits → position unchanged.
 	# At BASELINE_ZOOM, visible viewport is 480×270.
@@ -482,8 +527,9 @@ func test_clamp_pushes_camera_off_left_edge() -> void:
 	var bounds: Rect2 = Rect2(0, 0, 1440, 270)
 	var cam: Vector2 = Vector2(10, 135)
 	var result: Vector2 = _director._clamp_to_world_bounds(cam, bounds)
-	assert_almost_eq(result.x, 240.0, 0.5,
-		"clamped to left-edge: cam.x = bounds.x + viewport_world.x/2")
+	assert_almost_eq(
+		result.x, 240.0, 0.5, "clamped to left-edge: cam.x = bounds.x + viewport_world.x/2"
+	)
 
 
 func test_clamp_pushes_camera_off_right_edge() -> void:
@@ -492,8 +538,9 @@ func test_clamp_pushes_camera_off_right_edge() -> void:
 	var bounds: Rect2 = Rect2(0, 0, 1440, 270)
 	var cam: Vector2 = Vector2(2000, 135)
 	var result: Vector2 = _director._clamp_to_world_bounds(cam, bounds)
-	assert_almost_eq(result.x, 1200.0, 0.5,
-		"clamped to right-edge: cam.x = bounds.end.x - viewport_world.x/2")
+	assert_almost_eq(
+		result.x, 1200.0, 0.5, "clamped to right-edge: cam.x = bounds.end.x - viewport_world.x/2"
+	)
 
 
 func test_clamp_bounds_narrower_than_viewport_centers_camera() -> void:
@@ -501,8 +548,12 @@ func test_clamp_bounds_narrower_than_viewport_centers_camera() -> void:
 	var bounds: Rect2 = Rect2(0, 0, 200, 270)
 	var cam: Vector2 = Vector2(0, 135)  # way left
 	var result: Vector2 = _director._clamp_to_world_bounds(cam, bounds)
-	assert_almost_eq(result.x, 100.0, 0.5,
-		"bounds narrower than viewport on X → camera centers on bounds.x center")
+	assert_almost_eq(
+		result.x,
+		100.0,
+		0.5,
+		"bounds narrower than viewport on X → camera centers on bounds.x center"
+	)
 
 
 func test_clamp_bounds_with_non_zero_origin() -> void:
@@ -511,13 +562,12 @@ func test_clamp_bounds_with_non_zero_origin() -> void:
 	var bounds: Rect2 = Rect2(100, 50, 1440, 400)
 	var cam: Vector2 = Vector2(50, 0)
 	var result: Vector2 = _director._clamp_to_world_bounds(cam, bounds)
-	assert_almost_eq(result.x, 340.0, 0.5,
-		"non-zero-origin bounds: clamp to bounds.x + half_vp")
-	assert_almost_eq(result.y, 185.0, 0.5,
-		"non-zero-origin bounds: clamp to bounds.y + half_vp")
+	assert_almost_eq(result.x, 340.0, 0.5, "non-zero-origin bounds: clamp to bounds.x + half_vp")
+	assert_almost_eq(result.y, 185.0, 0.5, "non-zero-origin bounds: clamp to bounds.y + half_vp")
 
 
 # ---- follow_target API lifecycle --------------------------------------
+
 
 func test_follow_target_engages_and_clear_disengages() -> void:
 	var t: Node2D = _setup_follow_target_at(Vector2(0, 0))
@@ -525,21 +575,19 @@ func test_follow_target_engages_and_clear_disengages() -> void:
 	_director.follow_target(t, Vector2(40, 24))
 	assert_true(_director.is_following_target(), "engaged after follow_target()")
 	assert_eq(_director.get_follow_target(), t, "follow target reference exposed")
-	assert_eq(_director.get_follow_deadzone(), Vector2(40, 24),
-		"deadzone exposed via getter")
+	assert_eq(_director.get_follow_deadzone(), Vector2(40, 24), "deadzone exposed via getter")
 	_director.clear_follow_target()
-	assert_false(_director.is_following_target(),
-		"disengaged after clear_follow_target()")
-	assert_null(_director.get_follow_target(),
-		"follow target reference cleared")
+	assert_false(_director.is_following_target(), "disengaged after clear_follow_target()")
+	assert_null(_director.get_follow_target(), "follow target reference cleared")
 
 
 func test_follow_target_null_treated_as_clear() -> void:
 	var t: Node2D = _setup_follow_target_at(Vector2(0, 0))
 	_director.follow_target(t, Vector2(40, 24))
 	_director.follow_target(null)  # null → clear
-	assert_false(_director.is_following_target(),
-		"follow_target(null) treated as clear_follow_target()")
+	assert_false(
+		_director.is_following_target(), "follow_target(null) treated as clear_follow_target()"
+	)
 
 
 func test_follow_target_negative_deadzone_clamps_with_warning() -> void:
@@ -547,8 +595,11 @@ func test_follow_target_negative_deadzone_clamps_with_warning() -> void:
 	var t: Node2D = _setup_follow_target_at(Vector2(0, 0))
 	_director.follow_target(t, Vector2(-10, 24))
 	# Negative X component clamped to 0.
-	assert_eq(_director.get_follow_deadzone(), Vector2(0, 24),
-		"negative deadzone component clamped to 0 with warning")
+	assert_eq(
+		_director.get_follow_deadzone(),
+		Vector2(0, 24),
+		"negative deadzone component clamped to 0 with warning"
+	)
 
 
 func test_follow_target_nan_deadzone_refused_with_warning() -> void:
@@ -556,11 +607,13 @@ func test_follow_target_nan_deadzone_refused_with_warning() -> void:
 	var t: Node2D = _setup_follow_target_at(Vector2(0, 0))
 	_director.follow_target(t, Vector2(NAN, 24))
 	# Refused — follow not engaged.
-	assert_false(_director.is_following_target(),
-		"non-finite deadzone refused — follow not engaged")
+	assert_false(
+		_director.is_following_target(), "non-finite deadzone refused — follow not engaged"
+	)
 
 
 # ---- follow_target_changed signal -------------------------------------
+
 
 func test_follow_target_changed_emits_on_engage_and_clear() -> void:
 	var events: Array = []
@@ -569,8 +622,7 @@ func test_follow_target_changed_emits_on_engage_and_clear() -> void:
 	var t: Node2D = _setup_follow_target_at(Vector2(0, 0))
 	_director.follow_target(t, Vector2(40, 24))
 	_director.clear_follow_target()
-	assert_eq(events, [true, false],
-		"follow_target_changed fires (true, false) on engage + clear")
+	assert_eq(events, [true, false], "follow_target_changed fires (true, false) on engage + clear")
 	_director.follow_target_changed.disconnect(cb)
 
 
@@ -581,12 +633,12 @@ func test_follow_target_same_params_re_engage_no_spam_signal() -> void:
 	var t: Node2D = _setup_follow_target_at(Vector2(0, 0))
 	_director.follow_target(t, Vector2(40, 24))
 	_director.follow_target(t, Vector2(40, 24))  # same params
-	assert_eq(events, [true],
-		"re-engaging with identical params → no duplicate signal")
+	assert_eq(events, [true], "re-engaging with identical params → no duplicate signal")
 	_director.follow_target_changed.disconnect(cb)
 
 
 # ---- _process integration: deadzone + clamp work together --------------
+
 
 func test_process_follow_with_deadzone_holds_camera_inside_box() -> void:
 	# Test the "target moves inside deadzone → camera holds" invariant.
@@ -608,20 +660,29 @@ func test_process_follow_with_deadzone_holds_camera_inside_box() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var cam: Camera2D = _director.get_camera()
-	assert_eq(cam.global_position, Vector2(100, 100),
-		"step 1: zero-deadzone engage snap-followed camera to target (100, 100)")
+	assert_eq(
+		cam.global_position,
+		Vector2(100, 100),
+		"step 1: zero-deadzone engage snap-followed camera to target (100, 100)"
+	)
 	# Step 2: switch to the real deadzone — camera already inside, holds.
 	_director.follow_target(t, Vector2(40, 24))
 	await get_tree().process_frame
 	var pos_before: Vector2 = cam.global_position
-	assert_eq(pos_before, Vector2(100, 100),
-		"step 2: re-engage with non-zero deadzone holds camera (target inside dz)")
+	assert_eq(
+		pos_before,
+		Vector2(100, 100),
+		"step 2: re-engage with non-zero deadzone holds camera (target inside dz)"
+	)
 	# Step 3: move target by 30 in X (< deadzone half-extent 40) → camera holds.
 	t.global_position = Vector2(130, 100)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert_eq(cam.global_position, pos_before,
-		"camera holds while target moves +30 in X (inside ±40 deadzone)")
+	assert_eq(
+		cam.global_position,
+		pos_before,
+		"camera holds while target moves +30 in X (inside ±40 deadzone)"
+	)
 
 
 func test_process_follow_with_deadzone_shifts_camera_on_edge_cross() -> void:
@@ -641,8 +702,11 @@ func test_process_follow_with_deadzone_shifts_camera_on_edge_cross() -> void:
 	t.global_position = Vector2(160, 100)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert_eq(cam.global_position.x, 120.0,
-		"camera shifts so target sits at right deadzone edge after edge-cross")
+	assert_eq(
+		cam.global_position.x,
+		120.0,
+		"camera shifts so target sits at right deadzone edge after edge-cross"
+	)
 
 
 func test_process_follow_with_bounds_clamps_at_world_edge() -> void:
@@ -660,8 +724,12 @@ func test_process_follow_with_bounds_clamps_at_world_edge() -> void:
 	var cam: Camera2D = _director.get_camera()
 	# Bounds 1440 wide; viewport at zoom 2.6667 is 480 wide; half = 240.
 	# Max cam.x = 1440 - 240 = 1200.
-	assert_almost_eq(cam.global_position.x, 1200.0, 1.0,
-		"camera clamps at right world edge — does not scroll past bounds")
+	assert_almost_eq(
+		cam.global_position.x,
+		1200.0,
+		1.0,
+		"camera clamps at right world edge — does not scroll past bounds"
+	)
 	_director.clear_world_bounds()
 
 
@@ -675,12 +743,17 @@ func test_process_snap_follow_with_bounds_also_clamps() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var cam: Camera2D = _director.get_camera()
-	assert_almost_eq(cam.global_position.x, 1200.0, 1.0,
-		"snap-follow path also bounds-clamps (back-compat preservation)")
+	assert_almost_eq(
+		cam.global_position.x,
+		1200.0,
+		1.0,
+		"snap-follow path also bounds-clamps (back-compat preservation)"
+	)
 	_director.clear_world_bounds()
 
 
 # ---- HUD-immunity preserved through continuous-scroll path ------------
+
 
 func test_hud_canvaslayer_unaffected_by_continuous_scroll() -> void:
 	# Equivalent of test_hud_canvaslayer_unaffected_by_camera_zoom but
@@ -703,14 +776,20 @@ func test_hud_canvaslayer_unaffected_by_continuous_scroll() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var post_pos: Vector2 = hud_label.get_global_transform_with_canvas().origin
-	assert_eq(pre_pos, post_pos,
-		"CanvasLayer-child render position unchanged after continuous-scroll "
-		+ "(HUD-immunity preserved through W1 spike path)")
+	assert_eq(
+		pre_pos,
+		post_pos,
+		(
+			"CanvasLayer-child render position unchanged after continuous-scroll "
+			+ "(HUD-immunity preserved through W1 spike path)"
+		)
+	)
 	_director.clear_world_bounds()
 	_director.clear_follow_target()
 
 
 # ---- follow_target survives target-freed (defensive) -------------------
+
 
 func test_follow_target_freed_target_falls_back_safely() -> void:
 	var t: Node2D = _setup_follow_target_at(Vector2(100, 100))
@@ -722,11 +801,13 @@ func test_follow_target_freed_target_falls_back_safely() -> void:
 	# (no player in "player" group in this test → camera holds last position).
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert_false(_director.is_following_target(),
-		"freed target → is_following_target returns false")
+	assert_false(
+		_director.is_following_target(), "freed target → is_following_target returns false"
+	)
 
 
 # ---- set_world_bounds API + signal ------------------------------------
+
 
 func test_set_world_bounds_emits_signal_and_exposes_value() -> void:
 	var events: Array = []
@@ -734,8 +815,7 @@ func test_set_world_bounds_emits_signal_and_exposes_value() -> void:
 	_director.world_bounds_changed.connect(cb)
 	var bounds: Rect2 = Rect2(0, 0, 1440, 270)
 	_director.set_world_bounds(bounds)
-	assert_eq(_director.get_world_bounds(), bounds,
-		"get_world_bounds reflects set value")
+	assert_eq(_director.get_world_bounds(), bounds, "get_world_bounds reflects set value")
 	assert_eq(events.size(), 1, "world_bounds_changed fired once on set")
 	assert_eq(events[0], bounds, "signal payload == set bounds")
 	# Setting same value again → idempotent (no spam).
@@ -751,5 +831,8 @@ func test_set_world_bounds_emits_signal_and_exposes_value() -> void:
 func test_set_world_bounds_negative_size_refused_with_warning() -> void:
 	_warn_guard.expect_warning("negative size")
 	_director.set_world_bounds(Rect2(0, 0, -100, 270))
-	assert_eq(_director.get_world_bounds(), Rect2(),
-		"negative-size bounds refused — clamp remains disabled")
+	assert_eq(
+		_director.get_world_bounds(),
+		Rect2(),
+		"negative-size bounds refused — clamp remains disabled"
+	)

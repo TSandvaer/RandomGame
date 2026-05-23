@@ -82,8 +82,7 @@ const MOVEMENT_THRESHOLD_SQ: float = 900.0
 
 ## res:// path to the PracticeDummy scene (Stage 2b). Indirected via export
 ## so tests can swap in a marker fake.
-@export_file("*.tscn") var practice_dummy_scene_path: String = (
-	"res://scenes/mobs/PracticeDummy.tscn")
+@export_file("*.tscn") var practice_dummy_scene_path: String = "res://scenes/mobs/PracticeDummy.tscn"
 
 ## res:// path to the Grunt MobDef.
 @export_file("*.tres") var grunt_mob_def_path: String = "res://resources/mobs/grunt.tres"
@@ -142,6 +141,7 @@ func _build() -> void:
 
 # ---- Public API -------------------------------------------------------
 
+
 func get_assembly() -> LevelAssembler.AssemblyResult:
 	return _assembly
 
@@ -162,14 +162,20 @@ func get_spawned_mobs() -> Array[Node]:
 ## emission sequence (WASD → dodge → LMB → RMB) without polling the bus.
 func get_tutorial_beat_emitted(beat_id: StringName) -> bool:
 	match beat_id:
-		BEAT_WASD: return _wasd_emitted
-		BEAT_DODGE: return _dodge_emitted
-		BEAT_LMB: return _lmb_emitted
-		BEAT_RMB: return _rmb_emitted
-		_: return false
+		BEAT_WASD:
+			return _wasd_emitted
+		BEAT_DODGE:
+			return _dodge_emitted
+		BEAT_LMB:
+			return _lmb_emitted
+		BEAT_RMB:
+			return _rmb_emitted
+		_:
+			return false
 
 
 # ---- Spawner ----------------------------------------------------------
+
 
 func _spawn_mob(mob_id: StringName, _world_pos: Vector2) -> Node:
 	# Stage 2b: factory recognizes both &"grunt" (legacy / tests) and
@@ -180,8 +186,11 @@ func _spawn_mob(mob_id: StringName, _world_pos: Vector2) -> Node:
 		var dummy_scene: PackedScene = _get_practice_dummy_scene()
 		if dummy_scene == null:
 			push_warning(
-				"Stratum1Room01: practice_dummy scene failed to load at '%s'"
-					% practice_dummy_scene_path)
+				(
+					"Stratum1Room01: practice_dummy scene failed to load at '%s'"
+					% practice_dummy_scene_path
+				)
+			)
 			return null
 		return dummy_scene.instantiate()
 	if mob_id == &"grunt":
@@ -226,6 +235,7 @@ func _get_practice_dummy_scene() -> PackedScene:
 
 
 # ---- Tutorial flow wiring -------------------------------------------
+
 
 ## Resolve the player + the spawned dummy, fire the WASD beat, and wire the
 ## detection chain that advances through dodge → LMB → RMB.
@@ -285,6 +295,7 @@ func _physics_process(_delta: float) -> void:
 
 # ---- Tutorial flow signal handlers ----------------------------------
 
+
 ## Player started an intentional dodge. Fires `lmb_strike` beat.
 ##
 ## **Why dodge_started, not state_changed or iframes_started:**
@@ -311,6 +322,7 @@ func _on_practice_dummy_died(_mob: Variant, _pos: Variant, _def: Variant) -> voi
 
 # ---- Beat emission helper -----------------------------------------
 
+
 ## Resolve which one-shot latch to flip + call into TutorialEventBus.
 ## Keeps the latch + bus call in one place so a "did I just emit X already?"
 ## check can never drift between caller and emitter.
@@ -322,16 +334,20 @@ func _emit_beat(beat_id: StringName) -> bool:
 	# room script's job is "fire each beat at most once per room-entry."
 	match beat_id:
 		BEAT_WASD:
-			if _wasd_emitted: return false
+			if _wasd_emitted:
+				return false
 			_wasd_emitted = true
 		BEAT_DODGE:
-			if _dodge_emitted: return false
+			if _dodge_emitted:
+				return false
 			_dodge_emitted = true
 		BEAT_LMB:
-			if _lmb_emitted: return false
+			if _lmb_emitted:
+				return false
 			_lmb_emitted = true
 		BEAT_RMB:
-			if _rmb_emitted: return false
+			if _rmb_emitted:
+				return false
 			_rmb_emitted = true
 		_:
 			return false

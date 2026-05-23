@@ -29,6 +29,7 @@ func _make_player() -> Player:
 
 # --- 1. Dodge fallback to facing ---------------------------------------
 
+
 func test_dodge_with_zero_dir_uses_facing() -> void:
 	var p: Player = _make_player()
 	# Default facing is DOWN (0, 1).
@@ -49,6 +50,7 @@ func test_dodge_normalises_direction() -> void:
 
 # --- 2. Rapid-fire double-press handled --------------------------------
 
+
 func test_cannot_dodge_while_dodging() -> void:
 	var p: Player = _make_player()
 	assert_true(p.try_dodge(Vector2.RIGHT), "first dodge must succeed")
@@ -56,11 +58,14 @@ func test_cannot_dodge_while_dodging() -> void:
 	assert_false(p.try_dodge(Vector2.LEFT), "second dodge during active dodge must be rejected")
 	# State should still reflect the first dodge.
 	assert_eq(p.get_state(), Player.STATE_DODGE)
-	assert_eq(p._dodge_dir, Vector2.RIGHT, "second dodge attempt must not have overwritten direction")
+	assert_eq(
+		p._dodge_dir, Vector2.RIGHT, "second dodge attempt must not have overwritten direction"
+	)
 	p.free()
 
 
 # --- 3. I-frames are active during dodge, off after --------------------
+
 
 func test_iframes_active_during_dodge() -> void:
 	var p: Player = _make_player()
@@ -86,6 +91,7 @@ func test_iframes_signals_fire_in_order() -> void:
 
 # --- 4. Cooldown blocks immediate re-dodge -----------------------------
 
+
 func test_cooldown_blocks_immediate_redodge() -> void:
 	var p: Player = _make_player()
 	p.try_dodge(Vector2.RIGHT)
@@ -104,13 +110,18 @@ func test_cooldown_blocks_immediate_redodge() -> void:
 
 # --- 5. state_changed signal carries from/to ---------------------------
 
+
 func test_state_changed_signal_carries_from_to() -> void:
 	var p: Player = _make_player()
 	watch_signals(p)
 	p.set_state(Player.STATE_WALK)
-	assert_signal_emitted_with_parameters(p, "state_changed", [Player.STATE_IDLE, Player.STATE_WALK])
+	assert_signal_emitted_with_parameters(
+		p, "state_changed", [Player.STATE_IDLE, Player.STATE_WALK]
+	)
 	p.set_state(Player.STATE_DODGE)
-	assert_signal_emitted_with_parameters(p, "state_changed", [Player.STATE_WALK, Player.STATE_DODGE])
+	assert_signal_emitted_with_parameters(
+		p, "state_changed", [Player.STATE_WALK, Player.STATE_DODGE]
+	)
 	p.free()
 
 
@@ -125,6 +136,7 @@ func test_set_state_to_same_does_not_emit() -> void:
 
 
 # --- 6. Collision layer restoration ------------------------------------
+
 
 func test_collision_layer_cleared_during_iframes_restored_after() -> void:
 	var p: Player = _make_player()
@@ -141,6 +153,7 @@ func test_collision_layer_cleared_during_iframes_restored_after() -> void:
 
 # --- Bonus: 8-direction normalisation invariant ------------------------
 
+
 func test_movement_diagonals_are_unit_length() -> void:
 	# We cannot stub Input here without a test scene, so this asserts the
 	# downstream invariant: any non-zero `_dodge_dir` (which mirrors what
@@ -150,7 +163,9 @@ func test_movement_diagonals_are_unit_length() -> void:
 	var p: Player = _make_player()
 	for v: Vector2 in [Vector2(1, 1), Vector2(-1, 1), Vector2(2, 0), Vector2(0, -3)]:
 		p.try_dodge(v)
-		assert_almost_eq(p._dodge_dir.length(), 1.0, 0.001, "dodge direction unit length for %s" % v)
+		assert_almost_eq(
+			p._dodge_dir.length(), 1.0, 0.001, "dodge direction unit length for %s" % v
+		)
 		# Reset for next iteration.
 		p._tick_timers(Player.DODGE_COOLDOWN + Player.DODGE_DURATION + 0.01)
 		p._process_dodge(0.0)

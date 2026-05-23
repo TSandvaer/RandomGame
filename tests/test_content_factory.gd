@@ -8,7 +8,6 @@ extends GutTest
 
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
 
-
 # ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
 ##
 ## ContentFactory exercises `ItemInstance.from_save_dict` and related
@@ -51,10 +50,15 @@ func test_make_affix_def_defaults() -> void:
 
 
 func test_make_affix_def_overrides() -> void:
-	var a: AffixDef = ContentFactory.make_affix_def({
-		"id": &"custom_keen",
-		"apply_mode": AffixDef.ApplyMode.ADD,
-	})
+	var a: AffixDef = (
+		ContentFactory
+		. make_affix_def(
+			{
+				"id": &"custom_keen",
+				"apply_mode": AffixDef.ApplyMode.ADD,
+			}
+		)
+	)
 	assert_eq(a.id, &"custom_keen")
 	assert_eq(a.apply_mode, AffixDef.ApplyMode.ADD)
 
@@ -106,6 +110,7 @@ func test_make_mob_def_with_loot_table() -> void:
 
 # ---- Authored TRES round-trip ----------------------------------------
 
+
 func test_authored_grunt_tres_loads() -> void:
 	# Per sign-off checklist: load the authored grunt.tres, assert types
 	# resolve, fields match the spec. Damage history: 5 → 3 in M1 RC soak-4;
@@ -116,10 +121,15 @@ func test_authored_grunt_tres_loads() -> void:
 	assert_not_null(def, "grunt.tres loads as MobDef")
 	assert_eq(def.id, &"grunt")
 	assert_eq(def.hp_base, 50)
-	assert_eq(def.damage_base, 2,
-		"REGRESSION GUARD: Grunt damage_base must remain 2 (Uma's AC4 pin §3.A). " +
-		"Reverting to 3 re-introduces the 3-chaser Room 05 cluster-DPS that the " +
-		"L1 no-dodge harness AI cannot survive.")
+	assert_eq(
+		def.damage_base,
+		2,
+		(
+			"REGRESSION GUARD: Grunt damage_base must remain 2 (Uma's AC4 pin §3.A). "
+			+ "Reverting to 3 re-introduces the 3-chaser Room 05 cluster-DPS that the "
+			+ "L1 no-dodge harness AI cannot survive."
+		)
+	)
 	assert_eq(def.ai_behavior_tag, &"melee_chaser")
 	assert_not_null(def.loot_table, "grunt has a loot table")
 
@@ -132,10 +142,15 @@ func test_authored_charger_tres_loads() -> void:
 	assert_not_null(def, "charger.tres loads as MobDef")
 	assert_eq(def.id, &"charger")
 	assert_eq(def.hp_base, 70)
-	assert_eq(def.damage_base, 4,
-		"REGRESSION GUARD: Charger damage_base must remain 4 (Uma's AC4 pin §3.A). " +
-		"Reverting to 5 re-introduces the Charger contact-spike that combines with " +
-		"the simultaneous-Grunt cluster to one-shot a low-HP player in Room 05.")
+	assert_eq(
+		def.damage_base,
+		4,
+		(
+			"REGRESSION GUARD: Charger damage_base must remain 4 (Uma's AC4 pin §3.A). "
+			+ "Reverting to 5 re-introduces the Charger contact-spike that combines with "
+			+ "the simultaneous-Grunt cluster to one-shot a low-HP player in Room 05."
+		)
+	)
 	assert_eq(def.ai_behavior_tag, &"charger")
 
 

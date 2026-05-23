@@ -101,15 +101,22 @@ func _ready() -> void:
 	_resolve_boss_hp_mult()
 	_resolve_start_room()
 	# Single boot-time line for Tess's grep.
-	print(("[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s"
-			+ " web=%s boss_hp_mult=%.3f start_room=%d") % [
-		OS.is_debug_build(),
-		test_mode_enabled,
-		fast_xp_enabled,
-		OS.has_feature("web"),
-		boss_hp_mult,
-		start_room,
-	])
+	print(
+		(
+			(
+				"[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s"
+				+ " web=%s boss_hp_mult=%.3f start_room=%d"
+			)
+			% [
+				OS.is_debug_build(),
+				test_mode_enabled,
+				fast_xp_enabled,
+				OS.has_feature("web"),
+				boss_hp_mult,
+				start_room,
+			]
+		)
+	)
 
 
 ## Combat-trace gate (Sponsor soak `embergrave-html5-0e77a92`). When running
@@ -200,6 +207,7 @@ func set_test_mode_for_test(enabled: bool) -> void:
 
 # ---- Internals ----------------------------------------------------------
 
+
 func _toggle_fast_xp() -> void:
 	# Defense in depth: the only writer of fast_xp_enabled, and it refuses
 	# to flip on in release. Belt to `_input`'s suspenders.
@@ -207,10 +215,15 @@ func _toggle_fast_xp() -> void:
 		fast_xp_enabled = false
 		return
 	fast_xp_enabled = not fast_xp_enabled
-	print("[DebugFlags] fast_xp_enabled=%s (multiplier now %dx)" % [
-		fast_xp_enabled,
-		xp_multiplier(),
-	])
+	print(
+		(
+			"[DebugFlags] fast_xp_enabled=%s (multiplier now %dx)"
+			% [
+				fast_xp_enabled,
+				xp_multiplier(),
+			]
+		)
+	)
 	fast_xp_toggled.emit(fast_xp_enabled)
 
 
@@ -258,8 +271,8 @@ func _resolve_boss_hp_mult() -> void:
 	# Read the query param. `URLSearchParams.get(key)` returns null when absent,
 	# string otherwise. We coerce via String() and bail if empty/null.
 	var raw_value: Variant = bridge.eval(
-		"new URLSearchParams(window.location.search).get('%s')" % BOSS_HP_MULT_QUERY_PARAM,
-		true)
+		"new URLSearchParams(window.location.search).get('%s')" % BOSS_HP_MULT_QUERY_PARAM, true
+	)
 	if raw_value == null:
 		return
 	var raw_str: String = str(raw_value).strip_edges()
@@ -273,9 +286,12 @@ func _resolve_boss_hp_mult() -> void:
 	var clamped: float = clamp(parsed, BOSS_HP_MULT_MIN, BOSS_HP_MULT_MAX)
 	boss_hp_mult = clamped
 	if not is_equal_approx(parsed, clamped):
-		push_warning(("[DebugFlags] boss_hp_mult clamped from %.3f to %.3f " +
-			"(range [%.2f..%.2f])") % [
-				parsed, clamped, BOSS_HP_MULT_MIN, BOSS_HP_MULT_MAX])
+		push_warning(
+			(
+				("[DebugFlags] boss_hp_mult clamped from %.3f to %.3f " + "(range [%.2f..%.2f])")
+				% [parsed, clamped, BOSS_HP_MULT_MIN, BOSS_HP_MULT_MAX]
+			)
+		)
 
 
 ## Test-only: inject a boss HP multiplier without going through the JS bridge.
@@ -310,8 +326,8 @@ func _resolve_start_room() -> void:
 		return
 	var bridge: Object = Engine.get_singleton("JavaScriptBridge")
 	var raw_value: Variant = bridge.eval(
-		"new URLSearchParams(window.location.search).get('%s')" % START_ROOM_QUERY_PARAM,
-		true)
+		"new URLSearchParams(window.location.search).get('%s')" % START_ROOM_QUERY_PARAM, true
+	)
 	if raw_value == null:
 		return
 	var raw_str: String = str(raw_value).strip_edges()
@@ -324,9 +340,12 @@ func _resolve_start_room() -> void:
 	var clamped: int = clamp(parsed, START_ROOM_MIN, START_ROOM_MAX)
 	start_room = clamped
 	if parsed != clamped:
-		push_warning(("[DebugFlags] start_room clamped from %d to %d " +
-			"(range [%d..%d])") % [
-				parsed, clamped, START_ROOM_MIN, START_ROOM_MAX])
+		push_warning(
+			(
+				("[DebugFlags] start_room clamped from %d to %d " + "(range [%d..%d])")
+				% [parsed, clamped, START_ROOM_MIN, START_ROOM_MAX]
+			)
+		)
 
 
 ## Test-only: inject a start-room override without the JS bridge. Tests can

@@ -70,8 +70,8 @@ const Stratum1BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const ProjectileScript: Script = preload("res://scripts/projectiles/Projectile.gd")
 
-
 # ---- Helpers ---------------------------------------------------------------
+
 
 func _make_player_in_tree(at: Vector2 = Vector2.ZERO) -> Player:
 	var p: Player = PlayerScript.new()
@@ -146,6 +146,7 @@ func _await_physics_frames(n: int = 1) -> void:
 
 # ---- 1: Player swing-spam — 50 attacks against a touching grunt ----------
 
+
 func test_player_sustained_swing_spam_no_panic_50_attacks() -> void:
 	# The headline regression: ~50 rapid Player swings while a grunt is
 	# overlapping the player's swing arc. Each swing spawns a Hitbox Area2D
@@ -186,26 +187,40 @@ func test_player_sustained_swing_spam_no_panic_50_attacks() -> void:
 		# Tick past LIGHT_RECOVERY (0.18s) so the next swing can fire.
 		p._tick_timers(Player.LIGHT_RECOVERY + 0.001)
 		var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT) as Hitbox
-		assert_not_null(hb,
-			"swing %d/50 fires (try_attack returned non-null)" % (i + 1))
+		assert_not_null(hb, "swing %d/50 fires (try_attack returned non-null)" % (i + 1))
 		# Immediate-tree assertion: post-add_child the hitbox MUST be in
 		# the tree under the player. Pre-fix the panic interrupts the
 		# call so this assertion captures the consequence directly.
-		assert_true(hb.is_inside_tree(),
-			("REGRESSION-86c9nx1dx: swing %d hitbox is in the tree synchronously after"
-				+ " try_attack (pre-fix the panic aborts add_child)") % (i + 1))
-		assert_eq(hb.get_parent(), p,
-			"swing %d hitbox parented under the player" % (i + 1))
+		assert_true(
+			hb.is_inside_tree(),
+			(
+				(
+					"REGRESSION-86c9nx1dx: swing %d hitbox is in the tree synchronously after"
+					+ " try_attack (pre-fix the panic aborts add_child)"
+				)
+				% (i + 1)
+			)
+		)
+		assert_eq(hb.get_parent(), p, "swing %d hitbox parented under the player" % (i + 1))
 		# Per-swing monitoring assertion (ticket 86c9p1fk1) — phase 1:
 		# the just-add_child'd hitbox MUST still be monitoring-OFF. This
 		# is the encapsulated `_init` invariant; if any swing entered the
 		# tree monitoring-ON it would be the exact physics-flush-panic
 		# shape this whole test exists to guard against.
-		assert_false(hb.monitoring,
-			("TICKET-86c9p1fk1: swing %d hitbox is monitoring=false right after add_child"
-				+ " (encapsulated _init defers activation)") % (i + 1))
-		assert_false(hb.monitorable,
-			"TICKET-86c9p1fk1: swing %d hitbox is monitorable=false right after add_child" % (i + 1))
+		assert_false(
+			hb.monitoring,
+			(
+				(
+					"TICKET-86c9p1fk1: swing %d hitbox is monitoring=false right after add_child"
+					+ " (encapsulated _init defers activation)"
+				)
+				% (i + 1)
+			)
+		)
+		assert_false(
+			hb.monitorable,
+			"TICKET-86c9p1fk1: swing %d hitbox is monitorable=false right after add_child" % (i + 1)
+		)
 		# Step one physics frame so the hitbox's deferred activation +
 		# initial-overlap sweep lands, body_entered fires (or the sweep
 		# applies the hit), and the hitbox's lifetime ticks down.
@@ -216,28 +231,52 @@ func test_player_sustained_swing_spam_no_panic_50_attacks() -> void:
 		# monitoring/monitorable back ON for THIS swing. The hitbox is
 		# still well within its 0.10s lifetime (one frame ~= 0.0167s),
 		# so it has not queue_free'd yet — it is in its active window.
-		assert_true(hb.is_inside_tree(),
-			"swing %d hitbox still in tree one frame post-spawn (within 0.10s lifetime)" % (i + 1))
-		assert_true(hb.monitoring,
-			("TICKET-86c9p1fk1: swing %d hitbox monitoring flipped ON after deferred"
-				+ " activation landed") % (i + 1))
-		assert_true(hb.monitorable,
-			("TICKET-86c9p1fk1: swing %d hitbox monitorable flipped ON after deferred"
-				+ " activation landed") % (i + 1))
+		assert_true(
+			hb.is_inside_tree(),
+			"swing %d hitbox still in tree one frame post-spawn (within 0.10s lifetime)" % (i + 1)
+		)
+		assert_true(
+			hb.monitoring,
+			(
+				(
+					"TICKET-86c9p1fk1: swing %d hitbox monitoring flipped ON after deferred"
+					+ " activation landed"
+				)
+				% (i + 1)
+			)
+		)
+		assert_true(
+			hb.monitorable,
+			(
+				(
+					"TICKET-86c9p1fk1: swing %d hitbox monitorable flipped ON after deferred"
+					+ " activation landed"
+				)
+				% (i + 1)
+			)
+		)
 
 	# `attack_spawned` emit-count proves all 50 swings ran end-to-end.
 	# Pre-fix the panic could interrupt before the emit, dropping the count.
-	assert_signal_emit_count(p, "attack_spawned", 50,
-		"REGRESSION-86c9nx1dx: all 50 attack_spawned signals fire (pre-fix the panic aborts before emit)")
+	assert_signal_emit_count(
+		p,
+		"attack_spawned",
+		50,
+		"REGRESSION-86c9nx1dx: all 50 attack_spawned signals fire (pre-fix the panic aborts before emit)"
+	)
 
 	# Sanity: the grunt took at least one damage along the way (proves
 	# the post-fix deferred-monitoring activation + initial-overlap sweep
 	# still applies hits — we didn't break the regression-86c9m36zh fix).
-	assert_lt(grunt.get_hp(), 9999,
-		"grunt took at least one damage during the spam (initial-overlap sweep still works post-fix)")
+	assert_lt(
+		grunt.get_hp(),
+		9999,
+		"grunt took at least one damage during the spam (initial-overlap sweep still works post-fix)"
+	)
 
 
 # ---- 2: Player vs MULTIPLE grunts simultaneously ------------------------
+
 
 func test_player_swing_spam_against_multi_mob_pile_no_panic() -> void:
 	# Multi-target variant — three grunts touching the player, 30 swings.
@@ -269,6 +308,7 @@ func test_player_swing_spam_against_multi_mob_pile_no_panic() -> void:
 
 # ---- 3: Grunt swing-spam — 30 melee swings from a grunt ------------------
 
+
 func test_grunt_sustained_swing_spam_no_panic() -> void:
 	# Per-mob analogue: a Grunt's `_swing_light` runs from `_process_chase`
 	# inside `_physics_process` and spawns a Hitbox Area2D. Same root
@@ -294,6 +334,7 @@ func test_grunt_sustained_swing_spam_no_panic() -> void:
 
 # ---- 4: Charger contact-hitbox spam --------------------------------------
 
+
 func test_charger_contact_hitbox_spawn_spam_no_panic() -> void:
 	# Charger's `_spawn_charge_hitbox` runs from `_maybe_charge_hit_player`
 	# inside `_process_charge` (physics-tick). Each call spawns a Hitbox.
@@ -309,6 +350,7 @@ func test_charger_contact_hitbox_spawn_spam_no_panic() -> void:
 
 # ---- 5: Boss melee + slam hitbox spawn spam ------------------------------
 
+
 func test_boss_hitbox_spawn_spam_no_panic() -> void:
 	# Boss's `_spawn_hitbox` is called from melee + slam fire paths inside
 	# `_physics_process`. We exercise it directly with a mix of melee +
@@ -319,24 +361,29 @@ func test_boss_hitbox_spawn_spam_no_panic() -> void:
 		var hb: Hitbox
 		if i % 2 == 0:
 			hb = b._spawn_hitbox(
-				Vector2.RIGHT, 5,
+				Vector2.RIGHT,
+				5,
 				Vector2.RIGHT * Stratum1Boss.MELEE_KNOCKBACK,
 				Stratum1Boss.MELEE_HITBOX_REACH,
 				Stratum1Boss.MELEE_HITBOX_RADIUS,
-				Stratum1Boss.MELEE_HITBOX_LIFETIME)
+				Stratum1Boss.MELEE_HITBOX_LIFETIME
+			)
 		else:
 			hb = b._spawn_hitbox(
-				Vector2.ZERO, 7,
+				Vector2.ZERO,
+				7,
 				Vector2.RIGHT * Stratum1Boss.SLAM_KNOCKBACK,
 				0.0,
 				Stratum1Boss.SLAM_HITBOX_RADIUS,
-				Stratum1Boss.SLAM_HITBOX_LIFETIME)
+				Stratum1Boss.SLAM_HITBOX_LIFETIME
+			)
 		assert_not_null(hb, "boss hitbox %d/20 spawned" % (i + 1))
 		await get_tree().physics_frame
 	assert_false(b.is_dead(), "boss survived 20 hitbox spawns cleanly")
 
 
 # ---- 6: Shooter projectile spawn spam ------------------------------------
+
 
 func test_shooter_projectile_spawn_spam_no_panic() -> void:
 	# Shooter's `_spawn_projectile` parents the projectile under the
@@ -348,14 +395,19 @@ func test_shooter_projectile_spawn_spam_no_panic() -> void:
 		s._spawn_projectile(Vector2.RIGHT)
 		await get_tree().physics_frame
 	# Shooter still alive — no panic mid-spawn aborted any AI state.
-	assert_false(s.is_dead(),
-		"shooter survived 15 projectile spawns cleanly (spawn-path panic absent)")
+	assert_false(
+		s.is_dead(), "shooter survived 15 projectile spawns cleanly (spawn-path panic absent)"
+	)
 	# Each spawn appended to `_shots_fired`.
-	assert_eq(s.get_shots_fired(), 15,
-		"all 15 projectiles registered shots_fired (no panic-aborted spawns)")
+	assert_eq(
+		s.get_shots_fired(),
+		15,
+		"all 15 projectiles registered shots_fired (no panic-aborted spawns)"
+	)
 
 
 # ---- 7: Hitbox enters tree with monitoring-off, activates after defer ----
+
 
 func test_hitbox_enters_tree_with_monitoring_off_then_activates() -> void:
 	# Direct-property assertion of the wave-2 fix shape: a freshly-
@@ -365,10 +417,11 @@ func test_hitbox_enters_tree_with_monitoring_off_then_activates() -> void:
 	var hb: Hitbox = HitboxScript.new()
 	hb.configure(5, Vector2.ZERO, 0.30, Hitbox.TEAM_PLAYER, null)
 	# Pre-tree: monitoring/monitorable should be false (set in _init).
-	assert_false(hb.monitoring,
-		"REGRESSION-86c9nx1dx: Hitbox starts with monitoring=false (avoids physics-flush panic)")
-	assert_false(hb.monitorable,
-		"REGRESSION-86c9nx1dx: Hitbox starts with monitorable=false")
+	assert_false(
+		hb.monitoring,
+		"REGRESSION-86c9nx1dx: Hitbox starts with monitoring=false (avoids physics-flush panic)"
+	)
+	assert_false(hb.monitorable, "REGRESSION-86c9nx1dx: Hitbox starts with monitorable=false")
 	# Add a CollisionShape2D so post-activation overlap queries work.
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	var circle: CircleShape2D = CircleShape2D.new()
@@ -380,24 +433,22 @@ func test_hitbox_enters_tree_with_monitoring_off_then_activates() -> void:
 	# The deferred `_activate_and_check_initial_overlaps` runs at the next
 	# idle phase. Await one process_frame to let it run.
 	await get_tree().process_frame
-	assert_true(hb.monitoring,
-		"REGRESSION-86c9nx1dx: Hitbox monitoring activated post-flush via deferred call")
-	assert_true(hb.monitorable,
-		"REGRESSION-86c9nx1dx: Hitbox monitorable activated post-flush")
+	assert_true(
+		hb.monitoring,
+		"REGRESSION-86c9nx1dx: Hitbox monitoring activated post-flush via deferred call"
+	)
+	assert_true(hb.monitorable, "REGRESSION-86c9nx1dx: Hitbox monitorable activated post-flush")
 
 
 # ---- 8: Projectile mirrors the same monitoring-off-then-on shape --------
 
+
 func test_projectile_enters_tree_with_monitoring_off_then_activates() -> void:
 	var pj: Projectile = ProjectileScript.new()
 	pj.configure(5, Vector2.RIGHT * 90.0, 1.0, Projectile.TEAM_ENEMY, null)
-	assert_false(pj.monitoring,
-		"REGRESSION-86c9nx1dx: Projectile starts with monitoring=false")
-	assert_false(pj.monitorable,
-		"REGRESSION-86c9nx1dx: Projectile starts with monitorable=false")
+	assert_false(pj.monitoring, "REGRESSION-86c9nx1dx: Projectile starts with monitoring=false")
+	assert_false(pj.monitorable, "REGRESSION-86c9nx1dx: Projectile starts with monitorable=false")
 	add_child_autofree(pj)
 	await get_tree().process_frame
-	assert_true(pj.monitoring,
-		"REGRESSION-86c9nx1dx: Projectile monitoring activated post-flush")
-	assert_true(pj.monitorable,
-		"REGRESSION-86c9nx1dx: Projectile monitorable activated post-flush")
+	assert_true(pj.monitoring, "REGRESSION-86c9nx1dx: Projectile monitoring activated post-flush")
+	assert_true(pj.monitorable, "REGRESSION-86c9nx1dx: Projectile monitorable activated post-flush")

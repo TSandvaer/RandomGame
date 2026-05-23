@@ -13,13 +13,11 @@ const MobSpawnPointScript: Script = preload("res://scripts/levels/MobSpawnPoint.
 const ChunkPortScript: Script = preload("res://scripts/levels/ChunkPort.gd")
 const LevelAssemblerScript: Script = preload("res://scripts/levels/LevelAssembler.gd")
 
-
 # ---- Helpers ---------------------------------------------------------
 
+
 func _make_chunk(
-	id: StringName = &"test_chunk",
-	size: Vector2i = Vector2i(15, 8),
-	tile_size: int = 32
+	id: StringName = &"test_chunk", size: Vector2i = Vector2i(15, 8), tile_size: int = 32
 ) -> LevelChunkDef:
 	var c: LevelChunkDef = LevelChunkDefScript.new()
 	c.id = id
@@ -48,6 +46,7 @@ func _make_port(pos: Vector2i, dir: int, tag: StringName = &"exit") -> ChunkPort
 class RecordingFactory:
 	extends RefCounted
 	var calls: Array[Dictionary] = []
+
 	func make(mob_id: StringName, world_pos: Vector2) -> Node:
 		calls.append({"mob_id": mob_id, "world_pos": world_pos})
 		var n: Node2D = Node2D.new()
@@ -56,6 +55,7 @@ class RecordingFactory:
 
 
 # ---- LevelChunkDef shape ---------------------------------------------
+
 
 func test_size_px_is_size_tiles_times_tile_size() -> void:
 	var c: LevelChunkDef = _make_chunk(&"sz", Vector2i(15, 8), 32)
@@ -108,6 +108,7 @@ func test_validate_catches_out_of_bounds_port() -> void:
 
 # ---- ChunkPort + tag helpers -----------------------------------------
 
+
 func test_ports_with_tag_filters_correctly() -> void:
 	var c: LevelChunkDef = _make_chunk(&"tag")
 	c.ports = [
@@ -134,6 +135,7 @@ func test_get_entry_port_returns_null_when_none() -> void:
 
 
 # ---- LevelAssembler.assemble_single ----------------------------------
+
 
 func test_assemble_single_returns_null_for_invalid_chunk() -> void:
 	var asm: LevelAssembler = LevelAssemblerScript.new()
@@ -185,8 +187,7 @@ func test_assemble_single_skips_when_factory_returns_null() -> void:
 	var asm: LevelAssembler = LevelAssemblerScript.new()
 	var c: LevelChunkDef = _make_chunk(&"null_factory")
 	c.mob_spawns = [_make_spawn(Vector2i(3, 3), &"grunt")]
-	var null_factory: Callable = func(_id: StringName, _pos: Vector2) -> Node:
-		return null
+	var null_factory: Callable = func(_id: StringName, _pos: Vector2) -> Node: return null
 	var result: LevelAssembler.AssemblyResult = asm.assemble_single(c, null_factory)
 	assert_not_null(result)
 	assert_eq(result.mobs.size(), 0, "null mobs are skipped, not crashed on")
@@ -215,6 +216,7 @@ func test_assemble_single_falls_back_to_chunk_centre_without_entry_port() -> voi
 
 
 # ---- Authored s1_room01.tres round-trip ------------------------------
+
 
 func test_authored_s1_room01_chunk_loads() -> void:
 	var c: LevelChunkDef = load("res://resources/level_chunks/s1_room01.tres") as LevelChunkDef
@@ -248,5 +250,6 @@ func test_authored_s1_room01_spawns_practice_dummy_only() -> void:
 	# regression — practice_dummy is the only valid Room01 entity at M2 W1.
 	var c: LevelChunkDef = load("res://resources/level_chunks/s1_room01.tres") as LevelChunkDef
 	for ms: MobSpawnPoint in c.mob_spawns:
-		assert_eq(ms.mob_id, &"practice_dummy",
-			"Stage 2b: Room01 spawns only practice_dummy (was: grunt)")
+		assert_eq(
+			ms.mob_id, &"practice_dummy", "Stage 2b: Room01 spawns only practice_dummy (was: grunt)"
+		)

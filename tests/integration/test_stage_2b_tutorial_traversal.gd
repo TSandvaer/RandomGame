@@ -41,8 +41,8 @@ const PracticeDummyScript: Script = preload("res://scripts/mobs/PracticeDummy.gd
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _save() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("Save")
@@ -124,27 +124,37 @@ func _find_pickup(node: Node) -> Pickup:
 
 # ---- 1: cold-open boots Room01 with WASD beat latched + player fistless ---
 
+
 func test_cold_open_boots_room01_with_wasd_beat_and_fistless_player() -> void:
 	var main: Main = _instantiate_main()
 	await _await_tutorial_wire()
 	var room: Node = main.get_current_room()
 	assert_true(room is Stratum1Room01, "boot lands in Stratum1Room01")
 	# Stage 2b: WASD beat fired on room-entry.
-	assert_true(room.get_tutorial_beat_emitted(&"wasd"),
-		"WASD tutorial beat latched on Main boot (room-entry)")
+	assert_true(
+		room.get_tutorial_beat_emitted(&"wasd"),
+		"WASD tutorial beat latched on Main boot (room-entry)"
+	)
 	# PracticeDummy spawned (one mob, type matches).
 	var dummy: PracticeDummy = _first_dummy(room)
 	assert_not_null(dummy, "Room01 spawned a PracticeDummy on boot")
 	# Ticket 86c9qbb3k: player boots FISTLESS — no boot-equip bandaid.
 	var p: Player = main.get_player()
-	assert_null(p.get_equipped_weapon(),
-		"player boots fistless — the PR #146 boot-equip bandaid is retired; " +
-		"the player equips by picking up the dummy's iron_sword drop")
-	assert_null(_inventory().get_equipped(&"weapon"),
-		"Inventory weapon slot empty at cold boot (no boot-time seed/equip)")
+	assert_null(
+		p.get_equipped_weapon(),
+		(
+			"player boots fistless — the PR #146 boot-equip bandaid is retired; "
+			+ "the player equips by picking up the dummy's iron_sword drop"
+		)
+	)
+	assert_null(
+		_inventory().get_equipped(&"weapon"),
+		"Inventory weapon slot empty at cold boot (no boot-time seed/equip)"
+	)
 
 
 # ---- 2: full traversal — kill dummy, WALK ONTO PICKUP, advance equipped ---
+
 
 func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() -> void:
 	# The headline Tier 3 invariant — the entire Stage 2b flow end-to-end,
@@ -163,15 +173,15 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 	# Step 1: drive movement → dodge beat.
 	p.velocity = Vector2(Player.WALK_SPEED, 0.0)
 	room._physics_process(PHYS_DELTA)
-	assert_true(room.get_tutorial_beat_emitted(&"dodge"),
-		"dodge beat fires on movement detection")
+	assert_true(room.get_tutorial_beat_emitted(&"dodge"), "dodge beat fires on movement detection")
 
 	# Step 2: drive dodge → LMB beat.
 	p.velocity = Vector2.ZERO
 	var ok: bool = p.try_dodge(Vector2.RIGHT)
 	assert_true(ok, "try_dodge accepted (player at idle, no cooldown)")
-	assert_true(room.get_tutorial_beat_emitted(&"lmb_strike"),
-		"lmb_strike beat fires on iframes_started")
+	assert_true(
+		room.get_tutorial_beat_emitted(&"lmb_strike"), "lmb_strike beat fires on iframes_started"
+	)
 
 	# Step 3: kill the dummy. Player is FISTLESS now (bandaid retired), so the
 	# dummy takes three FIST_DAMAGE=1 hits to die (HP_MAX=3). Drive via direct
@@ -184,13 +194,17 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 	for _i in PracticeDummy.HP_MAX:
 		dummy.take_damage(1, Vector2.ZERO, null)
 	assert_true(dummy.is_dead(), "dummy dies after HP_MAX fist hits")
-	assert_true(room.get_tutorial_beat_emitted(&"rmb_heavy"),
-		"rmb_heavy beat fires on dummy poof")
+	assert_true(room.get_tutorial_beat_emitted(&"rmb_heavy"), "rmb_heavy beat fires on dummy poof")
 	# The dummy's `add_child(pickup)` is deferred — it has NOT landed yet, the
 	# player is still fistless, so the Room01 → Room02 advance is still GATED.
-	assert_eq(main.get_current_room_index(), 0,
-		"Room01 → Room02 advance is GATED on pickup-equip — still in Room01 " +
-		"immediately after the kill, before the player collects the Pickup")
+	assert_eq(
+		main.get_current_room_index(),
+		0,
+		(
+			"Room01 → Room02 advance is GATED on pickup-equip — still in Room01 "
+			+ "immediately after the kill, before the player collects the Pickup"
+		)
+	)
 
 	# Step 3b: LET THE DODGE STATE EXPIRE before the pin loop. Step 2 called
 	# `try_dodge(RIGHT)` — the player is in STATE_DODGE for DODGE_DURATION
@@ -206,10 +220,15 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 	while p.get_state() == Player.STATE_DODGE and _dodge_drain_guard < 30:
 		_dodge_drain_guard += 1
 		await get_tree().physics_frame
-	assert_ne(p.get_state(), Player.STATE_DODGE,
-		"player exited STATE_DODGE before the pickup-pin loop — a still-active " +
-		"dodge would overwrite velocity each frame and drift the player off the " +
-		"drop tile, defeating the pin (root cause of the prior CI-red headline test)")
+	assert_ne(
+		p.get_state(),
+		Player.STATE_DODGE,
+		(
+			"player exited STATE_DODGE before the pickup-pin loop — a still-active "
+			+ "dodge would overwrite velocity each frame and drift the player off the "
+			+ "drop tile, defeating the pin (root cause of the prior CI-red headline test)"
+		)
+	)
 
 	# Step 4: PRE-POSITION THE PLAYER ON THE DROP TILE — the killing-blow case.
 	# The dummy's deferred `add_child` lands the Pickup a frame later; the
@@ -254,8 +273,11 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 	var pickup: Pickup = _find_pickup(room) if is_instance_valid(room) else null
 	if pickup != null:
 		assert_not_null(pickup.item, "the Pickup carries an ItemInstance")
-		assert_eq(pickup.item.def.id, &"iron_sword",
-			"the dropped Pickup is the iron_sword (deterministic dummy drop)")
+		assert_eq(
+			pickup.item.def.id,
+			&"iron_sword",
+			"the dropped Pickup is the iron_sword (deterministic dummy drop)"
+		)
 
 		# Step 5: belt-and-suspenders — re-pin to the Pickup's ACTUAL world
 		# position (defends against any room-offset between
@@ -280,28 +302,39 @@ func test_full_tutorial_traversal_walks_onto_pickup_and_lands_room02_equipped() 
 
 	# The player must now be in Room02 — which is ONLY reachable by collecting
 	# + equipping the iron_sword Pickup (the gate held the advance until then).
-	assert_eq(main.get_current_room_index(), 1,
-		"Main advanced to Room02 (index 1) — proves the iron_sword Pickup was " +
-		"collected + auto-equipped, releasing the Room01 onboarding gate. " +
-		"Pickup spawned at world ~%s." % dummy_pos)
+	assert_eq(
+		main.get_current_room_index(),
+		1,
+		(
+			"Main advanced to Room02 (index 1) — proves the iron_sword Pickup was "
+			+ "collected + auto-equipped, releasing the Room01 onboarding gate. "
+			+ "Pickup spawned at world ~%s." % dummy_pos
+		)
+	)
 
 	# CRITICAL — the iron_sword is equipped on BOTH dual-surfaces, via the
 	# legitimate dummy-drop → pickup → auto-equip flow (NOT the retired
 	# boot-equip bandaid). Assert both surfaces of the equipped-weapon
 	# dual-surface rule (per `.claude/docs/combat-architecture.md`).
 	var equipped: ItemDef = p.get_equipped_weapon()
-	assert_not_null(equipped,
-		"Player surface: equipped weapon non-null after the pickup-equip")
-	assert_eq(equipped.id, &"iron_sword",
-		"Player surface: equipped weapon is iron_sword (dummy drop → pickup → auto-equip)")
+	assert_not_null(equipped, "Player surface: equipped weapon non-null after the pickup-equip")
+	assert_eq(
+		equipped.id,
+		&"iron_sword",
+		"Player surface: equipped weapon is iron_sword (dummy drop → pickup → auto-equip)"
+	)
 	var inv: Node = _inventory()
 	var inv_equipped = inv.get_equipped(&"weapon")
 	assert_not_null(inv_equipped, "Inventory surface: equipped weapon non-null")
-	assert_eq(inv_equipped.def.id, &"iron_sword",
-		"Inventory surface: equipped weapon is iron_sword (dual-surface invariant)")
+	assert_eq(
+		inv_equipped.def.id,
+		&"iron_sword",
+		"Inventory surface: equipped weapon is iron_sword (dual-surface invariant)"
+	)
 
 
 # ---- 3: full sequence emits the four beats in order via the bus ------
+
 
 func test_full_traversal_emits_four_beats_via_bus_in_order() -> void:
 	# The bus is the production surface — Drew's room script calls
@@ -325,15 +358,25 @@ func test_full_traversal_emits_four_beats_via_bus_in_order() -> void:
 	for _i in PracticeDummy.HP_MAX:
 		dummy.take_damage(1, Vector2.ZERO, null)
 	# Assert four bus emits, in order WASD → dodge → LMB → RMB.
-	assert_signal_emit_count(bus, "tutorial_beat_requested", 4,
-		"bus saw exactly four beat-request emits (one per Beat 4-5 step)")
+	assert_signal_emit_count(
+		bus,
+		"tutorial_beat_requested",
+		4,
+		"bus saw exactly four beat-request emits (one per Beat 4-5 step)"
+	)
 	var expected_order: Array[StringName] = [
-		&"wasd", &"dodge", &"lmb_strike", &"rmb_heavy",
+		&"wasd",
+		&"dodge",
+		&"lmb_strike",
+		&"rmb_heavy",
 	]
 	for i in 4:
 		var params: Array = get_signal_parameters(bus, "tutorial_beat_requested", i)
-		assert_eq(params[0], expected_order[i],
-			"bus emit #%d carries beat_id = %s" % [i, str(expected_order[i])])
+		assert_eq(
+			params[0],
+			expected_order[i],
+			"bus emit #%d carries beat_id = %s" % [i, str(expected_order[i])]
+		)
 		assert_eq(params[1], 2, "bus emit #%d anchor = BOTTOM (Uma Beat 4)" % i)
 
 
@@ -350,6 +393,7 @@ func test_full_traversal_emits_four_beats_via_bus_in_order() -> void:
 # `Inventory.item_added` (the pickup lands in the grid without auto-equip
 # since the weapon slot is already full), THEN advance. This test asserts the
 # respawn path no longer advances Room01 before the player collects the Pickup.
+
 
 func test_respawn_path_gates_on_pickup_add_before_advancing() -> void:
 	# Simulate the post-death-respawn state: Main is freshly loaded (Room01)
@@ -389,9 +433,14 @@ func test_respawn_path_gates_on_pickup_add_before_advancing() -> void:
 	# The room must NOT have advanced yet — the gate is held.
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert_eq(main.get_current_room_index(), 0,
-		"Room01 → Room02 advance is GATED on pickup-add — still in Room01 " +
-		"after dummy death even though player is already equipped (P0 fix)")
+	assert_eq(
+		main.get_current_room_index(),
+		0,
+		(
+			"Room01 → Room02 advance is GATED on pickup-add — still in Room01 "
+			+ "after dummy death even though player is already equipped (P0 fix)"
+		)
+	)
 
 	# Walk the player onto the dropped Pickup so it lands in the grid.
 	# The weapon slot is full — auto-equip is skipped — but item_added fires,
@@ -423,16 +472,27 @@ func test_respawn_path_gates_on_pickup_add_before_advancing() -> void:
 	await get_tree().process_frame
 
 	# The room must have advanced: item_added fired → gate released → Room02 loaded.
-	assert_eq(main.get_current_room_index(), 1,
-		"Main advanced to Room02 after player collected the dummy-dropped Pickup " +
-		"into the grid (respawn path — weapon slot was full, item_added released gate). " +
-		"Pickup spawned at world ~%s." % dummy_pos)
+	assert_eq(
+		main.get_current_room_index(),
+		1,
+		(
+			"Main advanced to Room02 after player collected the dummy-dropped Pickup "
+			+ "into the grid (respawn path — weapon slot was full, item_added released gate). "
+			+ "Pickup spawned at world ~%s." % dummy_pos
+		)
+	)
 
 	# The previously-equipped sword is still equipped (unchanged — equip did not fire).
-	assert_not_null(inv.get_equipped(&"weapon"),
-		"Inventory weapon slot still occupied after Room02 advance (carried from respawn)")
+	assert_not_null(
+		inv.get_equipped(&"weapon"),
+		"Inventory weapon slot still occupied after Room02 advance (carried from respawn)"
+	)
 	# And a second iron_sword landed in the grid (the dummy's fresh drop).
 	var grid_count: int = inv.get_items().size()
-	assert_true(grid_count >= 1,
-		"At least one iron_sword in the inventory grid (the dummy-dropped sword " +
-		"collected via item_added path); got %d items" % grid_count)
+	assert_true(
+		grid_count >= 1,
+		(
+			"At least one iron_sword in the inventory grid (the dummy-dropped sword "
+			+ "collected via item_added path); got %d items" % grid_count
+		)
+	)

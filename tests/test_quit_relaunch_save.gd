@@ -49,6 +49,7 @@ func _simulate_relaunch_then_load() -> Dictionary:
 
 # --- ti-save-01: full quit-relaunch round-trip ---------------------------
 
+
 func test_full_quit_relaunch_continues_state() -> void:
 	# 1. Active session — player levels up, equips gear, fills meta.
 	var session: Dictionary = _save().default_payload()
@@ -56,7 +57,10 @@ func test_full_quit_relaunch_continues_state() -> void:
 	session["character"]["xp"] = 320
 	session["character"]["vigor"] = 1
 	session["equipped"]["weapon"] = {
-		"id": "weapon_iron_sword", "tier": 1, "rolled_affixes": [], "stack_count": 1,
+		"id": "weapon_iron_sword",
+		"tier": 1,
+		"rolled_affixes": [],
+		"stack_count": 1,
 	}
 	session["meta"]["runs_completed"] = 1
 	session["meta"]["deepest_stratum"] = 1
@@ -71,13 +75,17 @@ func test_full_quit_relaunch_continues_state() -> void:
 	assert_eq(continued["character"]["level"], 2, "level survives quit/relaunch (AC6)")
 	assert_eq(continued["character"]["xp"], 320, "xp survives quit/relaunch")
 	assert_eq(continued["character"]["vigor"], 1, "stat point survives quit/relaunch")
-	assert_eq(continued["equipped"]["weapon"]["id"], "weapon_iron_sword",
-		"equipped item survives quit/relaunch (AC6)")
+	assert_eq(
+		continued["equipped"]["weapon"]["id"],
+		"weapon_iron_sword",
+		"equipped item survives quit/relaunch (AC6)"
+	)
 	assert_eq(continued["meta"]["runs_completed"], 1)
 	assert_eq(continued["meta"]["deepest_stratum"], 1)
 
 
 # --- ti-save-02: stratum-exit save → quit → continue ---------------------
+
 
 func test_save_on_stratum_exit_then_continue() -> void:
 	# Per M1 spec (mvp-scope.md): auto-save fires on stratum exit.
@@ -102,6 +110,7 @@ func test_save_on_stratum_exit_then_continue() -> void:
 
 # --- bonus: relaunch into a missing save shows a clean new-game path ----
 
+
 func test_relaunch_with_no_save_returns_empty() -> void:
 	# Maps to AC6-T05 (clear cache and revisit URL): the load surface
 	# returns {} so the title screen can offer "New Game" instead of
@@ -113,6 +122,7 @@ func test_relaunch_with_no_save_returns_empty() -> void:
 
 
 # --- bonus: corrupt-save resilience (full integration shape) ------------
+
 
 func test_relaunch_with_corrupt_save_does_not_crash() -> void:
 	# AC5 (no hard crashes): a corrupt save on relaunch must not take down

@@ -66,9 +66,7 @@ extends Node2D
 ##   - `.claude/docs/camera-scroll.md` — follow_target API consumed here
 ##   - `.claude/docs/test-conventions.md` § Spike-class specs — paired Playwright shape
 
-
 # ---- Tuning constants -------------------------------------------------
-
 
 ## Path to the worked-example ZoneDef from the merged zone-schema spike
 ## (`86c9xuap4`).
@@ -90,14 +88,12 @@ const DEADZONE: Vector2 = Vector2(40.0, 24.0)
 ## Floor visualization tones. Anchors render in the warm-sandstone S1
 ## family; procedural fill renders in a slightly-cooler tone so the
 ## anchor/fill alternation is legible during soak.
-const ANCHOR_FLOOR_COLOR: Color = Color(0.45, 0.36, 0.27, 1.0)   # warm sandstone
-const PROCEDURAL_FLOOR_COLOR: Color = Color(0.34, 0.32, 0.28, 1.0) # cooler grey-sand
-const SEAM_MARKER_COLOR: Color = Color(1.0, 0.42, 0.16, 1.0)     # ember-orange
+const ANCHOR_FLOOR_COLOR: Color = Color(0.45, 0.36, 0.27, 1.0)  # warm sandstone
+const PROCEDURAL_FLOOR_COLOR: Color = Color(0.34, 0.32, 0.28, 1.0)  # cooler grey-sand
+const SEAM_MARKER_COLOR: Color = Color(1.0, 0.42, 0.16, 1.0)  # ember-orange
 const SEAM_MARKER_WIDTH_PX: float = 2.0
 
-
 # ---- Node refs --------------------------------------------------------
-
 
 @onready var _world: Node2D = $World
 @onready var _marker: CharacterBody2D = $PlayerMarker
@@ -108,12 +104,9 @@ const SEAM_MARKER_WIDTH_PX: float = 2.0
 @onready var _hud_mating_label: Label = $HUD/MatingLabel
 @onready var _hud_chunks_label: Label = $HUD/ChunksLabel
 
-
 # ---- Internal state ---------------------------------------------------
 
-
 var _assembled: AssembledFloor
-
 
 # ---- Lifecycle --------------------------------------------------------
 
@@ -148,9 +141,10 @@ func _ready() -> void:
 	else:
 		# Spawn marker at the entry-anchor's left edge + 1 tile inset.
 		var entry_pc: PlacedChunk = _assembled.placed_chunks[0]
-		_marker.global_position = entry_pc.position_px + Vector2(
-			float(entry_pc.size_px.x) * 0.25,
-			float(entry_pc.size_px.y) * 0.5)
+		_marker.global_position = (
+			entry_pc.position_px
+			+ Vector2(float(entry_pc.size_px.x) * 0.25, float(entry_pc.size_px.y) * 0.5)
+		)
 		if cd.has_method("follow_target"):
 			cd.follow_target(_marker, DEADZONE)
 		if cd.has_method("set_world_bounds"):
@@ -162,15 +156,23 @@ func _ready() -> void:
 	# 7. Boot line — `[procgen-spike] ready` is the spec's activation
 	#    detection regex.
 	print(
-		("[procgen-spike] ready zone=%s world_seed=%d zone_seed=%d chunks=%d"
-			+ " bounds=(%.0f,%.0f,%.0f,%.0f) mating_errors=%d")
-		% [
-			String(zone.zone_id), SPIKE_WORLD_SEED, zone_seed,
-			_assembled.chunk_count(),
-			_assembled.bounding_box_px.position.x, _assembled.bounding_box_px.position.y,
-			_assembled.bounding_box_px.size.x, _assembled.bounding_box_px.size.y,
-			_assembled.port_mating_errors.size(),
-		]
+		(
+			(
+				"[procgen-spike] ready zone=%s world_seed=%d zone_seed=%d chunks=%d"
+				+ " bounds=(%.0f,%.0f,%.0f,%.0f) mating_errors=%d"
+			)
+			% [
+				String(zone.zone_id),
+				SPIKE_WORLD_SEED,
+				zone_seed,
+				_assembled.chunk_count(),
+				_assembled.bounding_box_px.position.x,
+				_assembled.bounding_box_px.position.y,
+				_assembled.bounding_box_px.size.x,
+				_assembled.bounding_box_px.size.y,
+				_assembled.port_mating_errors.size(),
+			]
+		)
 	)
 
 	# 8. Determinism diff — emit the assembled placement vector so a
@@ -179,14 +181,13 @@ func _ready() -> void:
 	var placement_strs: PackedStringArray = PackedStringArray()
 	for pc: PlacedChunk in _assembled.placed_chunks:
 		placement_strs.append("%s@%.0f" % [String(pc.chunk_id), pc.position_px.x])
-	print(
-		"[procgen-spike] assemble | placement=%s"
-		% ",".join(placement_strs)
-	)
+	print("[procgen-spike] assemble | placement=%s" % ",".join(placement_strs))
 	if not _assembled.port_mating_errors.is_empty():
 		print(
-			"[procgen-spike] port_mating_errors | count=%d first=%s"
-			% [_assembled.port_mating_errors.size(), _assembled.port_mating_errors[0]]
+			(
+				"[procgen-spike] port_mating_errors | count=%d first=%s"
+				% [_assembled.port_mating_errors.size(), _assembled.port_mating_errors[0]]
+			)
 		)
 
 
@@ -223,14 +224,16 @@ func _physics_process(_delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	if _marker != null and _hud_marker_pos_label != null:
-		_hud_marker_pos_label.text = "marker=(%.0f, %.0f)" % [
-			_marker.global_position.x, _marker.global_position.y]
+		_hud_marker_pos_label.text = (
+			"marker=(%.0f, %.0f)" % [_marker.global_position.x, _marker.global_position.y]
+		)
 	var cd: Node = get_tree().root.get_node_or_null("CameraDirector")
 	if cd != null and cd.has_method("get_camera") and _hud_camera_pos_label != null:
 		var cam: Camera2D = cd.get_camera()
 		if cam != null:
-			_hud_camera_pos_label.text = "camera=(%.0f, %.0f)" % [
-				cam.global_position.x, cam.global_position.y]
+			_hud_camera_pos_label.text = (
+				"camera=(%.0f, %.0f)" % [cam.global_position.x, cam.global_position.y]
+			)
 
 
 # ---- Rendering --------------------------------------------------------
@@ -265,9 +268,9 @@ func _spawn_floor_chunk(pc: PlacedChunk, index: int) -> void:
 
 	# Center label — chunk_id + (anchor room_id if present).
 	var label: Label = Label.new()
-	label.position = pc.position_px + Vector2(
-		float(pc.size_px.x) * 0.5 - 60.0,
-		float(pc.size_px.y) * 0.5 - 16.0)
+	label.position = (
+		pc.position_px + Vector2(float(pc.size_px.x) * 0.5 - 60.0, float(pc.size_px.y) * 0.5 - 16.0)
+	)
 	label.size = Vector2(120.0, 32.0)
 	var label_text: String = "[%d] %s" % [index, String(pc.chunk_id)]
 	if pc.kind == &"anchor" and pc.anchor_room_id != &"":
@@ -323,22 +326,26 @@ func _populate_hud() -> void:
 	if _hud_mating_label != null:
 		if _assembled.port_mating_errors.is_empty():
 			_hud_mating_label.text = "port_mating_errors=0 (well-mated)"
-			_hud_mating_label.add_theme_color_override(
-				"font_color", Color(0.5, 0.85, 0.45, 1.0))  # green
+			_hud_mating_label.add_theme_color_override("font_color", Color(0.5, 0.85, 0.45, 1.0))  # green
 		else:
-			_hud_mating_label.text = "port_mating_errors=%d (R-PROCGEN.b — first: %s)" % [
-				_assembled.port_mating_errors.size(),
-				_assembled.port_mating_errors[0],
-			]
-			_hud_mating_label.add_theme_color_override(
-				"font_color", Color(1.0, 0.7, 0.3, 1.0))  # amber
+			_hud_mating_label.text = (
+				"port_mating_errors=%d (R-PROCGEN.b — first: %s)"
+				% [
+					_assembled.port_mating_errors.size(),
+					_assembled.port_mating_errors[0],
+				]
+			)
+			_hud_mating_label.add_theme_color_override("font_color", Color(1.0, 0.7, 0.3, 1.0))  # amber
 
 	# Bounds + chunk count.
 	if _hud_chunks_label != null:
-		_hud_chunks_label.text = "bounds=(%.0f,%.0f,%.0f,%.0f) chunks=%d" % [
-			_assembled.bounding_box_px.position.x,
-			_assembled.bounding_box_px.position.y,
-			_assembled.bounding_box_px.size.x,
-			_assembled.bounding_box_px.size.y,
-			_assembled.chunk_count(),
-		]
+		_hud_chunks_label.text = (
+			"bounds=(%.0f,%.0f,%.0f,%.0f) chunks=%d"
+			% [
+				_assembled.bounding_box_px.position.x,
+				_assembled.bounding_box_px.position.y,
+				_assembled.bounding_box_px.size.x,
+				_assembled.bounding_box_px.size.y,
+				_assembled.chunk_count(),
+			]
+		)

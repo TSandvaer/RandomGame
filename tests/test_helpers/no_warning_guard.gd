@@ -64,7 +64,6 @@ extends RefCounted
 ##   connection but does not affect other tests' guards (each guard's
 ##   `_on_warning` is a unique Callable).
 
-
 # Captured warnings since `attach()`. Each entry is a Dictionary with keys
 # `text` (String), `category` (String), `kind` (String — "warning" or
 # "error").
@@ -178,21 +177,27 @@ func assert_clean(gut_test) -> void:
 			var cat: String = (" {%s}" % v["category"]) if (v["category"] as String) != "" else ""
 			lines.append("  %s%s %s" % [prefix, cat, v["text"]])
 		var msg: String = (
-			"NoWarningGuard: %d unexpected WarningBus emission(s) during this test. "
-			+ "The universal-warning gate (ticket 86c9uf0mm Half B) exists to catch "
-			+ "save-load unknown-id warnings, DirAccess HTML5 recursion warnings, "
-			+ "save-schema migration warnings, and any analogous WarningBus.warn/error "
-			+ "calls that fire during a test that wasn't expecting them.\n\n"
-			+ "Captured emissions:\n%s\n\nTo opt out for a specific known warning "
-			+ "shape:\n  _warn_guard.expect_warning(\"substring of warning text\")\n\n"
-			+ "If this warning is a regression (NOT expected), fix the underlying "
-			+ "source code path — do NOT add an expect_warning to silence it."
-		) % [violations.size(), "\n".join(lines)]
+			(
+				"NoWarningGuard: %d unexpected WarningBus emission(s) during this test. "
+				+ "The universal-warning gate (ticket 86c9uf0mm Half B) exists to catch "
+				+ "save-load unknown-id warnings, DirAccess HTML5 recursion warnings, "
+				+ "save-schema migration warnings, and any analogous WarningBus.warn/error "
+				+ "calls that fire during a test that wasn't expecting them.\n\n"
+				+ "Captured emissions:\n%s\n\nTo opt out for a specific known warning "
+				+ 'shape:\n  _warn_guard.expect_warning("substring of warning text")\n\n'
+				+ "If this warning is a regression (NOT expected), fix the underlying "
+				+ "source code path — do NOT add an expect_warning to silence it."
+			)
+			% [violations.size(), "\n".join(lines)]
+		)
 		if dead_expectations.size() > 0:
 			msg += (
-				"\n\n(Note: %d expect_warning pattern(s) never matched — they may "
-				+ "be stale: %s)"
-			) % [dead_expectations.size(), str(dead_expectations)]
+				(
+					"\n\n(Note: %d expect_warning pattern(s) never matched — they may "
+					+ "be stale: %s)"
+				)
+				% [dead_expectations.size(), str(dead_expectations)]
+			)
 		gut_test.assert_eq(violations.size(), 0, msg)
 	# If `violations.size() == 0`, this is the green path — no GUT assertion
 	# call at all (an `assert_eq(0, 0, ...)` would just inflate the assertion

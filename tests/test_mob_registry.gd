@@ -25,7 +25,6 @@ extends GutTest
 const _MobDef: Script = preload("res://scripts/content/MobDef.gd")
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
 
-
 # ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
 ##
 ## Every test in this file gets a NoWarningGuard attached in before_each.
@@ -50,11 +49,13 @@ func after_each() -> void:
 
 # ---- Helpers ----------------------------------------------------------
 
+
 func _registry() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("MobRegistry")
 
 
 # ---- W3-T5-AC1 — Autoload registers ----------------------------------
+
 
 func test_mob_registry_autoload_registered() -> void:
 	var reg: Node = _registry()
@@ -71,12 +72,18 @@ func test_mob_registry_autoload_no_errors_on_boot() -> void:
 	var reg: Node = _registry()
 	assert_not_null(reg)
 	for method: String in [
-			"get_mob_def", "get_mob_scene", "has_mob",
-			"apply_stratum_scaling", "spawn", "registered_ids"]:
+		"get_mob_def",
+		"get_mob_scene",
+		"has_mob",
+		"apply_stratum_scaling",
+		"spawn",
+		"registered_ids"
+	]:
 		assert_true(reg.has_method(method), "MobRegistry must expose %s()" % method)
 
 
 # ---- W3-T5-AC2 — Round-trip: register + retrieve ---------------------
+
 
 func test_get_mob_def_returns_grunt_def_for_grunt_id() -> void:
 	var reg: Node = _registry()
@@ -146,6 +153,7 @@ func test_get_mob_def_returns_null_for_unknown_id_no_crash() -> void:
 ## S1 baseline: HP × 1.0 / dmg × 1.0.
 ## S2 scaling: HP × 1.2 / dmg × 1.15 (per mvp-scope.md §M2).
 
+
 func test_apply_stratum_scaling_s1_returns_baseline_values() -> void:
 	var reg: Node = _registry()
 	# Build a deterministic source MobDef so the test doesn't depend on
@@ -179,14 +187,18 @@ func test_apply_stratum_scaling_s2_returns_scaled_damage_1_15x() -> void:
 
 # ---- W3-T5-AC4 — Scaling-doesn't-mutate-source invariant ------------
 
+
 func test_apply_stratum_scaling_returns_new_instance_not_source() -> void:
 	var reg: Node = _registry()
 	var src: MobDef = ContentFactory.make_mob_def({"hp_base": 50, "damage_base": 4})
 	var scaled: MobDef = reg.apply_stratum_scaling(src, &"s2")
 	# Reference inequality: the returned def is a fresh instance, not
 	# the same MobDef object the caller passed in.
-	assert_ne(scaled.get_instance_id(), src.get_instance_id(),
-		"apply_stratum_scaling must allocate a NEW MobDef, not mutate the source")
+	assert_ne(
+		scaled.get_instance_id(),
+		src.get_instance_id(),
+		"apply_stratum_scaling must allocate a NEW MobDef, not mutate the source"
+	)
 	# Source remains at its original values.
 	assert_eq(src.hp_base, 50, "source hp_base unmodified after scaling")
 	assert_eq(src.damage_base, 4, "source damage_base unmodified after scaling")
@@ -200,15 +212,24 @@ func test_apply_stratum_scaling_twice_does_not_compound() -> void:
 	var src: MobDef = ContentFactory.make_mob_def({"hp_base": 50, "damage_base": 20})
 	var first: MobDef = reg.apply_stratum_scaling(src, &"s2")
 	var second: MobDef = reg.apply_stratum_scaling(src, &"s2")
-	assert_eq(first.hp_base, second.hp_base,
-		"twice-scaled hp_base must equal once-scaled (no compounding)")
-	assert_eq(first.damage_base, second.damage_base,
-		"twice-scaled damage_base must equal once-scaled (no compounding)")
+	assert_eq(
+		first.hp_base,
+		second.hp_base,
+		"twice-scaled hp_base must equal once-scaled (no compounding)"
+	)
+	assert_eq(
+		first.damage_base,
+		second.damage_base,
+		"twice-scaled damage_base must equal once-scaled (no compounding)"
+	)
 	# Hard pin on the 1.44× / 1.32× bug — if the source had been mutated
 	# in the first call, the second call would see hp_base=60 and produce
 	# 60 × 1.2 = 72. Verify that DID NOT happen.
-	assert_ne(second.hp_base, 72,
-		"compounded scaling (1.44x = 72) is a bug — second call must NOT see mutated source")
+	assert_ne(
+		second.hp_base,
+		72,
+		"compounded scaling (1.44x = 72) is a bug — second call must NOT see mutated source"
+	)
 
 
 # ---- W3-T5-AC5 — Refactor regression (MultiMobRoom._spawn_mob) -----
@@ -218,6 +239,7 @@ func test_apply_stratum_scaling_twice_does_not_compound() -> void:
 ## must stay green post-refactor). These two tests are smoke-coverage that
 ## the registry surface alone produces the right node types.
 
+
 func test_multi_mob_room_spawn_via_registry_returns_correct_mob_type() -> void:
 	var reg: Node = _registry()
 	# Call MobRegistry.spawn directly — proves the unified entry point
@@ -225,13 +247,15 @@ func test_multi_mob_room_spawn_via_registry_returns_correct_mob_type() -> void:
 	var room: Node2D = Node2D.new()
 	add_child_autofree(room)
 	var node: Node = reg.spawn(&"grunt", Vector2(123, 45), room)
-	assert_not_null(node, "spawn(&\"grunt\", ...) returns a node")
+	assert_not_null(node, 'spawn(&"grunt", ...) returns a node')
 	assert_true(node is Grunt, "spawn returns a Grunt instance")
 	assert_eq(node.get_parent(), room, "spawned mob is parented under the supplied room")
 	assert_eq((node as Node2D).position, Vector2(123, 45), "position applied to spawned mob")
 	# The MobDef must be set so kill -> XP / loot pipelines have a payload.
 	assert_not_null(node.mob_def, "spawned mob has mob_def applied")
-	assert_eq((node.mob_def as MobDef).id, &"grunt", "applied MobDef.id matches the requested mob_id")
+	assert_eq(
+		(node.mob_def as MobDef).id, &"grunt", "applied MobDef.id matches the requested mob_id"
+	)
 
 
 func test_multi_mob_room_spawn_handles_unknown_id_gracefully() -> void:
@@ -248,6 +272,7 @@ func test_multi_mob_room_spawn_handles_unknown_id_gracefully() -> void:
 
 
 # ---- EP-OOO — autoload-order independence ---------------------------
+
 
 func test_get_mob_def_before_ready_returns_correct_def() -> void:
 	# EP-OOO edge probe — module-scope constants make autoload-order
@@ -273,6 +298,7 @@ func test_get_mob_def_before_ready_returns_correct_def() -> void:
 ## above. This catches a future regression where someone removes a
 ## `_REGISTRATIONS` entry without auditing callers.
 
+
 func test_registered_ids_includes_grunt_charger_shooter() -> void:
 	var reg: Node = _registry()
 	var ids: Array = reg.registered_ids()
@@ -286,6 +312,7 @@ func test_registered_ids_includes_grunt_charger_shooter() -> void:
 ## Bonus coverage: `has_mob` is the cheap allocation-free check; verify it
 ## stays in lockstep with get_mob_def's null result.
 
+
 func test_has_mob_returns_true_for_registered_and_false_for_unknown() -> void:
 	var reg: Node = _registry()
 	assert_true(reg.has_mob(&"grunt"))
@@ -298,6 +325,7 @@ func test_has_mob_returns_true_for_registered_and_false_for_unknown() -> void:
 ##
 ## Bonus coverage: unknown stratum_id falls back to baseline 1.0/1.0 with a
 ## push_warning. Verifies the safety net for a typo'd stratum id.
+
 
 func test_apply_stratum_scaling_unknown_stratum_falls_back_to_baseline() -> void:
 	# Unknown-stratum DELIBERATELY emits a WarningBus warning. Opt the
@@ -315,6 +343,7 @@ func test_apply_stratum_scaling_unknown_stratum_falls_back_to_baseline() -> void
 ##
 ## Bonus coverage: apply_stratum_scaling(null, ...) must NOT crash. Returns
 ## null and push_warnings.
+
 
 func test_apply_stratum_scaling_null_def_returns_null_no_crash() -> void:
 	# Null-MobDef DELIBERATELY emits a WarningBus warning. Opt the guard

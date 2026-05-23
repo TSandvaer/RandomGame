@@ -40,8 +40,8 @@ extends GutTest
 
 const PlayerScript: Script = preload("res://scripts/player/Player.gd")
 
-
 # ---- Autoload accessors -------------------------------------------------
+
 
 func _inv() -> Node:
 	var n: Node = Engine.get_main_loop().root.get_node_or_null("Inventory")
@@ -51,12 +51,18 @@ func _inv() -> Node:
 
 # ---- Helpers ------------------------------------------------------------
 
+
 func _make_weapon_item(id: StringName = &"test_weapon") -> ItemInstance:
-	var def: ItemDef = ContentFactory.make_item_def({
-		"id": id,
-		"slot": ItemDef.Slot.WEAPON,
-		"base_stats": ContentFactory.make_item_base_stats({"damage": 5}),
-	})
+	var def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": id,
+				"slot": ItemDef.Slot.WEAPON,
+				"base_stats": ContentFactory.make_item_base_stats({"damage": 5}),
+			}
+		)
+	)
 	return ItemInstance.new(def, ItemDef.Tier.T1)
 
 
@@ -72,45 +78,60 @@ func after_each() -> void:
 # AC (a) — backwards-compat: existing 2-arg callers still equip
 # ==========================================================================
 
+
 func test_equip_default_source_lmb_click_succeeds() -> void:
 	var item: ItemInstance = _make_weapon_item()
 	_inv().add(item)
 	# Backwards-compat call shape — every existing caller in the codebase
 	# uses `equip(item, slot)` without a third arg. Default value is &"lmb_click".
-	assert_true(_inv().equip(item, &"weapon"),
-		"equip(item, slot) with default source must succeed (backwards-compat)")
-	assert_eq(_inv().get_equipped(&"weapon"), item,
-		"item is in the weapon slot after default-source equip")
-	assert_eq(_inv().get_items().size(), 0,
-		"item removed from grid after equip")
+	assert_true(
+		_inv().equip(item, &"weapon"),
+		"equip(item, slot) with default source must succeed (backwards-compat)"
+	)
+	assert_eq(
+		_inv().get_equipped(&"weapon"),
+		item,
+		"item is in the weapon slot after default-source equip"
+	)
+	assert_eq(_inv().get_items().size(), 0, "item removed from grid after equip")
 
 
 # ==========================================================================
 # AC (b) — explicit auto_pickup source equips successfully
 # ==========================================================================
 
+
 func test_equip_explicit_auto_pickup_source_succeeds() -> void:
 	var item: ItemInstance = _make_weapon_item()
 	_inv().add(item)
 	# This is the call shape `on_pickup_collected` uses internally for the
 	# auto-equip-first-weapon-on-pickup onboarding path.
-	assert_true(_inv().equip(item, &"weapon", &"auto_pickup"),
-		"equip(item, slot, &\"auto_pickup\") must succeed")
-	assert_eq(_inv().get_equipped(&"weapon"), item,
-		"item equipped via auto_pickup is in the weapon slot")
+	assert_true(
+		_inv().equip(item, &"weapon", &"auto_pickup"),
+		'equip(item, slot, &"auto_pickup") must succeed'
+	)
+	assert_eq(
+		_inv().get_equipped(&"weapon"), item, "item equipped via auto_pickup is in the weapon slot"
+	)
 
 
 # ==========================================================================
 # AC (c) — explicit lmb_click source equips successfully (round-trip parity)
 # ==========================================================================
 
+
 func test_equip_explicit_lmb_click_source_succeeds() -> void:
 	var item: ItemInstance = _make_weapon_item()
 	_inv().add(item)
-	assert_true(_inv().equip(item, &"weapon", &"lmb_click"),
-		"equip(item, slot, &\"lmb_click\") must succeed (explicit default)")
-	assert_eq(_inv().get_equipped(&"weapon"), item,
-		"item equipped via explicit lmb_click is in the weapon slot")
+	assert_true(
+		_inv().equip(item, &"weapon", &"lmb_click"),
+		'equip(item, slot, &"lmb_click") must succeed (explicit default)'
+	)
+	assert_eq(
+		_inv().get_equipped(&"weapon"),
+		item,
+		"item equipped via explicit lmb_click is in the weapon slot"
+	)
 
 
 # ==========================================================================
@@ -123,6 +144,7 @@ func test_equip_explicit_lmb_click_source_succeeds() -> void:
 #   1. `Inventory._equipped["weapon"]` is non-null AND points at an iron_sword.
 #   2. `Player._equipped_weapon` is non-null AND points at iron_sword.def.
 # Both halves of the dual-surface rule must hold simultaneously.
+
 
 func test_pickup_collected_routes_through_equip_with_auto_pickup_source() -> void:
 	_inv().reset()
@@ -138,20 +160,22 @@ func test_pickup_collected_routes_through_equip_with_auto_pickup_source() -> voi
 	_inv().on_pickup_collected(sword)
 	# Inventory side: weapon slot populated.
 	var equipped: ItemInstance = _inv().get_equipped(&"weapon") as ItemInstance
-	assert_not_null(equipped,
-		"weapon slot must be populated after on_pickup_collected auto-equip")
-	assert_eq(equipped.def.id, &"iron_sword",
-		"weapon slot occupant is the picked-up iron_sword")
+	assert_not_null(equipped, "weapon slot must be populated after on_pickup_collected auto-equip")
+	assert_eq(equipped.def.id, &"iron_sword", "weapon slot occupant is the picked-up iron_sword")
 	# Player side: _equipped_weapon also set (the dual-surface invariant).
 	var weapon_on_player: ItemDef = player.get_equipped_weapon() as ItemDef
-	assert_not_null(weapon_on_player,
-		"Player.get_equipped_weapon() must be non-null after auto_pickup equip — " +
-		"dual-surface invariant. If null, _apply_equip_to_player short-circuited.")
-	assert_eq(weapon_on_player.id, &"iron_sword",
-		"Player._equipped_weapon points at the iron_sword")
+	assert_not_null(
+		weapon_on_player,
+		(
+			"Player.get_equipped_weapon() must be non-null after auto_pickup equip — "
+			+ "dual-surface invariant. If null, _apply_equip_to_player short-circuited."
+		)
+	)
+	assert_eq(
+		weapon_on_player.id, &"iron_sword", "Player._equipped_weapon points at the iron_sword"
+	)
 	# Inventory grid: empty (the iron_sword moved from grid to slot).
-	assert_eq(_inv().get_items().size(), 0,
-		"iron_sword moved from grid into the weapon slot")
+	assert_eq(_inv().get_items().size(), 0, "iron_sword moved from grid into the weapon slot")
 
 
 # ==========================================================================
@@ -163,6 +187,7 @@ func test_pickup_collected_routes_through_equip_with_auto_pickup_source() -> voi
 # We invoke equip() (which calls _emit_equip_trace internally) twice with
 # different source tags and assert no exception.
 
+
 func test_emit_equip_trace_is_silent_noop_in_headless() -> void:
 	var item_a: ItemInstance = _make_weapon_item(&"trace_test_a")
 	var item_b: ItemInstance = _make_weapon_item(&"trace_test_b")
@@ -170,16 +195,19 @@ func test_emit_equip_trace_is_silent_noop_in_headless() -> void:
 	_inv().add(item_b)
 	# Both source tags must equip cleanly without raising — even though
 	# combat_trace is a no-op in headless, the path-through must be safe.
-	assert_true(_inv().equip(item_a, &"weapon", &"lmb_click"),
-		"first equip with lmb_click source: no crash")
+	assert_true(
+		_inv().equip(item_a, &"weapon", &"lmb_click"), "first equip with lmb_click source: no crash"
+	)
 	# Equip a different item to drive the swap path (touches both branches).
-	assert_true(_inv().equip(item_b, &"weapon", &"auto_pickup"),
-		"second equip (swap) with auto_pickup source: no crash")
+	assert_true(
+		_inv().equip(item_b, &"weapon", &"auto_pickup"),
+		"second equip (swap) with auto_pickup source: no crash"
+	)
 	# Final state: item_b equipped, item_a back in grid.
-	assert_eq(_inv().get_equipped(&"weapon"), item_b,
-		"swap completed: item_b is now equipped")
-	assert_true(_inv().get_items().has(item_a),
-		"swap preserved item_a in the grid (P0 86c9q96m8 invariant)")
+	assert_eq(_inv().get_equipped(&"weapon"), item_b, "swap completed: item_b is now equipped")
+	assert_true(
+		_inv().get_items().has(item_a), "swap preserved item_a in the grid (P0 86c9q96m8 invariant)"
+	)
 
 
 # ==========================================================================
@@ -195,21 +223,33 @@ func test_emit_equip_trace_is_silent_noop_in_headless() -> void:
 # `_emit_equip_trace` probe also confirms the shim handles every documented
 # tag (lmb_click / auto_pickup / deprecated auto_starter) without raising.
 
+
 func test_deprecated_auto_starter_source_still_type_checks_and_equips() -> void:
 	var item: ItemInstance = _make_weapon_item()
 	_inv().add(item)
 	# Deprecated tag — no current producer, but equip() still accepts it.
-	assert_true(_inv().equip(item, &"weapon", &"auto_starter"),
-		"equip(item, slot, &\"auto_starter\") must still type-check and equip — " +
-		"the tag is deprecated (ticket 86c9qbb3k) but equip() has no source " +
-		"whitelist, so it survives as a valid input with no producer")
-	assert_eq(_inv().get_equipped(&"weapon"), item,
-		"item equipped via the deprecated auto_starter tag is in the weapon slot")
+	assert_true(
+		_inv().equip(item, &"weapon", &"auto_starter"),
+		(
+			'equip(item, slot, &"auto_starter") must still type-check and equip — '
+			+ "the tag is deprecated (ticket 86c9qbb3k) but equip() has no source "
+			+ "whitelist, so it survives as a valid input with no producer"
+		)
+	)
+	assert_eq(
+		_inv().get_equipped(&"weapon"),
+		item,
+		"item equipped via the deprecated auto_starter tag is in the weapon slot"
+	)
 	# Direct shim probe — handles every documented source tag without raising.
 	var probe_item: ItemInstance = _make_weapon_item(&"shim_probe")
 	_inv().call("_emit_equip_trace", probe_item, &"weapon", &"lmb_click")
 	_inv().call("_emit_equip_trace", probe_item, &"weapon", &"auto_pickup")
 	_inv().call("_emit_equip_trace", probe_item, &"weapon", &"auto_starter")
-	assert_true(true,
-		"_emit_equip_trace handled lmb_click, auto_pickup, and the deprecated " +
-		"auto_starter tag without crash")
+	assert_true(
+		true,
+		(
+			"_emit_equip_trace handled lmb_click, auto_pickup, and the deprecated "
+			+ "auto_starter tag without crash"
+		)
+	)

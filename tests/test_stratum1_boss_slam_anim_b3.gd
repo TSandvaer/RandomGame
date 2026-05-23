@@ -21,12 +21,18 @@ const EXPECTED_FRAME_COUNT: int = 7
 
 # Map .tres dir suffix → on-disk folder name (per anim-folder-map.md).
 const DIR_SUFFIX_TO_FOLDER: Dictionary = {
-	"n": "north", "ne": "north-east", "e": "east", "se": "south-east",
-	"s": "south", "sw": "south-west", "w": "west", "nw": "north-west",
+	"n": "north",
+	"ne": "north-east",
+	"e": "east",
+	"se": "south-east",
+	"s": "south",
+	"sw": "south-west",
+	"w": "west",
+	"nw": "north-west",
 }
 
-
 # ---- Frame count invariant -------------------------------------------
+
 
 func test_each_slam_dir_has_seven_frames() -> void:
 	# surprise-uppercut template ships 7 frames per direction (frame_000.png ...
@@ -37,11 +43,15 @@ func test_each_slam_dir_has_seven_frames() -> void:
 	assert_not_null(frames, "Stratum1Boss SpriteFrames .tres loads")
 	for dir_suffix in ANIM_DIRS:
 		var anim_name: StringName = StringName("slam_%s" % dir_suffix)
-		assert_eq(frames.get_frame_count(anim_name), EXPECTED_FRAME_COUNT,
-			"slam_%s frame count = 7 (surprise-uppercut template)" % dir_suffix)
+		assert_eq(
+			frames.get_frame_count(anim_name),
+			EXPECTED_FRAME_COUNT,
+			"slam_%s frame count = 7 (surprise-uppercut template)" % dir_suffix
+		)
 
 
 # ---- Frame texture resolves + size invariant -------------------------
+
 
 func test_each_slam_frame_texture_loads_at_80x80_rgba() -> void:
 	# Every PixelLab frame for this boss is 80×80 RGBA. Catch:
@@ -52,18 +62,16 @@ func test_each_slam_frame_texture_loads_at_80x80_rgba() -> void:
 		var anim_name: StringName = StringName("slam_%s" % dir_suffix)
 		for i in range(EXPECTED_FRAME_COUNT):
 			var tex: Texture2D = frames.get_frame_texture(anim_name, i)
-			assert_not_null(tex,
-				"slam_%s frame %d texture resolves" % [dir_suffix, i])
+			assert_not_null(tex, "slam_%s frame %d texture resolves" % [dir_suffix, i])
 			if tex == null:
 				continue
 			var size: Vector2 = tex.get_size()
-			assert_eq(int(size.x), 80,
-				"slam_%s frame %d width = 80 px" % [dir_suffix, i])
-			assert_eq(int(size.y), 80,
-				"slam_%s frame %d height = 80 px" % [dir_suffix, i])
+			assert_eq(int(size.x), 80, "slam_%s frame %d width = 80 px" % [dir_suffix, i])
+			assert_eq(int(size.y), 80, "slam_%s frame %d height = 80 px" % [dir_suffix, i])
 
 
 # ---- Source-folder path pin (B3 swap regression guard) ---------------
+
 
 func test_each_slam_frame_texture_resolves_via_slam_directory() -> void:
 	# Pin the on-disk source folder: every slam_<dir> frame must point at a
@@ -78,24 +86,29 @@ func test_each_slam_frame_texture_resolves_via_slam_directory() -> void:
 		var anim_name: StringName = StringName("slam_%s" % dir_suffix)
 		var folder: String = DIR_SUFFIX_TO_FOLDER[dir_suffix]
 		var expected_dir: String = (
-			"res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/slam/%s/"
-			% folder
+			"res://assets/sprites/boss/_pixellab_anims/Stratum1Boss/animations/slam/%s/" % folder
 		)
 		for i in range(EXPECTED_FRAME_COUNT):
 			var tex: Texture2D = frames.get_frame_texture(anim_name, i)
 			if tex == null:
 				continue
 			var path: String = tex.resource_path
-			assert_true(path.begins_with(expected_dir),
-				"slam_%s frame %d path under '%s' (got: '%s')"
-				% [dir_suffix, i, expected_dir, path])
+			assert_true(
+				path.begins_with(expected_dir),
+				"slam_%s frame %d path under '%s' (got: '%s')" % [dir_suffix, i, expected_dir, path]
+			)
 			var expected_file: String = "frame_%03d.png" % i
-			assert_true(path.ends_with(expected_file),
-				"slam_%s frame %d path ends with '%s' (got: '%s')"
-				% [dir_suffix, i, expected_file, path])
+			assert_true(
+				path.ends_with(expected_file),
+				(
+					"slam_%s frame %d path ends with '%s' (got: '%s')"
+					% [dir_suffix, i, expected_file, path]
+				)
+			)
 
 
 # ---- Anim duration vs slam_recovery timing (audio-cue alignment) -----
+
 
 func test_slam_anim_total_duration_fits_inside_slam_recovery_window() -> void:
 	# SLAM_RECOVERY = 0.85 s (real, pre-enrage). FPS=8 across all anims per
@@ -112,10 +125,14 @@ func test_slam_anim_total_duration_fits_inside_slam_recovery_window() -> void:
 	# This is loose enough to allow future template swaps with reasonable
 	# frame counts (6-12 frames at 8 fps) but tight enough to catch a
 	# 24-frame template misimport.
-	assert_lt(anim_duration, Stratum1Boss.SLAM_RECOVERY * 2.0,
-		"slam anim duration (%.3fs) < 2× SLAM_RECOVERY (%.3fs)"
-		% [anim_duration, Stratum1Boss.SLAM_RECOVERY * 2.0])
+	assert_lt(
+		anim_duration,
+		Stratum1Boss.SLAM_RECOVERY * 2.0,
+		(
+			"slam anim duration (%.3fs) < 2× SLAM_RECOVERY (%.3fs)"
+			% [anim_duration, Stratum1Boss.SLAM_RECOVERY * 2.0]
+		)
+	)
 	# Lower bound: anim shouldn't be a 1-frame still — the slam needs at
 	# least 3 visible frames to read as a strike motion.
-	assert_gte(EXPECTED_FRAME_COUNT, 3,
-		"slam anim has >=3 frames (visible strike motion)")
+	assert_gte(EXPECTED_FRAME_COUNT, 3, "slam anim has >=3 frames (visible strike motion)")

@@ -30,8 +30,8 @@ extends GutTest
 const MobLootSpawnerScript: Script = preload("res://scripts/loot/MobLootSpawner.gd")
 const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 
-
 # ---- Helpers ---------------------------------------------------------
+
 
 func _inv() -> Node:
 	var n: Node = Engine.get_main_loop().root.get_node_or_null("Inventory")
@@ -48,10 +48,15 @@ func _make_room_root() -> Node2D:
 func _make_item(slot: int = ItemDef.Slot.ARMOR) -> ItemInstance:
 	# Use ARMOR slot so the auto-equip-first-weapon-on-pickup branch is
 	# bypassed — keeps the inventory-delta assertions clean (ticket 86c9qbb3k).
-	var def: ItemDef = ContentFactory.make_item_def({
-		"id": &"test_force_spawn_armor",
-		"slot": slot,
-	})
+	var def: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": &"test_force_spawn_armor",
+				"slot": slot,
+			}
+		)
+	)
 	return ItemInstance.new(def, ItemDef.Tier.T1)
 
 
@@ -65,12 +70,12 @@ func after_each() -> void:
 
 # ---- Test 1: happy path — pickup lands in inventory ------------------
 
+
 func test_force_spawn_pickup_lands_in_inventory() -> void:
 	var room: Node2D = _make_room_root()
 	var item: ItemInstance = _make_item()
 
-	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(
-		item, Vector2(100.0, 100.0), room)
+	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(item, Vector2(100.0, 100.0), room)
 
 	assert_not_null(pickup, "helper returns a Pickup")
 	# Wire to Inventory (production path: caller calls auto_collect_pickups).
@@ -80,13 +85,20 @@ func test_force_spawn_pickup_lands_in_inventory() -> void:
 
 	# Simulate player walking onto the pickup.
 	pickup.emit_signal("picked_up", pickup.item, pickup)
-	assert_eq(_inv().get_items().size(), 1,
-		"force-spawned pickup lands in inventory via auto_collect_pickups path")
-	assert_eq((_inv().get_items()[0] as ItemInstance).def.id, item.def.id,
-		"inventory item matches the force-spawned item")
+	assert_eq(
+		_inv().get_items().size(),
+		1,
+		"force-spawned pickup lands in inventory via auto_collect_pickups path"
+	)
+	assert_eq(
+		(_inv().get_items()[0] as ItemInstance).def.id,
+		item.def.id,
+		"inventory item matches the force-spawned item"
+	)
 
 
 # ---- Test 2: no mob died during force-spawn --------------------------
+
 
 func test_force_spawn_does_not_require_mob_death() -> void:
 	# The core negative-arm invariant: spawn a pickup while the mob is alive,
@@ -106,68 +118,80 @@ func test_force_spawn_does_not_require_mob_death() -> void:
 	grunt.mob_died.connect(func(_m, _p, _d): mob_died_fired = true)
 
 	# Force-spawn a pickup without touching the grunt.
-	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(
-		item, Vector2(50.0, 50.0), room)
+	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(item, Vector2(50.0, 50.0), room)
 	await get_tree().process_frame
 
-	assert_false(mob_died_fired,
-		"NEGATIVE ARM: mob_died must NOT fire when using _test_force_spawn_pickup " +
-		"(the whole point of the hook is to get a pickup WITHOUT killing the mob)")
-	assert_false(grunt.is_dead(),
-		"NEGATIVE ARM: grunt is still alive after force-spawn (no kill occurred)")
+	assert_false(
+		mob_died_fired,
+		(
+			"NEGATIVE ARM: mob_died must NOT fire when using _test_force_spawn_pickup "
+			+ "(the whole point of the hook is to get a pickup WITHOUT killing the mob)"
+		)
+	)
+	assert_false(
+		grunt.is_dead(), "NEGATIVE ARM: grunt is still alive after force-spawn (no kill occurred)"
+	)
 	assert_not_null(pickup, "Pickup was spawned despite the mob being alive")
 
 
 # ---- Test 3: Pickup is parented under the supplied parent node -------
 
+
 func test_force_spawn_pickup_is_parented_under_room() -> void:
 	var room: Node2D = _make_room_root()
 	var item: ItemInstance = _make_item()
 
-	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(
-		item, Vector2(80.0, 80.0), room)
+	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(item, Vector2(80.0, 80.0), room)
 	# add_child is deferred — same as on_mob_died.
 	await get_tree().process_frame
 
-	assert_eq(pickup.get_parent(), room,
-		"force-spawned Pickup is parented under the supplied room root after one frame")
+	assert_eq(
+		pickup.get_parent(),
+		room,
+		"force-spawned Pickup is parented under the supplied room root after one frame"
+	)
 
 
 # ---- Test 4: Pickup carries the correct item -------------------------
+
 
 func test_force_spawn_pickup_carries_correct_item() -> void:
 	var room: Node2D = _make_room_root()
 	var item: ItemInstance = _make_item()
 
-	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(
-		item, Vector2.ZERO, room)
+	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(item, Vector2.ZERO, room)
 
-	assert_not_null(pickup.item,
-		"Pickup.item is non-null immediately after _test_force_spawn_pickup")
-	assert_eq(pickup.item, item,
-		"Pickup.item is the SAME ItemInstance passed to the helper (not a copy)")
-	assert_eq(pickup.item.def.id, item.def.id,
-		"Pickup item def id matches the supplied item's def id")
+	assert_not_null(
+		pickup.item, "Pickup.item is non-null immediately after _test_force_spawn_pickup"
+	)
+	assert_eq(
+		pickup.item, item, "Pickup.item is the SAME ItemInstance passed to the helper (not a copy)"
+	)
+	assert_eq(
+		pickup.item.def.id, item.def.id, "Pickup item def id matches the supplied item's def id"
+	)
 
 
 # ---- Test 5: null parent — returned Pickup is un-parented ------------
 
+
 func test_force_spawn_pickup_null_parent_returns_unparented_pickup() -> void:
 	var item: ItemInstance = _make_item()
 
-	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(
-		item, Vector2(200.0, 200.0), null)
+	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(item, Vector2(200.0, 200.0), null)
 	# No deferred add_child was scheduled (parent == null).
 	await get_tree().process_frame
 
 	assert_not_null(pickup, "helper returns a Pickup even when parent is null")
-	assert_null(pickup.get_parent(),
-		"Pickup has no parent when null was passed — caller owns lifecycle")
+	assert_null(
+		pickup.get_parent(), "Pickup has no parent when null was passed — caller owns lifecycle"
+	)
 	# Cleanup: manually free the un-parented Pickup (no autofree node owns it).
 	pickup.free()
 
 
 # ---- Test 6: collectability via auto_collect_pickups + body_entered --
+
 
 func test_force_spawn_pickup_is_collectable_via_body_entered() -> void:
 	# Exercises the production collection chain end-to-end:
@@ -181,19 +205,24 @@ func test_force_spawn_pickup_is_collectable_via_body_entered() -> void:
 	# Use an ARMOR item — armor never auto-equips, so inv_after - inv_before == 1.
 	var item: ItemInstance = _make_item(ItemDef.Slot.ARMOR)
 
-	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(
-		item, Vector2(32.0, 32.0), room)
+	var pickup: Pickup = MobLootSpawner._test_force_spawn_pickup(item, Vector2(32.0, 32.0), room)
 	_inv().auto_collect_pickups([pickup])
 	await get_tree().process_frame
 
 	var inv_before: int = _inv().get_items().size()
 	# Confirm the picked_up signal is wired (auto_collect_pickups contract).
-	assert_gt(pickup.picked_up.get_connections().size(), 0,
-		"picked_up signal has at least one listener (auto_collect_pickups wired it)")
+	assert_gt(
+		pickup.picked_up.get_connections().size(),
+		0,
+		"picked_up signal has at least one listener (auto_collect_pickups wired it)"
+	)
 
 	# Simulate player body_entered.
 	pickup.emit_signal("picked_up", pickup.item, pickup)
 
 	var inv_after: int = _inv().get_items().size()
-	assert_eq(inv_after, inv_before + 1,
-		"force-spawned pickup collected via body_entered adds exactly 1 item to inventory")
+	assert_eq(
+		inv_after,
+		inv_before + 1,
+		"force-spawned pickup collected via body_entered adds exactly 1 item to inventory"
+	)

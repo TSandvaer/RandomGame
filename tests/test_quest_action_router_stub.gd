@@ -58,40 +58,39 @@ func after_each() -> void:
 
 # ---- AC1: autoload registered + reachable -----------------------------
 
+
 func test_router_autoload_registered() -> void:
 	var router: Node = _router()
 	assert_not_null(router, "QuestActionRouter autoload registered")
-	assert_true(router.has_method("last_quest_action"),
-		"router exposes last_quest_action()")
-	assert_true(router.has_method("last_npc_id"),
-		"router exposes last_npc_id()")
-	assert_true(router.has_method("last_branch_key"),
-		"router exposes last_branch_key()")
-	assert_true(router.has_method("has_received_quest_action"),
-		"router exposes has_received_quest_action()")
-	assert_true(router.has_method("clear"),
-		"router exposes clear()")
-	assert_true(router.has_signal("quest_action_received"),
-		"router exposes quest_action_received signal")
-	assert_true(router.has_signal("dialogue_closed_observed"),
-		"router exposes dialogue_closed_observed signal")
+	assert_true(router.has_method("last_quest_action"), "router exposes last_quest_action()")
+	assert_true(router.has_method("last_npc_id"), "router exposes last_npc_id()")
+	assert_true(router.has_method("last_branch_key"), "router exposes last_branch_key()")
+	assert_true(
+		router.has_method("has_received_quest_action"), "router exposes has_received_quest_action()"
+	)
+	assert_true(router.has_method("clear"), "router exposes clear()")
+	assert_true(
+		router.has_signal("quest_action_received"), "router exposes quest_action_received signal"
+	)
+	assert_true(
+		router.has_signal("dialogue_closed_observed"),
+		"router exposes dialogue_closed_observed signal"
+	)
 
 
 # ---- AC2: initial state ---------------------------------------------
 
+
 func test_initial_state_is_empty() -> void:
 	var router: Node = _router()
-	assert_eq(router.last_quest_action(), &"",
-		"last_quest_action() is empty StringName initially")
-	assert_eq(router.last_npc_id(), &"",
-		"last_npc_id() is empty StringName initially")
-	assert_eq(router.last_branch_key(), &"",
-		"last_branch_key() is empty StringName initially")
-	assert_false(router.has_received_quest_action(),
-		"has_received_quest_action() false initially")
+	assert_eq(router.last_quest_action(), &"", "last_quest_action() is empty StringName initially")
+	assert_eq(router.last_npc_id(), &"", "last_npc_id() is empty StringName initially")
+	assert_eq(router.last_branch_key(), &"", "last_branch_key() is empty StringName initially")
+	assert_false(router.has_received_quest_action(), "has_received_quest_action() false initially")
 
 
 # ---- AC3: quest_action_invoked → record + echo ----------------------
+
 
 func test_quest_action_recorded_and_echoed() -> void:
 	var tree: DialogueTreeDef = _make_tree_with_quest_action()
@@ -100,44 +99,54 @@ func test_quest_action_recorded_and_echoed() -> void:
 	dc.open(tree, &"pre_quest")
 	dc.advance_line()  # advance into responses
 	dc.select_response(0)  # picks the accept-bounty response
-	assert_true(router.has_received_quest_action(),
-		"has_received_quest_action() true after select")
-	assert_eq(router.last_quest_action(), &"accept_bounty:test_target",
-		"last_quest_action() records the action id verbatim")
-	assert_eq(router.last_npc_id(), &"router_test_npc",
-		"last_npc_id() records the originating NPC")
+	assert_true(router.has_received_quest_action(), "has_received_quest_action() true after select")
+	assert_eq(
+		router.last_quest_action(),
+		&"accept_bounty:test_target",
+		"last_quest_action() records the action id verbatim"
+	)
+	assert_eq(router.last_npc_id(), &"router_test_npc", "last_npc_id() records the originating NPC")
 	# branch_key is captured from branch_opened during the active session;
 	# at quest_action_invoked-time the controller is still on `pre_quest`
 	# (emit fires BEFORE navigation per dialogue-system.md).
-	assert_eq(router.last_branch_key(), &"pre_quest",
-		"last_branch_key() is the ORIGINATING branch at quest_action time")
+	assert_eq(
+		router.last_branch_key(),
+		&"pre_quest",
+		"last_branch_key() is the ORIGINATING branch at quest_action time"
+	)
 	# Echo signal fired with same payload.
-	assert_eq(_quest_action_received_log.size(), 1,
-		"quest_action_received echo fired exactly once")
-	assert_eq(_quest_action_received_log[0]["action_id"],
+	assert_eq(_quest_action_received_log.size(), 1, "quest_action_received echo fired exactly once")
+	assert_eq(
+		_quest_action_received_log[0]["action_id"],
 		&"accept_bounty:test_target",
-		"echo carries action_id")
-	assert_eq(_quest_action_received_log[0]["npc_id"], &"router_test_npc",
-		"echo carries npc_id")
-	assert_eq(_quest_action_received_log[0]["branch_key"], &"pre_quest",
-		"echo carries originating branch_key")
+		"echo carries action_id"
+	)
+	assert_eq(_quest_action_received_log[0]["npc_id"], &"router_test_npc", "echo carries npc_id")
+	assert_eq(
+		_quest_action_received_log[0]["branch_key"],
+		&"pre_quest",
+		"echo carries originating branch_key"
+	)
 
 
 # ---- AC4: dialogue_closed → echo ------------------------------------
+
 
 func test_dialogue_closed_observed_echo() -> void:
 	var tree: DialogueTreeDef = _make_simple_closeable_tree()
 	var dc: Node = _controller()
 	dc.open(tree, &"flavor")
 	dc.close()
-	assert_eq(_dialogue_closed_observed_log.size(), 1,
-		"dialogue_closed_observed echo fired once")
-	assert_eq(_dialogue_closed_observed_log[0]["npc_id"],
+	assert_eq(_dialogue_closed_observed_log.size(), 1, "dialogue_closed_observed echo fired once")
+	assert_eq(
+		_dialogue_closed_observed_log[0]["npc_id"],
 		&"closeable_npc",
-		"echo carries npc_id matching the closed session")
+		"echo carries npc_id matching the closed session"
+	)
 
 
 # ---- AC5: clear() resets state --------------------------------------
+
 
 func test_clear_resets_router_state() -> void:
 	var tree: DialogueTreeDef = _make_tree_with_quest_action()
@@ -151,17 +160,16 @@ func test_clear_resets_router_state() -> void:
 	# Close + clear.
 	dc.close()
 	router.clear()
-	assert_eq(router.last_quest_action(), &"",
-		"last_quest_action() reset to empty after clear()")
-	assert_eq(router.last_npc_id(), &"",
-		"last_npc_id() reset to empty after clear()")
-	assert_eq(router.last_branch_key(), &"",
-		"last_branch_key() reset to empty after clear()")
-	assert_false(router.has_received_quest_action(),
-		"has_received_quest_action() false after clear()")
+	assert_eq(router.last_quest_action(), &"", "last_quest_action() reset to empty after clear()")
+	assert_eq(router.last_npc_id(), &"", "last_npc_id() reset to empty after clear()")
+	assert_eq(router.last_branch_key(), &"", "last_branch_key() reset to empty after clear()")
+	assert_false(
+		router.has_received_quest_action(), "has_received_quest_action() false after clear()"
+	)
 
 
 # ---- AC6: most-recent wins on multiple quest_actions ----------------
+
 
 func test_multiple_quest_actions_router_records_most_recent() -> void:
 	# A tree where the first response navigates to a second branch which
@@ -176,13 +184,18 @@ func test_multiple_quest_actions_router_records_most_recent() -> void:
 	# Now on second branch — advance + pick second action.
 	dc.advance_line()
 	dc.select_response(0)  # second action
-	assert_eq(router.last_quest_action(), &"second_action:second_target",
-		"last_quest_action is the MOST RECENT, not the first")
-	assert_eq(_quest_action_received_log.size(), 2,
-		"echo fired twice (once per quest_action_invoked)")
+	assert_eq(
+		router.last_quest_action(),
+		&"second_action:second_target",
+		"last_quest_action is the MOST RECENT, not the first"
+	)
+	assert_eq(
+		_quest_action_received_log.size(), 2, "echo fired twice (once per quest_action_invoked)"
+	)
 
 
 # ---- Helpers --------------------------------------------------------
+
 
 func _controller() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("DialogueController")
@@ -211,14 +224,18 @@ func _disconnect_router_signals() -> void:
 
 
 func _on_quest_action_received(
-		action_id: StringName,
-		npc_id: StringName,
-		branch_key: StringName) -> void:
-	_quest_action_received_log.append({
-		"action_id": action_id,
-		"npc_id": npc_id,
-		"branch_key": branch_key,
-	})
+	action_id: StringName, npc_id: StringName, branch_key: StringName
+) -> void:
+	(
+		_quest_action_received_log
+		. append(
+			{
+				"action_id": action_id,
+				"npc_id": npc_id,
+				"branch_key": branch_key,
+			}
+		)
+	)
 
 
 func _on_dialogue_closed_observed(npc_id: StringName) -> void:
@@ -226,6 +243,7 @@ func _on_dialogue_closed_observed(npc_id: StringName) -> void:
 
 
 # Tree factories -----------------------------------------------------
+
 
 func _make_tree_with_quest_action() -> DialogueTreeDef:
 	var accept: DialogueResponse = ResponseScript.new()

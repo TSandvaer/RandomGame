@@ -35,6 +35,7 @@ func after_each() -> void:
 # 1. Mob death -> loot drop -> ItemInstance has affixes per tier
 # =======================================================================
 
+
 func test_authored_grunt_drop_produces_affixes() -> void:
 	# Grunt's authored loot table drops iron_sword and leather_vest. Both
 	# point at the M1 affix pool. Roll many times; T2/T3 drops carry
@@ -59,8 +60,10 @@ func test_authored_grunt_drop_produces_affixes() -> void:
 				var aff: AffixRoll = inst.rolled_affixes[0]
 				assert_not_null(aff.def)
 				var known_stats: Array = [&"vigor", &"focus", &"edge", &"move_speed"]
-				assert_true(aff.def.stat_modified in known_stats,
-					"affix stat is one of M1 vital/keen/swift; got %s" % aff.def.stat_modified)
+				assert_true(
+					aff.def.stat_modified in known_stats,
+					"affix stat is one of M1 vital/keen/swift; got %s" % aff.def.stat_modified
+				)
 				saw_t2_with_affix = true
 			elif inst.rolled_tier == ItemDef.Tier.T3:
 				var n: int = inst.rolled_affixes.size()
@@ -75,7 +78,9 @@ func test_authored_grunt_drop_produces_affixes() -> void:
 func test_boss_drop_produces_higher_tier_affixes() -> void:
 	# boss_drops.tres ships iron_sword tier_modifier=2 (-> T3) and
 	# leather_vest tier_modifier=1 (-> T2). Both should roll affixes.
-	var boss_table: LootTableDef = load("res://resources/loot_tables/boss_drops.tres") as LootTableDef
+	var boss_table: LootTableDef = (
+		load("res://resources/loot_tables/boss_drops.tres") as LootTableDef
+	)
 	assert_not_null(boss_table)
 	var roller: LootRoller = LootRollerScript.new()
 	roller.seed_rng(42)
@@ -94,37 +99,59 @@ func test_boss_drop_produces_higher_tier_affixes() -> void:
 		# Each affix value must be inside its tier's range.
 		for ar: AffixRoll in inst.rolled_affixes:
 			var tier_idx: int = int(inst.rolled_tier)
-			assert_lt(tier_idx, ar.def.value_ranges.size(),
-				"affix has a value_range for the rolled tier")
+			assert_lt(
+				tier_idx, ar.def.value_ranges.size(), "affix has a value_range for the rolled tier"
+			)
 			var rng_band: AffixValueRange = ar.def.value_ranges[tier_idx]
-			assert_between(ar.rolled_value, rng_band.min_value, rng_band.max_value,
-				"rolled value %.4f in [%.4f, %.4f] for affix '%s'" % [
-					ar.rolled_value, rng_band.min_value, rng_band.max_value, ar.def.id
-				])
+			assert_between(
+				ar.rolled_value,
+				rng_band.min_value,
+				rng_band.max_value,
+				(
+					"rolled value %.4f in [%.4f, %.4f] for affix '%s'"
+					% [ar.rolled_value, rng_band.min_value, rng_band.max_value, ar.def.id]
+				)
+			)
 
 
 # =======================================================================
 # 2. Save round-trip preserves rolled affixes
 # =======================================================================
 
+
 func test_item_instance_save_roundtrip_preserves_affixes() -> void:
 	# Build an ItemInstance with two rolled affixes; serialize; rebuild
 	# via from_save_dict using explicit resolvers; assert fields match.
-	var item: ItemDef = ContentFactory.make_item_def({
-		"id": &"rt_sword",
-		"slot": ItemDef.Slot.WEAPON,
-		"tier": ItemDef.Tier.T2,
-	})
-	var vital: AffixDef = ContentFactory.make_affix_def({
-		"id": &"rt_vital",
-		"stat_modified": &"vigor",
-		"apply_mode": AffixDef.ApplyMode.ADD,
-	})
-	var keen: AffixDef = ContentFactory.make_affix_def({
-		"id": &"rt_keen",
-		"stat_modified": &"edge",
-		"apply_mode": AffixDef.ApplyMode.ADD,
-	})
+	var item: ItemDef = (
+		ContentFactory
+		. make_item_def(
+			{
+				"id": &"rt_sword",
+				"slot": ItemDef.Slot.WEAPON,
+				"tier": ItemDef.Tier.T2,
+			}
+		)
+	)
+	var vital: AffixDef = (
+		ContentFactory
+		. make_affix_def(
+			{
+				"id": &"rt_vital",
+				"stat_modified": &"vigor",
+				"apply_mode": AffixDef.ApplyMode.ADD,
+			}
+		)
+	)
+	var keen: AffixDef = (
+		ContentFactory
+		. make_affix_def(
+			{
+				"id": &"rt_keen",
+				"stat_modified": &"edge",
+				"apply_mode": AffixDef.ApplyMode.ADD,
+			}
+		)
+	)
 	var instance: ItemInstance = ItemInstanceScript.new(item, ItemDef.Tier.T2)
 	instance.rolled_affixes = [
 		AffixRollScript.new(vital, 12.0),
@@ -144,10 +171,12 @@ func test_item_instance_save_roundtrip_preserves_affixes() -> void:
 	var item_lookup: Dictionary = {&"rt_sword": item}
 	var affix_lookup: Dictionary = {&"rt_vital": vital, &"rt_keen": keen}
 	var item_resolver: Callable = func(id: StringName) -> Resource: return item_lookup.get(id, null)
-	var affix_resolver: Callable = func(id: StringName) -> Resource: return affix_lookup.get(id, null)
+	var affix_resolver: Callable = func(id: StringName) -> Resource:
+		return affix_lookup.get(id, null)
 
 	var rebuilt: ItemInstance = ItemInstanceScript.from_save_dict(
-		serialized, item_resolver, affix_resolver)
+		serialized, item_resolver, affix_resolver
+	)
 	assert_not_null(rebuilt, "rebuild succeeds")
 	assert_eq(rebuilt.def, item)
 	assert_eq(rebuilt.rolled_tier, ItemDef.Tier.T2)
@@ -167,7 +196,8 @@ func test_save_envelope_round_trip_preserves_affix_values() -> void:
 		{
 			"id": "iron_sword",
 			"tier": int(ItemDef.Tier.T2),
-			"rolled_affixes": [
+			"rolled_affixes":
+			[
 				{"affix_id": "vital", "value": 12.0},
 				{"affix_id": "keen", "value": 4.5},
 			],
@@ -194,7 +224,8 @@ func test_from_save_dict_skips_unknown_affix_id() -> void:
 	var data: Dictionary = {
 		"id": "rt_sword2",
 		"tier": int(ItemDef.Tier.T2),
-		"rolled_affixes": [
+		"rolled_affixes":
+		[
 			{"affix_id": "rt_keen2", "value": 3.0},
 			{"affix_id": "ghost_affix", "value": 99.0},  # unknown
 		],
@@ -204,7 +235,9 @@ func test_from_save_dict_skips_unknown_affix_id() -> void:
 		return item if id == &"rt_sword2" else null
 	var affix_resolver: Callable = func(id: StringName) -> Resource:
 		return keen if id == &"rt_keen2" else null
-	var rebuilt: ItemInstance = ItemInstanceScript.from_save_dict(data, item_resolver, affix_resolver)
+	var rebuilt: ItemInstance = ItemInstanceScript.from_save_dict(
+		data, item_resolver, affix_resolver
+	)
 	assert_not_null(rebuilt, "load tolerates unknown affix id")
 	assert_eq(rebuilt.rolled_affixes.size(), 1, "unknown affix is dropped, known affix retained")
 
@@ -213,5 +246,7 @@ func test_from_save_dict_returns_null_for_unknown_item() -> void:
 	var item_resolver: Callable = func(_id: StringName) -> Resource: return null
 	var affix_resolver: Callable = func(_id: StringName) -> Resource: return null
 	var data: Dictionary = {"id": "ghost_item", "tier": 0, "rolled_affixes": []}
-	var result: ItemInstance = ItemInstanceScript.from_save_dict(data, item_resolver, affix_resolver)
+	var result: ItemInstance = ItemInstanceScript.from_save_dict(
+		data, item_resolver, affix_resolver
+	)
 	assert_null(result, "unknown item id -> null (caller drops the stash entry)")

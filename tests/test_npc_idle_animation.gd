@@ -48,14 +48,19 @@ const NPC_FIXTURES: Array[Dictionary] = [
 	},
 ]
 
-
 # ---- SpriteFrames resource shape -------------------------------------
+
 
 func test_each_npc_sprite_frames_loads() -> void:
 	for fixture in NPC_FIXTURES:
 		var frames: SpriteFrames = load(fixture["sprite_frames_path"]) as SpriteFrames
-		assert_not_null(frames,
-			"NPC '%s' SpriteFrames at %s loads cleanly" % [fixture["npc_id"], fixture["sprite_frames_path"]])
+		assert_not_null(
+			frames,
+			(
+				"NPC '%s' SpriteFrames at %s loads cleanly"
+				% [fixture["npc_id"], fixture["sprite_frames_path"]]
+			)
+		)
 
 
 func test_each_npc_exposes_all_eight_idle_direction_keys() -> void:
@@ -64,8 +69,10 @@ func test_each_npc_exposes_all_eight_idle_direction_keys() -> void:
 		var frames: SpriteFrames = load(fixture["sprite_frames_path"]) as SpriteFrames
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("idle_%s" % dir_suffix)
-			assert_true(frames.has_animation(anim_name),
-				"NPC '%s' SpriteFrames exposes '%s'" % [fixture["npc_id"], anim_name])
+			assert_true(
+				frames.has_animation(anim_name),
+				"NPC '%s' SpriteFrames exposes '%s'" % [fixture["npc_id"], anim_name]
+			)
 
 
 func test_each_npc_idle_animations_loop_true() -> void:
@@ -77,8 +84,10 @@ func test_each_npc_idle_animations_loop_true() -> void:
 		var frames: SpriteFrames = load(fixture["sprite_frames_path"]) as SpriteFrames
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("idle_%s" % dir_suffix)
-			assert_true(frames.get_animation_loop(anim_name),
-				"NPC '%s' '%s' loops (loop=true)" % [fixture["npc_id"], anim_name])
+			assert_true(
+				frames.get_animation_loop(anim_name),
+				"NPC '%s' '%s' loops (loop=true)" % [fixture["npc_id"], anim_name]
+			)
 
 
 func test_each_npc_idle_animations_play_at_8_fps() -> void:
@@ -88,8 +97,11 @@ func test_each_npc_idle_animations_play_at_8_fps() -> void:
 		var frames: SpriteFrames = load(fixture["sprite_frames_path"]) as SpriteFrames
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("idle_%s" % dir_suffix)
-			assert_eq(frames.get_animation_speed(anim_name), 8.0,
-				"NPC '%s' '%s' plays at 8 fps" % [fixture["npc_id"], anim_name])
+			assert_eq(
+				frames.get_animation_speed(anim_name),
+				8.0,
+				"NPC '%s' '%s' plays at 8 fps" % [fixture["npc_id"], anim_name]
+			)
 
 
 func test_each_npc_idle_animations_have_at_least_one_frame() -> void:
@@ -100,11 +112,15 @@ func test_each_npc_idle_animations_have_at_least_one_frame() -> void:
 		var frames: SpriteFrames = load(fixture["sprite_frames_path"]) as SpriteFrames
 		for dir_suffix in ANIM_DIRS:
 			var anim_name: StringName = StringName("idle_%s" % dir_suffix)
-			assert_gt(frames.get_frame_count(anim_name), 0,
-				"NPC '%s' '%s' has frames" % [fixture["npc_id"], anim_name])
+			assert_gt(
+				frames.get_frame_count(anim_name),
+				0,
+				"NPC '%s' '%s' has frames" % [fixture["npc_id"], anim_name]
+			)
 
 
 # ---- NPC scene-wiring shape ------------------------------------------
+
 
 func test_each_npc_scene_loads_and_has_animated_sprite_named_sprite() -> void:
 	# Sprite child resolves to AnimatedSprite2D (not ColorRect). The node-name
@@ -113,16 +129,22 @@ func test_each_npc_scene_loads_and_has_animated_sprite_named_sprite() -> void:
 	# even though NPCs themselves never need hit-flash.
 	for fixture in NPC_FIXTURES:
 		var packed: PackedScene = load(fixture["scene_path"]) as PackedScene
-		assert_not_null(packed,
-			"NPC '%s' scene at %s loads" % [fixture["npc_id"], fixture["scene_path"]])
+		assert_not_null(
+			packed, "NPC '%s' scene at %s loads" % [fixture["npc_id"], fixture["scene_path"]]
+		)
 		var root: Node = packed.instantiate()
 		add_child_autofree(root)
-		assert_eq(root.name, StringName(fixture["expected_root_name"]),
-			"NPC '%s' scene root named %s" % [fixture["npc_id"], fixture["expected_root_name"]])
+		assert_eq(
+			root.name,
+			StringName(fixture["expected_root_name"]),
+			"NPC '%s' scene root named %s" % [fixture["npc_id"], fixture["expected_root_name"]]
+		)
 		var sprite_node: Node = root.get_node_or_null("Sprite")
 		assert_not_null(sprite_node, "NPC '%s' has a 'Sprite' child" % fixture["npc_id"])
-		assert_true(sprite_node is AnimatedSprite2D,
-			"NPC '%s' Sprite child is AnimatedSprite2D (M3W-1 convention)" % fixture["npc_id"])
+		assert_true(
+			sprite_node is AnimatedSprite2D,
+			"NPC '%s' Sprite child is AnimatedSprite2D (M3W-1 convention)" % fixture["npc_id"]
+		)
 
 
 func test_each_npc_scene_assigns_sprite_frames_to_animated_sprite() -> void:
@@ -134,8 +156,10 @@ func test_each_npc_scene_assigns_sprite_frames_to_animated_sprite() -> void:
 		var root: Node = packed.instantiate()
 		add_child_autofree(root)
 		var asprite: AnimatedSprite2D = root.get_node("Sprite") as AnimatedSprite2D
-		assert_not_null(asprite.sprite_frames,
-			"NPC '%s' AnimatedSprite2D has SpriteFrames assigned" % fixture["npc_id"])
+		assert_not_null(
+			asprite.sprite_frames,
+			"NPC '%s' AnimatedSprite2D has SpriteFrames assigned" % fixture["npc_id"]
+		)
 
 
 func test_each_npc_scene_uses_nearest_neighbor_texture_filter() -> void:
@@ -147,8 +171,11 @@ func test_each_npc_scene_uses_nearest_neighbor_texture_filter() -> void:
 		var root: Node = packed.instantiate()
 		add_child_autofree(root)
 		var asprite: AnimatedSprite2D = root.get_node("Sprite") as AnimatedSprite2D
-		assert_eq(asprite.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
-			"NPC '%s' texture_filter = NEAREST" % fixture["npc_id"])
+		assert_eq(
+			asprite.texture_filter,
+			CanvasItem.TEXTURE_FILTER_NEAREST,
+			"NPC '%s' texture_filter = NEAREST" % fixture["npc_id"]
+		)
 
 
 func test_each_npc_scene_initial_animation_is_idle_s() -> void:
@@ -164,7 +191,12 @@ func test_each_npc_scene_initial_animation_is_idle_s() -> void:
 		# Wait one process_frame so the AnimatedSprite2D's _ready resolves
 		# autoplay → is_playing.
 		await get_tree().process_frame
-		assert_eq(asprite.animation, StringName("idle_s"),
-			"NPC '%s' initial animation is 'idle_s'" % fixture["npc_id"])
-		assert_true(asprite.is_playing(),
-			"NPC '%s' AnimatedSprite2D is_playing after autoplay" % fixture["npc_id"])
+		assert_eq(
+			asprite.animation,
+			StringName("idle_s"),
+			"NPC '%s' initial animation is 'idle_s'" % fixture["npc_id"]
+		)
+		assert_true(
+			asprite.is_playing(),
+			"NPC '%s' AnimatedSprite2D is_playing after autoplay" % fixture["npc_id"]
+		)

@@ -26,8 +26,8 @@ const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const MobDefScript: Script = preload("res://scripts/content/MobDef.gd")
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 class FakePlayer:
 	extends Node2D
@@ -54,9 +54,11 @@ func _hit_grunt(g: Grunt, dmg: int) -> void:
 
 # ---- 1: full HP at spawn from MobDef ---------------------------------
 
+
 func test_spawns_with_full_hp_from_mobdef() -> void:
 	var def: MobDef = ContentFactory.make_mob_def(
-		{"hp_base": 80, "damage_base": 12, "move_speed": 75.0})
+		{"hp_base": 80, "damage_base": 12, "move_speed": 75.0}
+	)
 	var g: Grunt = _make_grunt_with_def(def)
 	assert_eq(g.get_hp(), 80, "starts at hp_base")
 	assert_eq(g.get_max_hp(), 80, "max_hp = hp_base at spawn")
@@ -74,6 +76,7 @@ func test_default_hp_when_no_mobdef_assigned() -> void:
 
 
 # ---- 2: takes damage via Hitbox layer-3 -------------------------------
+
 
 func test_takes_damage_from_player_hitbox() -> void:
 	# Construct a player-team hitbox manually and call the duck-typed
@@ -93,6 +96,7 @@ func test_takes_damage_from_player_hitbox() -> void:
 
 # ---- 3: damaged signal carries amount + remaining + source -----------
 
+
 func test_damaged_signal_carries_payload() -> void:
 	var g: Grunt = _make_grunt()
 	watch_signals(g)
@@ -102,6 +106,7 @@ func test_damaged_signal_carries_payload() -> void:
 
 
 # ---- 4: death emits mob_died exactly once + carries payload ----------
+
 
 func test_death_emits_mob_died_once() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 20})
@@ -119,11 +124,15 @@ func test_death_emits_mob_died_once() -> void:
 	assert_eq(args[0], g, "mob_died carries the mob node")
 	assert_almost_eq(args[1].x, 123.0, 0.001)
 	assert_almost_eq(args[1].y, 456.0, 0.001)
-	assert_eq(args[2], def,
-		"mob_died carries the MobDef so loot listeners get loot_table without re-resolving")
+	assert_eq(
+		args[2],
+		def,
+		"mob_died carries the MobDef so loot listeners get loot_table without re-resolving"
+	)
 
 
 # ---- 5: state machine transitions idle -> chasing --------------------
+
 
 func test_state_chases_player_when_in_range() -> void:
 	var g: Grunt = _make_grunt()
@@ -158,8 +167,11 @@ func test_state_swings_when_in_attack_range() -> void:
 	# M1 RC soak-4 fix: grunt now enters STATE_TELEGRAPHING_LIGHT first
 	# (rooted, 0.4 s windup) before the swing fires. Swing fires when the
 	# telegraph window expires.
-	assert_eq(g.get_state(), Grunt.STATE_TELEGRAPHING_LIGHT,
-		"grunt enters telegraph state on first tick in melee range")
+	assert_eq(
+		g.get_state(),
+		Grunt.STATE_TELEGRAPHING_LIGHT,
+		"grunt enters telegraph state on first tick in melee range"
+	)
 	# Tick past the telegraph window — swing fires and state advances to ATTACKING.
 	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.01)
 	assert_eq(g.get_state(), Grunt.STATE_ATTACKING)
@@ -188,6 +200,7 @@ func test_state_recovers_then_returns_to_chasing() -> void:
 
 
 # ---- 6 + 7: heavy telegraph at <=30% HP, one-shot -------------------
+
 
 func test_heavy_telegraph_fires_at_30_percent() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 100})
@@ -241,6 +254,7 @@ func test_heavy_telegraph_is_one_shot() -> void:
 
 # ---- 13: telegraph guard above threshold ----------------------------
 
+
 func test_no_telegraph_above_threshold() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 100})
 	var g: Grunt = _make_grunt_with_def(def)
@@ -252,6 +266,7 @@ func test_no_telegraph_above_threshold() -> void:
 
 
 # ---- 8 EDGE: rapid hit spam -----------------------------------------
+
 
 func test_rapid_hit_spam_collapses_to_single_death() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 30})
@@ -270,6 +285,7 @@ func test_rapid_hit_spam_collapses_to_single_death() -> void:
 
 
 # ---- 9 EDGE: dies during heavy telegraph ----------------------------
+
 
 func test_dies_during_heavy_telegraph_no_swing_from_corpse() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 100, "damage_base": 10})
@@ -296,6 +312,7 @@ func test_dies_during_heavy_telegraph_no_swing_from_corpse() -> void:
 
 # ---- 10 EDGE: dies while pathing ------------------------------------
 
+
 func test_dies_while_pathing() -> void:
 	var def: MobDef = ContentFactory.make_mob_def({"hp_base": 25})
 	var g: Grunt = _make_grunt_with_def(def)
@@ -321,6 +338,7 @@ func test_dies_while_pathing() -> void:
 
 # ---- 11: layers per DECISIONS.md ------------------------------------
 
+
 func test_collision_layer_is_enemy() -> void:
 	var g: Grunt = _make_grunt()
 	# The .gd default uses LAYER_ENEMY (bit 4 = 8). The .tscn also sets 8;
@@ -334,6 +352,7 @@ func test_collision_layer_is_enemy() -> void:
 
 # ---- 12: spawned hitbox is enemy-team -------------------------------
 
+
 func test_spawned_hitbox_is_enemy_team() -> void:
 	var g: Grunt = _make_grunt()
 	var p: FakePlayer = FakePlayer.new()
@@ -342,9 +361,7 @@ func test_spawned_hitbox_is_enemy_team() -> void:
 	p.global_position = Vector2(20.0, 0.0)  # in attack range
 	g.set_player(p)
 	var captured_hb: Array = [null]
-	g.swing_spawned.connect(func(_kind: StringName, hb: Node) -> void:
-		captured_hb[0] = hb
-	)
+	g.swing_spawned.connect(func(_kind: StringName, hb: Node) -> void: captured_hb[0] = hb)
 	# M1 RC soak-4 fix: enter telegraph first, then tick past it so swing fires.
 	g._physics_process(0.016)
 	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.01)
@@ -357,11 +374,13 @@ func test_spawned_hitbox_is_enemy_team() -> void:
 
 # ---- 14: apply_mob_def() rebinds at runtime -------------------------
 
+
 func test_apply_mob_def_rebinds_runtime_stats() -> void:
 	var g: Grunt = _make_grunt()
 	# Default 50/5/60 in scope.
 	var hot_swap: MobDef = ContentFactory.make_mob_def(
-		{"hp_base": 200, "damage_base": 25, "move_speed": 90.0})
+		{"hp_base": 200, "damage_base": 25, "move_speed": 90.0}
+	)
 	g.apply_mob_def(hot_swap)
 	assert_eq(g.get_hp(), 200)
 	assert_eq(g.get_max_hp(), 200)
@@ -371,6 +390,7 @@ func test_apply_mob_def_rebinds_runtime_stats() -> void:
 
 # ---- 15: knockback applied on damage --------------------------------
 
+
 func test_damage_applies_knockback_velocity() -> void:
 	var g: Grunt = _make_grunt()
 	g.take_damage(5, Vector2(75.0, 0.0), null)
@@ -378,6 +398,7 @@ func test_damage_applies_knockback_velocity() -> void:
 
 
 # ---- 16: negative damage clamped to zero ----------------------------
+
 
 func test_negative_damage_does_not_heal() -> void:
 	var g: Grunt = _make_grunt()
@@ -394,6 +415,7 @@ func test_negative_damage_does_not_heal() -> void:
 # any residual vector (knockback impulse, post-contact pushback) persisted
 # for the whole recovery window and visibly drifted the grunt.
 # Post-fix, _process_recover sets `velocity = Vector2.ZERO` every tick.
+
 
 func test_grunt_recovery_velocity_decays_to_zero_within_two_ticks() -> void:
 	# Drive grunt into STATE_ATTACKING (the recovery state) by firing a swing
@@ -415,12 +437,18 @@ func test_grunt_recovery_velocity_decays_to_zero_within_two_ticks() -> void:
 	# pushback velocity applied.
 	g._physics_process(Grunt.LIGHT_TELEGRAPH_DURATION + 0.01)
 	assert_eq(g.get_state(), Grunt.STATE_ATTACKING)
-	assert_gt(g.velocity.length(), 0.0,
-		"swing-fire applies non-zero pushback (sets up the recovery-decay test)")
+	assert_gt(
+		g.velocity.length(),
+		0.0,
+		"swing-fire applies non-zero pushback (sets up the recovery-decay test)"
+	)
 	# Tick 3: _process_recover runs and zeroes velocity.
 	g._physics_process(0.016)
-	assert_eq(g.velocity, Vector2.ZERO,
-		"recovery handler zeros velocity on first post-pushback tick (no float / drift)")
+	assert_eq(
+		g.velocity,
+		Vector2.ZERO,
+		"recovery handler zeros velocity on first post-pushback tick (no float / drift)"
+	)
 
 
 func test_grunt_recovery_velocity_stays_zero_across_full_window() -> void:
@@ -451,8 +479,9 @@ func test_grunt_recovery_velocity_stays_zero_across_full_window() -> void:
 		# already been validated.
 		if g.get_state() != Grunt.STATE_ATTACKING:
 			break
-		assert_eq(g.velocity, Vector2.ZERO,
-			"grunt velocity stays at ZERO every tick of recovery window")
+		assert_eq(
+			g.velocity, Vector2.ZERO, "grunt velocity stays at ZERO every tick of recovery window"
+		)
 
 
 func test_grunt_knockback_does_not_persist_into_recovery() -> void:
@@ -477,14 +506,18 @@ func test_grunt_knockback_does_not_persist_into_recovery() -> void:
 	# Now slam a knockback impulse onto the grunt while it's in recovery.
 	# take_damage sets velocity = knockback unconditionally (when nonzero).
 	g.take_damage(1, Vector2(150.0, 0.0), null)
-	assert_almost_eq(g.velocity.x, 150.0, 0.001,
-		"take_damage writes knockback velocity even while recovering")
+	assert_almost_eq(
+		g.velocity.x, 150.0, 0.001, "take_damage writes knockback velocity even while recovering"
+	)
 	# Next physics tick — _process_recover must wipe that knockback away
 	# (rooted-during-recovery contract). Without the zero-each-tick guard,
 	# the grunt would drift at +150 px/s for the rest of ATTACK_RECOVERY.
 	g._physics_process(0.016)
-	assert_eq(g.velocity, Vector2.ZERO,
-		"recovery handler zeros knockback velocity that lands during recovery")
+	assert_eq(
+		g.velocity,
+		Vector2.ZERO,
+		"recovery handler zeros knockback velocity that lands during recovery"
+	)
 
 
 # ---- Combat-trace spy infra (mirrors test_charger.gd / test_shooter.gd) ---
@@ -497,16 +530,20 @@ func test_grunt_knockback_does_not_persist_into_recovery() -> void:
 # spy under the same name, drive the physics frames, assert the spy captured
 # the expected tag, then restore the autoload.
 
+
 class CombatTraceSpy:
 	extends Node
 	var calls: Array = []  # Array of [tag, msg]
+
 	func combat_trace(tag: String, msg: String = "") -> void:
 		calls.append([tag, msg])
+
 	func has_tag(tag: String) -> bool:
 		for c: Array in calls:
 			if c[0] == tag:
 				return true
 		return false
+
 	func has_msg_containing(tag: String, needle: String) -> bool:
 		for c: Array in calls:
 			if c[0] == tag and (c[1] as String).find(needle) != -1:
@@ -546,6 +583,7 @@ func _restore_debug_flags(spy: CombatTraceSpy) -> void:
 # closes the sibling gap for `Grunt.pos`. Same CombatTraceSpy injection +
 # direct-physics-frame pattern as test_shooter.gd's pos-trace test.
 
+
 func test_pos_trace_emits_after_throttle_interval() -> void:
 	var g: Grunt = _make_grunt()
 	# Place at a known world position so the trace payload is predictable,
@@ -569,12 +607,20 @@ func test_pos_trace_emits_after_throttle_interval() -> void:
 			pos_msg = c[1]
 			break
 	_restore_debug_flags(spy)
-	assert_false(emitted_early,
-		"Grunt.pos must NOT emit before POS_TRACE_INTERVAL elapses — the " +
-		"trace is throttled so it is a cheap no-op on perf")
-	assert_true(emitted_after,
-		"Grunt.pos must emit once the throttle accumulator passes " +
-		"POS_TRACE_INTERVAL — the AC4 multi-chaser clear helper steers off it")
+	assert_false(
+		emitted_early,
+		(
+			"Grunt.pos must NOT emit before POS_TRACE_INTERVAL elapses — the "
+			+ "trace is throttled so it is a cheap no-op on perf"
+		)
+	)
+	assert_true(
+		emitted_after,
+		(
+			"Grunt.pos must emit once the throttle accumulator passes "
+			+ "POS_TRACE_INTERVAL — the AC4 multi-chaser clear helper steers off it"
+		)
+	)
 	# Downstream consequence (Tier 2 bar): the payload carries the world
 	# coords the harness parses with /pos=\((-?\d+),(-?\d+)\)/. Position
 	# may have drifted ±1px from the seeded value because the engine auto-
@@ -583,8 +629,16 @@ func test_pos_trace_emits_after_throttle_interval() -> void:
 	# match on the regex shape rather than the exact coordinates.
 	var pos_match := RegEx.new()
 	pos_match.compile("pos=\\(-?\\d+,-?\\d+\\)")
-	assert_true(pos_match.search(pos_msg) != null,
-		"Grunt.pos payload must carry the parseable world-coord tuple " +
-		"(harness parses /pos=\\((-?\\d+),(-?\\d+)\\)/); got: " + pos_msg)
-	assert_string_contains(pos_msg, "dist_to_player=",
-		"Grunt.pos payload must carry dist_to_player for the chase helper")
+	assert_true(
+		pos_match.search(pos_msg) != null,
+		(
+			"Grunt.pos payload must carry the parseable world-coord tuple "
+			+ "(harness parses /pos=\\((-?\\d+),(-?\\d+)\\)/); got: "
+			+ pos_msg
+		)
+	)
+	assert_string_contains(
+		pos_msg,
+		"dist_to_player=",
+		"Grunt.pos payload must carry dist_to_player for the chase helper"
+	)

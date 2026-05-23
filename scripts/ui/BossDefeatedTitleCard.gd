@@ -82,11 +82,11 @@ const SUBTITLE_BASELINE_OFFSET_Y: float = 24.0
 
 ## Emitted when the fade-in tween starts (T+1.2 game-time post-trigger).
 ## Playwright spec hook + GUT timing test hook.
-signal title_card_shown()
+signal title_card_shown
 
 ## Emitted when the fade-out tween completes and the node is about to
 ## `queue_free`. Tests use this to assert the lifecycle landed.
-signal title_card_dismissed()
+signal title_card_dismissed
 
 # ---- Runtime ----------------------------------------------------------
 
@@ -108,6 +108,7 @@ func _ready() -> void:
 
 
 # ---- Public API -------------------------------------------------------
+
 
 ## Kicks off the fade sequence. Idempotent — a second call while the
 ## card is on screen is a no-op (the room emits `boss_defeated` exactly
@@ -155,6 +156,7 @@ func resolve_short_name(boss: Node) -> String:
 
 # ---- Test introspection -----------------------------------------------
 
+
 func get_root_control() -> Control:
 	return _root
 
@@ -176,6 +178,7 @@ func is_dismissed() -> bool:
 
 
 # ---- Internal --------------------------------------------------------
+
 
 func _build_ui() -> void:
 	if _root != null:
@@ -246,15 +249,21 @@ func _start_tween() -> void:
 	# Fade in — modulate.a only. RGB stays at (1, 1, 1) — never modulate
 	# above 1.0 on any channel per `.claude/docs/html5-export.md` § HDR
 	# clamp.
-	(_tween.tween_property(_root, "modulate:a", 1.0, FADE_IN_DURATION)
-		.set_trans(Tween.TRANS_QUAD)
-		.set_ease(Tween.EASE_OUT))
+	(
+		_tween
+		. tween_property(_root, "modulate:a", 1.0, FADE_IN_DURATION)
+		. set_trans(Tween.TRANS_QUAD)
+		. set_ease(Tween.EASE_OUT)
+	)
 	# Hold — explicit interval keeps the tween chain readable.
 	_tween.tween_interval(HOLD_DURATION)
 	# Fade out — symmetric easing.
-	(_tween.tween_property(_root, "modulate:a", 0.0, FADE_OUT_DURATION)
-		.set_trans(Tween.TRANS_QUAD)
-		.set_ease(Tween.EASE_IN))
+	(
+		_tween
+		. tween_property(_root, "modulate:a", 0.0, FADE_OUT_DURATION)
+		. set_trans(Tween.TRANS_QUAD)
+		. set_ease(Tween.EASE_IN)
+	)
 	# Completion callback: emit dismiss signal then queue_free. NEVER
 	# call into Area2D monitoring mutations or `add_child` here — per
 	# `.claude/docs/combat-architecture.md` § "physics-flush rule", a
@@ -265,8 +274,10 @@ func _start_tween() -> void:
 
 func _emit_title_card_shown() -> void:
 	title_card_shown.emit()
-	_combat_trace("BossDefeatedTitleCard.title_card_shown",
-		"text='%s' subtitle='%s'" % [_title_label.text, _subtitle_label.text])
+	_combat_trace(
+		"BossDefeatedTitleCard.title_card_shown",
+		"text='%s' subtitle='%s'" % [_title_label.text, _subtitle_label.text]
+	)
 
 
 func _on_fade_complete() -> void:

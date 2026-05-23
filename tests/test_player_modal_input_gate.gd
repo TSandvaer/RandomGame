@@ -71,6 +71,7 @@ func after_each() -> void:
 
 # ---- Helpers --------------------------------------------------------
 
+
 func _dialogue_controller() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("DialogueController")
 
@@ -81,12 +82,16 @@ func _dialogue_controller() -> Node:
 ## Avoids loading the full InventoryPanel scene (which pulls Inventory autoload
 ## state, tooltip, palette, etc.) — the gate is a pure boolean predicate, so
 ## stubbing the predicate's input is the minimum-surface assertion.
-class _StubInventoryPanel extends Node:
+class _StubInventoryPanel:
+	extends Node
 	var _opened: bool = false
+
 	func _init(initially_open: bool = false) -> void:
 		_opened = initially_open
+
 	func is_open() -> bool:
 		return _opened
+
 	func set_open(v: bool) -> void:
 		_opened = v
 
@@ -106,14 +111,16 @@ func _make_player_in_tree() -> Player:
 
 # ---- Test 1: attack suppressed while inventory open -----------------
 
+
 func test_player_attack_suppressed_while_inventory_open() -> void:
 	# Wire a stub panel reporting is_open()==true into the inventory_panel group.
 	_attach_stub_panel(true)
 	var p: Player = _make_player_in_tree()
-	assert_true(p._inventory_is_open(),
-		"_inventory_is_open() true when stub panel in group reports is_open()==true")
-	assert_true(p._modal_is_active(),
-		"_modal_is_active() true when any modal (inventory) is open")
+	assert_true(
+		p._inventory_is_open(),
+		"_inventory_is_open() true when stub panel in group reports is_open()==true"
+	)
+	assert_true(p._modal_is_active(), "_modal_is_active() true when any modal (inventory) is open")
 	# The gate is the load-bearing surface: _process_grounded early-returns on
 	# _modal_is_active() before consulting Input.is_action_just_pressed. Direct
 	# proof of the predicate's value plus the production code's
@@ -123,11 +130,15 @@ func test_player_attack_suppressed_while_inventory_open() -> void:
 	# the player did not transition into STATE_ATTACK.
 	assert_eq(p.get_state(), Player.STATE_IDLE, "player starts IDLE")
 	p._process_grounded(0.0)
-	assert_ne(p.get_state(), Player.STATE_ATTACK,
-		"player must NOT enter STATE_ATTACK while inventory open (gate suppresses attack input)")
+	assert_ne(
+		p.get_state(),
+		Player.STATE_ATTACK,
+		"player must NOT enter STATE_ATTACK while inventory open (gate suppresses attack input)"
+	)
 
 
 # ---- Test 2: attack resumes after inventory close -------------------
+
 
 func test_player_attack_resumes_after_inventory_close() -> void:
 	var stub := _attach_stub_panel(true)
@@ -135,19 +146,19 @@ func test_player_attack_resumes_after_inventory_close() -> void:
 	assert_true(p._modal_is_active(), "modal active while panel open")
 	# Close the modal — gate must drop.
 	stub.set_open(false)
-	assert_false(p._inventory_is_open(),
-		"_inventory_is_open() false after stub panel close()")
-	assert_false(p._modal_is_active(),
-		"_modal_is_active() false when no modals active")
+	assert_false(p._inventory_is_open(), "_inventory_is_open() false after stub panel close()")
+	assert_false(p._modal_is_active(), "_modal_is_active() false when no modals active")
 	# With the gate dropped, the production path now reaches the
 	# is_action_just_pressed checks. Direct API proof that try_attack succeeds
 	# when called (the production input path would invoke this).
 	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT)
-	assert_not_null(hb,
-		"try_attack returns a hitbox after inventory close — attack path is no longer gated")
+	assert_not_null(
+		hb, "try_attack returns a hitbox after inventory close — attack path is no longer gated"
+	)
 
 
 # ---- Test 3: union over dialogue + inventory truth table ------------
+
 
 func test_modal_is_active_union_dialogue_and_inventory() -> void:
 	var p: Player = _make_player_in_tree()
@@ -158,40 +169,40 @@ func test_modal_is_active_union_dialogue_and_inventory() -> void:
 	# Cell 1: no modals -> false
 	assert_false(p._dialogue_is_active(), "(no modals) dialogue inactive")
 	assert_false(p._inventory_is_open(), "(no modals) inventory closed")
-	assert_false(p._modal_is_active(),
-		"_modal_is_active() false when neither dialogue nor inventory open")
+	assert_false(
+		p._modal_is_active(), "_modal_is_active() false when neither dialogue nor inventory open"
+	)
 
 	# Cell 2: only dialogue -> true
 	var tree: DialogueTreeDef = _make_simple_dialogue_tree()
 	dc.open(tree, &"flavor")
 	assert_true(p._dialogue_is_active(), "(dialogue-only) dialogue active")
 	assert_false(p._inventory_is_open(), "(dialogue-only) inventory closed")
-	assert_true(p._modal_is_active(),
-		"_modal_is_active() true when ONLY dialogue is active")
+	assert_true(p._modal_is_active(), "_modal_is_active() true when ONLY dialogue is active")
 	dc.close()
 
 	# Cell 3: only inventory -> true
 	stub.set_open(true)
 	assert_false(p._dialogue_is_active(), "(inventory-only) dialogue inactive")
 	assert_true(p._inventory_is_open(), "(inventory-only) inventory open")
-	assert_true(p._modal_is_active(),
-		"_modal_is_active() true when ONLY inventory is open")
+	assert_true(p._modal_is_active(), "_modal_is_active() true when ONLY inventory is open")
 
 	# Cell 4: both modals -> true
 	dc.open(tree, &"flavor")
 	assert_true(p._dialogue_is_active(), "(both modals) dialogue active")
 	assert_true(p._inventory_is_open(), "(both modals) inventory open")
-	assert_true(p._modal_is_active(),
-		"_modal_is_active() true when BOTH dialogue AND inventory are active")
+	assert_true(
+		p._modal_is_active(), "_modal_is_active() true when BOTH dialogue AND inventory are active"
+	)
 
 	# Cleanup back to cell 1 to confirm the union releases cleanly
 	dc.close()
 	stub.set_open(false)
-	assert_false(p._modal_is_active(),
-		"_modal_is_active() returns to false once both modals close")
+	assert_false(p._modal_is_active(), "_modal_is_active() returns to false once both modals close")
 
 
 # ---- Test 4: movement input NOT gated by inventory ------------------
+
 
 func test_movement_input_not_gated_by_inventory() -> void:
 	# Diablo convention pin (per Player.gd:1163 modal-input-gate comment block):
@@ -216,9 +227,14 @@ func test_movement_input_not_gated_by_inventory() -> void:
 	assert_gt(gate_pos, -1, "_modal_is_active() gate present inside _process_grounded")
 	var velocity_pos: int = src.find("velocity = input_dir * speed", grounded_start)
 	assert_gt(velocity_pos, -1, "velocity-write present inside _process_grounded")
-	assert_lt(velocity_pos, gate_pos,
-		"velocity-write (movement) must precede the _modal_is_active() gate — " +
-		"WASD movement is intentionally NOT suppressed by modal panels (Diablo convention)")
+	assert_lt(
+		velocity_pos,
+		gate_pos,
+		(
+			"velocity-write (movement) must precede the _modal_is_active() gate — "
+			+ "WASD movement is intentionally NOT suppressed by modal panels (Diablo convention)"
+		)
+	)
 
 	# Behavioural confirmation: step _process_grounded with a non-zero
 	# velocity already set via the public state and confirm the gate does
@@ -229,13 +245,20 @@ func test_movement_input_not_gated_by_inventory() -> void:
 	p._process_grounded(0.0)
 	# After the call the gate has returned early; state must remain IDLE
 	# (no attack spawned, no dodge entered).
-	assert_ne(p.get_state(), Player.STATE_ATTACK,
-		"WASD-only pin sanity check: no attack spawned during modal-gated step")
-	assert_ne(p.get_state(), Player.STATE_DODGE,
-		"WASD-only pin sanity check: no dodge entered during modal-gated step")
+	assert_ne(
+		p.get_state(),
+		Player.STATE_ATTACK,
+		"WASD-only pin sanity check: no attack spawned during modal-gated step"
+	)
+	assert_ne(
+		p.get_state(),
+		Player.STATE_DODGE,
+		"WASD-only pin sanity check: no dodge entered during modal-gated step"
+	)
 
 
 # ---- Helpers --------------------------------------------------------
+
 
 func _make_simple_dialogue_tree() -> DialogueTreeDef:
 	var BranchScript: Script = preload("res://scripts/dialogue/DialogueBranch.gd")

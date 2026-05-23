@@ -64,6 +64,7 @@ func after_each() -> void:
 
 # ---- Per-tree smoke-loads -----------------------------------------
 
+
 func test_hadda_vendor_tree_loads_clean() -> void:
 	_assert_tree_smoke(HUB_TREE_PATHS[0], &"hub_hadda")
 
@@ -78,13 +79,13 @@ func test_sister_ennick_storyteller_tree_loads_clean() -> void:
 
 # ---- Cross-tree invariants ---------------------------------------
 
+
 func test_all_hub_town_trees_have_unique_npc_ids() -> void:
 	var seen: Dictionary = {}
 	for path: String in HUB_TREE_PATHS:
 		var t: DialogueTreeDef = load(path) as DialogueTreeDef
 		assert_not_null(t, "tree at %s loads" % path)
-		assert_false(seen.has(t.npc_id),
-			"npc_id %s appears in two trees" % str(t.npc_id))
+		assert_false(seen.has(t.npc_id), "npc_id %s appears in two trees" % str(t.npc_id))
 		seen[t.npc_id] = true
 
 
@@ -98,8 +99,9 @@ func test_all_hub_town_trees_match_expected_npc_id_set() -> void:
 		var t: DialogueTreeDef = load(path) as DialogueTreeDef
 		actual.append(t.npc_id)
 	for expected: StringName in EXPECTED_NPC_IDS:
-		assert_true(actual.has(expected),
-			"expected npc_id %s present in hub-town trio" % str(expected))
+		assert_true(
+			actual.has(expected), "expected npc_id %s present in hub-town trio" % str(expected)
+		)
 
 
 func test_at_least_one_branch_per_tree_has_a_quest_action() -> void:
@@ -119,11 +121,13 @@ func test_at_least_one_branch_per_tree_has_a_quest_action() -> void:
 					break
 			if has_action:
 				break
-		assert_true(has_action,
-			"tree at %s has at least one response with non-empty quest_action" % path)
+		assert_true(
+			has_action, "tree at %s has at least one response with non-empty quest_action" % path
+		)
 
 
 # ---- Helpers --------------------------------------------------------
+
 
 func _controller() -> Node:
 	return Engine.get_main_loop().root.get_node_or_null("DialogueController")
@@ -134,23 +138,21 @@ func _assert_tree_smoke(path: String, expected_npc_id: StringName) -> void:
 	var t: DialogueTreeDef = load(path) as DialogueTreeDef
 	assert_not_null(t, "tree at %s loads as DialogueTreeDef" % path)
 	# Pin 2: npc_id + display_name populated.
-	assert_eq(t.npc_id, expected_npc_id,
-		"npc_id matches expected (%s)" % str(expected_npc_id))
+	assert_eq(t.npc_id, expected_npc_id, "npc_id matches expected (%s)" % str(expected_npc_id))
 	assert_gt(t.display_name.length(), 0, "display_name non-empty")
 	# Pin 3: branches dict has 2+ entries.
-	assert_gte(t.branches.size(), 2,
-		"tree has at least 2 branches (state-branching minimum)")
+	assert_gte(t.branches.size(), 2, "tree has at least 2 branches (state-branching minimum)")
 	# Pin 4 + 5: default_branch_key resolves + every branch is DialogueBranch.
-	assert_true(t.branches.has(t.default_branch_key),
-		"default_branch_key (%s) present in branches" % str(t.default_branch_key))
+	assert_true(
+		t.branches.has(t.default_branch_key),
+		"default_branch_key (%s) present in branches" % str(t.default_branch_key)
+	)
 	for key: StringName in t.branches:
 		var branch: DialogueBranch = t.branches[key] as DialogueBranch
-		assert_not_null(branch,
-			"branch at key %s is a DialogueBranch" % str(key))
+		assert_not_null(branch, "branch at key %s is a DialogueBranch" % str(key))
 		# Pin 6: every response is DialogueResponse.
 		for r: DialogueResponse in branch.responses:
-			assert_not_null(r,
-				"response in branch %s is a DialogueResponse" % str(key))
+			assert_not_null(r, "response in branch %s is a DialogueResponse" % str(key))
 	# Pin 9: opening the tree through controller emits no warnings.
 	var dc: Node = _controller()
 	var ok: bool = dc.open(t, t.default_branch_key)

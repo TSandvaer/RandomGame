@@ -30,8 +30,8 @@ const RoomGateScript: Script = preload("res://scripts/levels/RoomGate.gd")
 const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 const GruntScript: Script = preload("res://scripts/mobs/Grunt.gd")
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 func _make_grunt(at: Vector2, hp: int = 1) -> Grunt:
 	# Same recipe as test_simultaneous_mob_deaths_no_physics_panic.gd —
@@ -95,6 +95,7 @@ func _await_physics_settles() -> void:
 
 # ---- The P0 paired test ----------------------------------------------
 
+
 func test_two_real_grunts_both_decrement_gate_counter() -> void:
 	# Build a "room" (Node2D parent) so mobs + gate share a tree.
 	var room: Node2D = autofree(Node2D.new())
@@ -140,9 +141,14 @@ func test_two_real_grunts_both_decrement_gate_counter() -> void:
 	# **CORE ASSERTION (the regression fix gate):** the gate's _mobs_alive
 	# counter must reach 0 after both grunts die. Pre-fix this is stuck at 1
 	# (Tess's AC4 trace evidence on origin/main 1c2438e/c72e758).
-	assert_eq(gate.mobs_alive(), 0,
-		"gate._mobs_alive must reach 0 after both grunts emit mob_died — " +
-		"this is the desync bug from ticket 86c9qcf9z")
+	assert_eq(
+		gate.mobs_alive(),
+		0,
+		(
+			"gate._mobs_alive must reach 0 after both grunts emit mob_died — "
+			+ "this is the desync bug from ticket 86c9qcf9z"
+		)
+	)
 
 	# Gate must transition LOCKED → UNLOCKED + emit gate_unlocked exactly once.
 	assert_true(gate.is_unlocked(), "gate transitioned to UNLOCKED")
@@ -151,6 +157,7 @@ func test_two_real_grunts_both_decrement_gate_counter() -> void:
 
 
 # ---- Companion: 3 grunts (Room05 / Room08 grunt count) ---------------
+
 
 func test_three_real_grunts_all_decrement_gate_counter() -> void:
 	# Generalises the regression: 3 grunts dying simultaneously, all 3
@@ -178,15 +185,14 @@ func test_three_real_grunts_all_decrement_gate_counter() -> void:
 	add_child_autofree(hb)
 	await _await_physics_settles()
 
-	assert_true(g_a.is_dead() and g_b.is_dead() and g_c.is_dead(),
-		"all 3 grunts entered _die")
-	assert_eq(gate.mobs_alive(), 0,
-		"gate._mobs_alive reaches 0 after all 3 grunts emit mob_died")
+	assert_true(g_a.is_dead() and g_b.is_dead() and g_c.is_dead(), "all 3 grunts entered _die")
+	assert_eq(gate.mobs_alive(), 0, "gate._mobs_alive reaches 0 after all 3 grunts emit mob_died")
 	assert_true(gate.is_unlocked())
 	assert_signal_emit_count(gate, "gate_unlocked", 1)
 
 
 # ---- Companion: register order vs death order doesn't matter ---------
+
 
 func test_grunt_dies_after_gate_locks_late_register_works() -> void:
 	# Late-registration scenario: grunt B is registered AFTER gate.lock().

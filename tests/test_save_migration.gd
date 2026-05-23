@@ -28,7 +28,6 @@ const FIXTURE_V0_EMPTY: String = "save_v0_empty_inventory.json"
 const FIXTURE_V0_MALFORMED: String = "save_v0_malformed_item.json"
 const NoWarningGuard := preload("res://tests/test_helpers/no_warning_guard.gd")
 
-
 # ---- Universal-warning gate (ticket 86c9uf0mm Half B) ----------------
 ##
 ## Save migration is the precise surface that catches schema-version drift
@@ -88,12 +87,14 @@ func after_each() -> void:
 # Core migration: v0 fixture → load → migrated v1
 # =====================================================================
 
+
 func test_v0_fixture_loads_via_load_game() -> void:
 	# Sanity: the fixture exists, is valid JSON, and is consumed by Save.gd.
 	_install_fixture_at_slot(FIXTURE_V0, TEST_SLOT)
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_false(loaded.is_empty(),
-		"v0 fixture must load (envelope.data carried through migration)")
+	assert_false(
+		loaded.is_empty(), "v0 fixture must load (envelope.data carried through migration)"
+	)
 
 
 func test_v0_to_v1_preserves_all_v0_data() -> void:
@@ -115,7 +116,9 @@ func test_v0_to_v1_preserves_all_v0_data() -> void:
 	assert_eq(loaded["stash"][0]["id"], "iron_sword")
 	assert_eq(loaded["stash"][0]["tier"], 2)
 	assert_almost_eq(
-		float(loaded["stash"][0]["rolled_affixes"][0]["value"]), 0.075, 1e-6,
+		float(loaded["stash"][0]["rolled_affixes"][0]["value"]),
+		0.075,
+		1e-6,
 		"affix rolled_value survives JSON parse + migration"
 	)
 	assert_eq(loaded["stash"][1]["id"], "leather_vest")
@@ -130,21 +133,35 @@ func test_v0_to_v1_backfills_required_v1_fields_with_defaults() -> void:
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	# `meta` block backfilled with default values per Save.DEFAULT_PAYLOAD.
 	assert_true(loaded.has("meta"), "v1 `meta` block backfilled")
-	assert_eq(loaded["meta"]["runs_completed"], 0,
-		"v1 meta.runs_completed defaults to 0 for migrated v0 saves")
-	assert_eq(loaded["meta"]["deepest_stratum"], 1,
-		"v1 meta.deepest_stratum defaults to 1 (player has at least started s1)")
-	assert_almost_eq(float(loaded["meta"]["total_playtime_sec"]), 0.0, 1e-6,
-		"v1 meta.total_playtime_sec defaults to 0.0")
+	assert_eq(
+		loaded["meta"]["runs_completed"],
+		0,
+		"v1 meta.runs_completed defaults to 0 for migrated v0 saves"
+	)
+	assert_eq(
+		loaded["meta"]["deepest_stratum"],
+		1,
+		"v1 meta.deepest_stratum defaults to 1 (player has at least started s1)"
+	)
+	assert_almost_eq(
+		float(loaded["meta"]["total_playtime_sec"]),
+		0.0,
+		1e-6,
+		"v1 meta.total_playtime_sec defaults to 0.0"
+	)
 	# `equipped` map backfilled empty (no auto-equipment guess).
 	assert_true(loaded.has("equipped"), "v1 `equipped` map backfilled")
-	assert_eq(loaded["equipped"].size(), 0,
-		"backfilled `equipped` is empty — migration never invents gear")
+	assert_eq(
+		loaded["equipped"].size(),
+		0,
+		"backfilled `equipped` is empty — migration never invents gear"
+	)
 
 
 # =====================================================================
 # Round-trip after migration — migrated save reloads cleanly
 # =====================================================================
+
 
 func test_save_migrated_v0_then_reload_round_trips() -> void:
 	# After loading a v0, the next save call writes back at the current
@@ -167,8 +184,11 @@ func test_save_migrated_v0_then_reload_round_trips() -> void:
 	# added one-time re-roll of the `0` sentinel for legacy v4 characters).
 	# When SCHEMA_VERSION bumps, update this number AND add the new
 	# migration test in test_save.gd.
-	assert_eq(int(parsed["schema_version"]), 5,
-		"on-disk envelope upgraded to current schema (v5) after migration + save")
+	assert_eq(
+		int(parsed["schema_version"]),
+		5,
+		"on-disk envelope upgraded to current schema (v5) after migration + save"
+	)
 	# And reload one more time — fields are stable.
 	var reloaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_eq(reloaded["character"]["level"], 4, "level stable across v0 → migrate → save → reload")
@@ -179,6 +199,7 @@ func test_save_migrated_v0_then_reload_round_trips() -> void:
 # =====================================================================
 # Edge-probe #1: empty-inventory v0 fixture
 # =====================================================================
+
 
 func test_v0_with_empty_inventory_migrates_without_throwing() -> void:
 	# The empty-inventory fixture has only `character` — no stash, no
@@ -199,6 +220,7 @@ func test_v0_with_empty_inventory_migrates_without_throwing() -> void:
 # Edge-probe #2: malformed-item v0 fixture — loader doesn't crash
 # =====================================================================
 
+
 func test_v0_with_malformed_item_does_not_crash_loader() -> void:
 	# The fixture has a stash with a non-Dictionary entry (a bare string)
 	# and a half-formed item (missing fields). load_game's contract is
@@ -211,8 +233,7 @@ func test_v0_with_malformed_item_does_not_crash_loader() -> void:
 	# refuse the whole save just because one item is bad.
 	_install_fixture_at_slot(FIXTURE_V0_MALFORMED, TEST_SLOT)
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
-	assert_false(loaded.is_empty(),
-		"malformed-item save still loads (the good fields survive)")
+	assert_false(loaded.is_empty(), "malformed-item save still loads (the good fields survive)")
 	assert_eq(loaded["character"]["name"], "Curious-Knight")
 	assert_eq(loaded["character"]["level"], 2)
 	# Stash carried through verbatim — the malformed entry is the consumer's
@@ -223,6 +244,7 @@ func test_v0_with_malformed_item_does_not_crash_loader() -> void:
 # =====================================================================
 # Edge-probe #3: double-migration is a no-op
 # =====================================================================
+
 
 func test_already_v1_save_does_not_double_migrate() -> void:
 	# Save a v1, reload, save again, reload again. Nothing should change
@@ -242,16 +264,21 @@ func test_already_v1_save_does_not_double_migrate() -> void:
 	var loaded_b: Dictionary = _save().load_game(TEST_SLOT)
 	# Every field unchanged across the two cycles.
 	assert_eq(loaded_b["character"]["level"], 8)
-	assert_eq(loaded_b["meta"]["runs_completed"], 3,
-		"double-migration didn't reset runs_completed to 0")
+	assert_eq(
+		loaded_b["meta"]["runs_completed"], 3, "double-migration didn't reset runs_completed to 0"
+	)
 	assert_eq(loaded_b["meta"]["deepest_stratum"], 2)
-	assert_eq(loaded_b["equipped"]["weapon"]["id"], "weapon_iron_sword",
-		"equipped weapon survives the no-op double-migrate cycle")
+	assert_eq(
+		loaded_b["equipped"]["weapon"]["id"],
+		"weapon_iron_sword",
+		"equipped weapon survives the no-op double-migrate cycle"
+	)
 
 
 # =====================================================================
 # Schema-version envelope assertions on migrated files
 # =====================================================================
+
 
 func test_migration_leaves_envelope_schema_version_intact_on_disk_until_save() -> void:
 	# Load-only does NOT rewrite the file. The on-disk file remains v0
@@ -267,13 +294,16 @@ func test_migration_leaves_envelope_schema_version_intact_on_disk_until_save() -
 	var raw: String = f.get_as_text()
 	f.close()
 	var parsed: Dictionary = JSON.parse_string(raw)
-	assert_false(parsed.has("schema_version"),
-		"load-only does not rewrite the on-disk envelope — v0 stays v0 until save")
+	assert_false(
+		parsed.has("schema_version"),
+		"load-only does not rewrite the on-disk envelope — v0 stays v0 until save"
+	)
 
 
 # =====================================================================
 # Migration covers AC #6 — save survives quit-and-relaunch
 # =====================================================================
+
 
 func test_v0_save_survives_simulated_quit_and_relaunch() -> void:
 	# AC #6 wedge: a player who saved before the v1 schema landed must be
@@ -300,6 +330,7 @@ func test_v0_save_survives_simulated_quit_and_relaunch() -> void:
 # v3 -> v4: first_boss_kill_seen backfill (M3-T2-W3-T17, ticket 86c9wjzjf)
 # =====================================================================
 
+
 func test_v3_migration_chains_through_to_v4() -> void:
 	# A hand-authored v3 save must migrate cleanly to v4 — the only new
 	# v4 field is `character.first_boss_kill_seen`, backfilled to `false`.
@@ -309,8 +340,10 @@ func test_v3_migration_chains_through_to_v4() -> void:
 	var v3_envelope: Dictionary = {
 		"schema_version": 3,
 		"saved_at": "2026-05-22T10:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Mid-game-Knight",
 				"level": 3,
 				"xp": 600,
@@ -336,22 +369,30 @@ func test_v3_migration_chains_through_to_v4() -> void:
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_true(loaded.has("character"))
 	# v3 -> v4 migration backfills first_boss_kill_seen to false.
-	assert_true(loaded["character"].has("first_boss_kill_seen"),
-		"v3 → v4 migration adds first_boss_kill_seen to character")
-	assert_false(bool(loaded["character"]["first_boss_kill_seen"]),
-		"first_boss_kill_seen defaults to false on migration (first kill still unskippable)")
+	assert_true(
+		loaded["character"].has("first_boss_kill_seen"),
+		"v3 → v4 migration adds first_boss_kill_seen to character"
+	)
+	assert_false(
+		bool(loaded["character"]["first_boss_kill_seen"]),
+		"first_boss_kill_seen defaults to false on migration (first kill still unskippable)"
+	)
 	# Untouched v3 fields preserved bit-identical.
 	assert_eq(loaded["character"]["level"], 3, "v3 level preserved through v4 migration")
 	assert_eq(loaded["character"]["xp"], 600)
 	assert_eq(loaded["character"]["unspent_stat_points"], 2)
-	assert_true(bool(loaded["character"]["first_level_up_seen"]),
-		"v3 first_level_up_seen preserved (not overwritten by v4 migration)")
+	assert_true(
+		bool(loaded["character"]["first_level_up_seen"]),
+		"v3 first_level_up_seen preserved (not overwritten by v4 migration)"
+	)
 	# v3 -> v4 -> v5 chain — the v5 step (W2-T4) re-rolls the world_seed
 	# sentinel (`0`, backfilled by v3 -> v4) to a non-zero value.
-	assert_true(loaded["character"].has("world_seed"),
-		"v3 → v5 chain preserves world_seed key")
-	assert_ne(int(loaded["character"]["world_seed"]), 0,
-		"v3 → v4 → v5 chain re-rolls the `0` sentinel; loaded seed is non-zero")
+	assert_true(loaded["character"].has("world_seed"), "v3 → v5 chain preserves world_seed key")
+	assert_ne(
+		int(loaded["character"]["world_seed"]),
+		0,
+		"v3 → v4 → v5 chain re-rolls the `0` sentinel; loaded seed is non-zero"
+	)
 	# Re-save and verify on-disk schema bumped to 5 (W2-T4).
 	_save().save_game(TEST_SLOT, loaded)
 	var path: String = _save().save_path(TEST_SLOT)
@@ -359,8 +400,11 @@ func test_v3_migration_chains_through_to_v4() -> void:
 	var raw2: String = f2.get_as_text()
 	f2.close()
 	var parsed: Dictionary = JSON.parse_string(raw2)
-	assert_eq(int(parsed["schema_version"]), 5,
-		"on-disk envelope upgraded to v5 after v3 → v4 → v5 migration + save")
+	assert_eq(
+		int(parsed["schema_version"]),
+		5,
+		"on-disk envelope upgraded to v5 after v3 → v4 → v5 migration + save"
+	)
 
 
 func test_v0_migration_chains_through_to_v5() -> void:
@@ -381,16 +425,21 @@ func test_v0_migration_chains_through_to_v5() -> void:
 	assert_true(loaded["character"].has("unspent_stat_points"), "v2 → v3 added unspent_stat_points")
 	assert_true(loaded["character"].has("first_level_up_seen"), "v2 → v3 added first_level_up_seen")
 	# v3 -> v4: first_boss_kill_seen added; world_seed backfilled to `0`.
-	assert_true(loaded["character"].has("first_boss_kill_seen"),
-		"v3 → v4 added first_boss_kill_seen")
-	assert_false(bool(loaded["character"]["first_boss_kill_seen"]),
-		"v3 → v4 default-false (first kill of migrated character still unskippable)")
-	assert_true(loaded["character"].has("world_seed"),
-		"v3 → v4 backfilled world_seed key")
+	assert_true(
+		loaded["character"].has("first_boss_kill_seen"), "v3 → v4 added first_boss_kill_seen"
+	)
+	assert_false(
+		bool(loaded["character"]["first_boss_kill_seen"]),
+		"v3 → v4 default-false (first kill of migrated character still unskippable)"
+	)
+	assert_true(loaded["character"].has("world_seed"), "v3 → v4 backfilled world_seed key")
 	# v4 -> v5: world_seed re-rolled from `0` sentinel to non-zero (W2-T4
 	# canonical promotion; ticket 86c9y108t).
-	assert_ne(int(loaded["character"]["world_seed"]), 0,
-		"v4 → v5 re-rolls the `0` sentinel to a non-zero seed (W2-T4)")
+	assert_ne(
+		int(loaded["character"]["world_seed"]),
+		0,
+		"v4 → v5 re-rolls the `0` sentinel to a non-zero seed (W2-T4)"
+	)
 	# Original v0 fields survive the full chain.
 	assert_eq(loaded["character"]["level"], 4, "v0 level survives full v0→v5 chain")
 	assert_eq(loaded["character"]["xp"], 1850)
@@ -413,8 +462,10 @@ func test_v4_migration_is_idempotent() -> void:
 	var v4_envelope: Dictionary = {
 		"schema_version": 4,
 		"saved_at": "2026-05-22T11:00:00",
-		"data": {
-			"character": {
+		"data":
+		{
+			"character":
+			{
 				"name": "Veteran-Knight",
 				"level": 5,
 				"xp": 2500,
@@ -443,11 +494,18 @@ func test_v4_migration_is_idempotent() -> void:
 	# cycle. The defensive `has()` check in _migrate_v3_to_v4 must not overwrite
 	# an existing true value. If it does, every veteran character would lose
 	# their skip privilege on schema-version rollback / partial load.
-	assert_true(bool(loaded["character"]["first_boss_kill_seen"]),
-		"already-v4 first_boss_kill_seen=true survives the no-op migration")
+	assert_true(
+		bool(loaded["character"]["first_boss_kill_seen"]),
+		"already-v4 first_boss_kill_seen=true survives the no-op migration"
+	)
 	# v4 -> v5 step preserves a non-zero world_seed (immutability post-roll).
-	assert_eq(int(loaded["character"]["world_seed"]), veteran_seed,
-		"already-rolled world_seed survives v4 -> v5 no-op migration")
-	assert_true(bool(loaded["character"]["first_level_up_seen"]),
-		"already-v4 first_level_up_seen=true survives the no-op migration")
+	assert_eq(
+		int(loaded["character"]["world_seed"]),
+		veteran_seed,
+		"already-rolled world_seed survives v4 -> v5 no-op migration"
+	)
+	assert_true(
+		bool(loaded["character"]["first_level_up_seen"]),
+		"already-v4 first_level_up_seen=true survives the no-op migration"
+	)
 	assert_eq(loaded["character"]["level"], 5)

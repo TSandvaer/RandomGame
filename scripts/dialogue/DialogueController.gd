@@ -123,8 +123,8 @@ var _branch: DialogueBranch = null
 var _branch_key: StringName = &""
 var _line_index: int = -1
 
-
 # ---- Public API -----------------------------------------------------
+
 
 ## Open a new dialogue session with the given tree. Returns true on success,
 ## false if rejected (already-active OR unresolvable branch). The spike does
@@ -136,17 +136,27 @@ var _line_index: int = -1
 ## (typically `&"flavor"`) when `quest_state` is not in `tree.branches`.
 func open(tree: DialogueTreeDef, quest_state: StringName = &"flavor") -> bool:
 	if _active:
-		_warn("DialogueController.open: rejected — session already active for npc=%s" %
-				str(_npc_id_or_unknown()))
+		_warn(
+			(
+				"DialogueController.open: rejected — session already active for npc=%s"
+				% str(_npc_id_or_unknown())
+			)
+		)
 		return false
 	if tree == null:
 		_warn("DialogueController.open: rejected — null tree")
 		return false
 	var branch: DialogueBranch = tree.resolve_branch(quest_state)
 	if branch == null:
-		_warn(("DialogueController.open: rejected — npc=%s has no branch for"
-				+ " quest_state=%s and no default")
-					% [str(tree.npc_id), str(quest_state)])
+		_warn(
+			(
+				(
+					"DialogueController.open: rejected — npc=%s has no branch for"
+					+ " quest_state=%s and no default"
+				)
+				% [str(tree.npc_id), str(quest_state)]
+			)
+		)
 		return false
 	# Latch session state.
 	_active = true
@@ -156,9 +166,18 @@ func open(tree: DialogueTreeDef, quest_state: StringName = &"flavor") -> bool:
 	# default_branch_key). Used for tracing + the branch_opened signal.
 	_branch_key = quest_state if tree.branches.has(quest_state) else tree.default_branch_key
 	_line_index = 0
-	_combat_trace("DialogueController.open", "npc=%s state=%s branch=%s lines=%d" % [
-		str(tree.npc_id), str(quest_state), str(_branch_key), _branch.lines.size(),
-	])
+	_combat_trace(
+		"DialogueController.open",
+		(
+			"npc=%s state=%s branch=%s lines=%d"
+			% [
+				str(tree.npc_id),
+				str(quest_state),
+				str(_branch_key),
+				_branch.lines.size(),
+			]
+		)
+	)
 	branch_opened.emit(tree.npc_id, _branch_key)
 	# Auto-display line 0 if any lines exist. A branch with empty lines +
 	# non-empty responses is a pure choice prompt — present responses
@@ -201,8 +220,12 @@ func select_response(idx: int) -> void:
 		_warn("DialogueController.select_response: no responses presented (idx=%d)" % idx)
 		return
 	if idx < 0 or idx >= _branch.responses.size():
-		_warn("DialogueController.select_response: idx %d out of range [0,%d)" %
-				[idx, _branch.responses.size()])
+		_warn(
+			(
+				"DialogueController.select_response: idx %d out of range [0,%d)"
+				% [idx, _branch.responses.size()]
+			)
+		)
 		return
 	var response: DialogueResponse = _branch.responses[idx] as DialogueResponse
 	if response == null:
@@ -212,8 +235,10 @@ func select_response(idx: int) -> void:
 	# Side-effect channel — emit BEFORE navigation so W2 listeners run with
 	# the originating branch context intact, not the destination branch.
 	if response.quest_action != &"":
-		_combat_trace("DialogueController.quest_action",
-				"action=%s npc=%s" % [str(response.quest_action), str(_tree.npc_id)])
+		_combat_trace(
+			"DialogueController.quest_action",
+			"action=%s npc=%s" % [str(response.quest_action), str(_tree.npc_id)]
+		)
 		quest_action_invoked.emit(response.quest_action, _tree.npc_id)
 	# Navigation.
 	if response.next_branch_key == &"":
@@ -288,6 +313,7 @@ func current_display_name() -> String:
 
 # ---- Internals ------------------------------------------------------
 
+
 func _present_responses_or_close() -> void:
 	if _branch == null:
 		close()
@@ -304,23 +330,37 @@ func _navigate_to_branch(branch_key: StringName) -> void:
 		close()
 		return
 	if not _tree.branches.has(branch_key):
-		_warn(("DialogueController._navigate_to_branch: unknown branch_key=%s on"
-				+ " npc=%s — closing dialogue")
-					% [str(branch_key), str(_tree.npc_id)])
+		_warn(
+			(
+				(
+					"DialogueController._navigate_to_branch: unknown branch_key=%s on"
+					+ " npc=%s — closing dialogue"
+				)
+				% [str(branch_key), str(_tree.npc_id)]
+			)
+		)
 		close()
 		return
 	var next_branch: DialogueBranch = _tree.branches[branch_key] as DialogueBranch
 	if next_branch == null:
-		_warn(("DialogueController._navigate_to_branch: branch_key=%s resolved to"
-				+ " null on npc=%s — closing")
-					% [str(branch_key), str(_tree.npc_id)])
+		_warn(
+			(
+				(
+					"DialogueController._navigate_to_branch: branch_key=%s resolved to"
+					+ " null on npc=%s — closing"
+				)
+				% [str(branch_key), str(_tree.npc_id)]
+			)
+		)
 		close()
 		return
 	_branch = next_branch
 	_branch_key = branch_key
 	_line_index = 0
-	_combat_trace("DialogueController.navigate",
-			"npc=%s branch=%s lines=%d" % [str(_tree.npc_id), str(_branch_key), _branch.lines.size()])
+	_combat_trace(
+		"DialogueController.navigate",
+		"npc=%s branch=%s lines=%d" % [str(_tree.npc_id), str(_branch_key), _branch.lines.size()]
+	)
 	branch_opened.emit(_tree.npc_id, _branch_key)
 	if _branch.lines.size() > 0:
 		line_displayed.emit(_line_index, _branch.lines[_line_index])

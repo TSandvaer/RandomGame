@@ -30,7 +30,7 @@ extends Area2D
 
 signal hit_target(target: Node, damage: int, source: Node)
 ## Projectile expired without hitting anyone. Useful for tests + audio.
-signal expired()
+signal expired
 
 # ---- Tuning -----------------------------------------------------------
 
@@ -38,11 +38,11 @@ const TEAM_PLAYER: StringName = &"player"
 const TEAM_ENEMY: StringName = &"enemy"
 
 # Layer bits — keep in sync with project.godot 2d_physics layers (and Hitbox).
-const LAYER_WORLD: int = 1 << 0             # bit 1
-const LAYER_PLAYER: int = 1 << 1            # bit 2
-const LAYER_PLAYER_HITBOX: int = 1 << 2     # bit 3
-const LAYER_ENEMY: int = 1 << 3             # bit 4
-const LAYER_ENEMY_HITBOX: int = 1 << 4      # bit 5
+const LAYER_WORLD: int = 1 << 0  # bit 1
+const LAYER_PLAYER: int = 1 << 1  # bit 2
+const LAYER_PLAYER_HITBOX: int = 1 << 2  # bit 3
+const LAYER_ENEMY: int = 1 << 3  # bit 4
+const LAYER_ENEMY_HITBOX: int = 1 << 4  # bit 5
 
 # ---- Configuration (set via configure() before add_child) -------------
 
@@ -118,15 +118,17 @@ func _physics_process(delta: float) -> void:
 
 # ---- Configuration API used by spawners -------------------------------
 
+
 ## Configure in one call. Call before add_child() so `_ready` reads the
 ## right team/lifetime/layer values.
 func configure(
-		p_damage: int,
-		p_velocity: Vector2,
-		p_lifetime: float,
-		p_team: StringName,
-		p_source: Node,
-		p_knockback: float = 60.0) -> void:
+	p_damage: int,
+	p_velocity: Vector2,
+	p_lifetime: float,
+	p_team: StringName,
+	p_source: Node,
+	p_knockback: float = 60.0
+) -> void:
 	damage = p_damage
 	velocity_vec = p_velocity
 	lifetime = p_lifetime
@@ -141,6 +143,7 @@ func has_already_hit(target: Node) -> bool:
 
 
 # ---- Layer wiring -----------------------------------------------------
+
 
 func _apply_team_layers() -> void:
 	collision_layer = 0
@@ -158,6 +161,7 @@ func _apply_team_layers() -> void:
 
 
 # ---- Hit handling -----------------------------------------------------
+
 
 func _on_body_entered(body: Node) -> void:
 	# Body could be world geometry (StaticBody / TileMap) — vanish without
@@ -190,6 +194,7 @@ func _try_apply_hit(target: Node) -> void:
 
 
 # ---- Expiry -----------------------------------------------------------
+
 
 func _expire() -> void:
 	if _expired_already:

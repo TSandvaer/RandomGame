@@ -48,7 +48,7 @@ extends CanvasLayer
 
 # ---- Signals ---------------------------------------------------------
 
-signal panel_opened()
+signal panel_opened
 signal panel_closed(banked_points: int)
 signal point_allocated(stat: StringName, new_value: int)
 
@@ -69,11 +69,11 @@ const SAVE_SLOT: int = 0
 # ---- Palette (Uma `palette.md`) -------------------------------------
 
 const COLOR_PANEL_BG: Color = Color(0.10588235, 0.10196078, 0.12156863, 0.92)  # #1B1A1F @92%
-const COLOR_PANEL_BORDER: Color = Color(0.18431373, 0.16470588, 0.2, 1.0)      # #2F2A33
-const COLOR_EMBER: Color = Color(1.0, 0.4156862745, 0.1647058824, 1.0)         # #FF6A2A
-const COLOR_EMBER_LIGHT: Color = Color(1.0, 0.69019608, 0.4, 1.0)              # #FFB066
-const COLOR_BODY: Color = Color(0.9098, 0.8941, 0.8392, 1.0)                   # #E8E4D6
-const COLOR_HINT: Color = Color(0.7215686275, 0.6745098039, 0.5568627451, 1.0) # #B8AC8E
+const COLOR_PANEL_BORDER: Color = Color(0.18431373, 0.16470588, 0.2, 1.0)  # #2F2A33
+const COLOR_EMBER: Color = Color(1.0, 0.4156862745, 0.1647058824, 1.0)  # #FF6A2A
+const COLOR_EMBER_LIGHT: Color = Color(1.0, 0.69019608, 0.4, 1.0)  # #FFB066
+const COLOR_BODY: Color = Color(0.9098, 0.8941, 0.8392, 1.0)  # #E8E4D6
+const COLOR_HINT: Color = Color(0.7215686275, 0.6745098039, 0.5568627451, 1.0)  # #B8AC8E
 
 # ---- Strings ---------------------------------------------------------
 
@@ -114,12 +114,15 @@ func _ready() -> void:
 	if levels != null and levels.has_signal("level_up"):
 		var err: int = levels.connect("level_up", _on_level_up)
 		if err != OK:
-			push_warning("[StatAllocationPanel] failed to connect to Levels.level_up (err=%d)" % err)
+			push_warning(
+				"[StatAllocationPanel] failed to connect to Levels.level_up (err=%d)" % err
+			)
 	# Hidden by default — level_up signal or manual open() reveals.
 	visible = false
 
 
 # ---- Public API -------------------------------------------------------
+
 
 func is_open() -> bool:
 	return _open
@@ -225,6 +228,7 @@ func force_press_for_test(key: StringName) -> void:
 
 # ---- Input -----------------------------------------------------------
 
+
 ## Modal-stacking rule (BB-4 `86c9m395d`):
 ##
 ##   P key opens the panel ONLY when:
@@ -308,6 +312,7 @@ func _handle_toggle_keypress() -> void:
 
 # ---- Auto-open (LU-05) -----------------------------------------------
 
+
 ## Internal handler for `Levels.level_up`. Increments banked points (the
 ## level-up grants +1 stat point per level) and opens the panel on the
 ## first ever level-up for this character (LU-05). Subsequent level-ups
@@ -328,6 +333,7 @@ func _on_level_up(_new_level: int) -> void:
 
 
 # ---- UI build --------------------------------------------------------
+
 
 func _build_ui() -> void:
 	# Background band — bottom-anchored, full canvas width. Uma spec ~280
@@ -368,8 +374,8 @@ func _build_ui() -> void:
 
 	# Three tiles — VIGOR / FOCUS / EDGE.
 	_build_tile(STAT_VIGOR, -260)
-	_build_tile(STAT_FOCUS,    0)
-	_build_tile(STAT_EDGE,   260)
+	_build_tile(STAT_FOCUS, 0)
+	_build_tile(STAT_EDGE, 260)
 
 	# Hint label at the bottom edge.
 	_hint_label = Label.new()
@@ -459,9 +465,12 @@ func _build_tile(stat_id: StringName, x_offset: float) -> void:
 	keybind_label.name = "KeybindLabel"
 	var keybind_text: String = ""
 	match stat_id:
-		STAT_VIGOR: keybind_text = "<1>"
-		STAT_FOCUS: keybind_text = "<2>"
-		STAT_EDGE:  keybind_text = "<3>"
+		STAT_VIGOR:
+			keybind_text = "<1>"
+		STAT_FOCUS:
+			keybind_text = "<2>"
+		STAT_EDGE:
+			keybind_text = "<3>"
 	keybind_label.text = keybind_text
 	keybind_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	keybind_label.add_theme_color_override("font_color", COLOR_HINT)
@@ -509,6 +518,7 @@ func _on_alloc_button_pressed(stat_id: StringName) -> void:
 
 
 # ---- Helpers ----------------------------------------------------------
+
 
 func _is_known_stat(stat_id: StringName) -> bool:
 	return stat_id == STAT_VIGOR or stat_id == STAT_FOCUS or stat_id == STAT_EDGE
@@ -562,6 +572,7 @@ func _get_unspent() -> int:
 
 
 # ---- First-level-up persistence (LU-05 / LU-06) ----------------------
+
 
 ## Returns true if the player has already seen their first level-up. The
 ## flag lives on the save file's character block so it survives quit-and-

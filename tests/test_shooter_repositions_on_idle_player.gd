@@ -27,8 +27,8 @@ const ShooterScript: Script = preload("res://scripts/mobs/Shooter.gd")
 const MobDefScript: Script = preload("res://scripts/content/MobDef.gd")
 const ContentFactory: GDScript = preload("res://tests/factories/content_factory.gd")
 
-
 # ---- Helpers -----------------------------------------------------------
+
 
 class FakePlayer:
 	extends Node2D
@@ -58,6 +58,7 @@ func _tick_shooter(s: Shooter, delta: float, ticks: int) -> void:
 
 # ---- 1. AIMING state closes the gap when player > AIM_RANGE ------------
 
+
 func test_shooter_moves_toward_player_when_aiming_and_player_too_far() -> void:
 	# Bug 3 core AC: when the Shooter is in AIMING state with the player
 	# outside AIM_RANGE (300 px), the Shooter must walk toward the player
@@ -76,11 +77,17 @@ func test_shooter_moves_toward_player_when_aiming_and_player_too_far() -> void:
 	# One physics tick — inspect velocity.
 	shooter._process_aiming(1.0 / 60.0)
 
-	assert_gt(shooter.velocity.x, 0.0,
-		"Shooter must move toward player (velocity.x > 0) when player is " +
-		"beyond AIM_RANGE during AIMING (Bug 3 fix)")
-	assert_gt(shooter.velocity.length(), 0.0,
-		"velocity must be non-zero when player is outside AIM_RANGE")
+	assert_gt(
+		shooter.velocity.x,
+		0.0,
+		(
+			"Shooter must move toward player (velocity.x > 0) when player is "
+			+ "beyond AIM_RANGE during AIMING (Bug 3 fix)"
+		)
+	)
+	assert_gt(
+		shooter.velocity.length(), 0.0, "velocity must be non-zero when player is outside AIM_RANGE"
+	)
 
 
 func test_shooter_holds_position_when_aiming_in_sweet_spot() -> void:
@@ -100,8 +107,11 @@ func test_shooter_holds_position_when_aiming_in_sweet_spot() -> void:
 
 	shooter._process_aiming(1.0 / 60.0)
 
-	assert_eq(shooter.velocity, Vector2.ZERO,
-		"Shooter must hold position in sweet-spot (KITE_RANGE..SHOOT_RANGE)")
+	assert_eq(
+		shooter.velocity,
+		Vector2.ZERO,
+		"Shooter must hold position in sweet-spot (KITE_RANGE..SHOOT_RANGE)"
+	)
 
 
 # Regression guard for ticket 86c9uehaq Sponsor failure mode 3 ("out-of-range
@@ -125,12 +135,20 @@ func test_shooter_pursues_when_player_past_projectile_reach() -> void:
 
 	shooter._process_aiming(1.0 / 60.0)
 
-	assert_gt(shooter.velocity.x, 0.0,
-		"REGRESSION CHECK (86c9uehaq Sponsor failure mode 3): Shooter must " +
-		"close the gap (velocity.x > 0) when player is past SHOOT_RANGE but " +
-		"inside the old AIM_RANGE — pre-fix stood still firing un-reaching shots.")
-	assert_eq(shooter.velocity.length(), shooter.move_speed,
-		"Pursuit speed must equal move_speed (no fractional)")
+	assert_gt(
+		shooter.velocity.x,
+		0.0,
+		(
+			"REGRESSION CHECK (86c9uehaq Sponsor failure mode 3): Shooter must "
+			+ "close the gap (velocity.x > 0) when player is past SHOOT_RANGE but "
+			+ "inside the old AIM_RANGE — pre-fix stood still firing un-reaching shots."
+		)
+	)
+	assert_eq(
+		shooter.velocity.length(),
+		shooter.move_speed,
+		"Pursuit speed must equal move_speed (no fractional)"
+	)
 
 
 # Regression guard for ticket 86c9uehaq Sponsor failure mode 2 ("cornered =
@@ -156,22 +174,42 @@ func test_shooter_cornered_promotes_kiting_to_aiming() -> void:
 	watch_signals(shooter)
 	shooter._promote_cornered_to_aiming(80.0)
 
-	assert_eq(shooter.get_state(), Shooter.STATE_AIMING,
-		"REGRESSION CHECK (86c9uehaq Sponsor failure mode 2): cornered kite " +
-		"promotion must transition to AIMING — pre-fix kiting had no exit " +
-		"when wall-blocked + player close, so shooter froze indefinitely.")
-	assert_almost_eq(shooter._aim_left, Shooter.CORNERED_AIM_DURATION, 0.001,
-		"Cornered windup uses CORNERED_AIM_DURATION (fast) not AIM_DURATION " +
-		"(normal) — player is right there, normal 0.55s windup feels idle.")
-	assert_eq(shooter._cornered_kite_ticks, 0,
-		"Cornered-tick counter must reset on promotion.")
-	assert_eq(shooter.velocity, Vector2.ZERO,
-		"Cornered AIMING starts with zero velocity — shooter is wall-blocked, " +
-		"don't keep trying to retreat.")
-	assert_signal_emitted(shooter, "aim_started",
-		"Cornered promotion must emit aim_started so visual hooks fire the " +
-		"telegraph (red glow on Sprite). Without this the cornered fallback " +
-		"looks identical to standing idle.")
+	assert_eq(
+		shooter.get_state(),
+		Shooter.STATE_AIMING,
+		(
+			"REGRESSION CHECK (86c9uehaq Sponsor failure mode 2): cornered kite "
+			+ "promotion must transition to AIMING — pre-fix kiting had no exit "
+			+ "when wall-blocked + player close, so shooter froze indefinitely."
+		)
+	)
+	assert_almost_eq(
+		shooter._aim_left,
+		Shooter.CORNERED_AIM_DURATION,
+		0.001,
+		(
+			"Cornered windup uses CORNERED_AIM_DURATION (fast) not AIM_DURATION "
+			+ "(normal) — player is right there, normal 0.55s windup feels idle."
+		)
+	)
+	assert_eq(shooter._cornered_kite_ticks, 0, "Cornered-tick counter must reset on promotion.")
+	assert_eq(
+		shooter.velocity,
+		Vector2.ZERO,
+		(
+			"Cornered AIMING starts with zero velocity — shooter is wall-blocked, "
+			+ "don't keep trying to retreat."
+		)
+	)
+	assert_signal_emitted(
+		shooter,
+		"aim_started",
+		(
+			"Cornered promotion must emit aim_started so visual hooks fire the "
+			+ "telegraph (red glow on Sprite). Without this the cornered fallback "
+			+ "looks identical to standing idle."
+		)
+	)
 
 
 # Regression guard for ticket 86c9uehaq Sponsor failure mode 2 (cornered
@@ -180,16 +218,31 @@ func test_shooter_cornered_promotes_kiting_to_aiming() -> void:
 # Tune drift in either direction makes the fallback either spam-prone (too
 # fast) or invisible (too slow).
 func test_shooter_cornered_constants_are_balanced() -> void:
-	assert_eq(Shooter.CORNERED_KITE_TICKS_TO_FIRE, 2,
-		"Cornered promotion must fire fast — 2 ticks ≈ 33 ms at 60 Hz keeps " +
-		"the shooter from looking idle for more than a single visible frame.")
-	assert_lt(Shooter.CORNERED_AIM_DURATION, Shooter.AIM_DURATION,
-		"Cornered windup must be shorter than the normal aim windup — the " +
-		"player is right there; a 0.55 s telegraph would feel like the shooter " +
-		"is still idle.")
-	assert_gt(Shooter.CORNERED_AIM_DURATION, 0.0,
-		"Cornered windup must be > 0 so the player has SOME telegraph window " +
-		"to react/dodge — zero-windup point-blank fire is unfair.")
+	assert_eq(
+		Shooter.CORNERED_KITE_TICKS_TO_FIRE,
+		2,
+		(
+			"Cornered promotion must fire fast — 2 ticks ≈ 33 ms at 60 Hz keeps "
+			+ "the shooter from looking idle for more than a single visible frame."
+		)
+	)
+	assert_lt(
+		Shooter.CORNERED_AIM_DURATION,
+		Shooter.AIM_DURATION,
+		(
+			"Cornered windup must be shorter than the normal aim windup — the "
+			+ "player is right there; a 0.55 s telegraph would feel like the shooter "
+			+ "is still idle."
+		)
+	)
+	assert_gt(
+		Shooter.CORNERED_AIM_DURATION,
+		0.0,
+		(
+			"Cornered windup must be > 0 so the player has SOME telegraph window "
+			+ "to react/dodge — zero-windup point-blank fire is unfair."
+		)
+	)
 
 
 # Regression guard for ticket 86c9uehaq Sponsor failure mode 2 (counter logic).
@@ -209,11 +262,13 @@ func test_shooter_cornered_counter_resets_on_unblocked_kite_tick() -> void:
 	# false in headless GUT — the else-branch fires, resetting the counter.
 	shooter._process_kiting(1.0 / 60.0)
 
-	assert_eq(shooter._cornered_kite_ticks, 0,
-		"Cornered-tick counter must reset on any non-blocked kite tick.")
+	assert_eq(
+		shooter._cornered_kite_ticks,
+		0,
+		"Cornered-tick counter must reset on any non-blocked kite tick."
+	)
 	# And kiting velocity is set (away from player).
-	assert_lt(shooter.velocity.x, 0.0,
-		"Unblocked kite tick still sets retreat velocity.")
+	assert_lt(shooter.velocity.x, 0.0, "Unblocked kite tick still sets retreat velocity.")
 
 
 # Regression guard for ticket 86c9uehaq SHOOT_RANGE derivation. The constant
@@ -223,17 +278,33 @@ func test_shooter_cornered_counter_resets_on_unblocked_kite_tick() -> void:
 # this test catches the divergence.
 func test_shoot_range_equals_projectile_reach() -> void:
 	var expected: float = Shooter.PROJECTILE_SPEED * Shooter.PROJECTILE_LIFETIME
-	assert_almost_eq(Shooter.SHOOT_RANGE, expected, 0.001,
-		"SHOOT_RANGE must equal PROJECTILE_SPEED × PROJECTILE_LIFETIME so the " +
-		"sweet spot matches actual projectile reach (ticket 86c9uehaq).")
+	assert_almost_eq(
+		Shooter.SHOOT_RANGE,
+		expected,
+		0.001,
+		(
+			"SHOOT_RANGE must equal PROJECTILE_SPEED × PROJECTILE_LIFETIME so the "
+			+ "sweet spot matches actual projectile reach (ticket 86c9uehaq)."
+		)
+	)
 	# And SHOOT_RANGE must be < AIM_RANGE (sweet spot is narrower than aggro).
-	assert_lt(Shooter.SHOOT_RANGE, Shooter.AIM_RANGE,
-		"SHOOT_RANGE must be tighter than AIM_RANGE — otherwise no close-the-gap " +
-		"region exists.")
+	assert_lt(
+		Shooter.SHOOT_RANGE,
+		Shooter.AIM_RANGE,
+		(
+			"SHOOT_RANGE must be tighter than AIM_RANGE — otherwise no close-the-gap "
+			+ "region exists."
+		)
+	)
 	# And SHOOT_RANGE must be > KITE_RANGE so a non-empty sweet spot exists.
-	assert_gt(Shooter.SHOOT_RANGE, Shooter.KITE_RANGE,
-		"SHOOT_RANGE must be greater than KITE_RANGE — otherwise the sweet spot " +
-		"is empty and the shooter can never stand and fire.")
+	assert_gt(
+		Shooter.SHOOT_RANGE,
+		Shooter.KITE_RANGE,
+		(
+			"SHOOT_RANGE must be greater than KITE_RANGE — otherwise the sweet spot "
+			+ "is empty and the shooter can never stand and fire."
+		)
+	)
 
 
 func test_shooter_still_kites_when_player_too_close_during_aiming() -> void:
@@ -250,11 +321,15 @@ func test_shooter_still_kites_when_player_too_close_during_aiming() -> void:
 
 	shooter._process_aiming(1.0 / 60.0)
 
-	assert_eq(shooter.get_state(), Shooter.STATE_KITING,
-		"close-in player during AIMING must trigger kite-interrupt (pre-existing)")
+	assert_eq(
+		shooter.get_state(),
+		Shooter.STATE_KITING,
+		"close-in player during AIMING must trigger kite-interrupt (pre-existing)"
+	)
 
 
 # ---- 2. Shooter does NOT corner-camp with idle opposite-corner player ---
+
 
 func test_shooter_closes_gap_after_repeated_fire_cycles() -> void:
 	# Bug 3 integration AC: Shooter starts at one corner, player at the far end.
@@ -301,9 +376,17 @@ func test_shooter_closes_gap_after_repeated_fire_cycles() -> void:
 	var end_x: float = shooter.global_position.x
 	# Shooter started at x=400, player is at x=32 (west).
 	# Closer means x decreased toward 32.
-	assert_lt(end_x, start_x,
-		"Shooter must close the gap toward player (x decreased) during idle-player " +
-		"scenario. Pre-fix: x=" + str(start_x) + " (frozen). Post-fix: x=" + str(end_x))
+	assert_lt(
+		end_x,
+		start_x,
+		(
+			"Shooter must close the gap toward player (x decreased) during idle-player "
+			+ "scenario. Pre-fix: x="
+			+ str(start_x)
+			+ " (frozen). Post-fix: x="
+			+ str(end_x)
+		)
+	)
 
 
 func test_shooter_approaches_player_who_is_at_maximum_room_diagonal() -> void:
@@ -323,17 +406,21 @@ func test_shooter_approaches_player_who_is_at_maximum_room_diagonal() -> void:
 	shooter._process_aiming(1.0 / 60.0)
 
 	var vel_len: float = shooter.velocity.length()
-	assert_gt(vel_len, 0.0,
-		"Shooter must move toward player in max-diagonal corner-camp scenario " +
-		"(dist ≈ 457 px >> AIM_RANGE 300 px)")
+	assert_gt(
+		vel_len,
+		0.0,
+		(
+			"Shooter must move toward player in max-diagonal corner-camp scenario "
+			+ "(dist ≈ 457 px >> AIM_RANGE 300 px)"
+		)
+	)
 	# Velocity should point roughly toward player (negative x, positive y).
-	assert_lt(shooter.velocity.x, 0.0,
-		"velocity.x must be negative (moving west toward player)")
-	assert_gt(shooter.velocity.y, 0.0,
-		"velocity.y must be positive (moving south toward player)")
+	assert_lt(shooter.velocity.x, 0.0, "velocity.x must be negative (moving west toward player)")
+	assert_gt(shooter.velocity.y, 0.0, "velocity.y must be positive (moving south toward player)")
 
 
 # ---- 3. Existing Shooter behaviours preserved (regression guards) -------
+
 
 func test_shooter_kites_when_player_closes_in() -> void:
 	# Pre-existing: player inside KITE_RANGE → kiting velocity is non-zero
@@ -346,8 +433,11 @@ func test_shooter_kites_when_player_closes_in() -> void:
 
 	shooter._process_kiting(1.0 / 60.0)
 
-	assert_lt(shooter.velocity.x, 0.0,
-		"Shooter kites AWAY from player (velocity.x < 0 when player is east)")
+	assert_lt(
+		shooter.velocity.x,
+		0.0,
+		"Shooter kites AWAY from player (velocity.x < 0 when player is east)"
+	)
 
 
 func test_shooter_idles_outside_aggro_radius() -> void:
@@ -360,8 +450,11 @@ func test_shooter_idles_outside_aggro_radius() -> void:
 
 	shooter._process_idle(1.0 / 60.0)
 
-	assert_eq(shooter.get_state(), Shooter.STATE_IDLE,
-		"player beyond AGGRO_RADIUS must not trigger SPOTTED from IDLE")
+	assert_eq(
+		shooter.get_state(),
+		Shooter.STATE_IDLE,
+		"player beyond AGGRO_RADIUS must not trigger SPOTTED from IDLE"
+	)
 
 
 func test_post_fire_recovery_transitions_to_aiming_when_player_in_aggro_radius() -> void:
@@ -378,8 +471,11 @@ func test_post_fire_recovery_transitions_to_aiming_when_player_in_aggro_radius()
 
 	shooter._process_post_fire(1.0 / 60.0)
 
-	assert_eq(shooter.get_state(), Shooter.STATE_AIMING,
-		"post-fire recovery must transition to AIMING (re-engage) when player in range")
+	assert_eq(
+		shooter.get_state(),
+		Shooter.STATE_AIMING,
+		"post-fire recovery must transition to AIMING (re-engage) when player in range"
+	)
 
 
 func test_shooter_returns_to_idle_after_fire_cycle_when_player_leaves_aggro() -> void:
@@ -394,8 +490,11 @@ func test_shooter_returns_to_idle_after_fire_cycle_when_player_leaves_aggro() ->
 
 	shooter._process_post_fire(1.0 / 60.0)
 
-	assert_eq(shooter.get_state(), Shooter.STATE_IDLE,
-		"shooter must return to IDLE when player leaves AGGRO_RADIUS post-recovery")
+	assert_eq(
+		shooter.get_state(),
+		Shooter.STATE_IDLE,
+		"shooter must return to IDLE when player leaves AGGRO_RADIUS post-recovery"
+	)
 
 
 # ===========================================================================
@@ -407,6 +506,7 @@ func test_shooter_returns_to_idle_after_fire_cycle_when_player_leaves_aggro() ->
 # POST_FIRE_RECOVERY when dist > AIM_RANGE. These tests would have FAILED
 # pre-fix and now PASS with the P0 #2 fix.
 # ===========================================================================
+
 
 ## P0 #2 core: POST_FIRE_RECOVERY walks toward player when dist > AIM_RANGE.
 ## Pre-fix this was velocity=ZERO unconditionally in _process_post_fire.
@@ -421,11 +521,19 @@ func test_p0_shooter_closes_gap_during_post_fire_recovery() -> void:
 
 	shooter._process_post_fire(1.0 / 60.0)
 
-	assert_gt(shooter.velocity.x, 0.0,
-		"REGRESSION CHECK (P0 #2): Shooter must walk toward player (velocity.x > 0) " +
-		"during POST_FIRE_RECOVERY when dist > AIM_RANGE. Pre-fix: velocity=ZERO.")
-	assert_gt(shooter.velocity.length(), 0.0,
-		"velocity must be non-zero during POST_FIRE_RECOVERY when out of sweet-spot")
+	assert_gt(
+		shooter.velocity.x,
+		0.0,
+		(
+			"REGRESSION CHECK (P0 #2): Shooter must walk toward player (velocity.x > 0) "
+			+ "during POST_FIRE_RECOVERY when dist > AIM_RANGE. Pre-fix: velocity=ZERO."
+		)
+	)
+	assert_gt(
+		shooter.velocity.length(),
+		0.0,
+		"velocity must be non-zero during POST_FIRE_RECOVERY when out of sweet-spot"
+	)
 
 
 ## P0 #2: POST_FIRE_RECOVERY holds position when player is in sweet-spot
@@ -442,8 +550,11 @@ func test_p0_post_fire_recovery_holds_position_in_sweet_spot() -> void:
 
 	shooter._process_post_fire(1.0 / 60.0)
 
-	assert_eq(shooter.velocity, Vector2.ZERO,
-		"Shooter holds position during POST_FIRE_RECOVERY when player is in sweet-spot")
+	assert_eq(
+		shooter.velocity,
+		Vector2.ZERO,
+		"Shooter holds position during POST_FIRE_RECOVERY when player is in sweet-spot"
+	)
 
 
 ## P0 #2 worst-case far-corner scenario: shooter at one corner, player at the
@@ -515,13 +626,21 @@ func test_p0_far_corner_scenario_shooter_closes_gap_over_full_cycle() -> void:
 	# Post-fix: gap_closed ≈ 71px (both AIMING + RECOVERY at 60px/s).
 	# Assert > 50px to clearly distinguish pre-fix (~33px) from post-fix (~71px),
 	# allowing for state-transition single-tick gaps in the simulation.
-	assert_gt(gap_closed, 50.0,
-		("REGRESSION CHECK (P0 #2): Shooter must close > 50px gap in one full"
-			+ " aim+recovery cycle when the gap remains >> AIM_RANGE throughout. "
-			+ "Got gap_closed=%.1f px. Pre-fix would show ~33px (AIMING only —"
-			+ " recovery held velocity=ZERO). "
-			+ "Post-fix expects ~71px (AIMING + POST_FIRE_RECOVERY both walk toward"
-			+ " player at move_speed=60).") % gap_closed)
+	assert_gt(
+		gap_closed,
+		50.0,
+		(
+			(
+				"REGRESSION CHECK (P0 #2): Shooter must close > 50px gap in one full"
+				+ " aim+recovery cycle when the gap remains >> AIM_RANGE throughout. "
+				+ "Got gap_closed=%.1f px. Pre-fix would show ~33px (AIMING only —"
+				+ " recovery held velocity=ZERO). "
+				+ "Post-fix expects ~71px (AIMING + POST_FIRE_RECOVERY both walk toward"
+				+ " player at move_speed=60)."
+			)
+			% gap_closed
+		)
+	)
 
 
 ## P0 #2: velocity direction during POST_FIRE_RECOVERY points toward player.
@@ -536,7 +655,5 @@ func test_p0_post_fire_recovery_velocity_direction_toward_player() -> void:
 
 	shooter._process_post_fire(1.0 / 60.0)
 
-	assert_almost_eq(shooter.velocity.x, 0.0, 1.0,
-		"velocity.x should be ~0 (player is due north)")
-	assert_lt(shooter.velocity.y, 0.0,
-		"velocity.y must be negative (moving north toward player)")
+	assert_almost_eq(shooter.velocity.x, 0.0, 1.0, "velocity.x should be ~0 (player is due north)")
+	assert_lt(shooter.velocity.y, 0.0, "velocity.y must be negative (moving north toward player)")

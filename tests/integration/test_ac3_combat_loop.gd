@@ -31,8 +31,8 @@ const ChunkPortScript: Script = preload("res://scripts/levels/ChunkPort.gd")
 
 const PHYS_DELTA: float = 1.0 / 60.0
 
-
 # ---- Helpers ----------------------------------------------------------
+
 
 ## Stage 2b: shipping `s1_room01.tres` spawns a PracticeDummy. AC3's
 ## player-vs-grunt combat-loop coverage requires a grunt, so we inject a
@@ -96,6 +96,7 @@ func _make_enemy_swing_at(target: Vector2, p: Player) -> Hitbox:
 
 # ---- 1: light attack lands on a grunt + reduces HP --------------------
 
+
 func test_light_attack_against_grunt_reduces_hp() -> void:
 	var room: Stratum1Room01 = _load_room()
 	var p: Player = _spawn_player(room)
@@ -112,6 +113,7 @@ func test_light_attack_against_grunt_reduces_hp() -> void:
 
 # ---- 2: i-frames during dodge prevent damage --------------------------
 
+
 func test_dodge_iframes_prevent_enemy_damage() -> void:
 	# AC3 mechanical: enemy-spawned hitbox masking layer 2 (player) finds
 	# nothing while the player's collision_layer is cleared by dodge. The
@@ -127,13 +129,17 @@ func test_dodge_iframes_prevent_enemy_damage() -> void:
 	var ok: bool = p.try_dodge(Vector2.RIGHT)
 	assert_true(ok, "dodge initiated")
 	assert_true(p.is_invulnerable(), "i-frames active")
-	assert_eq(p.collision_layer, 0,
-		"AC3: dodge clears player collision_layer (i-frames at physics level)")
+	assert_eq(
+		p.collision_layer, 0, "AC3: dodge clears player collision_layer (i-frames at physics level)"
+	)
 	# Spawn an enemy-team hitbox masking player layer. Verify mask wouldn't
 	# pick the player up (collision_mask & player.collision_layer == 0).
 	var hb: Hitbox = _make_enemy_swing_at(p.global_position, p)
-	assert_eq(hb.collision_mask & p.collision_layer, 0,
-		"enemy hitbox mask vs cleared player layer = 0 — engine overlap returns no hit")
+	assert_eq(
+		hb.collision_mask & p.collision_layer,
+		0,
+		"enemy hitbox mask vs cleared player layer = 0 — engine overlap returns no hit"
+	)
 	# Tick past dodge -> player layer restored.
 	p._tick_timers(Player.DODGE_DURATION + 0.01)
 	p._process_dodge(0.0)
@@ -142,6 +148,7 @@ func test_dodge_iframes_prevent_enemy_damage() -> void:
 
 
 # ---- 3: attacks during dodge are blocked ------------------------------
+
 
 func test_attack_blocked_during_dodge_in_room() -> void:
 	# AC3 mechanical state-machine: dodge wins. While dodging, try_attack
@@ -156,6 +163,7 @@ func test_attack_blocked_during_dodge_in_room() -> void:
 
 
 # ---- 4: dodge interrupts attack recovery ------------------------------
+
 
 func test_dodge_cancels_attack_recovery_in_room() -> void:
 	# Hades-feel rule: dodge can fire even during attack recovery (gives
@@ -172,6 +180,7 @@ func test_dodge_cancels_attack_recovery_in_room() -> void:
 
 # ---- 5: knockback applies — grunt position shifts after a hit --------
 
+
 func test_attack_applies_knockback_to_grunt() -> void:
 	# AC3 mechanical: a hit must shove the grunt (player-feel), not just
 	# decrement HP. We don't move_and_slide the physics here — knockback
@@ -185,11 +194,16 @@ func test_attack_applies_knockback_to_grunt() -> void:
 	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT) as Hitbox
 	hb._try_apply_hit(grunt)
 	assert_gt(grunt.velocity.x, 0.0, "AC3: knockback drives grunt velocity in attack direction")
-	assert_almost_eq(grunt.velocity.x, Player.LIGHT_KNOCKBACK, 0.001,
-		"knockback magnitude matches Player.LIGHT_KNOCKBACK")
+	assert_almost_eq(
+		grunt.velocity.x,
+		Player.LIGHT_KNOCKBACK,
+		0.001,
+		"knockback magnitude matches Player.LIGHT_KNOCKBACK"
+	)
 
 
 # ---- 6: single hitbox lifetime - 1 hit per target ----------------------
+
 
 func test_single_hitbox_only_hits_once_per_target() -> void:
 	# AC3 mechanical: hitboxes are single-hit-per-target (no multi-tick
@@ -204,11 +218,13 @@ func test_single_hitbox_only_hits_once_per_target() -> void:
 	hb._try_apply_hit(grunt)
 	hb._try_apply_hit(grunt)
 	hb._try_apply_hit(grunt)
-	assert_eq(grunt.get_hp(), hp_before - 1,
-		"AC3: hit applied exactly once despite repeat overlap calls")
+	assert_eq(
+		grunt.get_hp(), hp_before - 1, "AC3: hit applied exactly once despite repeat overlap calls"
+	)
 
 
 # ---- 7: dead grunt no longer takes damage -----------------------------
+
 
 func test_attack_against_dead_grunt_is_noop() -> void:
 	# AC3 mechanical + AC5: corpses are inert. A swing landing on a dead
@@ -226,11 +242,13 @@ func test_attack_against_dead_grunt_is_noop() -> void:
 	var hb: Hitbox = p.try_attack(Player.ATTACK_LIGHT, Vector2.RIGHT) as Hitbox
 	hb._try_apply_hit(grunt)
 	assert_eq(grunt.get_hp(), 0, "HP stays at 0 after corpse-swing")
-	assert_signal_emit_count(grunt, "mob_died", 1,
-		"mob_died still fires exactly once across corpse-hits")
+	assert_signal_emit_count(
+		grunt, "mob_died", 1, "mob_died still fires exactly once across corpse-hits"
+	)
 
 
 # ---- 8: dodge cooldown blocks immediate re-dodge in fight -------------
+
 
 func test_dodge_cooldown_in_combat() -> void:
 	# AC3 mechanical: even mid-combat, dodge cooldown gates a second dodge.
@@ -252,6 +270,7 @@ func test_dodge_cooldown_in_combat() -> void:
 
 
 # ---- 9: facing tracks attack direction --------------------------------
+
 
 func test_attack_updates_facing_direction() -> void:
 	# AC3 mechanical: a swing in a direction sets facing — important for

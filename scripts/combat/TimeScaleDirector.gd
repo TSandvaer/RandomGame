@@ -130,7 +130,6 @@ extends Node
 ##   - `.claude/docs/time-scale-director.md` (to be created by maintain-docs
 ##     when this PR lands per Priya's doc-flag)
 
-
 # ---- Constants -------------------------------------------------------
 
 ## Floor for any non-freeze request scale. Scales below this clamp UP to
@@ -145,10 +144,9 @@ const MAX_SCALE: float = 1.0
 
 ## Default priorities for documented use sites. Callers may pass any int;
 ## these constants document the recommended values.
-const PRIORITY_DEFAULT: int = 0       # hit-pause, swing-pause, ephemeral
-const PRIORITY_NARRATIVE: int = 1     # phase-transition, level-up slow
-const PRIORITY_FREEZE: int = 2        # freeze(); modal-stop
-
+const PRIORITY_DEFAULT: int = 0  # hit-pause, swing-pause, ephemeral
+const PRIORITY_NARRATIVE: int = 1  # phase-transition, level-up slow
+const PRIORITY_FREEZE: int = 2  # freeze(); modal-stop
 
 # ---- Signals ---------------------------------------------------------
 
@@ -161,7 +159,6 @@ signal scale_changed(new_scale: float)
 ## "released", "expired"). Subscribers: tests + debug overlay; production
 ## code rarely needs this.
 signal request_changed(reason: String, op: String)
-
 
 # ---- State -----------------------------------------------------------
 
@@ -192,8 +189,8 @@ var _current_scale: float = 1.0
 ## freeze is the canonical break). A monotonic int has no such collision.
 var _generation_counter: int = 0
 
-
 # ---- Lifecycle -------------------------------------------------------
+
 
 func _ready() -> void:
 	# Boot-time pin: the director writes 1.0 explicitly so any pre-boot
@@ -206,6 +203,7 @@ func _ready() -> void:
 
 
 # ---- Public API ------------------------------------------------------
+
 
 ## Request a time-scale change. See class docstring for semantics.
 ##
@@ -226,10 +224,8 @@ func _ready() -> void:
 ##
 ## `priority` controls multi-request resolution; see class docstring.
 func request(
-		reason: String,
-		scale: float,
-		duration: float,
-		priority: int = PRIORITY_DEFAULT) -> void:
+	reason: String, scale: float, duration: float, priority: int = PRIORITY_DEFAULT
+) -> void:
 	if reason == "":
 		_warn("TimeScaleDirector.request: empty reason — refusing", "time_scale_director")
 		return
@@ -239,17 +235,23 @@ func request(
 	# every downstream consumer. Reject explicitly + loud.
 	if is_nan(scale) or is_inf(scale):
 		_warn(
-			("TimeScaleDirector.request: non-finite scale (%s) for reason '%s' — refusing"
-				% [str(scale), reason]),
-			"time_scale_director")
+			(
+				"TimeScaleDirector.request: non-finite scale (%s) for reason '%s' — refusing"
+				% [str(scale), reason]
+			),
+			"time_scale_director"
+		)
 		return
 
 	var clamped_scale: float = clampf(scale, MIN_NON_FREEZE_SCALE, MAX_SCALE)
 	if not is_equal_approx(clamped_scale, scale):
 		var msg: String = (
-			"TimeScaleDirector.request: scale %.3f for reason '%s' clamped to %.3f "
-			+ "(range [%.3f, %.3f]; for a true freeze use freeze(...))"
-		) % [scale, reason, clamped_scale, MIN_NON_FREEZE_SCALE, MAX_SCALE]
+			(
+				"TimeScaleDirector.request: scale %.3f for reason '%s' clamped to %.3f "
+				+ "(range [%.3f, %.3f]; for a true freeze use freeze(...))"
+			)
+			% [scale, reason, clamped_scale, MIN_NON_FREEZE_SCALE, MAX_SCALE]
+		)
 		_warn(msg, "time_scale_director")
 
 	# Cancel any prior timer for this reason — re-request resets the clock.
@@ -347,6 +349,7 @@ func is_active(reason: String) -> bool:
 
 
 # ---- Internals --------------------------------------------------------
+
 
 ## Compute the effective scale from the live stack + apply to engine.
 ## Emits `scale_changed` only when the value actually changes (within

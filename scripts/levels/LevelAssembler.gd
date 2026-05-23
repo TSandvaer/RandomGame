@@ -12,6 +12,7 @@ extends RefCounted
 ## (which doesn't exist yet) and from the production Grunt scene path —
 ## tests inject a fake spawner that produces marker nodes for assertion.
 
+
 ## Result of an assembly call. Carries the room root, the chunk's world
 ## bounds, and all spawned mob nodes for downstream tests/code.
 class AssemblyResult:
@@ -30,8 +31,8 @@ class AssemblyResult:
 ## Returns null on validation failure (caller's responsibility to check
 ## `chunk_def.validate()` first if it cares about diagnostics).
 func assemble_single(
-		chunk_def: LevelChunkDef,
-		mob_factory: Callable = Callable()) -> AssemblyResult:
+	chunk_def: LevelChunkDef, mob_factory: Callable = Callable()
+) -> AssemblyResult:
 	if chunk_def == null:
 		push_error("LevelAssembler: chunk_def is null")
 		return null
@@ -62,17 +63,22 @@ func assemble_single(
 				result.root.add_child(geometry)
 		else:
 			push_warning(
-				"LevelAssembler: chunk_def.scene_path '%s' failed to load (geometry skipped)"
+				(
+					"LevelAssembler: chunk_def.scene_path '%s' failed to load (geometry skipped)"
 					% chunk_def.scene_path
+				)
 			)
 
 	# Entry world position — for M1 single-chunk rooms, it's the entry
 	# port if defined, else the chunk's center.
 	var entry_port: ChunkPort = chunk_def.get_entry_port()
 	if entry_port != null:
-		result.entry_world_pos = Vector2(entry_port.position_tiles * chunk_def.tile_size_px) + Vector2(
-			float(chunk_def.tile_size_px) * 0.5,
-			float(chunk_def.tile_size_px) * 0.5,
+		result.entry_world_pos = (
+			Vector2(entry_port.position_tiles * chunk_def.tile_size_px)
+			+ Vector2(
+				float(chunk_def.tile_size_px) * 0.5,
+				float(chunk_def.tile_size_px) * 0.5,
+			)
 		)
 	else:
 		result.entry_world_pos = Vector2(size_px) * 0.5
@@ -97,7 +103,10 @@ func assemble_single(
 
 ## Tile -> world position (centered on the tile).
 static func _tile_to_world(tile_pos: Vector2i, tile_size_px: int) -> Vector2:
-	return Vector2(tile_pos * tile_size_px) + Vector2(
-		float(tile_size_px) * 0.5,
-		float(tile_size_px) * 0.5,
+	return (
+		Vector2(tile_pos * tile_size_px)
+		+ Vector2(
+			float(tile_size_px) * 0.5,
+			float(tile_size_px) * 0.5,
+		)
 	)

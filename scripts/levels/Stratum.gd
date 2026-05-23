@@ -69,6 +69,7 @@ const ALL_IDS: Array[int] = [
 
 # ---- Public API -------------------------------------------------------
 
+
 ## Returns true iff `id` is a registered stratum. Use to validate save
 ## payloads + chunk-id parses without hardcoding the bounds.
 static func is_known(id: int) -> bool:
@@ -79,14 +80,22 @@ static func is_known(id: int) -> bool:
 ## unknown ids (callers should `is_known` first if they care).
 static func prefix(id: int) -> StringName:
 	match id:
-		Id.S1: return PREFIX_S1
-		Id.S2: return PREFIX_S2
-		Id.S3: return PREFIX_S3
-		Id.S4: return PREFIX_S4
-		Id.S5: return PREFIX_S5
-		Id.S6: return PREFIX_S6
-		Id.S7: return PREFIX_S7
-		Id.S8: return PREFIX_S8
+		Id.S1:
+			return PREFIX_S1
+		Id.S2:
+			return PREFIX_S2
+		Id.S3:
+			return PREFIX_S3
+		Id.S4:
+			return PREFIX_S4
+		Id.S5:
+			return PREFIX_S5
+		Id.S6:
+			return PREFIX_S6
+		Id.S7:
+			return PREFIX_S7
+		Id.S8:
+			return PREFIX_S8
 	return &""
 
 
@@ -95,28 +104,44 @@ static func prefix(id: int) -> StringName:
 ## whitespace + case.
 static func id_from_prefix(p: StringName) -> int:
 	match p:
-		PREFIX_S1: return Id.S1
-		PREFIX_S2: return Id.S2
-		PREFIX_S3: return Id.S3
-		PREFIX_S4: return Id.S4
-		PREFIX_S5: return Id.S5
-		PREFIX_S6: return Id.S6
-		PREFIX_S7: return Id.S7
-		PREFIX_S8: return Id.S8
+		PREFIX_S1:
+			return Id.S1
+		PREFIX_S2:
+			return Id.S2
+		PREFIX_S3:
+			return Id.S3
+		PREFIX_S4:
+			return Id.S4
+		PREFIX_S5:
+			return Id.S5
+		PREFIX_S6:
+			return Id.S6
+		PREFIX_S7:
+			return Id.S7
+		PREFIX_S8:
+			return Id.S8
 	return 0
 
 
 ## Display name for `id`. en-source; localisation is M3+ scope.
 static func display_name(id: int) -> String:
 	match id:
-		Id.S1: return "Stratum 1"
-		Id.S2: return "Stratum 2"
-		Id.S3: return "Stratum 3"
-		Id.S4: return "Stratum 4"
-		Id.S5: return "Stratum 5"
-		Id.S6: return "Stratum 6"
-		Id.S7: return "Stratum 7"
-		Id.S8: return "Stratum 8"
+		Id.S1:
+			return "Stratum 1"
+		Id.S2:
+			return "Stratum 2"
+		Id.S3:
+			return "Stratum 3"
+		Id.S4:
+			return "Stratum 4"
+		Id.S5:
+			return "Stratum 5"
+		Id.S6:
+			return "Stratum 6"
+		Id.S7:
+			return "Stratum 7"
+		Id.S8:
+			return "Stratum 8"
 	return ""
 
 

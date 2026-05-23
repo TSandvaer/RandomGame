@@ -9,11 +9,11 @@ extends GutTest
 const BossRoomScript: Script = preload("res://scripts/levels/Stratum1BossRoom.gd")
 const BossScript: Script = preload("res://scripts/mobs/Stratum1Boss.gd")
 
-
 # ---- Test isolation ---------------------------------------------------
 # M3 Tier 2 Wave 1 T2/T3 — Stratum1Boss fires TimeScaleDirector requests on
 # hit / die / phase-transition. Tests that take the boss to 0 HP leak director
 # state (and Engine.time_scale) into subsequent tests. Reset on both ends.
+
 
 func before_each() -> void:
 	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
@@ -41,8 +41,10 @@ func after_each() -> void:
 
 # ---- Helpers ----------------------------------------------------------
 
+
 class FakePlayerBody:
 	extends CharacterBody2D
+
 	# A real CharacterBody2D so the door trigger's body_entered overlap
 	# fires. We don't need any AI on it; just a body on the player layer.
 	func _init() -> void:
@@ -59,6 +61,7 @@ func _make_room() -> Stratum1BossRoom:
 
 # ---- 1: scene loads + room script wires -----------------------------
 
+
 func test_boss_room_scene_loads() -> void:
 	var packed: PackedScene = load("res://scenes/levels/Stratum1BossRoom.tscn")
 	assert_not_null(packed, "Stratum1BossRoom.tscn must load")
@@ -74,7 +77,9 @@ func test_room_has_door_trigger_and_boss() -> void:
 	# pass (ticket 86c9tv8uf physics-flush fix) — drain a frame for it.
 	assert_not_null(room.get_boss(), "boss spawned at room ready (synchronous)")
 	await get_tree().process_frame
-	assert_not_null(room.get_door_trigger(), "door trigger Area2D exists after deferred fixture pass")
+	assert_not_null(
+		room.get_door_trigger(), "door trigger Area2D exists after deferred fixture pass"
+	)
 	var boss: Stratum1Boss = room.get_boss()
 	# Boss starts DORMANT — Uma BI-19 (no attack during intro).
 	assert_true(boss.is_dormant(), "boss starts dormant — wakes at end of intro")
@@ -107,24 +112,33 @@ func test_room_has_door_trigger_and_boss() -> void:
 # in the tree. The HTML5 release-build trace evidence in the Self-Test Report
 # covers the actual physics-flush-window path.)
 
+
 func test_door_trigger_enters_tree_and_monitors_after_deferred_pass() -> void:
 	var room: Stratum1BossRoom = _make_room()
 	# Pre-drain: the deferred fixture pass has NOT landed yet, so the door
 	# trigger does not exist.
-	assert_null(room.get_door_trigger(),
-		"door trigger is NOT built synchronously in _ready (deferred out of physics-flush window)")
+	assert_null(
+		room.get_door_trigger(),
+		"door trigger is NOT built synchronously in _ready (deferred out of physics-flush window)"
+	)
 	await get_tree().process_frame
 	# Post-drain: the deferred `_assemble_room_fixtures` pass has run.
 	var trigger: Area2D = room.get_door_trigger()
-	assert_not_null(trigger,
-		"REGRESSION-86c9tv8uf: door trigger Area2D built in deferred fixture pass")
-	assert_true(trigger.is_inside_tree(),
-		"REGRESSION-86c9tv8uf: door trigger Area2D is inserted in the scene tree")
-	assert_eq(trigger.get_parent(), room,
-		"door trigger is parented under the boss room")
-	assert_true(trigger.monitoring,
-		"REGRESSION-86c9tv8uf: door trigger Area2D has monitoring ACTIVE — " +
-		"body_entered can fire so the player can exit the boss room")
+	assert_not_null(
+		trigger, "REGRESSION-86c9tv8uf: door trigger Area2D built in deferred fixture pass"
+	)
+	assert_true(
+		trigger.is_inside_tree(),
+		"REGRESSION-86c9tv8uf: door trigger Area2D is inserted in the scene tree"
+	)
+	assert_eq(trigger.get_parent(), room, "door trigger is parented under the boss room")
+	assert_true(
+		trigger.monitoring,
+		(
+			"REGRESSION-86c9tv8uf: door trigger Area2D has monitoring ACTIVE — "
+			+ "body_entered can fire so the player can exit the boss room"
+		)
+	)
 	# The trigger must still carry a CollisionShape2D child (the rect that
 	# defines the overlap zone) — a monitoring Area2D with no shape is inert.
 	var has_shape: bool = false
@@ -134,11 +148,14 @@ func test_door_trigger_enters_tree_and_monitors_after_deferred_pass() -> void:
 	assert_true(has_shape, "door trigger Area2D carries its CollisionShape2D")
 	# StratumExit (which builds its own Area2D interaction area on _ready) is
 	# also spawned in the deferred pass — confirm it landed.
-	assert_not_null(room.get_stratum_exit(),
-		"REGRESSION-86c9tv8uf: StratumExit spawned in the deferred fixture pass")
+	assert_not_null(
+		room.get_stratum_exit(),
+		"REGRESSION-86c9tv8uf: StratumExit spawned in the deferred fixture pass"
+	)
 
 
 # ---- 2: door trigger fires entry sequence ---------------------------
+
 
 func test_door_trigger_fires_entry_sequence() -> void:
 	var room: Stratum1BossRoom = _make_room()
@@ -158,17 +175,26 @@ func test_door_trigger_is_idempotent() -> void:
 	room.trigger_entry_sequence()
 	room.trigger_entry_sequence()
 	room.trigger_entry_sequence()
-	assert_signal_emit_count(room, "entry_sequence_started", 1,
-		"entry sequence fires exactly once even if trigger overlaps multiple times")
+	assert_signal_emit_count(
+		room,
+		"entry_sequence_started",
+		1,
+		"entry sequence fires exactly once even if trigger overlaps multiple times"
+	)
 
 
 # ---- 3: entry sequence completes within 1.8 s ± tolerance -----------
 
+
 func test_entry_sequence_duration_constant_is_1_8s() -> void:
 	# Static contract — Uma's spec says 1.8 s. If this constant ever drifts,
 	# tests bounce so we don't silently break Uma's beat-timing intent.
-	assert_almost_eq(Stratum1BossRoom.ENTRY_SEQUENCE_DURATION, 1.8, 0.001,
-		"entry sequence is exactly 1.8 s per Uma boss-intro.md")
+	assert_almost_eq(
+		Stratum1BossRoom.ENTRY_SEQUENCE_DURATION,
+		1.8,
+		0.001,
+		"entry sequence is exactly 1.8 s per Uma boss-intro.md"
+	)
 
 
 func test_entry_sequence_completion_signal_fires_after_completion_call() -> void:
@@ -184,6 +210,7 @@ func test_entry_sequence_completion_signal_fires_after_completion_call() -> void
 
 
 # ---- 4: boss spawns at end of entry sequence (i.e. wakes) ------------
+
 
 func test_boss_wakes_at_entry_sequence_end() -> void:
 	var room: Stratum1BossRoom = _make_room()
@@ -205,11 +232,11 @@ func test_boss_does_not_take_damage_during_intro() -> void:
 	# Boss is dormant during entry — damage is rejected.
 	var hp_at_intro: int = boss.get_hp()
 	boss.take_damage(50, Vector2.ZERO, null)
-	assert_eq(boss.get_hp(), hp_at_intro,
-		"boss takes no damage during intro sequence")
+	assert_eq(boss.get_hp(), hp_at_intro, "boss takes no damage during intro sequence")
 
 
 # ---- 5: boss death triggers stratum-exit-unlocked state -------------
+
 
 func test_boss_death_unlocks_stratum_exit() -> void:
 	var room: Stratum1BossRoom = _make_room()
@@ -269,11 +296,15 @@ func test_standalone_boss_death_drops_NO_loot_from_room_self() -> void:
 	for c: Node in room.get_children():
 		if c is Pickup:
 			pickup_count += 1
-	assert_eq(pickup_count, 0,
-		"REGRESSION-86c9uemdg: boss room does NOT spawn its own loot — Main owns the boss-loot pipeline")
+	assert_eq(
+		pickup_count,
+		0,
+		"REGRESSION-86c9uemdg: boss room does NOT spawn its own loot — Main owns the boss-loot pipeline"
+	)
 
 
 # ---- Bounds + content sanity ----------------------------------------
+
 
 func test_boss_spawn_position_is_in_arena() -> void:
 	# Default spawn at (240, 135) sits inside Uma's 480x270 internal canvas
@@ -332,8 +363,7 @@ func test_stratum_exit_activate_deferred_after_boss_death() -> void:
 	assert_false(exit.is_active(), "StratumExit starts INACTIVE")
 	var area: Area2D = exit.get_interaction_area()
 	assert_not_null(area, "StratumExit interaction area exists")
-	assert_false(area.monitoring,
-		"interaction area NOT monitoring before boss death")
+	assert_false(area.monitoring, "interaction area NOT monitoring before boss death")
 	# Kill the boss through the production damage path.
 	room.trigger_entry_sequence()
 	room.complete_entry_sequence_for_test()
@@ -348,32 +378,49 @@ func test_stratum_exit_activate_deferred_after_boss_death() -> void:
 	# calls still land next process frame — the idempotency of `call_deferred`
 	# is the same whether or not we are in a physics flush. So the exit must
 	# still be INACTIVE immediately after take_damage returns.
-	assert_false(exit.is_active(),
-		"REGRESSION-86c9ujq8d: StratumExit NOT active same-frame as boss death — " +
-		"activate() was deferred (physics-flush safety)")
-	assert_false(area.monitoring,
-		"REGRESSION-86c9ujq8d: interaction area NOT monitoring same frame as boss death " +
-		"— monitoring mutation is deferred to avoid physics-flush panic")
+	assert_false(
+		exit.is_active(),
+		(
+			"REGRESSION-86c9ujq8d: StratumExit NOT active same-frame as boss death — "
+			+ "activate() was deferred (physics-flush safety)"
+		)
+	)
+	assert_false(
+		area.monitoring,
+		(
+			"REGRESSION-86c9ujq8d: interaction area NOT monitoring same frame as boss death "
+			+ "— monitoring mutation is deferred to avoid physics-flush panic"
+		)
+	)
 	# **After one process frame:** the deferred `activate()` has landed and
 	# flipped `_is_active` synchronously (the sync part of activate()).
 	await get_tree().process_frame
-	assert_true(exit.is_active(),
-		"REGRESSION-86c9ujq8d: StratumExit IS active after deferred activate() lands " +
-		"(sync portion: _is_active latch flips immediately in activate())")
+	assert_true(
+		exit.is_active(),
+		(
+			"REGRESSION-86c9ujq8d: StratumExit IS active after deferred activate() lands "
+			+ "(sync portion: _is_active latch flips immediately in activate())"
+		)
+	)
 	# **REGRESSION-86c9unkr2 update:** after PR #240, the monitoring write is
 	# now ALSO awaited via `await get_tree().physics_frame` inside
 	# `_arm_interaction_area_after_flush` (double-defer for HTML5 silent
 	# ERR_FAIL_COND). So monitoring needs ONE MORE physics_frame to land.
 	await get_tree().physics_frame
 	await get_tree().process_frame
-	assert_true(area.monitoring,
-		"REGRESSION-86c9ujq8d + 86c9unkr2: interaction area IS monitoring after"
+	assert_true(
+		area.monitoring,
+		(
+			"REGRESSION-86c9ujq8d + 86c9unkr2: interaction area IS monitoring after"
 			+ " the double-defer settles (call_deferred activate + await physics_frame"
 			+ " inside _arm_interaction_area_after_flush) — player can walk in and"
-			+ " trigger descend_triggered")
+			+ " trigger descend_triggered"
+		)
+	)
 
 
 # ---- M3-T2-W3-T13 — BossNameplate wiring -----------------------------
+
 
 ## REGRESSION-86c9wjz2d — BossNameplate is spawned in `_assemble_room_fixtures`
 ## and shown on `entry_sequence_completed`. Catches:
@@ -386,21 +433,22 @@ func test_stratum_exit_activate_deferred_after_boss_death() -> void:
 func test_boss_nameplate_spawned_in_deferred_fixture_pass() -> void:
 	var room: Stratum1BossRoom = _make_room()
 	# Pre-drain: deferred pass has not landed.
-	assert_null(room.get_boss_nameplate(),
-			"BossNameplate is NOT built synchronously in _ready (deferred)")
+	assert_null(
+		room.get_boss_nameplate(), "BossNameplate is NOT built synchronously in _ready (deferred)"
+	)
 	await get_tree().process_frame
 	# Post-drain: BossNameplate is in the tree, parented under the room.
 	var np: Node = room.get_boss_nameplate()
-	assert_not_null(np,
-			"REGRESSION-86c9wjz2d: BossNameplate built in deferred fixture pass")
-	assert_true(np is BossNameplate,
-			"BossNameplate spawned as the correct script type")
-	assert_eq(np.get_parent(), room,
-			"BossNameplate is parented under the boss room (lifecycle tied)")
+	assert_not_null(np, "REGRESSION-86c9wjz2d: BossNameplate built in deferred fixture pass")
+	assert_true(np is BossNameplate, "BossNameplate spawned as the correct script type")
+	assert_eq(
+		np.get_parent(), room, "BossNameplate is parented under the boss room (lifecycle tied)"
+	)
 	# Pre-`show_for`: nameplate is hidden (no `show_for` call yet).
 	# `is_shown()` will be true only after entry_sequence_completed fires.
-	assert_false((np as BossNameplate).is_shown(),
-			"BossNameplate hidden before entry_sequence_completed")
+	assert_false(
+		(np as BossNameplate).is_shown(), "BossNameplate hidden before entry_sequence_completed"
+	)
 
 
 func test_boss_nameplate_shown_on_entry_sequence_completed() -> void:
@@ -417,10 +465,17 @@ func test_boss_nameplate_shown_on_entry_sequence_completed() -> void:
 	room.trigger_entry_sequence()
 	room.complete_entry_sequence_for_test()
 	# After completion, the nameplate has called show_for(boss).
-	assert_true(np.is_shown(),
-			"REGRESSION-86c9wjz2d: nameplate.show_for called from " +
-			"_complete_entry_sequence — slide-in tween armed")
+	assert_true(
+		np.is_shown(),
+		(
+			"REGRESSION-86c9wjz2d: nameplate.show_for called from "
+			+ "_complete_entry_sequence — slide-in tween armed"
+		)
+	)
 	# Boss name rendered uppercase from MobDef.display_name
 	# ("Warden of the Outer Cloister" → "WARDEN OF THE OUTER CLOISTER").
-	assert_eq(np.get_name_label().text, "WARDEN OF THE OUTER CLOISTER",
-			"nameplate renders boss display_name in uppercase")
+	assert_eq(
+		np.get_name_label().text,
+		"WARDEN OF THE OUTER CLOISTER",
+		"nameplate renders boss display_name in uppercase"
+	)

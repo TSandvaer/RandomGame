@@ -37,14 +37,21 @@ func test_input_actions_exist() -> void:
 	# Drew and Uma both wire UI/AI to these names, so any rename must be
 	# explicit and tracked.
 	var required_actions: Array[String] = [
-		"move_up", "move_down", "move_left", "move_right",
-		"dodge", "sprint",
-		"attack_light", "attack_heavy",
+		"move_up",
+		"move_down",
+		"move_left",
+		"move_right",
+		"dodge",
+		"sprint",
+		"attack_light",
+		"attack_heavy",
 		"toggle_inventory",
 	]
 	for action: String in required_actions:
-		assert_true(InputMap.has_action(action),
-			"Input action '%s' must be defined in project.godot" % action)
+		assert_true(
+			InputMap.has_action(action),
+			"Input action '%s' must be defined in project.godot" % action
+		)
 
 
 func test_physics_layers_named() -> void:
@@ -60,4 +67,6 @@ func test_physics_layers_named() -> void:
 	}
 	for layer: int in expected:
 		var got: String = ProjectSettings.get_setting("layer_names/2d_physics/layer_%d" % layer, "")
-		assert_eq(got, expected[layer], "Physics layer %d must be named '%s'" % [layer, expected[layer]])
+		assert_eq(
+			got, expected[layer], "Physics layer %d must be named '%s'" % [layer, expected[layer]]
+		)

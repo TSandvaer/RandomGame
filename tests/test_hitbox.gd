@@ -18,19 +18,22 @@ const HitboxScript: Script = preload("res://scripts/combat/Hitbox.gd")
 class FakeTarget:
 	extends Node2D
 	var hits: Array[Dictionary] = []
+
 	func take_damage(amount: int, kb: Vector2, source: Node) -> void:
 		hits.append({"amount": amount, "knockback": kb, "source": source})
 
 
 # --- 1 + 2: layer routing -------------------------------------------------
 
+
 func test_player_team_layer_routing() -> void:
 	var hb: Hitbox = HitboxScript.new()
 	hb.configure(5, Vector2.ZERO, 0.1, Hitbox.TEAM_PLAYER, null)
 	add_child_autofree(hb)
 	# Mask = enemy bit.
-	assert_eq(hb.collision_layer, Hitbox.LAYER_PLAYER_HITBOX,
-		"player team -> player_hitbox layer (bit 3)")
+	assert_eq(
+		hb.collision_layer, Hitbox.LAYER_PLAYER_HITBOX, "player team -> player_hitbox layer (bit 3)"
+	)
 	assert_eq(hb.collision_mask, Hitbox.LAYER_ENEMY, "player team mask -> enemy (bit 4)")
 
 
@@ -38,12 +41,14 @@ func test_enemy_team_layer_routing() -> void:
 	var hb: Hitbox = HitboxScript.new()
 	hb.configure(5, Vector2.ZERO, 0.1, Hitbox.TEAM_ENEMY, null)
 	add_child_autofree(hb)
-	assert_eq(hb.collision_layer, Hitbox.LAYER_ENEMY_HITBOX,
-		"enemy team -> enemy_hitbox layer (bit 5)")
+	assert_eq(
+		hb.collision_layer, Hitbox.LAYER_ENEMY_HITBOX, "enemy team -> enemy_hitbox layer (bit 5)"
+	)
 	assert_eq(hb.collision_mask, Hitbox.LAYER_PLAYER, "enemy team mask -> player (bit 2)")
 
 
 # --- 3: self-hit filtered -------------------------------------------------
+
 
 func test_source_is_never_self_hit() -> void:
 	var source: FakeTarget = FakeTarget.new()
@@ -58,6 +63,7 @@ func test_source_is_never_self_hit() -> void:
 
 # --- 4: single-hit-per-target invariant -----------------------------------
 
+
 func test_target_only_takes_damage_once() -> void:
 	var enemy: FakeTarget = FakeTarget.new()
 	add_child_autofree(enemy)
@@ -68,12 +74,16 @@ func test_target_only_takes_damage_once() -> void:
 	hb._try_apply_hit(enemy)
 	hb._try_apply_hit(enemy)
 	hb._try_apply_hit(enemy)
-	assert_eq(enemy.hits.size(), 1,
-		"single-hit-per-target invariant — multiple overlap signals must collapse")
+	assert_eq(
+		enemy.hits.size(),
+		1,
+		"single-hit-per-target invariant — multiple overlap signals must collapse"
+	)
 	assert_true(hb.has_already_hit(enemy), "has_already_hit returns true after first hit")
 
 
 # --- 5: payload fidelity --------------------------------------------------
+
 
 func test_take_damage_payload_round_trip() -> void:
 	var enemy: FakeTarget = FakeTarget.new()
@@ -93,6 +103,7 @@ func test_take_damage_payload_round_trip() -> void:
 
 # --- 6: configure callable pre-tree ---------------------------------------
 
+
 func test_configure_before_add_child() -> void:
 	# This is the same flow Player._spawn_hitbox uses: configure first,
 	# then add_child. Asserts that _ready() picks up the configured
@@ -108,6 +119,7 @@ func test_configure_before_add_child() -> void:
 
 
 # --- 7: hit_target signal carries target/damage/source -------------------
+
 
 func test_hit_target_signal_carries_payload() -> void:
 	var enemy: FakeTarget = FakeTarget.new()
@@ -140,14 +152,20 @@ func test_hit_target_signal_carries_payload() -> void:
 # fails before CI green and the engine/spec drift cannot ship silently.
 func test_team_constants_match_trace_string_contract() -> void:
 	assert_eq(
-		String(Hitbox.TEAM_PLAYER), "player",
-		"TEAM_PLAYER value drives [combat-trace] Hitbox.hit | team=player " +
-			"— renaming this constant breaks every Playwright spec asserting " +
-			"player-attacks-mob (ac3-death-persistence, regen-smoke)."
+		String(Hitbox.TEAM_PLAYER),
+		"player",
+		(
+			"TEAM_PLAYER value drives [combat-trace] Hitbox.hit | team=player "
+			+ "— renaming this constant breaks every Playwright spec asserting "
+			+ "player-attacks-mob (ac3-death-persistence, regen-smoke)."
+		)
 	)
 	assert_eq(
-		String(Hitbox.TEAM_ENEMY), "enemy",
-		"TEAM_ENEMY value drives [combat-trace] Hitbox.hit | team=enemy " +
-			"— renaming this constant breaks every Playwright spec asserting " +
-			"mob-attacks-player (mob-self-engagement, soak-narrative-regression)."
+		String(Hitbox.TEAM_ENEMY),
+		"enemy",
+		(
+			"TEAM_ENEMY value drives [combat-trace] Hitbox.hit | team=enemy "
+			+ "— renaming this constant breaks every Playwright spec asserting "
+			+ "mob-attacks-player (mob-self-engagement, soak-narrative-regression)."
+		)
 	)
