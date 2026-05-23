@@ -35,9 +35,15 @@ const ZoneAnchorScript: Script = preload("res://resources/level/ZoneAnchor.gd")
 const LevelChunkDefScript: Script = preload("res://scripts/levels/LevelChunkDef.gd")
 const ChunkPortScript: Script = preload("res://scripts/levels/ChunkPort.gd")
 const MobSpawnPointScript: Script = preload("res://scripts/levels/MobSpawnPoint.gd")
-const OUTER_CLOISTER_ZONE: Resource = preload(
-	"res://resources/level/zones/s1_z1_outer_cloister.tres"
-)
+
+
+# `.tres` files containing nested scripted sub-resources (9 ZoneAnchor
+# sub-resources here) fail to resolve via parse-time `preload(...)` — the
+# const binds to null. Route through runtime `load(...)` via this helper
+# instead. See `.claude/docs/test-conventions.md` § "preload of .tres with
+# nested scripted sub-resources fails at parse-time (PR #357 lesson)".
+func _load_outer_cloister_zone() -> ZoneDef:
+	return load("res://resources/level/zones/s1_z1_outer_cloister.tres")
 
 var _warn_guard: NoWarningGuard
 
@@ -487,7 +493,7 @@ func test_assemble_authored_s1_z1_outer_cloister_round_trip() -> void:
 	# convention) Stratum-1 narrative arc with a [0, 1]-slot procedural fill
 	# pool of size 3. Demonstrates the full pipeline: ZoneDef.tres +
 	# LevelChunkDef.tres files → AssembledFloor with deterministic placement.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	assert_not_null(zone, "s1_z1_outer_cloister.tres must load as ZoneDef")
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	var seed: int = FloorAssemblerScript.derive_zone_seed(
@@ -507,7 +513,7 @@ func test_assemble_authored_s1_z1_same_seed_identical_across_runs() -> void:
 	# Same character + same zone → same map across save/load (R-PROCGEN.a).
 	# This is the spike's headline proof for the seed round-trip
 	# question, exercising the real production .tres files.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	var seed: int = 0xC0FFEE
 	var a: AssembledFloor = asm.assemble_floor(zone, seed)
@@ -536,7 +542,7 @@ func test_assemble_authored_s1_z1_room01_east_seam_now_mates() -> void:
 	#
 	# Pin: production S1 z1 zone assembles with ZERO port-mating errors;
 	# specifically, no error mentions s1_room01.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	var f: AssembledFloor = asm.assemble_floor(zone, 1)
 	assert_true(
@@ -559,7 +565,7 @@ func test_assemble_authored_s1_z1_boss_door_mates_cleanly() -> void:
 	# boss_door tag appears in the worked example) MUST NOT produce a
 	# mating error. If a future refactor accidentally drops boss_door
 	# from OPEN_PORT_TAGS, this test surfaces it.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	# Use a small seed so we have predictable output; assert no error
 	# mentions s1_room08 (the boss_door chunk) at the boss/exit seam.
@@ -585,7 +591,7 @@ func test_s1_z1_clean_mating_across_8_seeds() -> void:
 	# post-retrofit S1 z1 zone must produce zero port-mating errors. If
 	# any seed surfaces an error, either a procedural-pool chunk lacks
 	# the canonical row-4 seam OR an anchor seam regressed.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	for s: int in [1, 2, 3, 7, 13, 42, 100, 999]:
 		var f: AssembledFloor = asm.assemble_floor(zone, s)
@@ -599,7 +605,7 @@ func test_s1_z1_all_8_unique_chunks_referenced() -> void:
 	# Coverage pin — the W2 retrofit declares all 8 S1 hand-authored chunks
 	# (s1_room01 .. s1_room08) as anchors in the zone. Without this pin a
 	# silent drop of one room would be caught only by a content review.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var anchor_chunk_ids: Dictionary = {}
 	for a: ZoneAnchor in zone.anchors:
 		anchor_chunk_ids[a.chunk_id] = true
@@ -619,7 +625,7 @@ func test_s1_z1_anchors_have_deterministic_relative_order_across_seeds() -> void
 	# (NOT seed-dependent); only the procedural slots between them vary by
 	# seed. Across N=8 seeds, the ORDERED LIST of anchor room_ids must be
 	# identical (only procedural-fill chunk_ids may differ).
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var expected_room_ids: Array[StringName] = []
 	for a: ZoneAnchor in zone.anchors:
 		expected_room_ids.append(a.room_id)
@@ -645,7 +651,7 @@ func test_s1_z1_total_chunk_count_in_documented_bounds() -> void:
 	# 9 (anchors-only) .. 17 (max procedural fill) chunks per assembly.
 	# Anchors=9, gaps=8, slots-per-gap=[0,1] → procedural ∈ [0, 8] →
 	# total ∈ [9, 17].
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	for s: int in [1, 2, 3, 7, 13, 42, 100, 999]:
 		var f: AssembledFloor = asm.assemble_floor(zone, s)
@@ -661,7 +667,7 @@ func test_s1_z1_same_seed_bit_identical_across_runs() -> void:
 	# The headline determinism pin for the production zone. Asserts the
 	# full placement vector (chunk_id + position + kind + anchor_room_id)
 	# is bit-identical across two assemble calls with the same seed.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	var seed: int = 0xCAFEBABE
 	var a: AssembledFloor = asm.assemble_floor(zone, seed)
@@ -743,7 +749,7 @@ func test_s1_z1_different_seeds_produce_different_layouts() -> void:
 	# placement signatures. With pool size 3 × [0, 1] slots per 8 gaps,
 	# variance is significant — accidental seed collisions across 8 seeds
 	# are negligibly improbable.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	var signatures: Dictionary = {}
 	for s: int in [12345, 67890, 11111, 22222, 33333, 44444, 55555, 66666]:
@@ -768,7 +774,7 @@ func test_s1_z1_procedural_pool_chunks_resolve_via_load() -> void:
 	# resolves to an actual LevelChunkDef on disk. A typo in the .tres
 	# would fail loudly here instead of surfacing as an unresolvable-id
 	# error at assemble-time on a player's machine.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	for chunk_id: StringName in zone.procedural_slot_pool:
 		var path: String = "res://resources/level_chunks/%s.tres" % String(chunk_id)
 		var res: Resource = load(path)
@@ -784,7 +790,7 @@ func test_s1_z1_procedural_pool_chunks_resolve_via_load() -> void:
 func test_s1_z1_all_anchor_chunk_ids_resolve_via_load() -> void:
 	# Sibling pin — every anchor.chunk_id resolves on disk. The eight
 	# unique S1 chunks (s1_room01 .. s1_room08) must all load.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var seen: Dictionary = {}
 	for a: ZoneAnchor in zone.anchors:
 		if seen.has(a.chunk_id):
@@ -823,7 +829,7 @@ func test_s1_z1_zone_def_validates_cleanly() -> void:
 	# Hygiene pin — the production zone .tres must validate cleanly. A
 	# typo, duplicate room_id, or missing entry/exit anchor would surface
 	# at GUT time instead of at the first player's run.
-	var zone: ZoneDef = OUTER_CLOISTER_ZONE as ZoneDef
+	var zone: ZoneDef = _load_outer_cloister_zone()
 	var errors: Array[String] = zone.validate()
 	assert_true(
 		errors.is_empty(),
