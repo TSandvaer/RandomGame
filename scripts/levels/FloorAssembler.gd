@@ -27,8 +27,10 @@ extends RefCounted
 ## (`derive_stratum_seed` + `derive_zone_seed`) let callers chain
 ## cleanly:
 ##
+##   var stratum_seed: int = FloorAssembler.derive_stratum_seed(
+##       character.world_seed, zone_def.stratum_id)
 ##   var zone_seed: int = FloorAssembler.derive_zone_seed(
-##       character.world_seed, zone_def.stratum_id, zone_def.zone_id)
+##       stratum_seed, zone_def.zone_id)
 ##   var floor: AssembledFloor = FloorAssembler.new().assemble_floor(
 ##       zone_def, zone_seed)
 ##
