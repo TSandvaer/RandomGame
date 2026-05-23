@@ -433,6 +433,45 @@ The gate at `Stratum1BossRoom.gd:358` (currently — verify line if refactored) 
 
 **Symptom to recognize:** test premise reads "no boss should mean no entry-sequence-active" yet GUT log shows the entry sequence engaging anyway after a frame-drain await. The deferred-call resolution is the culprit, not the test order.
 
+## Test stubs — script-typed `extends Node` required for `Object.set` writes (PR #352 lesson)
+
+**What it is.** A GUT test wants a lightweight stub for a real game object (e.g. `Player`), so it instantiates `Node.new()` and seeds fields via `Object.set("active_bounty", QuestState.new())`. Every assertion against the stub then fails with bizarre shapes — `active_bounty is null` when it was just `set` to a value, `Trying to assign value of type 'Nil' to a variable of type 'Array'` when reading a Variant field.
+
+**Root cause.** Godot 4 GDScript's `Object.set(name, value)` **silently drops the write when the property does not exist on the receiver**. A bare `Node.new()` has only the base `Node` API surface — no `active_bounty`, no `completed_bounties` — so every stub-seeding write becomes a no-op. The next `Object.get(...)` returns `null` (or the type-default for typed reads), and downstream code that expects a real value crashes or asserts incorrectly.
+
+**Why GDScript silently drops, not warns.** `Object.set` is the engine's generic mutator (same surface scripts use for runtime-typed property access via `tween_property` etc.). The engine cannot distinguish "intentional dynamic-property write" from "typo of an existing property" — so it silently accepts the write into a property bag that subsequent reads ignore. No warning is emitted; no `push_warning` fires. The failure surfaces only at the consumer site.
+
+**Fix shape (PR #352, ticket `86c9y7ydg`).** Declare a script-typed stub that explicitly enumerates every field the system-under-test will `set` or `get`:
+
+```gdscript
+# tests/test_helpers/player_stub_for_quest_router.gd
+extends Node
+
+var active_bounty: Variant = null         # explicit declaration — `set("active_bounty", x)` now sticks
+var completed_bounties: Array = []        # typed default — read returns [] not null
+```
+
+Then in the test:
+
+```gdscript
+const PlayerStubScript := preload("res://tests/test_helpers/player_stub_for_quest_router.gd")
+
+func before_each() -> void:
+    _player_stub = PlayerStubScript.new()   # NOT Node.new()
+    _player_stub.active_bounty = quest_state  # direct assignment OR Object.set both work now
+```
+
+**When to use this pattern.** Any GUT test that:
+- Instantiates a bare-Node stub instead of the real production class
+- Calls `Object.set(stub, "<field>", value)` to seed state
+- Reads the same field back via `Object.get` or direct dot-access
+
+If the test exists, the pattern applies. The cost is one ~20-line helper script per stub-shape; the benefit is reads/writes behave as the test author expects.
+
+**Alternative considered (rejected):** instantiating the real `Player.new()` instead of a stub. Rejected because `Player` carries the full scene/input/audio/animation dependency surface — instantiation pulls in dozens of unrelated subsystems, and any one of them warning during test setup pollutes `NoWarningGuard`. The narrow-stub pattern is the right granularity.
+
+**Cite shape.** PR #352 / commit `4e33717` introduced this pattern; helper file lives at `tests/test_helpers/player_stub_for_quest_router.gd`. The same shape applies to any future test that needs a Player-stand-in or any other game-object stub.
+
 ## Spike-class specs — diag-build-gated activation pattern (PR #314 finding)
 
 **Context.** M3 Tier 3 W1 (PR #314, commit `e695bd9`) shipped a continuous-scroll camera spike that lives in `scenes/spike/CameraScrollSpike.tscn` — a hand-stitched 3-chunk test scene, NOT a feature of the production play loop. The matching Playwright spec `tests/playwright/specs/camera-scroll-spike.spec.ts` lives in `tests/playwright/specs/` (auto-discovered by Playwright) and runs on every CI Playwright lane, but it must NOT fail against the production artifact where `run/main_scene = Main.tscn`. The diag-build pattern (per `html5-export.md` § "Diagnostic-build pattern") flips the spike to active only on a transient `diag/*` branch with `project.godot::run/main_scene` swapped to the spike scene.

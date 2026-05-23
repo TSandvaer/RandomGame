@@ -95,6 +95,23 @@ Authoring convention for `quest_action` strings: `<verb>:<target>` colon-separat
 
 These are conventional only — the controller does not validate verb / target syntax. W2's BountyController defines the canonical list when it lands.
 
+### QuestStateResolver — the 4-state matrix (PR #352 / W2-T6)
+
+The `quest_state` value passed to `DialogueController.open(tree, quest_state)` is **resolved** by `QuestStateResolver.resolve_branch_key(npc_id, player_active, player_completed)` per a per-NPC offered-quest lookup. The resolver's `NPC_OFFERED_QUEST: Dictionary` const maps `npc_id → quest_id` (the quest each NPC offers); the matrix below produces the branch key the controller walks against:
+
+| `Player.active_bounty` | `Player.completed_bounties` | Branch key |
+|---|---|---|
+| `null` | does NOT contain `NPC_OFFERED_QUEST[npc_id]` | `&"pre_quest"` |
+| `QuestState` matching `NPC_OFFERED_QUEST[npc_id]` | (irrelevant) | `&"quest_active"` |
+| `null` OR mismatched quest | contains `NPC_OFFERED_QUEST[npc_id]` | `&"quest_completed"` |
+| (any state for an NPC not in `NPC_OFFERED_QUEST`) | — | `&"flavor"` (default) |
+
+The `quest_failed` branch exists in the `DialogueTreeDef` schema but is **not currently emitted** by the resolver — no quest can be failed in W2-T6 (single-active-bounty + accept-or-not gameplay only). Reserved for a future failure-condition feature (timer, mob-killed, lost-item).
+
+**Why a separate resolver autoload, not inline in DialogueController.** Per the W2-T6 ticket scope (Part D), branch-key resolution is intentionally decoupled from the controller. The controller owns "given a branch key, walk it"; the resolver owns "given Player + NPC state, pick the branch key." This split lets the resolver's matrix evolve (add quest_failed when timers ship, add per-NPC overrides for vendor reaction shifts) without touching DialogueController's stable API surface.
+
+**Cite shape.** Resolver impl at `scripts/quests/QuestStateResolver.gd` (PR #352, merge commit `8a0cc76`, ticket `86c9y7ydg`). The `NPC_OFFERED_QUEST` const Dict is the authoritative source for which NPC offers which quest — extend it when adding new questgivers. Paired GUT pin: `tests/test_quest_state_resolver.gd` (11 tests covering the matrix).
+
 ## DialoguePanel modal UI
 
 `scenes/ui/DialoguePanel.tscn` + `scripts/ui/DialoguePanel.gd`. Pure view; reads from `DialogueController`, writes via `advance_line` / `select_response` / `close`. All UI built procedurally in `_ready` (consistent with InventoryPanel pattern).
