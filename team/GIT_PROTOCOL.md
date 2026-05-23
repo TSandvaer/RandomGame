@@ -6,7 +6,7 @@ Remote: `https://github.com/TSandvaer/RandomGame.git`. Default branch: `main`. *
 
 **On task start — mandatory ClickUp visibility flip:**
 
-Before doing any work on a task, flip its ClickUp status from `to do` to **`in progress`** with `mcp__clickup__clickup_update_task`. This gives the Sponsor live visibility into what's currently in flight. If MCP is disconnected, queue the flip in `team/log/clickup-pending.md` per `team/CLICKUP_FALLBACK.md` and proceed; orchestrator flushes on next reconnect. Skip this for trivial run-state PRs (e.g. your own `chore(state): <role> idle` PR — that's not a backlog task).
+Before doing any work on a task, flip its ClickUp status from `to do` to **`in progress`** with `mcp__clickup__update_task`. This gives the Sponsor live visibility into what's currently in flight. If MCP is disconnected, queue the flip in `team/log/clickup-pending.md` per `team/CLICKUP_FALLBACK.md` and proceed; orchestrator flushes on next reconnect. Skip this for trivial run-state PRs (e.g. your own `chore(state): <role> idle` PR — that's not a backlog task).
 
 If you finish the task in the same run (typical for design docs, doc tasks, small fixes), the status will progress through `in progress → ready for qa test` (feature) or `in progress → complete` (docs/chore exempt) by the end of your run. The `in progress` window is meaningful for the Sponsor even if it's brief — it's the live signal of "what's being worked on right now."
 
@@ -69,8 +69,8 @@ Every ticket lifecycle event has a paired ClickUp status move that fires in the 
 **Rules:**
 
 1. **Same tool round.** The ClickUp `update_task` call goes in the same response as the dispatch / `gh pr create` / `gh pr merge` — not a follow-up. "Queue and forget" is the failure mode.
-2. **MCP down → fallback queue.** If `mcp__clickup__clickup_*` is unreachable, queue the flip in `team/log/clickup-pending.md` per `team/CLICKUP_FALLBACK.md`, and the orchestrator flushes on reconnect.
-3. **Heartbeat audit sweep.** Every heartbeat tick the orchestrator runs `mcp__clickup__clickup_filter_tasks list_ids=["901523123922"] statuses=["in progress","ready for qa test"]` and reconciles each ticket against reality (agent running? PR open? merged?). Discrepancies are fixed in the same tick.
+2. **MCP down → fallback queue.** If `mcp__clickup__*` is unreachable, queue the flip in `team/log/clickup-pending.md` per `team/CLICKUP_FALLBACK.md`, and the orchestrator flushes on reconnect.
+3. **Heartbeat audit sweep.** Every heartbeat tick the orchestrator runs `mcp__clickup__get_tasks list_id="901523123922" statuses=["in progress","ready for qa test"]` and reconciles each ticket against reality (agent running? PR open? merged?). Discrepancies are fixed in the same tick.
 4. **Tickets created mid-flight.** If Tess (or any role) discovers a bug and files a `bug(...)` ticket, set the initial status correctly: `complete` if the fix already shipped, default if the work is upcoming.
 
 **Mantra:** the ClickUp board is the truth. Don't lie to it.
