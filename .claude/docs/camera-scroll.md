@@ -1,6 +1,6 @@
 # Camera Scroll — continuous-scroll follow + world-bounds clamp
 
-> **STATUS — Spike landed on `main` via PR for ticket `86c9xu9yt` (M3 Tier 3 W1 spike).** This doc captures the continuous-scroll API contracts + design rationale. The W2 implementation PR will extend this doc with empirical HTML5 quirks discovered during S1 retrofit + Sponsor-soak.
+> **STATUS — Spike landed on `main` via PR for ticket `86c9xu9yt` (M3 Tier 3 W1 spike). Production wiring landed via PR for ticket `86c9y0zmg` (M3 Tier 3 W2-T1 — S1 light retrofit).** This doc captures the continuous-scroll API contracts + design rationale + production-wiring shape.
 
 ## What this is
 
@@ -166,9 +166,84 @@ CanvasLayer-anchored HUD remains immune to the continuous-scroll path — the W1
 
 **New paired pin:** `test_hud_canvaslayer_unaffected_by_continuous_scroll` — exercises the `follow_target` + `set_world_bounds` path (rather than the T9 zoom path the existing `test_hud_canvaslayer_unaffected_by_camera_zoom` covers) and asserts the HUD label's screen-space position is unchanged. If a future refactor reaches up to mutate CanvasLayer transforms via the camera, this catches it.
 
+## Production wiring (M3 Tier 3 W2-T1, ticket `86c9y0zmg`)
+
+The W1 spike landed the API + math + HTML5 rendering surface. **W2-T1 wires the production play loop (`Main.tscn` + `Stratum1BossRoom.tscn`) to engage the API on every room load.** "Light retrofit" means engaging follow-target + bounds-clamp without widening rooms to multi-chunk — current S1 rooms are 480×270 viewport-native, so the bounds-clamp's "narrower than viewport" branch holds the camera at bounds-center every tick (zero visual change vs the pre-T9 viewport-stretch shape, with the production code path now ready to consume `AssembledFloor.bounding_box_px` from the procgen impl W2-T3+).
+
+### Main.gd — `_engage_camera_for_room()` helper
+
+`Main.gd` declares two constants near `DEFAULT_PLAYER_SPAWN`:
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `S1_ROOM_BOUNDS` | `Rect2(0, 0, 480, 270)` | Viewport-native bounds for current S1 authored rooms |
+| `CAMERA_FOLLOW_DEADZONE` | `Vector2(40, 24)` | Half-extents — matches the W1 spike scene's authored deadzone |
+
+`_load_room_at_index(idx)` calls `_engage_camera_for_room()` **after** the player has been re-parented into the new room (so the closure target is alive) and **before** `_wire_room_signals` (so signal-ordering coupling is impossible). The helper soft-resolves `CameraDirector` and bails cleanly in bare-test surfaces without the autoload.
+
+```gdscript
+func _engage_camera_for_room() -> void:
+    if _player == null:
+        return
+    var cd: Node = _camera_director()
+    if cd == null:
+        return
+    if cd.has_method("follow_target"):
+        cd.follow_target(_player, CAMERA_FOLLOW_DEADZONE)
+    if cd.has_method("set_world_bounds"):
+        cd.set_world_bounds(S1_ROOM_BOUNDS)
+```
+
+**Idempotence on room-cycle.** Per the spike's idempotence semantics, re-engaging with the same target + same deadzone emits no `follow_target_changed` signal; re-setting the same `Rect2` bounds is a no-op. So a player traversing Room 01 → Room 02 → Room 01 → Room 02 receives 4 engage calls and exactly ONE `follow_target_changed(true)` emission (at boot). Pinned by `test_main_engage_camera_idempotent_on_room_swap` in `tests/test_main_camera_wiring.gd`.
+
+### Stratum1BossRoom.gd — `_engage_camera_for_boss_room()` helper
+
+The boss room has its own engage path inside `_assemble_room_fixtures` (the deferred fixture pass that runs one frame after `_ready`, OUTSIDE the physics-flush window). Two constants:
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `BOSS_ROOM_BOUNDS` | `Rect2(0, 0, 480, 270)` | Today identical to S1 rooms; a future widened-boss-room ticket updates here |
+| `BOSS_ROOM_FOLLOW_DEADZONE` | `Vector2(40, 24)` | Matches Main's authored deadzone |
+
+The boss room's `_engage_camera_for_boss_room()` fires at the **tail** of `_assemble_room_fixtures` (after `trigger_entry_sequence()`), so a future ticket can add bounds-overriding work inside the entry-sequence trigger without conflicting with the room's authored bounds. The player is resolved via `get_tree().get_first_node_in_group("player")` (matches `CameraDirector._process`'s per-tick fallback).
+
+**Why the boss room has its own engage when Main already engages on `_load_room_at_index(BOSS_ROOM_INDEX)`:** symmetry + defensive-in-depth. Main's call covers the production room-load path; the boss room's own call:
+
+1. Self-contains the boss-room engage for tests that bare-instantiate the controller (e.g. `test_room_advance_only_on_door_walk`).
+2. Provides the hook for future widened-boss-room work without requiring a Main.gd edit.
+3. Re-asserts the contract AFTER the deferred fixture pass drains — `_build_door_trigger` + `_spawn_stratum_exit` + `_spawn_boss_nameplate` all run from the deferred pass; if any of those ever mutate camera state (none do today), the engage call here is the final word.
+
+The double-engage is benign per idempotence.
+
+### Wiring sites — quick reference
+
+| File | Line | Call site |
+|---|---|---|
+| `scenes/Main.gd` | `_load_room_at_index` | `_engage_camera_for_room()` after `room.add_child(_player)` |
+| `scenes/Main.gd` | `_engage_camera_for_room` | Helper near bottom of file (alongside `_camera_director`) |
+| `scripts/levels/Stratum1BossRoom.gd` | `_assemble_room_fixtures` | `_engage_camera_for_boss_room()` after `trigger_entry_sequence()` |
+| `scripts/levels/Stratum1BossRoom.gd` | `_engage_camera_for_boss_room` | Helper near bottom of file (alongside `_resolve_camera_director`) |
+
+### Tests pinning the wiring
+
+| Test | Surface | Bug class caught |
+|---|---|---|
+| `tests/test_main_camera_wiring.gd::test_main_load_room_calls_engage_camera_after_player_reparent` | Source-scan structural | Ordering refactor that moves engage before player re-parent |
+| `tests/test_main_camera_wiring.gd::test_main_engage_camera_helper_calls_follow_target_and_set_world_bounds` | Source-scan structural | Refactor that drops one of the two API calls (e.g. follow_target only) |
+| `tests/test_main_camera_wiring.gd::test_boss_room_assemble_fixtures_calls_engage_camera_at_tail` | Source-scan structural | Boss-room ordering refactor that fires engage before entry-sequence trigger |
+| `tests/test_main_camera_wiring.gd::test_main_boot_engages_camera_against_player_with_authored_constants` | Behavioural (bare-instance Main) | Wiring drift (different deadzone, different bounds, different target) |
+| `tests/test_main_camera_wiring.gd::test_main_engage_camera_idempotent_on_room_swap` | Behavioural | Per-room signal-spam regression |
+| `tests/playwright/specs/camera-scroll-production.spec.ts` | HTML5 release-build | Production-artifact wiring regression (Self-Test Report gate satisfaction surface) |
+
+### Forward-compat — AssembledFloor.bounding_box_px swap (W2-T3+)
+
+PR #344 (W2-T3, ticket `86c9xub9p`) landed `FloorAssembler.assemble_floor(zone_def, seed) -> AssembledFloor` with `bounding_box_px: Rect2`. Main.gd does NOT consume this yet — room loads still go through `ROOM_SCENE_PATHS` + authored `.tscn` instantiation. When the procgen W2-T3-impl PR swaps `_load_room_at_index` to consume `AssembledFloor`, `_engage_camera_for_room()` should switch its source from `S1_ROOM_BOUNDS` to `assembled.bounding_box_px`. Per `procgen-pipeline.md` § "AssembledFloor output shape", this is the planned downstream-consumer integration point.
+
+Until that swap lands, the authored `Rect2(0, 0, 480, 270)` is the source of truth. The bounds value is centralised in ONE place (`Main.S1_ROOM_BOUNDS`) so the swap is a single-file edit.
+
 ## Open follow-ups (NOT in the spike PR)
 
-- **W2 S1 retrofit ticket** — wire `CameraDirector.follow_target(player, ...)` into `Main.gd` / room scripts; widen Stratum-1 rooms to multi-chunk wherever the scrolling shape demands; set per-room `set_world_bounds` based on chunk-assembled room bounds.
+- **W2 S1 retrofit ticket** — wire `CameraDirector.follow_target(player, ...)` into `Main.gd` / room scripts; widen Stratum-1 rooms to multi-chunk wherever the scrolling shape demands; set per-room `set_world_bounds` based on chunk-assembled room bounds. **PARTIAL LANDED PR for ticket `86c9y0zmg` (W2-T1 light retrofit)** — wires the API on every room load with authored 480×270 bounds; widening + procgen-bounds swap is the W2-T3+ work that consumes this wiring. See § "Production wiring" above.
 - **W2 procgen integration** — `assemble_floor` produces multi-chunk room compositions; `Main._load_room_at_index` calls `set_world_bounds(assembled_bounds)` after assembly.
 - **Soft-lerp follow** — current design is deadzone-edge snap (within deadzone: hold; crossing: shift target to edge). A future tuning ticket may add a per-tick lerp (~0.1 s catch-up) for "feel." Default snap is zero feel-change vs T9 within the deadzone; the spike's `Vector2(40, 24)` deadzone is large enough that single-frame snap is imperceptible. Sponsor decision; tag for Uma direction after W2 retrofit.
 - **Camera-shake redirect** (`86c9wvh8e`) — unchanged from T9's open follow-up. Independent surface.
