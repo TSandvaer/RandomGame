@@ -472,6 +472,40 @@ test.skip(
 
 **Apply this shape whenever** a Playwright spec targets a non-production scene only reachable via the diag-build pattern. Examples: future room-boundary spikes, isolated boss-test scenes, perf-stress spikes. The cite-of-record is PR #314 commit `e695bd9` + `tests/playwright/specs/camera-scroll-spike.spec.ts:80-110` (the activation race + skip block).
 
+## Forward-compat spike specs + spike-spec inventory
+
+### Forward-compat property — spike specs activate without rewrite when production wiring lands
+
+A spike-class spec authored using the race-then-skip pattern (§ above) is inherently **forward-compatible with production wiring**. When the production play loop is later updated to invoke the spike feature (e.g. `Main._load_room_at_index → assemble_floor → set_world_bounds`), the same spec auto-activates against the production artifact **without any spec rewrite**.
+
+**Mechanism.** The race tests for the spike scene's boot line vs the production `[Main]` boot line. Once the production play loop emits the feature's trace lines alongside `[Main] M1 play-loop ready`, the race resolves to production boot first, but the subsequent trace-assertion block matches against the feature's trace lines from the production context. The spec body asserts the feature in production without branching or conditional test logic.
+
+**Design rule for spike spec authors:**
+
+1. Boot-race + skip (standard pattern — see § above) handles the "wrong artifact" case.
+2. Within the active path, gate additional assertion blocks on a **production-wiring sentinel** (a distinct console line that only fires when the feature is live in the prod play loop — e.g. `[FloorAssembler] assemble_floor | zone_id=s1_z1`).
+3. Against the diag artifact, the production-wiring sentinel is absent → run the spike-proof assertions. Against a future prod artifact, the sentinel fires → run the full production assertion set.
+
+Write the spec body to assert the feature's observable trace lines (not the spike scene's private state). If the trace lines are identical whether the feature runs from the spike scene or the production play loop, the spec needs no changes when production wiring lands.
+
+### Spike-spec inventory (W2, 2026-05-23)
+
+Live diag-build-gated spike-class specs in `tests/playwright/specs/`:
+
+| Spec | Feature | Paired `diag/*` branch | Shipped via | Status |
+|---|---|---|---|---|
+| `camera-scroll-spike.spec.ts` | W1 continuous-scroll camera spike | `diag/camera-scroll-spike-soak` | PR #314 | Merged |
+| `procgen-spike.spec.ts` | W1 FloorAssembler proof | `diag/procgen-spike-soak` | PR #328 | Merged |
+| `m3-procgen-determinism.spec.ts` | W2 S1 retrofit + ZoneDef expansion (AC-C5-{1,2,3,7}) | `diag/procgen-spike-soak` | PR #344 | Merged (`ed8ae26`) |
+
+**Update policy:** when a new spike-class spec merges, add a row. Include the paired diag branch so the pairing is explicit.
+
+### Do NOT prune "always-skipping" spike specs
+
+As spike specs accumulate, a future tooling pass or refactor agent may flag them as "dead specs" (always-skip against production, never-assert) and propose removal. **Do NOT prune spike-class specs.** Each is the activation harness for its spike feature's eventual production wiring — removing it means the production wiring would ship without its Playwright test layer until someone re-authors the spec. The "always-skipping" behavior is expected and correct; it is the production-safety posture for an unactivated spike, not evidence the spec is dead.
+
+**How to distinguish dead specs from spike-class specs:** a dead spec has no boot-race skip block and fails consistently or is `test.describe.skip`-flagged statically; a spike-class spec has an explicit `test.skip(spikeBootLine === undefined, ...)` and produces clean skips against production. Any spec matching the race-then-skip pattern is a spike-class spec — treat as load-bearing until the spike is either promoted to production (spec activates automatically) or the spike is formally retired (then the spec may be deleted).
+
 ## Source-scan structural pins — code-ordering invariants no behavioural test can pin (PR #323 finding)
 
 **The trap.** Some invariants are about **code ordering inside a single function**, not about externally-observable behaviour. Example from PR #323: the gate-check `if _modal_is_active(): return` in `Player._process_grounded` must sit AFTER the velocity-write (`velocity = input_dir * speed`) but BEFORE the attack/dodge input-polls. A future refactor moving the gate above the velocity-write would break movement-while-modal-open without breaking ANY behavioural test — bare-instanced GUT tests can't synthesise `Input.is_action_*` global state in Godot 4 GDScript, so they can't directly observe the input-polling output.
@@ -505,6 +539,19 @@ func test_movement_input_not_gated_by_inventory() -> void:
 - A refactor reshaping the function would be load-bearing — silent reversal would be a real regression.
 
 **Cite shape.** PR #323 introduced this pattern in `tests/test_player_modal_input_gate.gd:194` (commit `2779647`, ticket `86c9xxg0n`). The same shape can pin any "this line must come before / after that line" invariant — `Mob._die` cleanup ordering, save-migration step ordering, resource-load-vs-init ordering. Use sparingly; behavioural tests remain the default. Source-scan pins exist for invariants the behavioural surface cannot reach.
+
+### Additional exemplar — autoload state lifecycle across signal-handler boundaries (PR #347 / W2-T2)
+
+A sibling source-scan pin from PR #347 (`tests/test_quest_action_listener_reads_branch_key_before_close.gd`) enforces a different invariant class: **state lifecycle across signal-handler boundaries**. The `QuestActionRouter` listener autoload must snapshot `DialogueController.current_branch_key()` synchronously BEFORE `DialogueController.close()` clears the controller's state. If a refactor moves the snapshot AFTER the close, the read returns empty string — silently breaking any downstream quest-state logic that depends on the branch key.
+
+The pin reads both `QuestActionRouter.gd` and the related controller source, and asserts:
+
+- The autoload's `_action_branch_key` field exists (snapshot location is autoload state, NOT controller state — so it survives both controller navigation and `close()`).
+- The snapshot read site precedes the `close()` call site within the listener's signal handler.
+
+**Why this differs from the PR #323 pattern.** PR #323 pins one-function relative ordering (two lines inside `Player._process_grounded`). This W2-T2 pin spans TWO source files (the autoload and the controller it observes). The same source-scan API (`FileAccess.get_file_as_string` + `.find` + `assert_lt`) applies, but the pin enumerates load-bearing sites across the autoload/controller boundary. **Apply this two-file variant whenever a signal-handler's correctness depends on temporally-ordered reads/writes against a different autoload's state** — controllers that emit `<thing>_closed` signals AND clear state in the same call are the most common shape.
+
+**Cite shape.** PR #347 introduced this pattern in `tests/test_quest_action_listener_reads_branch_key_before_close.gd` (merge commit `12916d9`, ticket `86c9y0zyv`). The pattern was flagged as a new exemplar in Devon's W2-T2 dispatch final report.
 
 ## Cross-references
 

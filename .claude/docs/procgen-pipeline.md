@@ -42,6 +42,22 @@ Each consecutive `(left, right)` placed-chunk pair must satisfy:
 
 **Source:** `scripts/levels/FloorAssembler.gd` lines 63–81 (docstring), `_sweep_port_mating` line 330, `_check_port_mating` line 360.
 
+## Port-additivity invariance
+
+**The invariant:** adding a new port to an existing chunk resource is non-breaking to all other chunks' mating contracts, provided the new port does not introduce a collision with existing mating — specifically, if no currently-assembled zone has a chunk placed to the right of the modified chunk that ALSO needs a matching WEST port at the same `position_tiles.y`. If no such collision exists, `_sweep_port_mating()` records zero new mating errors; the pre-existing error count can only decrease (the new port satisfies previously-unsatisfied EAST requirements).
+
+**Why this holds.** The assembler's `_sweep_port_mating` sweep is pairwise — it checks consecutive `(left, right)` chunk pairs independently. Adding an EAST port to the left chunk of any pair can only satisfy or leave unchanged the left-side requirement; it cannot break a pair where the left chunk previously had no EAST requirement. The invariance follows from the pairwise-independence of the mating sweep.
+
+**Pre-addition checklist (before adding a port to an existing chunk):**
+
+1. `grep -r "<chunk_name>" resources/level/zones/` — enumerate every zone that references the chunk.
+2. For each referencing zone, identify any chunk placed to the **right** (higher index) of the target chunk in the `anchor_chunks` or `procedural_slots` list.
+3. Confirm the right-side chunk's WEST port set includes a `position_tiles.y` that matches your new EAST port. If it does: no collision, proceed. If it does not: the new EAST port will create a NEW mating error for that pair, counteracting any error you intended to clear.
+
+**Implication for sprint planning:** port-add fixes and chunk-content overhauls are independently mergeable. Block port-adds on `is_well_mated()` test passage, not on full ZoneDef pool completeness.
+
+**Scope note.** This invariant covers port *additions* only. Port *removals* and port *position_tiles changes* do NOT hold this invariant — they can break existing mating in any zone that relied on the removed/moved port. Port additions are the uniquely safe mutation class.
+
 ## AssembledFloor output shape
 
 `resources/level/AssembledFloor.gd` is the typed output Resource. Five load-bearing fields:

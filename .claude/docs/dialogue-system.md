@@ -127,7 +127,7 @@ Spike ships a `ColorRect` portrait placeholder. Stratum NPC sprites land in Sub-
 
 **Why this matters.** Without the gate, LMB-clicking a response button would fire both the UI selection AND a player swing. Visually disconcerting + double-fires the player's attack at every dialogue choice. Same input-leak class as the InventoryPanel ticket `86c9xwxhu` flagged by Drew — Sponsor's larger design call on inventory input-gating is in flight; the dialogue gate ships now as the pre-emptive convention seed.
 
-**Movement is intentionally NOT gated.** Player can walk away from a dialogue (Diablo convention — soft abort). Esc is the formal-exit channel. Walking off does NOT auto-close the controller in the spike — that's a behavior decision deferred to the W2 NPC-interaction wiring (NPC owns the proximity check + auto-close).
+**Movement is intentionally NOT gated.** Player can walk away from a dialogue (Diablo convention — soft abort). Esc is the formal-exit channel. Walking off does NOT auto-close the controller in the spike — that's a behavior decision deferred to the W3 NPC-interaction wiring (sub-track 5b; NPC owns the proximity check + auto-close).
 
 **Generalization for future modal panels.** Any modal UI that consumes LMB-click input on its surface (response buttons, inventory grid cells, vendor shop entries) should publish an `is_active() -> bool` method on a global controller / autoload. The Player's `_process_grounded` checks the union of those gates and suppresses attack input when ANY is active. The spike establishes the shape with one consumer (`DialogueController`); inventory follows as the Sponsor design call resolves.
 
@@ -145,7 +145,7 @@ All three tests use `NoWarningGuard` per `test-conventions.md` § Universal warn
 
 - `tests/playwright/specs/dialogue-spike-smoke.spec.ts` — boot smoke: autoload chain reaches `[Main] M1 play-loop ready`, no `DialogueController.*` warnings, no parser errors on `res://scripts/dialogue/`, no fixture-load failures on `res://resources/dialogue/`.
 
-**No Playwright interactive coverage in the spike.** NPC interaction → dialogue open is W2 wiring scope. The spike's Playwright surface is the warning-gate boot smoke only.
+**No Playwright interactive coverage in the spike.** NPC interaction → dialogue open is W3 wiring scope (sub-track 5b). The spike's Playwright surface is the warning-gate boot smoke only. W2-T2 (PR #347, merge `12916d9`) shipped the DialoguePanel mount on Main + QuestActionRouter listener stub + 3 hub-town `.tres` trees, but deliberately did NOT wire NPC scenes to invoke `DialogueController.open()` — that surface lands in W3 sub-track 5b.
 
 ## HTML5 escape-clause eligibility
 
