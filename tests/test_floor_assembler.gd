@@ -459,10 +459,11 @@ func test_derive_zone_seed_is_deterministic() -> void:
 
 
 func test_assemble_authored_s1_z1_outer_cloister_round_trip() -> void:
-	# The worked-example .tres from the zone-schema spike — assemble it
-	# with a fixed seed via production load() path (no override).
-	# Demonstrates the full pipeline: ZoneDef.tres + LevelChunkDef.tres
-	# files → AssembledFloor with deterministic placement.
+	# W2-T3 retrofit (`86c9y1045`) — the production S1 zone is now the full
+	# 9-anchor (8 unique chunks; room08 used for boss + exit per spike
+	# convention) Stratum-1 narrative arc with a [0, 1]-slot procedural fill
+	# pool of size 3. Demonstrates the full pipeline: ZoneDef.tres +
+	# LevelChunkDef.tres files → AssembledFloor with deterministic placement.
 	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
 	assert_not_null(zone, "s1_z1_outer_cloister.tres must load as ZoneDef")
 	var asm: FloorAssembler = FloorAssemblerScript.new()
@@ -472,10 +473,10 @@ func test_assemble_authored_s1_z1_outer_cloister_round_trip() -> void:
 	)
 	var f: AssembledFloor = asm.assemble_floor(zone, seed)
 	assert_false(f.is_empty(), "production zone must assemble: %s" % str(f.port_mating_errors))
-	assert_eq(f.anchor_count(), 5, "S1 z1 has 5 anchors")
-	# Procedural count is between (n-1)*min and (n-1)*max = 4*1=4..4*3=12.
-	assert_true(f.procedural_count() >= 4 and f.procedural_count() <= 12,
-		"S1 z1 procedural count %d out of [4, 12]" % f.procedural_count())
+	assert_eq(f.anchor_count(), 9, "S1 z1 has 9 anchors (8 unique chunks; room08 boss + exit)")
+	# Procedural count is between (n-1)*min and (n-1)*max = 8*0=0..8*1=8.
+	assert_true(f.procedural_count() >= 0 and f.procedural_count() <= 8,
+		"S1 z1 procedural count %d out of [0, 8]" % f.procedural_count())
 
 
 func test_assemble_authored_s1_z1_same_seed_identical_across_runs() -> void:
@@ -493,37 +494,33 @@ func test_assemble_authored_s1_z1_same_seed_identical_across_runs() -> void:
 		assert_eq(a.placed_chunks[i].position_px, b.placed_chunks[i].position_px)
 
 
-func test_assemble_authored_s1_z1_records_s1_room01_east_seam_finding() -> void:
-	# R-PROCGEN.b proof — production zone has a KNOWN port-mating gap at
-	# the s1_room01 → first-procedural-chunk seam: s1_room01.tres declares
-	# only a WEST entry port (it's an M1-era single-room intro chunk),
-	# so its EAST seam is open and the assembler records a mating error.
+func test_assemble_authored_s1_z1_room01_east_seam_now_mates() -> void:
+	# W2-T3 retrofit (`86c9y1045`) — R-PROCGEN.b closed for s1_room01.
 	#
-	# This finding is EMPIRICAL DATA for the W2 retrofit ticket — fix
-	# shape is to add an EAST &"exit" port at position_tiles=(14, 4) to
-	# s1_room01.tres so it can hand off cleanly to its eastward
-	# procedural neighbour. The assembler still places the chunks (so
-	# the visual proof scene can show the regression in HTML5); the
-	# error string surfaces the gap for the retrofit ticket to close.
+	# **Pre-W2 history:** s1_room01.tres declared only a WEST entry port
+	# (M1-era single-room intro chunk), so its EAST seam was open and the
+	# assembler recorded a mating error at the s1_room01 → first-procedural
+	# seam. The spike PR's `test_assemble_authored_s1_z1_records_s1_room01_east_seam_finding`
+	# pinned that empirical state.
 	#
-	# Pin: the finding is exactly one error per assemble (the s1_room01
-	# east seam), and the finding string mentions s1_room01.
+	# **Post-W2 state (this PR):** s1_room01.tres now carries an EAST
+	# &"exit" port at position_tiles=(14, 4) (the canonical row-4 seam
+	# shape shared by all S1 chunks). The W2 retrofit also expanded the
+	# S1 z1 ZoneDef to declare ALL 8 S1 chunks as anchors with a small
+	# procedural pool drawn from rooms 03/05/07 — every adjacent seam now
+	# mates cleanly.
+	#
+	# Pin: production S1 z1 zone assembles with ZERO port-mating errors;
+	# specifically, no error mentions s1_room01.
 	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	var f: AssembledFloor = asm.assemble_floor(zone, 1)
-	assert_false(f.is_well_mated(),
-		"production S1 z1 zone must report the s1_room01 east-seam finding")
-	# The s1_room01 finding must surface; other seams (boss_door↔entry
-	# at the s1_room08↔s1_room08 boss/exit pair, all procedural↔procedural
-	# seams) must mate cleanly because OPEN_PORT_TAGS includes boss_door.
-	var has_s1_room01_finding: bool = false
-	for err: String in f.port_mating_errors:
-		if err.find("s1_room01") >= 0:
-			has_s1_room01_finding = true
-			break
-	assert_true(has_s1_room01_finding,
-		"expected an s1_room01 east-seam finding, got: %s"
+	assert_true(f.is_well_mated(),
+		"production S1 z1 zone must mate cleanly after W2 retrofit, got: %s"
 			% str(f.port_mating_errors))
+	for err: String in f.port_mating_errors:
+		assert_false(err.find("s1_room01") >= 0,
+			"unexpected s1_room01 mating finding after W2 east-seam fix: %s" % err)
 
 
 func test_assemble_authored_s1_z1_boss_door_mates_cleanly() -> void:
@@ -540,3 +537,220 @@ func test_assemble_authored_s1_z1_boss_door_mates_cleanly() -> void:
 	for err: String in f.port_mating_errors:
 		assert_false(err.find("s1_room08") >= 0 and err.find("no shared seam row") >= 0,
 			"boss_door tag must mate cleanly; unexpected s1_room08 seam-row error: %s" % err)
+
+
+# -----------------------------------------------------------------------
+# W2-T3 (86c9y1045) — S1 procgen retrofit acceptance pins
+# -----------------------------------------------------------------------
+#
+# Per the SI-8 (b) lock + AC-C5-{1,3,4,5} acceptance rows in
+# `team/tess-qa/m3-acceptance-plan-tier-3.md` Track 1.5. Sample-size
+# discipline N≥8 per the AC4-retro Gap 1 lesson + dispatch brief.
+
+
+func test_s1_z1_clean_mating_across_8_seeds() -> void:
+	# R-PROCGEN.b closure pin — across N=8 release-quality seeds, the
+	# post-retrofit S1 z1 zone must produce zero port-mating errors. If
+	# any seed surfaces an error, either a procedural-pool chunk lacks
+	# the canonical row-4 seam OR an anchor seam regressed.
+	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var asm: FloorAssembler = FloorAssemblerScript.new()
+	for s: int in [1, 2, 3, 7, 13, 42, 100, 999]:
+		var f: AssembledFloor = asm.assemble_floor(zone, s)
+		assert_true(f.is_well_mated(),
+			"seed=%d produced mating errors after W2 retrofit: %s"
+				% [s, str(f.port_mating_errors)])
+
+
+func test_s1_z1_all_8_unique_chunks_referenced() -> void:
+	# Coverage pin — the W2 retrofit declares all 8 S1 hand-authored chunks
+	# (s1_room01 .. s1_room08) as anchors in the zone. Without this pin a
+	# silent drop of one room would be caught only by a content review.
+	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var anchor_chunk_ids: Dictionary = {}
+	for a: ZoneAnchor in zone.anchors:
+		anchor_chunk_ids[a.chunk_id] = true
+	for i: int in range(1, 9):
+		var expected: StringName = StringName("s1_room%02d" % i)
+		assert_true(anchor_chunk_ids.has(expected),
+			"S1 z1 must declare %s as an anchor chunk_id (got anchors %s)"
+				% [str(expected), str(anchor_chunk_ids.keys())])
+
+
+func test_s1_z1_anchors_have_deterministic_relative_order_across_seeds() -> void:
+	# AC-C5-3 — hand-authored anchors compose at deterministic positions
+	# (NOT seed-dependent); only the procedural slots between them vary by
+	# seed. Across N=8 seeds, the ORDERED LIST of anchor room_ids must be
+	# identical (only procedural-fill chunk_ids may differ).
+	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var expected_room_ids: Array[StringName] = []
+	for a: ZoneAnchor in zone.anchors:
+		expected_room_ids.append(a.room_id)
+	var asm: FloorAssembler = FloorAssemblerScript.new()
+	for s: int in [1, 2, 3, 7, 13, 42, 100, 999]:
+		var f: AssembledFloor = asm.assemble_floor(zone, s)
+		var observed: Array[StringName] = []
+		for pc: PlacedChunk in f.placed_chunks:
+			if pc.kind == &"anchor":
+				observed.append(pc.anchor_room_id)
+		assert_eq(observed, expected_room_ids,
+			"seed=%d anchor order must match input zone_def.anchors (got %s, want %s)"
+				% [s, str(observed), str(expected_room_ids)])
+
+
+func test_s1_z1_total_chunk_count_in_documented_bounds() -> void:
+	# Bounds pin — per the .tres docstring, the W2 retrofit zone produces
+	# 9 (anchors-only) .. 17 (max procedural fill) chunks per assembly.
+	# Anchors=9, gaps=8, slots-per-gap=[0,1] → procedural ∈ [0, 8] →
+	# total ∈ [9, 17].
+	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var asm: FloorAssembler = FloorAssemblerScript.new()
+	for s: int in [1, 2, 3, 7, 13, 42, 100, 999]:
+		var f: AssembledFloor = asm.assemble_floor(zone, s)
+		assert_true(f.chunk_count() >= 9 and f.chunk_count() <= 17,
+			"seed=%d total chunk count %d outside documented [9, 17]"
+				% [s, f.chunk_count()])
+		assert_eq(f.anchor_count(), 9, "seed=%d anchor count must equal 9" % s)
+
+
+func test_s1_z1_same_seed_bit_identical_across_runs() -> void:
+	# AC-C5-1 — same character + same zone → same map across save/load.
+	# The headline determinism pin for the production zone. Asserts the
+	# full placement vector (chunk_id + position + kind + anchor_room_id)
+	# is bit-identical across two assemble calls with the same seed.
+	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var asm: FloorAssembler = FloorAssemblerScript.new()
+	var seed: int = 0xCAFEBABE
+	var a: AssembledFloor = asm.assemble_floor(zone, seed)
+	var b: AssembledFloor = asm.assemble_floor(zone, seed)
+	assert_eq(a.chunk_count(), b.chunk_count())
+	for i: int in range(a.chunk_count()):
+		assert_eq(a.placed_chunks[i].chunk_id, b.placed_chunks[i].chunk_id,
+			"chunk[%d] chunk_id identical" % i)
+		assert_eq(a.placed_chunks[i].position_px, b.placed_chunks[i].position_px,
+			"chunk[%d] position identical" % i)
+		assert_eq(a.placed_chunks[i].kind, b.placed_chunks[i].kind,
+			"chunk[%d] kind identical" % i)
+		assert_eq(a.placed_chunks[i].anchor_room_id, b.placed_chunks[i].anchor_room_id,
+			"chunk[%d] anchor_room_id identical" % i)
+
+
+func test_s1_z1_per_stratum_seed_isolation() -> void:
+	# AC-C5-4 — re-rolling S1 layout does NOT leak into S2 layout for the
+	# same character (and vice versa). `stratum_seed = hash(world_seed,
+	# stratum_id)` — two stratum_ids must produce DIFFERENT derived seeds
+	# from the same world_seed.
+	var world_seed: int = 0xC001D00D
+	var s1_seed: int = FloorAssemblerScript.derive_stratum_seed(world_seed, 1)
+	var s2_seed: int = FloorAssemblerScript.derive_stratum_seed(world_seed, 2)
+	assert_ne(s1_seed, s2_seed,
+		"S1 and S2 stratum_seeds must differ for the same world_seed (got %d == %d)"
+			% [s1_seed, s2_seed])
+	# And the same stratum_id with the same world_seed must be stable
+	# (already pinned by test_derive_stratum_seed_is_deterministic above,
+	# repeated here for the per-zone-impl narrative).
+	var s1_seed_b: int = FloorAssemblerScript.derive_stratum_seed(world_seed, 1)
+	assert_eq(s1_seed, s1_seed_b,
+		"S1 stratum_seed must be stable for the same (world_seed, stratum_id)")
+
+
+func test_s1_z1_per_zone_seed_isolation() -> void:
+	# AC-C5-5 — re-entering a zone within a run produces the same layout
+	# (no re-roll on zone-load); a different zone produces independent
+	# layout. `zone_seed = hash(stratum_seed, zone_id)` — two zone_ids
+	# under the same stratum_seed must produce DIFFERENT derived seeds.
+	var stratum_seed: int = FloorAssemblerScript.derive_stratum_seed(0xC001D00D, 1)
+	var z1_seed: int = FloorAssemblerScript.derive_zone_seed(stratum_seed, &"s1_z1_outer_cloister")
+	var z2_seed: int = FloorAssemblerScript.derive_zone_seed(stratum_seed, &"s1_z2_inner_cloister")
+	assert_ne(z1_seed, z2_seed,
+		"Different zone_ids must produce different zone_seeds under the same stratum_seed (got %d == %d)"
+			% [z1_seed, z2_seed])
+	var z1_seed_b: int = FloorAssemblerScript.derive_zone_seed(stratum_seed, &"s1_z1_outer_cloister")
+	assert_eq(z1_seed, z1_seed_b,
+		"Same zone_id must produce the same zone_seed under the same stratum_seed")
+
+
+func test_s1_z1_different_seeds_produce_different_layouts() -> void:
+	# AC-C5-2 — different characters in same save produce different maps.
+	# Surveys 8 distinct seeds and asserts at least 2 produce distinct
+	# placement signatures. With pool size 3 × [0, 1] slots per 8 gaps,
+	# variance is significant — accidental seed collisions across 8 seeds
+	# are negligibly improbable.
+	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var asm: FloorAssembler = FloorAssemblerScript.new()
+	var signatures: Dictionary = {}
+	for s: int in [12345, 67890, 11111, 22222, 33333, 44444, 55555, 66666]:
+		var f: AssembledFloor = asm.assemble_floor(zone, s)
+		var sig_parts: Array[String] = []
+		sig_parts.append(str(f.chunk_count()))
+		for pc: PlacedChunk in f.placed_chunks:
+			sig_parts.append(String(pc.chunk_id))
+		signatures[s] = "|".join(sig_parts)
+	var unique: Dictionary = {}
+	for v: String in signatures.values():
+		unique[v] = true
+	assert_gt(unique.size(), 1,
+		"8 distinct seeds against S1 z1 produced only one placement signature — variance dead")
+
+
+func test_s1_z1_procedural_pool_chunks_resolve_via_load() -> void:
+	# Content-integrity pin — every chunk_id in the procedural_slot_pool
+	# resolves to an actual LevelChunkDef on disk. A typo in the .tres
+	# would fail loudly here instead of surfacing as an unresolvable-id
+	# error at assemble-time on a player's machine.
+	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	for chunk_id: StringName in zone.procedural_slot_pool:
+		var path: String = "res://resources/level_chunks/%s.tres" % String(chunk_id)
+		var res: Resource = load(path)
+		assert_not_null(res, "procedural pool chunk_id %s must resolve at %s"
+			% [str(chunk_id), path])
+		assert_true(res is LevelChunkDef,
+			"procedural pool chunk_id %s at %s must be a LevelChunkDef"
+				% [str(chunk_id), path])
+
+
+func test_s1_z1_all_anchor_chunk_ids_resolve_via_load() -> void:
+	# Sibling pin — every anchor.chunk_id resolves on disk. The eight
+	# unique S1 chunks (s1_room01 .. s1_room08) must all load.
+	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var seen: Dictionary = {}
+	for a: ZoneAnchor in zone.anchors:
+		if seen.has(a.chunk_id):
+			continue
+		seen[a.chunk_id] = true
+		var path: String = "res://resources/level_chunks/%s.tres" % String(a.chunk_id)
+		var res: Resource = load(path)
+		assert_not_null(res, "anchor chunk_id %s must resolve at %s"
+			% [str(a.chunk_id), path])
+		assert_true(res is LevelChunkDef,
+			"anchor chunk_id %s at %s must be a LevelChunkDef"
+				% [str(a.chunk_id), path])
+
+
+func test_s1_room01_now_has_east_exit_port() -> void:
+	# W2-T3 Part B — direct chunk-level pin on the s1_room01 east-seam fix.
+	# After the W2 retrofit s1_room01.tres carries:
+	#   - WEST entry port (original M1 spawn point)
+	#   - EAST exit port at position_tiles=(14, 4) (NEW)
+	# This is the root-cause fix for R-PROCGEN.b's s1_room01 finding.
+	var chunk: LevelChunkDef = load("res://resources/level_chunks/s1_room01.tres") as LevelChunkDef
+	assert_not_null(chunk, "s1_room01.tres must load")
+	var has_east_exit: bool = false
+	for p: ChunkPort in chunk.ports:
+		if int(p.direction) == ChunkPort.Direction.EAST and p.tag == &"exit":
+			has_east_exit = true
+			assert_eq(p.position_tiles, Vector2i(14, 4),
+				"s1_room01 EAST exit port must sit at (14, 4) per W2 fix shape")
+	assert_true(has_east_exit,
+		"s1_room01 must declare an EAST &\"exit\" port (W2-T3 east-seam fix)")
+
+
+func test_s1_z1_zone_def_validates_cleanly() -> void:
+	# Hygiene pin — the production zone .tres must validate cleanly. A
+	# typo, duplicate room_id, or missing entry/exit anchor would surface
+	# at GUT time instead of at the first player's run.
+	var zone: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
+	var errors: Array[String] = zone.validate()
+	assert_true(errors.is_empty(),
+		"production S1 z1 ZoneDef.validate() must return empty array; got: %s"
+			% str(errors))

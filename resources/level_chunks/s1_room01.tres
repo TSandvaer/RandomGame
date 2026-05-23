@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="LevelChunkDef" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="LevelChunkDef" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/levels/LevelChunkDef.gd" id="1_chunk"]
 [ext_resource type="Script" path="res://scripts/levels/MobSpawnPoint.gd" id="2_spawn"]
@@ -9,6 +9,12 @@ script = ExtResource("3_port")
 position_tiles = Vector2i(2, 4)
 direction = 3
 tag = &"entry"
+
+[sub_resource type="Resource" id="Resource_exit_port"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(14, 4)
+direction = 1
+tag = &"exit"
 
 [sub_resource type="Resource" id="Resource_spawn_dummy"]
 script = ExtResource("2_spawn")
@@ -22,5 +28,5 @@ display_name = "Outer Cloister — Threshold"
 size_tiles = Vector2i(15, 8)
 tile_size_px = 32
 scene_path = "res://scenes/levels/chunks/s1_room01_chunk.tscn"
-ports = [SubResource("Resource_entry_port")]
+ports = [SubResource("Resource_entry_port"), SubResource("Resource_exit_port")]
 mob_spawns = [SubResource("Resource_spawn_dummy")]

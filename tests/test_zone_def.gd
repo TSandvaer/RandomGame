@@ -256,15 +256,20 @@ func test_authored_s1_z1_outer_cloister_validates() -> void:
 	)
 
 
-func test_authored_s1_z1_outer_cloister_has_five_anchors() -> void:
+func test_authored_s1_z1_outer_cloister_has_nine_anchors() -> void:
+	# W2-T3 retrofit (`86c9y1045`) — the production S1 zone now declares
+	# all 8 S1 chunks (room08 used twice: boss_room + exit) for a total
+	# of 9 anchors. The spike's original 5-anchor count is preserved in
+	# git history as the pre-retrofit shape.
 	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
-	assert_eq(z.anchors.size(), 5, "spike worked example pins 5 anchors")
-	# One of each non-story_beat kind.
-	assert_eq(z.get_anchors_of_kind(&"entry").size(), 1)
-	assert_eq(z.get_anchors_of_kind(&"npc_room").size(), 1)
-	assert_eq(z.get_anchors_of_kind(&"quest_target").size(), 1)
-	assert_eq(z.get_anchors_of_kind(&"boss_room").size(), 1)
-	assert_eq(z.get_anchors_of_kind(&"exit").size(), 1)
+	assert_eq(z.anchors.size(), 9, "W2-T3 retrofit pins 9 anchors (8 unique chunks; room08 used for boss + exit)")
+	# Kind tallies per the (b)-lock narrative arc.
+	assert_eq(z.get_anchors_of_kind(&"entry").size(), 1, "exactly 1 entry anchor")
+	assert_eq(z.get_anchors_of_kind(&"npc_room").size(), 2, "2 npc_room anchors (Antechamber + Hallowed Spring)")
+	assert_eq(z.get_anchors_of_kind(&"story_beat").size(), 3, "3 story_beat anchors (Charger's Run / Crossfire / Pincer)")
+	assert_eq(z.get_anchors_of_kind(&"quest_target").size(), 1, "1 quest_target anchor (Marksman's Perch)")
+	assert_eq(z.get_anchors_of_kind(&"boss_room").size(), 1, "1 boss_room anchor")
+	assert_eq(z.get_anchors_of_kind(&"exit").size(), 1, "1 exit anchor")
 
 
 func test_authored_s1_z1_outer_cloister_anchor_chunks_resolve() -> void:
@@ -284,8 +289,11 @@ func test_authored_s1_z1_outer_cloister_anchor_chunks_resolve() -> void:
 
 func test_authored_s1_z1_outer_cloister_pool_chunks_resolve() -> void:
 	# Each procedural_slot_pool entry must reference a real chunk too.
+	# W2-T3 retrofit (`86c9y1045`) — pool shrank from 4 to 3 per the SI-8
+	# (b) "light procedural fill" commitment (smaller pool + slot range
+	# [0,1] vs spike's [1,3]).
 	var z: ZoneDef = load("res://resources/level/zones/s1_z1_outer_cloister.tres") as ZoneDef
-	assert_eq(z.procedural_slot_pool.size(), 4, "spike worked example pins 4-chunk pool")
+	assert_eq(z.procedural_slot_pool.size(), 3, "W2-T3 retrofit pins 3-chunk procedural pool (rooms 03/05/07)")
 	for chunk_id: StringName in z.procedural_slot_pool:
 		var path: String = "res://resources/level_chunks/%s.tres" % str(chunk_id)
 		var chunk: Resource = load(path)

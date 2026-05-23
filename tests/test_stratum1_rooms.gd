@@ -344,13 +344,22 @@ func test_difficulty_curve_roughly_increases() -> void:
 # ---- 4. Connectivity: Room 1 -> ... -> Room 8 has continuous ports --
 
 func test_room_chain_has_continuous_ports() -> void:
-	# Each room (except r01 which is the entry-only chunk) must have an
-	# entry port to receive the player from the previous room AND an exit
-	# port to hand off to the next. r08's exit is the boss-room handoff
-	# (`boss_door` tag) — the boss room itself has its own door trigger.
+	# Each room (except r01 — the M1-era entry chunk; see room01 east-seam
+	# note below) must have an entry port to receive the player from the
+	# previous room AND an exit port to hand off to the next. r08's exit
+	# is the boss-room handoff (`boss_door` tag) — the boss room itself
+	# has its own door trigger.
 	#
-	# Full chain: r01 (entry only) -> r02 -> r03 -> r04 -> r05 -> r06
-	#          -> r07 -> r08 (exit tag = boss_door) -> Stratum1BossRoom.
+	# Full chain: r01 (entry + east exit per W2-T3 retrofit) -> r02 -> r03
+	#          -> r04 -> r05 -> r06 -> r07 -> r08 (exit tag = boss_door)
+	#          -> Stratum1BossRoom.
+	#
+	# W2-T3 retrofit (`86c9y1045`) added an EAST `&"exit"` port to r01 so
+	# the procgen assembler can mate it into the Outer Cloister zone graph.
+	# This test still skips r01 because the M1 single-room intro path
+	# (Stratum1Room01.gd) doesn't consume the east port — the assembler
+	# does. r01's port shape is pinned by
+	# tests/test_floor_assembler.gd::test_s1_room01_now_has_east_exit_port.
 	#
 	# We verify each chunk has the right port shape; physical assembly
 	# (placing rooms next to each other in world space) is M2 — for now
