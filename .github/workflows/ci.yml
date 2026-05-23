@@ -220,6 +220,7 @@ jobs:
           # self-describing without needing to download the artifact.
           mkdir -p lint-reports
           set +e
+          # Config: gdlintrc at repo root (committed to make baseline reproducible).
           gdlint scripts/ tests/ > lint-reports/gdlint.txt 2>&1
           gdlint_exit=$?
           set -e
