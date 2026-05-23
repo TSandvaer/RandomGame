@@ -142,6 +142,29 @@ Godot HTML5 exports register a service worker that aggressively caches `index.js
 
 **First diagnostic step on a "doesn't behave as expected" report:** have Sponsor paste the boot lines including `[BuildInfo] build: <sha>`. If the SHA doesn't match the artifact name, Sponsor's on a cached or wrong-zip build. Faster than spawning a Devon investigation into "is the code wrong?". See memory: `html5-service-worker-cache-trap.md`.
 
+## CLI-agent HTML5 self-soak — COOP/COEP headers required
+
+The `python -m http.server` path above is for **Sponsor's manual soak** — interactive `localhost:8000` in a browser. **Sub-agents running an HTML5 author-self-soak from a CLI session need a different server.** Discovered empirically during PR #351 (W2-T1 camera-scroll production wiring, Drew, 2026-05-23): Python's `http.server` silently boot-hangs the Godot artifact when the agent's automation drives it headlessly. The artifact loads, but no boot lines are emitted — Godot is waiting on a `SharedArrayBuffer` reference that the browser refuses to instantiate.
+
+**Root cause.** Modern browsers gate `SharedArrayBuffer` behind a **cross-origin isolation** policy. The serving page must respond with **both**:
+
+- `Cross-Origin-Opener-Policy: same-origin`
+- `Cross-Origin-Embedder-Policy: require-corp`
+
+Python's stdlib `http.server` emits neither. Sponsor's interactive browser-soak coincidentally tolerates the absence (the engine falls back to non-SAB rendering for the simple `Main.tscn` path), but headless Playwright / automation reads the boot hang as silent failure.
+
+**The fix.** Reuse `tests/playwright/fixtures/artifact-server.ts` — Playwright's harness already encodes the COOP/COEP headers as a Node HTTP server fixture. Any new CLI-agent self-soak tooling should consume that fixture or replicate its header pattern, **not roll a fresh `python -m http.server` wrapper**.
+
+**Distinction summary:**
+
+| Soak surface | Server | Headers | Tolerates missing COOP/COEP? |
+|---|---|---|---|
+| Sponsor manual (browser) | `python -m http.server 8000` | none | yes (most surfaces) |
+| Sub-agent CLI self-soak | Node HTTP server (artifact-server.ts) | COOP + COEP | no — boot hangs |
+| Playwright CI | artifact-server.ts (already wired) | COOP + COEP | no — boot hangs |
+
+Apply this whenever a sub-agent's brief includes an HTML5 author-self-soak step. Cite of record: Drew's W2-T1 final report on PR #351, 2026-05-23.
+
 ## BuildInfo SHA verification
 
 Boot logs include:
