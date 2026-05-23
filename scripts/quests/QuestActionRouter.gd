@@ -1,13 +1,17 @@
 extends Node
-## QuestActionRouter autoload — listener stub for the dialogue-system
-## `quest_action_invoked` + `dialogue_closed` signals.
+## QuestActionRouter autoload — listener + persistence wiring for the
+## dialogue-system `quest_action_invoked` + `dialogue_closed` signals.
 ##
-## **Ticket W2-T2 (`86c9y0zyv`)** — production wiring layer for the W1 dialogue
-## spike (`86c9xuab3`). This autoload is the spike-scope listener stub Track 3
-## W2 (BountyController) will subsume; for W2-T2 it ONLY records the most
-## recent `quest_action_invoked` payload + emits a `quest_action_received` echo
-## signal so paired GUT tests can pin the wiring without staging a full
-## BountyController graph.
+## **Ticket W2-T2 (`86c9y0zyv`)** introduced the listener stub: subscribe
+## to DialogueController signals, record the most-recent payload, emit
+## `quest_action_received` for test verification.
+##
+## **Ticket W2-T6 (`86c9y7ydg`)** extends the stub with PERSISTENCE wiring:
+## the router now mutates `Player.active_bounty` and `Player.completed_bounties`
+## in response to `accept_bounty:<npc_id>` and `complete_bounty:<npc_id>`
+## verbs, drives the QuestStateResolver-based npc→quest lookup, and emits
+## `quest_accepted` / `quest_completed` for downstream consumers (reward
+## pipeline, world-map UI quest-target zones, future BountyController).
 ##
 ## ## Part D — Drew nit fold (PR #320 review)
 ##
@@ -41,51 +45,83 @@ extends Node
 ##     `current_branch_key()` inside `_on_dialogue_closed` (positional invariant
 ##     per `.claude/docs/test-conventions.md` § Source-scan structural pins).
 ##
-## ## What this autoload does NOT do (deferred to W2-T6 / Track 3 W2)
+## ## W2-T6 persistence wiring (this PR)
 ##
-##   - **No actual bounty-state mutation.** This is a listener STUB — it
-##     records the most recent `quest_action_invoked` payload and echoes it
-##     via `quest_action_received` for test verification. Full
-##     `BountyController.handle_quest_action(action_id, npc_id)` (which
-##     mutates `Player.active_bounty` / `Player.completed_bounties` /
-##     `Player.quest_progress`) lands in Track 3 W2 quest-content.
+##   - **`accept_bounty:<npc_id>`** — look up the NPC's offered quest via
+##     `QuestStateResolver.NPC_OFFERED_QUEST`. If the NPC offers no quest
+##     OR the player already has an active bounty, REJECT via
+##     `WarningBus.warn(..., "quest")` (single-active-bounty lock per
+##     W2-T7 §9 v6 trigger guard). Otherwise instantiate a fresh
+##     `QuestState`, write to `Player.active_bounty`, emit `quest_accepted`.
 ##
-##   - **No save persistence.** The recorded last-event is transient — wiped
-##     by `clear()` or session restart. Bounty state writes through Save via
-##     Track 3 W2, not via this router.
+##   - **`complete_bounty:<npc_id>`** — verify `Player.active_bounty.quest_id`
+##     matches the NPC's offered quest_id (defensive — catches a future
+##     content regression where Sister Ennick's complete-verb references
+##     a different quest than her offer-verb). On match, append to
+##     `Player.completed_bounties`, clear `Player.active_bounty`, emit
+##     `quest_completed`. On mismatch / no active bounty, REJECT via
+##     `WarningBus.warn(..., "quest")`.
 ##
-##   - **No verb registry.** The `quest_action` StringName is recorded
-##     verbatim (e.g. `&"accept_bounty:s1_warden_scholar"`); Track 3 W2 owns
-##     the action-id verb-parsing + target-resolution layer.
+##   - **`open_vendor:<npc_id>` + `reforge:<slot>` + `abandon_bounty`** stay
+##     as no-op — those are W3+ consumer scope.
 ##
-## ## Public API
+## ## Player lookup is defensive
 ##
-##   QuestActionRouter.last_quest_action() -> StringName
-##   QuestActionRouter.last_npc_id() -> StringName
-##   QuestActionRouter.last_branch_key() -> StringName
-##   QuestActionRouter.has_received_quest_action() -> bool
-##   QuestActionRouter.clear() -> void
+## The router resolves Player via the `&"player"` group at action-handle
+## time. If no Player is in the tree (autoload-bare GUT test context, or
+## the brief window during Main scene transitions when the Player has been
+## freed but a dialogue is somehow still alive — should not happen in
+## practice because `Player._die` doesn't trigger dialogue), the
+## persistence path is a no-op. The listener-stub state (echo signals,
+## `_last_quest_action`) still populates so tests can verify wiring
+## without staging a Player.
+##
+## ## Public API (W2-T2 stub + W2-T6 persistence)
+##
+##   QuestActionRouter.last_quest_action() -> StringName        # stub
+##   QuestActionRouter.last_npc_id() -> StringName              # stub
+##   QuestActionRouter.last_branch_key() -> StringName          # stub
+##   QuestActionRouter.has_received_quest_action() -> bool      # stub
+##   QuestActionRouter.clear() -> void                          # stub
 ##
 ## ## Signals
 ##
-##   quest_action_received(action_id: StringName, npc_id: StringName,
-##                          branch_key: StringName)
-##     -> fires on every `DialogueController.quest_action_invoked` emit. The
-##        echo signal carries the branch_key the action was selected FROM
-##        (the originating branch context per Drew nit read-order), NOT the
-##        destination branch.
+##   quest_action_received(action_id, npc_id, branch_key)
+##     -> Listener-stub echo (W2-T2): fires on every `quest_action_invoked`
+##        emit. Carries the ORIGINATING branch_key.
 ##
-##   dialogue_closed_observed(npc_id: StringName)
-##     -> fires on every `DialogueController.dialogue_closed` emit. Mirrors
-##        the upstream signal — exists so tests can assert subscription
-##        wiring without lifting a separate dependency on the controller.
+##   dialogue_closed_observed(npc_id)
+##     -> Listener-stub echo (W2-T2): fires on every `dialogue_closed` emit.
+##
+##   quest_accepted(quest_id: StringName)
+##     -> W2-T6 NEW: fires when `accept_bounty:<npc_id>` successfully
+##        instantiates a QuestState and writes to `Player.active_bounty`.
+##        Does NOT fire on rejection (already-active bounty, unknown NPC,
+##        no Player in tree).
+##
+##   quest_completed(quest_id: StringName)
+##     -> W2-T6 NEW: fires when `complete_bounty:<npc_id>` successfully
+##        appends to `Player.completed_bounties` and clears active_bounty.
+##        Does NOT fire on rejection.
 
 # ---- Signals ---------------------------------------------------------
 
 signal quest_action_received(action_id: StringName, npc_id: StringName, branch_key: StringName)
 signal dialogue_closed_observed(npc_id: StringName)
+signal quest_accepted(quest_id: StringName)
+signal quest_completed(quest_id: StringName)
 
-# ---- Last-event state ------------------------------------------------
+# ---- Verb constants --------------------------------------------------
+
+## Verb prefixes parsed from `<verb>:<target>` quest_action StringNames.
+## Split on the FIRST `:` only (per dialogue-system.md authoring convention).
+const VERB_ACCEPT_BOUNTY: String = "accept_bounty"
+const VERB_COMPLETE_BOUNTY: String = "complete_bounty"
+const VERB_OPEN_VENDOR: String = "open_vendor"
+const VERB_REFORGE: String = "reforge"
+const VERB_ABANDON_BOUNTY: String = "abandon_bounty"
+
+# ---- Last-event state (W2-T2 listener stub) --------------------------
 
 ## Most-recently-opened branch key — updated on every `branch_opened` emit.
 ## Transient — not the public-API value. Snapshotted into `_action_branch_key`
@@ -131,7 +167,7 @@ func _ready() -> void:
 		dc.connect("dialogue_closed", _on_dialogue_closed)
 
 
-# ---- Public API ------------------------------------------------------
+# ---- Public API (W2-T2 stub) -----------------------------------------
 
 
 ## Most-recent quest_action StringName, or `&""` if none received this session.
@@ -169,6 +205,12 @@ func has_received_quest_action() -> bool:
 ## Reset the last-event state. Tests call this in `before_each` to avoid
 ## state bleed between tests. Production code does NOT need to call this —
 ## the router is durable for the session lifetime.
+##
+## **W2-T6 note**: `clear()` only resets the listener-stub state (echo
+## payload). It does NOT clear `Player.active_bounty` / `Player.completed_bounties`
+## — those are persistent player state, owned by the Player node and
+## restored from save. Tests that need to reset Player bounty state must
+## do so on the Player instance directly.
 func clear() -> void:
 	_last_quest_action = &""
 	_last_npc_id = &""
@@ -203,7 +245,10 @@ func _on_branch_opened(_npc_id: StringName, branch_key: StringName) -> void:
 
 
 ## Fires on every controller `quest_action_invoked` emit. Records the
-## payload + emits the test-friendly echo signal `quest_action_received`.
+## payload + emits the test-friendly echo signal `quest_action_received`,
+## then dispatches the verb to the appropriate persistence handler
+## (W2-T6 extension).
+##
 ## Order-of-operations: `quest_action_invoked` fires BEFORE controller
 ## navigation (per dialogue-system.md § "Signal surface"), so
 ## `_current_branch_key` is still the originating branch at snapshot
@@ -221,6 +266,27 @@ func _on_quest_action_invoked(action_id: StringName, npc_id: StringName) -> void
 	_action_branch_key = _current_branch_key
 	_has_received = true
 	quest_action_received.emit(action_id, npc_id, _action_branch_key)
+	# ---- W2-T6 persistence dispatch ---------------------------------
+	# Split on the FIRST `:` only — a future target containing `:` (e.g.
+	# `reforge:weapon:tier_2`) still resolves cleanly. The verb is the
+	# substring BEFORE the first colon; the target is everything after.
+	var raw: String = String(action_id)
+	var verb: String = raw
+	var _target: String = ""
+	var colon: int = raw.find(":")
+	if colon >= 0:
+		verb = raw.substr(0, colon)
+		_target = raw.substr(colon + 1)
+	match verb:
+		VERB_ACCEPT_BOUNTY:
+			_handle_accept_bounty(npc_id)
+		VERB_COMPLETE_BOUNTY:
+			_handle_complete_bounty(npc_id)
+		_:
+			# open_vendor / reforge / abandon_bounty + any future verb stays
+			# as listener-only no-op for W2-T6. Track 3 W3+ wires the
+			# remaining handlers.
+			pass
 
 
 ## Fires on every controller `dialogue_closed` emit. DO NOT read
@@ -234,6 +300,85 @@ func _on_dialogue_closed(npc_id: StringName) -> void:
 	dialogue_closed_observed.emit(npc_id)
 
 
+# ---- W2-T6 persistence handlers -------------------------------------
+
+## Handle `accept_bounty:<npc_id>` — look up the NPC's offered quest via
+## QuestStateResolver, instantiate a QuestState, write to Player. Rejects
+## with a WarningBus.warn(..., "quest") on:
+##   - No Player in tree (defensive — tests / pre-Player-spawn windows).
+##   - Player already has an active bounty (single-active-bounty lock).
+##   - NPC offers no quest (would mean a content authoring error where a
+##     vendor / lore NPC has an `accept_bounty` response).
+func _handle_accept_bounty(npc_id: StringName) -> void:
+	var player: Node = _player_node()
+	if player == null:
+		# No Player in tree — autoload-bare GUT test context or pre-spawn
+		# window. The listener-stub state still records the event so tests
+		# can verify wiring; we don't WarningBus.warn here because that
+		# would taint NoWarningGuard on every test that bare-instantiates.
+		return
+	# NPC → quest_id lookup. The resolver class owns the canonical map.
+	if not QuestStateResolver.NPC_OFFERED_QUEST.has(npc_id):
+		_warn(("QuestActionRouter.accept_bounty: NPC %s offers no quest" +
+				" — dropping accept_bounty action") % str(npc_id))
+		return
+	# Single-active-bounty lock. Multi-concurrent-bounty is v6 trigger
+	# territory per W2-T7 §9.
+	var existing: Variant = player.get("active_bounty")
+	if existing is QuestState:
+		_warn(("QuestActionRouter.accept_bounty: rejected — player already" +
+				" has an active bounty (quest_id=%s); single-active-bounty lock") %
+				str((existing as QuestState).quest_id))
+		return
+	# Instantiate a fresh QuestState.
+	var quest_id: StringName = QuestStateResolver.NPC_OFFERED_QUEST[npc_id]
+	var qs: QuestState = QuestState.new()
+	qs.quest_id = quest_id
+	qs.accepted_at_tick = Time.get_ticks_msec()
+	qs.completion_progress = {}
+	qs.state = &"quest_active"
+	player.set("active_bounty", qs)
+	quest_accepted.emit(quest_id)
+
+
+## Handle `complete_bounty:<npc_id>` — verify the active bounty matches
+## the NPC's offered quest, move quest_id onto completed_bounties, clear
+## active_bounty, emit quest_completed. Rejects with WarningBus.warn(...,
+## "quest") on:
+##   - No Player in tree (defensive).
+##   - No active bounty (defensive — caught by content authoring should
+##     prevent this, but we surface for diagnostic).
+##   - active_bounty.quest_id mismatches the NPC's offered quest_id
+##     (defensive — surfaces a content-vs-engine drift class).
+func _handle_complete_bounty(npc_id: StringName) -> void:
+	var player: Node = _player_node()
+	if player == null:
+		return
+	if not QuestStateResolver.NPC_OFFERED_QUEST.has(npc_id):
+		_warn(("QuestActionRouter.complete_bounty: NPC %s offers no quest" +
+				" — dropping complete_bounty action") % str(npc_id))
+		return
+	var existing: Variant = player.get("active_bounty")
+	if not (existing is QuestState):
+		_warn(("QuestActionRouter.complete_bounty: rejected — player has" +
+				" no active bounty (npc=%s)") % str(npc_id))
+		return
+	var active: QuestState = existing
+	var expected_quest_id: StringName = QuestStateResolver.NPC_OFFERED_QUEST[npc_id]
+	if active.quest_id != expected_quest_id:
+		_warn(("QuestActionRouter.complete_bounty: rejected — active bounty" +
+				" quest_id=%s does NOT match NPC %s's offered quest_id=%s") %
+				[str(active.quest_id), str(npc_id), str(expected_quest_id)])
+		return
+	# Append to completed_bounties + clear active_bounty.
+	var completed: Variant = player.get("completed_bounties")
+	var completed_arr: Array = completed if completed is Array else []
+	completed_arr.append(active.quest_id)
+	player.set("completed_bounties", completed_arr)
+	player.set("active_bounty", null)
+	quest_completed.emit(active.quest_id)
+
+
 # ---- Helpers ---------------------------------------------------------
 
 
@@ -242,3 +387,37 @@ func _controller_node() -> Node:
 	if loop == null:
 		return null
 	return loop.root.get_node_or_null("DialogueController")
+
+
+## Resolve Player via the `&"player"` group (per Player._ready() — the
+## node adds itself to the group at boot). Returns null if no Player is in
+## the tree — defensive for autoload-bare GUT contexts.
+func _player_node() -> Node:
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return null
+	# get_nodes_in_group returns Array[Node] — Godot 4. Empty array if
+	# the group has no members.
+	var players: Array = loop.get_nodes_in_group("player")
+	if players.is_empty():
+		return null
+	return players[0] as Node
+
+
+## Route warnings through WarningBus so NoWarningGuard catches quest-action
+## regressions in headless GUT per `.claude/docs/test-conventions.md`
+## § Universal warning gate. Falls back to push_warning when the bus is
+## not registered (autoload-stripped test context).
+func _warn(text: String) -> void:
+	var bus: Node = _warning_bus()
+	if bus != null and bus.has_method("warn"):
+		bus.warn(text, "quest")
+	else:
+		push_warning(text)
+
+
+func _warning_bus() -> Node:
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return null
+	return loop.root.get_node_or_null("WarningBus")

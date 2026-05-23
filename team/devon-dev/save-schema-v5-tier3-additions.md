@@ -185,6 +185,16 @@ func test_active_dialogue_states_round_trips() -> void:
 
 **Cross-reference:** the dialogue spike's `DialogueResponse.quest_action: StringName` is the **write-side signal** that triggers active_bounty mutations. Authoring convention: `&"accept_bounty:<quest_id>"`, `&"complete_bounty:<quest_id>"`, `&"abandon_bounty"`. Track 3 W2 BountyController owns the action-id verb registry; the schema layer is permissive.
 
+**Active bounty implemented (W2-T6, 2026-05-23, ticket `86c9y7ydg`, branch `devon/w2-t6-quest-state-persistence`):** the survey's paper shape is now executable.
+
+- **Path lives at `data.character.active_bounty`** (single-character; pre-v5-multi-character-lift addressing). The survey originally enumerated `data.characters[N].active_bounty` — that's the post-multi-character-lift shape; v5 W2-T6 still ships single-character so the path is the survey shape minus the `s[N]` indirection. Forward-compat: the multi-character lift (paper-only at W2-T6 time) will rehome the field under `characters[active_slot]` without any structural change to the field itself.
+- **Verb routing**: `QuestActionRouter` (extended from the W2-T2 PR #347 listener stub) dispatches `accept_bounty:<npc_id>` and `complete_bounty:<npc_id>`. The npc→quest_id lookup lives in `QuestStateResolver.NPC_OFFERED_QUEST` (const Dictionary; one shipped entry at W2-T6: `hub_sister_ennick` offers `s1_recover_stoker_proof`). `abandon_bounty` stays as listener-only no-op (Track 3 W3 wires it).
+- **Single-active-bounty lock** enforced by the router (per W2-T7 §9 v6 trigger guard): `accept_bounty` rejected via `WarningBus.warn(..., "quest")` when `Player.active_bounty != null`. Multi-concurrent-bounty deferred to v6.
+- **Quest model classes shipped:** `scripts/quests/{QuestDef, QuestState, QuestStateResolver}.gd`. `QuestState` is the persisted-instance Resource with symmetric `to_dict()` / `from_dict()` for JSON round-trip; `QuestStateResolver.resolve_branch_key(npc_id, active_bounty, completed_bounties) -> StringName` is the side-effect-free 4-state matrix resolver (Part D of the W2-T6 ticket).
+- **Player runtime fields**: `Player.active_bounty: Variant` (QuestState or null) + `Player.completed_bounties: Array`. Symmetric `Player.to_save_dict()` / `Player.restore_from_save_dict(character)` for the save round-trip. Tier-3-naive saves backfill via `Save._backfill_v5_tier3_quest_fields()` (runs unconditionally in `migrate()` after the v0..v5 chain — catches both legacy v0..v4 saves AND pre-W2-T6 v5 saves where `from_version == 5` skips `_migrate_v4_to_v5`).
+- **No schema bump**: SCHEMA_VERSION stays at 5. All Tier 3 additions ride additively per §5 / §9 (no v6 trigger). The W2-T6 fields appear in `DEFAULT_PAYLOAD["character"]` so new characters start with `active_bounty=null` + `completed_bounties=[]`.
+- **GUT pin surface**: `tests/test_quest_def.gd`, `test_quest_state.gd`, `test_quest_state_resolver.gd`, `test_quest_action_router_persists.gd`, `test_quest_state_save_roundtrip.gd`, `test_save_migrate_quest_fields_backfill.gd`. All under NoWarningGuard.
+
 ### 2.6 `completed_bounties: Array[StringName]` (Track 3 / quest)
 
 | Property | Value |
