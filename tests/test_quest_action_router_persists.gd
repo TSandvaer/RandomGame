@@ -22,6 +22,8 @@ const BranchScript: Script = preload("res://scripts/dialogue/DialogueBranch.gd")
 const ResponseScript: Script = preload(
 	"res://scripts/dialogue/DialogueResponse.gd")
 const QuestStateScript: Script = preload("res://scripts/quests/QuestState.gd")
+const PlayerStubScript: Script = preload(
+	"res://tests/test_helpers/player_stub_for_quest_router.gd")
 
 var _warn_guard: NoWarningGuard
 var _player_stub: Node = null
@@ -42,9 +44,13 @@ func before_each() -> void:
 	if router != null and router.has_method("clear"):
 		router.clear()
 	# Stage a Player-shaped stub in the `&"player"` group so the router can
-	# resolve it. Stand-in (not bare Player) keeps tests light + avoids
-	# CharacterBody2D wiring that has nothing to do with quest persistence.
-	_player_stub = Node.new()
+	# resolve it. Script-defined stub (NOT bare Node) — bare `Node.new()`
+	# silently drops `Object.set("active_bounty", value)` because the property
+	# is not declared on the script, so router writes never landed in PR #352
+	# v1 and every test failed. The PlayerStubScript declares the two fields
+	# the router reads + writes (`active_bounty: Variant`, `completed_bounties:
+	# Array`), so `set/get` resolves to the declared properties.
+	_player_stub = PlayerStubScript.new()
 	_player_stub.name = "PlayerStubForQuestRouterTests"
 	# Initial state matches the W2-T6 Player defaults.
 	_player_stub.set("active_bounty", null)
