@@ -18,7 +18,16 @@ class-name: ([A-Z][a-z0-9]*)+
 class-variable-name: _?[a-z][a-z0-9]*(_[a-z0-9]+)*
 comparison-with-itself: null
 constant-name: _?[A-Z][A-Z0-9]*(_[A-Z0-9]+)*
-disable: []
+disable: [class-definitions-order]
+# class-definitions-order disabled per investigation `86c9y57g5` (Stage-2 followup
+# to PR #333). The project intentionally orders top-of-file sections by cohesion
+# (consts -> signals -> state-vars, with `# ---- Section ----` headers, and
+# pair-locality for related const+var groupings) rather than the strict gdlint
+# order (signals -> enums -> consts -> ...). 100% of inspected Director-pattern
+# findings (CameraDirector + TimeScaleDirector, 8/8) were intentional cohesion-
+# ordering false-positives. The same pattern recurs across 18+ non-Director files
+# (Inventory.gd, RoomGate.gd, Stratum1Boss.gd, ...). See
+# `lint-reports/director-class-order-finding-classification.md` for full rationale.
 duplicated-load: null
 enum-element-name: '[A-Z][A-Z0-9]*(_[A-Z0-9]+)*'
 enum-name: ([A-Z][a-z0-9]*)+
