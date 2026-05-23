@@ -535,3 +535,81 @@ ClickUp MCP reconnected; orchestrator drained the 9-entry queue accumulated sinc
 - created_at: 2026-05-23T (Priya bundled-process PR)
 - flushed: 2026-05-23 0759 UTC (orchestrator); created task `86c9y4hn3`
 - attempts: 0 (queued; MCP not enumerated in sub-agent tool surface — orch flushes)
+
+---
+
+## Flushed 2026-05-23 ~10:30 UTC (orchestrator) — ENTRIES 032-039 (8 tickets, gdlint Stage-2 follow-up batch)
+
+Source: PR #338 (`pm(stage2): file 8 gdlint Stage-2 follow-up tickets from PR #333 baseline + PR #332 docstring finding`, merge commit on `5d2b0d0..`).
+
+### ENTRY 2026-05-23-032 → 86c9y57g5
+
+- **ClickUp:** https://app.clickup.com/t/86c9y57g5
+- **Name:** investigate(lint): class-definitions-order false-positive scope on Director pattern
+- **Op:** create_task
+- **List:** 901523123922 (RandomGame)
+- **Status @ flush:** to do
+- **Flushed:** 2026-05-23T~10:30Z (orchestrator main session)
+
+### ENTRY 2026-05-23-033 → 86c9y58mv
+
+- **ClickUp:** https://app.clickup.com/t/86c9y58mv
+- **Name:** investigate(lint): duplicated-load false-positive scope on HTML5 cache warmup
+- **Op:** create_task
+- **List:** 901523123922 (RandomGame)
+- **Status @ flush:** to do
+- **Flushed:** 2026-05-23T~10:30Z (orchestrator main session)
+
+### ENTRY 2026-05-23-034 → 86c9y58nx
+
+- **ClickUp:** https://app.clickup.com/t/86c9y58nx
+- **Name:** fix(lint): max-line-length sweep (~175 findings)
+- **Op:** create_task
+- **List:** 901523123922 (RandomGame)
+- **Status @ flush:** to do
+- **Flushed:** 2026-05-23T~10:30Z (orchestrator main session)
+
+### ENTRY 2026-05-23-035 → 86c9y58pf
+
+- **ClickUp:** https://app.clickup.com/t/86c9y58pf
+- **Name:** fix(lint): duplicated-load sweep (~58 findings)
+- **Op:** create_task
+- **List:** 901523123922 (RandomGame)
+- **Status @ flush:** to do
+- **Flushed:** 2026-05-23T~10:30Z (orchestrator main session)
+
+### ENTRY 2026-05-23-036 → 86c9y58tt
+
+- **ClickUp:** https://app.clickup.com/t/86c9y58tt
+- **Name:** fix(lint): class-definitions-order sweep (~92 findings)
+- **Op:** create_task
+- **List:** 901523123922 (RandomGame)
+- **Status @ flush:** to do
+- **Flushed:** 2026-05-23T~10:30Z (orchestrator main session)
+
+### ENTRY 2026-05-23-037 → 86c9y58vn
+
+- **ClickUp:** https://app.clickup.com/t/86c9y58vn
+- **Name:** fix(lint): max-public-methods sweep (~23 findings)
+- **Op:** create_task
+- **List:** 901523123922 (RandomGame)
+- **Status @ flush:** to do
+- **Flushed:** 2026-05-23T~10:30Z (orchestrator main session)
+
+### ENTRY 2026-05-23-038 → 86c9y58yz
+
+- **ClickUp:** https://app.clickup.com/t/86c9y58yz
+- **Name:** chore(lint): gdformat reformat sweep (~179 files)
+- **Op:** create_task
+- **List:** 901523123922 (RandomGame)
+- **Status @ flush:** to do
+- **Flushed:** 2026-05-23T~10:30Z (orchestrator main session)
+
+### ENTRY 2026-05-23-039 → 86c9y5944
+
+- **ClickUp:** https://app.clickup.com/t/86c9y5944
+- **Name:** fix(docs): floor_assembler.gd derive_zone_seed docstring 3-arg → 2-arg correction
+- **Op:** create_task
+- **List:** 901523123922 (RandomGame)
+- **Status @ flush:** to do
+- **Flushed:** 2026-05-23T~10:30Z (orchestrator main session)
