@@ -442,7 +442,12 @@ var completed_bounties: Array = []
 ## Backfill default `{}` lives in `Save._backfill_v5_tier3_quest_fields`
 ## (renamed to `_backfill_v5_tier3_fields` to cover both quest + world-map
 ## additions; both ride additively on schema v5 per §5).
-var discovered_zones: Dictionary = {}
+## **Type discipline note:** declared as `Dictionary[StringName, bool]` (typed)
+## so insert-paths enforce StringName key type. An untyped Dictionary silently
+## coerces StringName -> String at insert time in Godot 4.3 (PR #362 regression
+## class; see `_normalise_dict_keys_to_stringname` rationale). Typed declaration
+## here PLUS typed local var inside the normaliser are belt-and-braces.
+var discovered_zones: Dictionary[StringName, bool] = {}
 
 ## Per-character waypoint-discovery dict. Keyed by StringName waypoint id
 ## (convention `<stratum>_<zone>_<waypoint_slug>`). `true` = discovered +
@@ -452,7 +457,9 @@ var discovered_zones: Dictionary = {}
 ##
 ## **Same shape rules as `discovered_zones`** — Dict[StringName, bool],
 ## per-character, monotone-grow, JSON-round-trips via String coercion.
-var discovered_waypoints: Dictionary = {}
+## Typed declaration mirrors `discovered_zones` for same StringName-key
+## enforcement reasons.
+var discovered_waypoints: Dictionary[StringName, bool] = {}
 
 
 func _ready() -> void:
@@ -2159,13 +2166,22 @@ func restore_from_save_dict(character: Dictionary) -> void:
 ## Mirror of `_stringify_dict_keys` for the load side. Coerce String keys
 ## (from JSON round-trip) back to StringName for in-memory canonicalisation.
 ## Tolerates missing entries (returns empty dict on non-Dictionary input).
+##
+## **Godot 4.3 quirk — typed Dictionary required for StringName key enforcement.**
+## An untyped `Dictionary` silently coerces StringName keys back to String on
+## insert (StringName/String compare-equal, so the engine dedup-replaces with
+## the String form). The typed `Dictionary[StringName, bool]` declaration is
+## load-bearing — without it, `typeof(k) == TYPE_STRING_NAME` reads back FALSE
+## for every key (PR #362 regression-fix; ticket `86c9y10fv` Tess QA).
+## Captured in `.claude/docs/test-conventions.md § "Godot 4.3 untyped-Dictionary
+## StringName-key coercion"`.
 static func _normalise_dict_keys_to_stringname(d: Variant) -> Dictionary:
-	var out: Dictionary = {}
+	var out: Dictionary[StringName, bool] = {}
 	if not (d is Dictionary):
 		return out
 	var src: Dictionary = d as Dictionary
 	for k in src.keys():
-		out[StringName(String(k))] = src[k]
+		out[StringName(String(k))] = bool(src[k])
 	return out
 
 

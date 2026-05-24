@@ -223,6 +223,14 @@ func _make_player_stub_script() -> Script:
 	# silently drops writes to undeclared properties (PR #352 lesson, see
 	# .claude/docs/test-conventions.md § "Test stubs — script-typed
 	# extends Node required for Object.set writes").
+	#
+	# Stub uses UNTYPED Dictionary intentionally — the test pushes dicts in
+	# via Object.set; if the stub's field were typed `Dictionary[StringName,
+	# bool]`, Godot would convert on assignment, but inline-GDScript-via-
+	# source_code may not parse the typed-collection syntax reliably across
+	# 4.3 patch levels. The panel reads via `p.get("discovered_zones")` and
+	# uses StringName-key lookup, which works against an untyped Dict whose
+	# keys happen to be StringName (as the tests supply).
 	var s: GDScript = GDScript.new()
 	s.source_code = (
 		"extends Node\n"

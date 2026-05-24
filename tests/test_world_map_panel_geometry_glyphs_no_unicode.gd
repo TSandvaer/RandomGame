@@ -170,6 +170,11 @@ func _make_player_stub() -> Node:
 
 
 func _make_player_stub_script() -> Script:
+	# Stub uses untyped Dictionary intentionally — see sibling
+	# `test_world_map_panel_renders_stratum_list.gd::_make_player_stub_script`
+	# for the rationale (inline-GDScript-via-source_code may not parse typed-
+	# collection syntax reliably; panel-side lookup tolerates untyped dict
+	# with StringName keys).
 	var s: GDScript = GDScript.new()
 	s.source_code = (
 		"extends Node\n"

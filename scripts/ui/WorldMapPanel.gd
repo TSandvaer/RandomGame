@@ -265,9 +265,13 @@ func _resolve_deepest_stratum() -> void:
 
 
 func _render_stratum_list() -> void:
-	# Tear down + rebuild. Cheap for ≤8 strata.
+	# Tear down + rebuild. Cheap for ≤8 strata. See `_render_zone_list` for
+	# the remove_child-before-queue_free rationale (Godot's auto-rename on
+	# name-collision with not-yet-removed siblings; PR #362 fix).
 	for btn: Button in _stratum_buttons:
 		if is_instance_valid(btn):
+			if btn.get_parent() != null:
+				btn.get_parent().remove_child(btn)
 			btn.queue_free()
 	_stratum_buttons.clear()
 	# Determine all known strata (from registry + deepest_stratum). Always
@@ -317,8 +321,18 @@ func _on_stratum_pressed(s: int) -> void:
 
 
 func _render_zone_list() -> void:
+	# IMPORTANT — remove_child BEFORE queue_free. `queue_free()` alone leaves
+	# the node in the parent until the next process_frame, so a subsequent
+	# `add_child` of a new node with the same name (e.g. `ZoneRow_<zone_id>`)
+	# triggers Godot's auto-rename (`@ZoneRow_...@N`) and breaks
+	# `find_child("ZoneRow_<zone_id>", true, false)` lookups in tests + the
+	# discovery-state setter re-render path. Explicit remove_child detaches
+	# the doomed node from the parent IMMEDIATELY so names are free to reuse.
+	# (PR #362 regression-fix; ticket `86c9y10fv` Tess QA failure 2 + 3.)
 	for row: Control in _zone_rows:
 		if is_instance_valid(row):
+			if row.get_parent() != null:
+				row.get_parent().remove_child(row)
 			row.queue_free()
 	_zone_rows.clear()
 	var zones: Array = _zones_by_stratum.get(_selected_stratum, [])
