@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_sunken_scholar"]
+
+[ext_resource type="Script" path="res://scripts/mobs/SunkenScholar.gd" id="1_sunken_scholar"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_sunken_scholar"]
+radius = 11.0
+
+[node name="SunkenScholar" type="CharacterBody2D"]
+collision_layer = 8
+collision_mask = 3
+script = ExtResource("1_sunken_scholar")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_sunken_scholar")
+
+[node name="Sprite" type="ColorRect" parent="."]
+offset_left = -8.0
+offset_top = -8.0
+offset_right = 8.0
+offset_bottom = 8.0
+color = Color(0.659, 0.572, 0.439, 1)
