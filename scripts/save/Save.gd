@@ -128,6 +128,16 @@ const DEFAULT_PAYLOAD: Dictionary = {
 		# `team/devon-dev/save-schema-v5-tier3-additions.md §5`.
 		"active_bounty": null,
 		"completed_bounties": [],
+		# M3 Tier 3 W2-T5 (2026-05-24, ticket `86c9y10fv`): per-character
+		# world-map discovery state. `discovered_zones` keyed by
+		# `ZoneDef.zone_id: StringName`; `discovered_waypoints` keyed by
+		# waypoint StringName id (convention `<stratum>_<zone>_<slug>`).
+		# Both are Dict[StringName, bool] in-memory; JSON round-trips keys
+		# as String (Player._normalise_dict_keys_to_stringname converts back
+		# at read time). Both ride additively on schema v5 — no version
+		# bump, per `team/devon-dev/save-schema-v5-tier3-additions.md §5`.
+		"discovered_zones": {},
+		"discovered_waypoints": {},
 	},
 	"stash": [],  # list of item dicts
 	"equipped": {},  # slot -> item dict
@@ -529,13 +539,20 @@ func _migrate_v4_to_v5(data: Dictionary) -> Dictionary:
 ## states: "Use existing v4 `_upgrade_payload` has()-guard pattern, NOT
 ## `_migrate_v5_to_v5_tier3` (that's forward-looking only)."
 ##
-## **What this backfills**: two W2-T6 fields under `character.*`:
-##   - `active_bounty` — defaults to null on absent. Tier-3-naive saves
-##     have no concept of quest state; the player starts post-load with
-##     no active bounty.
-##   - `completed_bounties` — defaults to [] on absent. Tier-3-naive saves
-##     have no completed-quest history; the player's completion list
+## **What this backfills**: four `character.*` fields ride additively on
+## v5, all via the same has()-guard pattern:
+##   - `active_bounty` — defaults to null on absent (W2-T6). Tier-3-naive
+##     saves have no concept of quest state; the player starts post-load
+##     with no active bounty.
+##   - `completed_bounties` — defaults to [] on absent (W2-T6). Tier-3-naive
+##     saves have no completed-quest history; the player's completion list
 ##     starts empty.
+##   - `discovered_zones` — defaults to {} on absent (W2-T5, ticket
+##     `86c9y10fv`). Tier-3-naive saves have no map-discovery state; the
+##     player's world-map renders all zones as undiscovered.
+##   - `discovered_waypoints` — defaults to {} on absent (W2-T5). Same
+##     shape as discovered_zones; M3 W2 ships the field with minimal
+##     consumer (W3+ surfaces consume).
 ##
 ## **Idempotent**: every backfill is gated by `not character.has(<key>)`,
 ## so running on an already-W2-T6 save is a no-op.
@@ -561,6 +578,15 @@ func _backfill_v5_tier3_quest_fields(data: Dictionary) -> Dictionary:
 		character["active_bounty"] = null
 	if not character.has("completed_bounties"):
 		character["completed_bounties"] = []
+	# M3 Tier 3 W2-T5 (ticket 86c9y10fv): world-map discovery state.
+	# Same has()-guarded additive pattern as the W2-T6 quest fields above.
+	# Tier-3-naive v5 saves (pre-W2-T5) and legacy v0..v4 saves both land
+	# here lacking the keys; backfill defaults to empty dict ("nothing
+	# discovered yet"). Idempotent on already-W2-T5 saves.
+	if not character.has("discovered_zones"):
+		character["discovered_zones"] = {}
+	if not character.has("discovered_waypoints"):
+		character["discovered_waypoints"] = {}
 	return data
 
 

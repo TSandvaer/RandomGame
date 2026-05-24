@@ -418,6 +418,42 @@ var active_bounty: Variant = null
 ## (the comparison is robust to either StringName or String shapes).
 var completed_bounties: Array = []
 
+# ---- M3 Tier 3 W2-T5 world-map discovery state (ticket 86c9y10fv) -------
+##
+## Per-character zone-discovery dict consumed by WorldMapPanel. Keyed by
+## `ZoneDef.zone_id: StringName`; value `true` = entered at least once.
+## Absent / false = undiscovered (fog-of-war on map UI). Discovery is
+## **monotone-grow** — once true, never reset within a character's life.
+##
+## **Why Dictionary[StringName, bool] not Array[StringName]:** O(1)
+## membership check + supports future expansion (per-zone state sub-keys
+## for entry-count / first-visited timestamp / cleared-state) without a
+## non-additive schema bump. Matches the survey §2.2 shape lock in
+## `team/devon-dev/save-schema-v5-tier3-additions.md`.
+##
+## **Why per-character:** matches Sponsor's 2026-05-17 per-character
+## decision rationale for `hub_town_seen` — each character is encountering
+## the world as themselves. Per-character also keeps the multi-character
+## v5 surface clean (no cross-character shared state).
+##
+## **Save round-trip:** serialised into `data.character.discovered_zones`
+## via `to_save_dict()`. JSON serialises StringName keys as String; the
+## load layer normalises every key back to StringName at restore time.
+## Backfill default `{}` lives in `Save._backfill_v5_tier3_quest_fields`
+## (renamed to `_backfill_v5_tier3_fields` to cover both quest + world-map
+## additions; both ride additively on schema v5 per §5).
+var discovered_zones: Dictionary = {}
+
+## Per-character waypoint-discovery dict. Keyed by StringName waypoint id
+## (convention `<stratum>_<zone>_<waypoint_slug>`). `true` = discovered +
+## available for future fast-travel (W3+ surface). M3 W2 ships the field
+## with a minimal consumer (panel reads it but no waypoint UI yet —
+## M4 expansion per ticket Part B).
+##
+## **Same shape rules as `discovered_zones`** — Dict[StringName, bool],
+## per-character, monotone-grow, JSON-round-trips via String coercion.
+var discovered_waypoints: Dictionary = {}
+
 
 func _ready() -> void:
 	# Seed the saved layer mask from whatever the scene authored. Tests may
@@ -2057,6 +2093,26 @@ func to_save_dict() -> Dictionary:
 	for entry in completed_bounties:
 		completed_strings.append(String(entry))
 	out["completed_bounties"] = completed_strings
+	# W2-T5: world-map discovery state. JSON serialises StringName keys as
+	# String; we stringify defensively at write time so the on-disk shape is
+	# unambiguous (Dictionary[String, bool]). restore_from_save_dict() converts
+	# back to StringName keys at read time.
+	out["discovered_zones"] = _stringify_dict_keys(discovered_zones)
+	out["discovered_waypoints"] = _stringify_dict_keys(discovered_waypoints)
+	return out
+
+
+## Coerce every key of a StringName-keyed Dict[bool] to plain String for
+## JSON serialisation. The runtime accepts either StringName or String
+## keys (Godot's Dictionary lookup is permissive), but the on-disk shape
+## must be JSON-safe — JSON has no StringName, so unstringified keys would
+## round-trip via the engine's StringName→String coercion non-explicitly.
+## Explicit stringification keeps the on-disk shape diagnosable + matches
+## the active_bounty / completed_bounties serialisation convention.
+static func _stringify_dict_keys(d: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for k in d.keys():
+		out[String(k)] = d[k]
 	return out
 
 
@@ -2088,5 +2144,51 @@ func restore_from_save_dict(character: Dictionary) -> void:
 	if character.has("completed_bounties"):
 		var arr: Variant = character["completed_bounties"]
 		if arr is Array:
-			for entry in (arr as Array):
+			for entry in arr as Array:
 				completed_bounties.append(StringName(String(entry)))
+	# W2-T5: world-map discovery state. JSON round-trips StringName keys as
+	# String, so we normalise back to StringName at read time. Missing key
+	# (tier-3-naive saves) defaults to empty {} — consumed by WorldMapPanel
+	# rendering as "all zones undiscovered."
+	discovered_zones = _normalise_dict_keys_to_stringname(character.get("discovered_zones", {}))
+	discovered_waypoints = _normalise_dict_keys_to_stringname(
+		character.get("discovered_waypoints", {})
+	)
+
+
+## Mirror of `_stringify_dict_keys` for the load side. Coerce String keys
+## (from JSON round-trip) back to StringName for in-memory canonicalisation.
+## Tolerates missing entries (returns empty dict on non-Dictionary input).
+static func _normalise_dict_keys_to_stringname(d: Variant) -> Dictionary:
+	var out: Dictionary = {}
+	if not (d is Dictionary):
+		return out
+	var src: Dictionary = d as Dictionary
+	for k in src.keys():
+		out[StringName(String(k))] = src[k]
+	return out
+
+
+## W2-T5: discovery write hook. Idempotent — re-entering an already-
+## discovered zone is a no-op. The boolean return tells callers whether
+## this was a NEW discovery (true) vs a re-entry (false), so Main.gd can
+## fire the discovery `[combat-trace]` line only on transitions.
+func mark_zone_discovered(zone_id: StringName) -> bool:
+	if zone_id == &"":
+		return false
+	if discovered_zones.has(zone_id):
+		return false
+	discovered_zones[zone_id] = true
+	return true
+
+
+## Same shape as mark_zone_discovered, applied to waypoints. M3 W2 has no
+## production caller (no waypoint surface yet); shipped now so W3+ /
+## M4 waypoint surface has the hook in place without a save-schema bump.
+func mark_waypoint_discovered(waypoint_id: StringName) -> bool:
+	if waypoint_id == &"":
+		return false
+	if discovered_waypoints.has(waypoint_id):
+		return false
+	discovered_waypoints[waypoint_id] = true
+	return true

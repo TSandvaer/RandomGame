@@ -62,6 +62,15 @@ const BODY_TEXT: String = "You have cleared the Outer Cloister.\nThe path deeper
 ## Button copy.
 const RETURN_BUTTON_TEXT: String = "Return to Stratum 1"
 
+## W2-T5 (ticket `86c9y10fv`): "Open Map" affordance — the descent portal
+## IS the canonical "where am I going next?" surface per Uma's
+## `world-map-direction.md §2` navigation chain. The button lazy-loads
+## a WorldMapPanel instance on click; on the panel's `close_requested`
+## the host frees the instance and refocuses the return button.
+const OPEN_MAP_BUTTON_TEXT: String = "Open Map"
+
+const WORLD_MAP_PANEL_SCENE_PATH: String = "res://scenes/ui/WorldMapPanel.tscn"
+
 # ---- Palette (Uma `palette.md`) ---------------------------------------
 
 ## Panel background — `#1B1A1F` at 100% opacity (Uma death-restart Beat D
@@ -87,6 +96,8 @@ var _title_label: Label = null
 var _subtitle_label: Label = null
 var _body_label: Label = null
 var _return_button: Button = null
+var _open_map_button: Button = null
+var _world_map_panel: CanvasLayer = null
 var _fade_tween: Tween = null
 
 
@@ -115,6 +126,20 @@ func get_bg_panel() -> ColorRect:
 
 func get_return_button() -> Button:
 	return _return_button
+
+
+func get_open_map_button() -> Button:
+	return _open_map_button
+
+
+func get_world_map_panel() -> CanvasLayer:
+	return _world_map_panel
+
+
+## Test-only: simulate the open-map-button press without dispatching a real
+## button event. Same lazy-load + signal-wiring path as the live button.
+func press_open_map_for_test() -> void:
+	_on_open_map_pressed()
 
 
 func get_title_label() -> Label:
@@ -207,6 +232,32 @@ func _build_ui() -> void:
 	_return_button.pressed.connect(_on_return_pressed)
 	_bg_panel.add_child(_return_button)
 
+	# W2-T5: "Open Map" affordance. Placed above the return button so the
+	# read-order is "see map → choose to return" (the player thinks about
+	# the descent before committing). Sized smaller than the return button
+	# (subordinate action) — opening the map is informational, return is
+	# the commit.
+	_open_map_button = Button.new()
+	_open_map_button.name = "OpenMapButton"
+	_open_map_button.text = OPEN_MAP_BUTTON_TEXT
+	_open_map_button.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_open_map_button.offset_left = -80.0
+	_open_map_button.offset_right = 80.0
+	_open_map_button.offset_top = -180.0
+	_open_map_button.offset_bottom = -148.0
+	_open_map_button.pressed.connect(_on_open_map_pressed)
+	_bg_panel.add_child(_open_map_button)
+
+
+func _exit_tree() -> void:
+	# W2-T5: clean up an open WorldMapPanel if DescendScreen is freed
+	# while the map is up (Main._on_descend_restart_run queue_frees the
+	# descend screen; without this guard, the map panel would orphan in
+	# the SceneTree root since it was added as a sibling, not a child).
+	if _world_map_panel != null and is_instance_valid(_world_map_panel):
+		_world_map_panel.queue_free()
+		_world_map_panel = null
+
 
 func _start_fade_in() -> void:
 	if _bg_panel == null:
@@ -242,3 +293,53 @@ func _on_return_pressed() -> void:
 	if _return_button != null:
 		_return_button.disabled = true
 	restart_run.emit()
+
+
+# ---- W2-T5: World-map panel hosting -----------------------------------
+
+
+func _on_open_map_pressed() -> void:
+	# Re-press while a panel is already open is a no-op (idempotent —
+	# matches the return-button's rapid-mash guard shape). The panel's
+	# Esc-close path drops the instance + clears _world_map_panel.
+	if _world_map_panel != null and is_instance_valid(_world_map_panel):
+		return
+	var packed: PackedScene = load(WORLD_MAP_PANEL_SCENE_PATH) as PackedScene
+	if packed == null:
+		push_warning(
+			"[DescendScreen] world-map panel scene missing at %s" % WORLD_MAP_PANEL_SCENE_PATH
+		)
+		return
+	_world_map_panel = packed.instantiate() as CanvasLayer
+	if _world_map_panel == null:
+		return
+	# Mount as a sibling of DescendScreen via the SceneTree root so the
+	# panel's CanvasLayer (layer=70) renders ABOVE the world but BELOW
+	# DescendScreen's own layer (100). The map should be readable, but the
+	# descend screen's "Return to Stratum 1" remains the dominant action
+	# in the screen hierarchy. Tradeoff: the descend screen's modal-bg
+	# darkens through the parchment substrate slightly. Acceptable —
+	# DescendScreen.bg is 100% opaque so the world is masked; the panel's
+	# 92% modal-bg + 100% parchment substrate sit above the world but
+	# under the descend chrome. The visual reads as "the parchment sits
+	# on top of the dark screen," which is the intended descent-narrative
+	# feel.
+	#
+	# Alternative considered: add_child(_world_map_panel) — would parent
+	# the panel under DescendScreen's CanvasLayer (layer 100) and force
+	# the panel above the descend chrome. Rejected: the descend screen
+	# IS the higher-priority surface; the map should not visually obscure
+	# the return-to-stratum-1 affordance.
+	get_tree().root.add_child(_world_map_panel)
+	if _world_map_panel.has_signal("close_requested"):
+		_world_map_panel.connect("close_requested", _on_world_map_closed)
+
+
+func _on_world_map_closed() -> void:
+	if _world_map_panel != null and is_instance_valid(_world_map_panel):
+		_world_map_panel.queue_free()
+	_world_map_panel = null
+	# Refocus the return button so keyboard navigation lands back on the
+	# primary action immediately after the map closes.
+	if _return_button != null and _return_button.is_inside_tree():
+		_return_button.grab_focus()
