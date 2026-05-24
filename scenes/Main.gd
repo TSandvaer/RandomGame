@@ -73,6 +73,31 @@ const ROOM_IDS: Array[StringName] = [
 	&"s1_boss_room",
 ]
 
+## M3 Tier 3 W2-T5 (ticket `86c9y10fv`) — world-map discovery hook.
+## Every S1 room (Rooms 01-08 + boss) maps to the single S1 ZoneDef
+## `s1_z1_outer_cloister` (the W2-T3 retrofit shipped one zone covering
+## the full S1 narrative arc — see `resources/level/zones/s1_z1_outer_cloister.tres`).
+## When `_load_room_at_index` fires for ANY S1 index, the player's
+## `discovered_zones[s1_z1_outer_cloister] = true` is set idempotently.
+##
+## Forward-compat: when procgen impl (W2-T3) replaces `ROOM_SCENE_PATHS`
+## traversal with `AssembledFloor` consumption, this constant becomes the
+## `room_idx → zone_id` fallback for non-procgen rooms; the procgen path
+## will derive the zone_id from the AssembledFloor.zone_id field. The
+## present mapping is correct at HEAD (all M3 S1 content lives in the
+## one zone).
+const ROOM_INDEX_TO_ZONE_ID: Array[StringName] = [
+	&"s1_z1_outer_cloister",  # Room 01
+	&"s1_z1_outer_cloister",  # Room 02
+	&"s1_z1_outer_cloister",  # Room 03
+	&"s1_z1_outer_cloister",  # Room 04
+	&"s1_z1_outer_cloister",  # Room 05
+	&"s1_z1_outer_cloister",  # Room 06
+	&"s1_z1_outer_cloister",  # Room 07
+	&"s1_z1_outer_cloister",  # Room 08
+	&"s1_z1_outer_cloister",  # Boss room — still part of S1 z1
+]
+
 const PLAYER_SCENE_PATH: String = "res://scenes/player/Player.tscn"
 const INVENTORY_PANEL_SCENE_PATH: String = "res://scenes/ui/InventoryPanel.tscn"
 const DIALOGUE_PANEL_SCENE_PATH: String = "res://scenes/ui/DialoguePanel.tscn"
@@ -536,6 +561,12 @@ func _load_room_at_index(index: int) -> void:
 	_engage_camera_for_room()
 	# Wire room-specific signals.
 	_wire_room_signals(room, index)
+	# M3 Tier 3 W2-T5 — world-map discovery hook (ticket `86c9y10fv`).
+	# Idempotent on re-entry (Player.mark_zone_discovered returns false if
+	# the zone was already discovered). Fires AFTER room is wired so the
+	# trace stream's room-load ordering reads consistently
+	# (room loaded → camera engaged → mob signals wired → discovery written).
+	_mark_zone_discovered_for_room_index(index)
 	# Push pickups into the room (loot spawner re-targets so dropped pickups
 	# get freed when the room frees).
 	_loot_spawner.set_parent_for_pickups(room)
@@ -1101,6 +1132,18 @@ func _load_save_or_defaults() -> void:
 	var sp: Node = _stratum_progression()
 	if sp != null:
 		sp.restore_from_save_data(data)
+	# W2-T5: restore Player quest + world-map state via Player.restore_from_save_dict.
+	# Pre-W2-T5 this round-trip wasn't wired into Main even though
+	# Player.to_save_dict / restore_from_save_dict existed (PR #352 shipped the
+	# methods + the Save.gd backfill but skipped the Main wiring — the
+	# field-level round-trip GUT test in test_save_migrate_quest_fields_backfill
+	# covers the methods in isolation; this Main wiring is the integration
+	# surface). Reads from `data.character` for v5 saves (pre-multi-character
+	# lift); `data.characters[active_slot]` for post-lift saves — branch
+	# defensively via `has()`-guard.
+	if _player != null and _player.has_method("restore_from_save_dict"):
+		if character is Dictionary:
+			_player.restore_from_save_dict(character)
 
 
 func _persist_to_save(slot: int = SAVE_SLOT) -> bool:
@@ -1120,6 +1163,16 @@ func _persist_to_save(slot: int = SAVE_SLOT) -> bool:
 	if _player != null:
 		character["hp_current"] = _player.hp_current
 		character["hp_max"] = _player.hp_max
+	# W2-T5: Player quest + world-map fields. Merge Player.to_save_dict()
+	# keys into the character dict — additive (does not overwrite
+	# levels/stats/HP). Pre-W2-T5 this wasn't wired (see _load_save_or_defaults
+	# comment); the gap meant `active_bounty` / `completed_bounties` /
+	# `discovered_zones` / `discovered_waypoints` all relied on the Save.gd
+	# default-payload defaults instead of round-tripping in-memory state.
+	if _player != null and _player.has_method("to_save_dict"):
+		var player_save: Dictionary = _player.to_save_dict()
+		for k in player_save.keys():
+			character[k] = player_save[k]
 	var inventory: Node = _inventory()
 	if inventory != null and inventory.has_method("snapshot_to_save"):
 		inventory.snapshot_to_save(data)
@@ -1547,3 +1600,28 @@ func _engage_camera_for_room() -> void:
 		cd.follow_target(_player, CAMERA_FOLLOW_DEADZONE)
 	if cd.has_method("set_world_bounds"):
 		cd.set_world_bounds(S1_ROOM_BOUNDS)
+
+
+## M3 Tier 3 W2-T5 — discovery write hook (ticket `86c9y10fv`). Looks up
+## the zone_id for the given room index in `ROOM_INDEX_TO_ZONE_ID` and
+## calls `Player.mark_zone_discovered(zone_id)`. The Player method is
+## idempotent; re-entering an already-discovered zone is a no-op.
+##
+## Fires a `[combat-trace] Main.discover_zone | zone_id=<id> new=<bool>`
+## line so Playwright + Sponsor soak can verify the hook empirically. The
+## `new` flag distinguishes first-discovery (true) from re-entry (false).
+##
+## Defensive against bare-test surfaces: returns cleanly when Player is
+## null or the index is out of range.
+func _mark_zone_discovered_for_room_index(index: int) -> void:
+	if _player == null:
+		return
+	if index < 0 or index >= ROOM_INDEX_TO_ZONE_ID.size():
+		return
+	var zone_id: StringName = ROOM_INDEX_TO_ZONE_ID[index]
+	if not _player.has_method("mark_zone_discovered"):
+		return
+	var was_new: bool = bool(_player.call("mark_zone_discovered", zone_id))
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags") if is_inside_tree() else null
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace("Main.discover_zone", "zone_id=%s new=%s" % [str(zone_id), str(was_new)])

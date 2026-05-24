@@ -468,3 +468,56 @@ Per `m3-design-seeds.md` defaults and `post-wave3-sequencing.md §6 SI-3` lock, 
 4. **The boss-room glyph color choice (`#7A2A26` mob HP foreground, NOT `#FF6A2A` ember)** is a load-bearing tonal call. Ember-orange is reserved for the player's task-marker; using ember on the boss-room would conflate "the player's current task" with "where the boss lives." Mob-HP-foreground reads as "the enemy lives here," which is the right diegetic frame.
 5. **The default-font-glyph coverage rule bites the cleared-state X-cross.** A natural first design is `✓` Unicode; that rendering-fails as tofu in HTML5 per the rule. Two rotated ColorRect strokes is the safe + diegetically-correct fix (the cloister keeps tallies, not check-marks).
 6. **The PixelLab parchment texture is the easiest "polish later" decision in the project so far.** ColorRect-fallback ships M3 Tier 3 W2 in 0 generations; polish PR adds 1-2 generations + ~30 min of pipeline work. Sponsor can decide based on M3 Tier 3 W2 soak — if the ColorRect fallback reads convincingly, the polish PR is optional.
+
+---
+
+## W2 minimal impl notes — production wiring + zone-state geometry primitives
+
+This section records the as-shipped W2-T5 impl decisions (ticket `86c9y10fv`). It is **append-only** — design changes still flow through the main body of this doc (v1.1 amendment).
+
+### Shipped scope (W2-T5 ship-floor)
+
+- **`scenes/ui/WorldMapPanel.tscn` + `scripts/ui/WorldMapPanel.gd`** — pure-view panel; `PANEL_LAYER = 70` (sits between InventoryPanel 80 and DialoguePanel 90 per `dialogue-system.md`).
+- **Parchment substrate = ColorRect** at `#D7C68F` (the §10 "deferrable" polish PixelLab texture is NOT shipped; W2-T5 takes the ColorRect-fallback per §10 item 1). Polish-PR follow-up tracked separately.
+- **Zone-state markers rendered as geometry primitives** per §6 — every marker is composed of ColorRect children only. The cleared-state X-cross is two rotated ColorRect strokes (NOT `✓` U+2713). Pinned structurally by `tests/test_world_map_panel_geometry_glyphs_no_unicode.gd` walking every Label/Button/RichTextLabel and asserting every codepoint ≤127.
+- **Stratum-list pane + per-stratum zone-list pane** — both rendered. Locked strata render in `#3A363D` slate + Button.disabled per §3 state 4 (boss-room) and §3 sponsor-input table.
+- **Player save fields** `discovered_zones: Dictionary` + `discovered_waypoints: Dictionary` added per the save survey §2.2 + §2.3. Round-trip via `Player.to_save_dict` / `restore_from_save_dict` (StringName keys stringified for JSON, normalised back at read time). Backfill default `{}` added to `Save._backfill_v5_tier3_quest_fields` — additive on v5, NO schema bump.
+- **DescendScreen "Open Map" button** — lazy-loads the panel on click; Esc on the panel closes back to DescendScreen (LIFO stack). Per §2 navigation chain: descent-portal → stratum picker (current DescendScreen surface) → world-map.
+- **Discovery write hook on room load** — `Main._load_room_at_index(index)` calls `Player.mark_zone_discovered(zone_id)` per `ROOM_INDEX_TO_ZONE_ID` (all S1 indices map to `s1_z1_outer_cloister` since the W2-T3 retrofit ships one S1 zone covering the full narrative arc). Fires `[combat-trace] Main.discover_zone | zone_id=<id> new=<bool>` for HTML5 trace observability.
+
+### Deviations from §3 / §6 visible to a soak
+
+- **No active-quest exclamation overlay** in W2-T5 ship-floor. §3 "Active-quest overlay" spec'd an ember-orange `!` Label pulse on the active-quest zone — Player.active_bounty IS in scope, but the zone-id binding from `QuestState.zone_id` is W3 quest-content surface. The panel reads from save state defensively; when W3+ wires the binding the overlay can be added without touching the existing render path. **Acceptable for ship-floor:** the spec's "single ember stamp at a time" rule means absence is graceful (no broken visual).
+- **No edges rendered between zones.** §4 "Edges" specced ink-lined connections between zone-nodes. W2-T5 ships the zone-list pane as a vertical VBox per zone (Diablo-II reading-list shape) rather than a graph layout. Reasoning: the shipped `s1_z1_outer_cloister` contains the WHOLE Stratum-1 arc (9 anchors + 3 procedural fills), and ALL S1 chunks live inside that ONE zone — there is no "Zone A → Zone B" edge to render at the stratum-1 scale. When W3 introduces S2 zones with cross-zone exits via `ZoneAnchor.target_zone_id`, the panel can lift to a graph layout. The list-view shipped today is consistent with §4's "hand-laid graph" philosophy at the trivial-graph (one-node) limit.
+- **No fast-travel click handlers.** §5 "Click / select" specced fast-travel between cleared zones. W2-T5 ship-floor does NOT implement; the discovery surface ships first, fast-travel composition is W3+. Player can read the map; clicking a zone is a no-op.
+- **Cleared-state proxy via `deepest_stratum > zone.stratum_id`** — §3 state 3 specced "all room-progression objectives complete." W2-T5 lacks a per-zone `cleared_condition` lookup (Drew's `ZoneDef.cleared_condition` is a future W2-T3+ surface). The proxy is conservative: cleared if the player has descended past this stratum. Tightens automatically when Drew's per-zone cleared-state flag lands.
+
+### HTML5 primitive checklist (§6) — as-shipped audit
+
+1. Modal background — **ColorRect** ✓
+2. Parchment substrate — **ColorRect** (texture follow-up deferred) ✓
+3. Node markers — **ColorRect** (NO Polygon2D) ✓
+4. Cleared-state X-cross — **two rotated ColorRect strokes** ✓ (NO `✓` glyph)
+5. Boss-room glyph — **ColorRect** (PixelLab sprite follow-up deferred) ✓
+6. Active-quest exclamation overlay — **NOT shipped W2-T5** (deferred to W3)
+7. Edge rendering — **NOT shipped W2-T5** (deferred to multi-zone W3)
+8. Unlocked-edge ember glow — **NOT shipped W2-T5** (deferred with edges)
+9. HDR-clamp discipline — **all modulate targets sub-1.0** ✓
+10. z_index discipline — **no negative z_index anywhere** ✓
+11. No CPUParticles2D — ✓
+
+### Test surface — what's pinned, what isn't
+
+**Pinned structurally:**
+- `tests/test_world_map_panel_renders_stratum_list.gd` — 8 GUT tests pin panel instantiation + header render + stratum-list count + zone-list count + discovered-marker composition + locked-stratum button-disabled + cleared X-cross strokes + close-requested signal.
+- `tests/test_world_map_panel_geometry_glyphs_no_unicode.gd` — 3 GUT tests walk every text node asserting all codepoints ≤127. Pins the HT-08 + HT-23 + HT-28 tester-checklist rows by structure rather than node-name.
+- `tests/test_discovered_zones_persists.gd` — 9 GUT tests pin Player save round-trip + Save backfill + mark_zone_discovered idempotence.
+- `tests/playwright/specs/world-map-panel-render.spec.ts` — HTML5 boot smoke + discovery-hook trace verification.
+
+**Not pinned (W3+ scope):**
+- HT-15 fast-travel click handler — deferred.
+- HT-11 active-quest stamp — deferred (no W2-T5 production caller).
+- HT-19 default-selected-node — partially covered (default is S1, selection logic shipped).
+- HT-21 hover-tooltip — deferred.
+
+Cite of record: PR for ticket `86c9y10fv`.
