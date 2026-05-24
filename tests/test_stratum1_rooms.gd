@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Integration tests for Stratum-1 rooms 02..08 — verifies each room loads,
 ## assembles via `LevelAssembler`, spawns the right mob mix, and that the

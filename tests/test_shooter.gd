@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for Shooter mob — paired with `scripts/mobs/Shooter.gd` per
 ## the testing bar (`team/TESTING_BAR.md` §Devon-and-Drew).

@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for `scripts/ui/StatAllocationPanel.gd` — the level-up panel that
 ## consumes banked stat points and writes V/F/E into PlayerStats.

@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## M3W-2 paired test — Player AnimatedSprite2D wiring.
 ##

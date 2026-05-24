@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Stress tests for save schema v4 — paired with W3-T6
 ## (`feat(save): schema v4 stress test fixtures + HTML5 OPFS round-trip`)

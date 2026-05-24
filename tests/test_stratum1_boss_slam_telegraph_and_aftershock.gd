@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for Stratum1Boss M3 Tier 2 Wave 2 T5 + T6.
 ##

@@ -1,3 +1,8 @@
+# gdlint:disable=max-public-methods
+# Director-pattern autoload: central owner of BGM / Ambient transitions per
+# .claude/docs/audio-architecture.md. High public-method count IS the design
+# (per-cue intent surface + per-test accessors); splitting would degrade the
+# single-owner contract. Sibling Director pattern: TimeScaleDirector, CameraDirector.
 extends Node
 ## AudioDirector autoload — central owner of BGM / Ambient music transitions.
 ##

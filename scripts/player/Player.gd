@@ -1,3 +1,7 @@
+# gdlint:disable=max-public-methods
+# Central play-loop class: state-machine + equip + stat + take_damage/heal +
+# try_dodge/try_attack + save round-trip form one cohesive Player surface.
+# Splitting would trade method count for cross-class coupling.
 class_name Player
 extends CharacterBody2D
 ## The Ember-Knight. Top-down 8-directional movement, sprint, an
