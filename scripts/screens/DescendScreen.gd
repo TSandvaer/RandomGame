@@ -299,6 +299,27 @@ func _on_return_pressed() -> void:
 
 
 func _on_open_map_pressed() -> void:
+	# `[combat-trace]` ENTRY trace — load-bearing diagnostic for the
+	# click-path-vs-render-path discrimination class. Sponsor's W2-T5
+	# RC soak (2026-05-24, build `0ae625c`) reported "clicking Open Map
+	# does nothing" with ZERO trace lines in the click handler — making
+	# it impossible to tell whether (a) the button signal wasn't firing,
+	# (b) the handler was crashing silently, or (c) the panel was
+	# instantiating-but-invisible. The latter was the true cause
+	# (layer-100 DescendScreen + opaque BG covered layer-70 panel) but
+	# diagnosis required a code read because the click path was
+	# instrumentally silent. Trace-first per the
+	# `diagnostic-traces-before-hypothesized-fixes` memory rule.
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		var already_open: bool = (
+			_world_map_panel != null and is_instance_valid(_world_map_panel)
+		)
+		df.combat_trace(
+			"DescendScreen._on_open_map_pressed",
+			"already_open=%s" % str(already_open),
+		)
+
 	# Re-press while a panel is already open is a no-op (idempotent —
 	# matches the return-button's rapid-mash guard shape). The panel's
 	# Esc-close path drops the instance + clears _world_map_panel.
@@ -313,26 +334,43 @@ func _on_open_map_pressed() -> void:
 	_world_map_panel = packed.instantiate() as CanvasLayer
 	if _world_map_panel == null:
 		return
-	# Mount as a sibling of DescendScreen via the SceneTree root so the
-	# panel's CanvasLayer (layer=70) renders ABOVE the world but BELOW
-	# DescendScreen's own layer (100). The map should be readable, but the
-	# descend screen's "Return to Stratum 1" remains the dominant action
-	# in the screen hierarchy. Tradeoff: the descend screen's modal-bg
-	# darkens through the parchment substrate slightly. Acceptable —
-	# DescendScreen.bg is 100% opaque so the world is masked; the panel's
-	# 92% modal-bg + 100% parchment substrate sit above the world but
-	# under the descend chrome. The visual reads as "the parchment sits
-	# on top of the dark screen," which is the intended descent-narrative
-	# feel.
+	# **Layer override — the load-bearing fix for the Sponsor RC soak P0**
+	# (ticket `86c9y10fv`, 2026-05-24). The panel's authored default
+	# `PANEL_LAYER = 70` is correct for hub-town / M4-hotkey hosts but is
+	# BELOW DescendScreen's own `layer = 100`. With the descend screen's
+	# 100%-opaque full-rect BG ColorRect, a 70-layer panel renders
+	# completely COVERED — the click handler fired, the panel
+	# instantiated, but it was invisible because the descend chrome was
+	# drawn on top. (The original "sibling at root, panel under descend
+	# chrome" framing in the prior comment was visually wrong — it
+	# assumed the BG was translucent like the inventory chrome, but
+	# DescendScreen is a stop-the-world moment at 100% opacity.) Fix:
+	# elevate the panel's layer ABOVE the descend screen on this host
+	# path. Mount as a CHILD of DescendScreen so the panel auto-frees
+	# alongside the screen (the `_exit_tree` cleanup hook stays as a
+	# defensive guard but is now structurally unnecessary).
 	#
-	# Alternative considered: add_child(_world_map_panel) — would parent
-	# the panel under DescendScreen's CanvasLayer (layer 100) and force
-	# the panel above the descend chrome. Rejected: the descend screen
-	# IS the higher-priority surface; the map should not visually obscure
-	# the return-to-stratum-1 affordance.
-	get_tree().root.add_child(_world_map_panel)
+	# **Ordering note — set layer AFTER add_child.** WorldMapPanel._ready
+	# unconditionally sets `layer = PANEL_LAYER` (70). If we set
+	# `_world_map_panel.layer = layer + 1` BEFORE add_child, the panel's
+	# `_ready` fires inside add_child and overwrites our override back to
+	# 70. Setting it AFTER add_child is the correct seam — `_ready` has
+	# already run, and our final write is the live value going forward.
+	# Regression-pinned by
+	# `tests/test_descend_screen.gd::test_world_map_panel_layer_above_descend_screen_layer`.
+	add_child(_world_map_panel)
+	_world_map_panel.layer = layer + 1
 	if _world_map_panel.has_signal("close_requested"):
 		_world_map_panel.connect("close_requested", _on_world_map_closed)
+	# Trace EXIT: panel mounted + listener wired. Sponsor's next soak
+	# trace stream MUST show this line + the WorldMapPanel.opened line
+	# (from `WorldMapPanel._emit_open_trace`) within ~1 frame of the
+	# click — that's the empirical contract for "the click path works."
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(
+			"DescendScreen.world_map_mounted",
+			"layer=%d" % _world_map_panel.layer,
+		)
 
 
 func _on_world_map_closed() -> void:
