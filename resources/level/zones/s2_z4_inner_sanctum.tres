@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="ZoneDef" load_steps=2 format=3]
+
+; W3-T7 Stage 1 — S2 ZoneDef authoring (Part A only; ticket `86c9y7ygj`).
+;
+; This file is the geographic SHELL — anchors + procedural_slot_pool are
+; left empty per the Stage 1 dispatch brief. Parts B (S2 mobs), C (S2
+; chunks), and D (S2 boss room) ship in later PRs.
+;
+; Sponsor-locked S2 names (2026-05-24): boss = Archive Sentinel. This
+; zone is the late-stratum / boss-approach zone — the player's final
+; corridor before the Stratum2BossRoom encounter. The boss_room anchor
+; here pins the Archive Sentinel arena; the exit anchor's
+; target_zone_id will reference the S3 entry zone once S3 zones land.
+;
+; TODO Part C/D: populate `anchors` with entry + boss_room (referencing
+; the Stratum2BossRoom chunk) + exit (target_zone_id = &"s3_z1_*" once
+; S3 lands; terminal for M3 Tier 3). `procedural_slot_pool` carries the
+; high-pressure boss-approach chunks (mixed Sunken-Scholar +
+; Bone-Catalyst rosters) per FloorAssembler.
+;
+; Cross-references:
+;   team/drew-dev/level-chunks.md § "Zone schema" + § "S2 zone roster"
+;   team/uma-ux/palette-stratum-2.md (S2 doctrine palette)
+;   .claude/docs/audio-architecture.md § "Tonal pattern — cross-stratum
+;     distinct ambient" (S2 boss music = distinct composition)
+
+[ext_resource type="Script" path="res://resources/level/ZoneDef.gd" id="1_zone"]
+
+[resource]
+script = ExtResource("1_zone")
+zone_id = &"s2_z4_inner_sanctum"
+display_name = "Inner Sanctum"
+stratum_id = 2
+anchors = []
+procedural_slot_pool = []
+min_slots_between_anchors = 0
+max_slots_between_anchors = 0
+port_mating_rules = {}

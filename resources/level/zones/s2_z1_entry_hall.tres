@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="ZoneDef" load_steps=2 format=3]
+
+; W3-T7 Stage 1 — S2 ZoneDef authoring (Part A only; ticket `86c9y7ygj`).
+;
+; This file is the geographic SHELL — anchors + procedural_slot_pool are
+; left empty per the Stage 1 dispatch brief. Parts B (S2 mobs), C (S2
+; chunks), and D (S2 boss room) ship in later PRs; this file declares the
+; zone identity + stratum binding so quest content (Part E) and the
+; FloorAssembler can reference `s2_z1_entry_hall` by id.
+;
+; Sponsor-locked S2 names (2026-05-24): ranged mob = Sunken-Scholar,
+; melee mob = Bone-Catalyst, boss = Archive Sentinel. This zone is the
+; descent entry — first room the player sees on transition from S1.
+;
+; TODO Part C: populate `anchors` with hand-authored anchor chunks
+; (entry + exit at minimum per ZoneDef.validate()'s invariants) and
+; `procedural_slot_pool` with the procgen-fill chunk ids drawn by
+; FloorAssembler.assemble_floor per `.claude/docs/procgen-pipeline.md`.
+;
+; Cross-references:
+;   team/drew-dev/level-chunks.md § "Zone schema" + § "S2 zone roster"
+;   team/uma-ux/palette-stratum-2.md (S2 doctrine palette)
+
+[ext_resource type="Script" path="res://resources/level/ZoneDef.gd" id="1_zone"]
+
+[resource]
+script = ExtResource("1_zone")
+zone_id = &"s2_z1_entry_hall"
+display_name = "Entry Hall of the Archive"
+stratum_id = 2
+anchors = []
+procedural_slot_pool = []
+min_slots_between_anchors = 0
+max_slots_between_anchors = 0
+port_mating_rules = {}
