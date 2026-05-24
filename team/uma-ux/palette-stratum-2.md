@@ -71,6 +71,70 @@ The previous indicative S2 entry in `palette.md` proposed **Sunken Library** (mu
 
 ---
 
+## §1.5 — Hybrid framing: Cinder Vaults + Sunken Archive (M3 Tier 3, Sponsor-locked 2026-05-24)
+
+**TL;DR:** Stratum 2 IS the Cinder Vaults (collapsed ember-ore mining complex). Drew's S2 zones (`s2_z1_entry_hall` → `s2_z2_reading_chamber` → `s2_z3_archive_vault` → `s2_z4_inner_sanctum`) are a **Sunken-Archive sub-region** built INSIDE the abandoned tunnels by a scholarly order. Mob/boss iconography blends both: scholar/archive surface layered over miner/cinder substrate.
+
+### Why this framing exists
+
+W3-T7 Stage 1 (PR #360, merged `14d7c83` 2026-05-24) shipped four S2 zone shells. Sponsor locked S2 mob/boss names the same day: **Sunken-Scholar** (ranged caster), **Bone-Catalyst** (melee bruiser), **Archive Sentinel** (boss). Drew flagged in his Part-A handoff that the locked names carry library/archive aesthetic which conflicts with this doc's Cinder-Vaults mining doctrine. Sponsor's reconciliation call (2026-05-24, path (c) hybrid): keep Cinder Vaults as the stratum anchor, AND let Drew's four zones land as a scholarly-order region built inside the abandoned tunnels. Both are true; neither overrides the other.
+
+### Pre-cataclysm narrative
+
+After the seam-break that killed the miners (per §1 above), a **scholarly order** descended into the abandoned Vaults. They were not miners. They came LATER — after the bodies had cooled, after the air had stopped killing — to study the **embergrave seams**: what the ore is, how it ties player flame to environment, whether the Cloister monks had understood it correctly or wrong.
+
+They built a small archive complex INSIDE the existing tunnels: shelving where miners had cart-tracks, reading desks where the ore had been crushed, lanterns where ember-veins lit the rock. The architecture is **parasitic** — wooden shelving bolted onto soot-blackened mining-stone walls, archive desks resting on tipped ore-cart tracks, scholarly chalk-marks scrawled over miner's tally-scratches.
+
+### Post-collapse current state
+
+The order is dead. **Pressure killed them too**, the same way it killed the miners — or some second cataclysm, the player will never quite know. The archive complex is intact-but-abandoned: shelving still standing, books still on desks, but everything is **soot-coated, vein-lit, and structurally on the verge**. The scholarly artifacts read as evidence of a *second human failure* layered over the first: "miners worked here; then scholars came to understand why the miners died; then the scholars died too."
+
+### Why mobs/boss carry archive iconography
+
+The hostile inhabitants are **what the scholars became**. Heat-pressure and ember-exposure didn't kill them cleanly — it transformed them. Their scholarly identity (robes, books, lanterns, reliquary-keeping) is still visible *underneath* the corruption (the same `#7A1F12` heat-corroded cloth + `#7E5A40` sun-scorched skin the Stoker carries — see §2 mob accents). The boss (Archive Sentinel) is the order's last construct-guardian, built to protect the books, still doing its job centuries after there's anything left to protect.
+
+This is the **diegetic load-bearing logic** for why scholar-named mobs inhabit a mining-tunnel biome: the scholars came second, layered themselves over the miners' substrate, then became the threat. The visual grammar is *miner-substrate beneath scholar-overlay beneath corruption-overlay* — three layers, all visible on any given mob sprite.
+
+### What this hybrid does NOT change
+
+- **Palette doctrine holds.** §2 Cinder-Rust ramp (burnt earth `#3F1E1A` floors, collapsed mining-stone `#2A1410` walls, ash-glow veins `#C25A1F`/`#FF6A2A`) is unchanged. The scholarly overlay is a SECONDARY palette layer (see §1.6 below) on top of these doctrine anchors — not a replacement.
+- **Ember through-line holds.** `#FF6A2A` still doubles as player flame + vein-bright cores. The diegetic logic strengthens: scholars studied the veins; the player IS the substance the scholars were studying.
+- **§5 sprite-reuse table holds.** Floor tiles + wall tiles + ash-glow node + doorway prop still need new authoring per the existing hard-need list. The scholarly overlay is decoration-tier (added shelving + reading-desk + lantern props), NOT a re-author of the base tiles.
+- **Boss-music UNIQUE decision holds** (DECISIONS.md 2026-05-15) — `mus-boss-stratum2.ogg` is distinct composition from S1 boss music. The Archive Sentinel's audio identity is its own composition, NOT a remix.
+- **Zone display_names land as-shipped.** Drew's `s2_z1_entry_hall` ("Entry Hall of the Archive") / `s2_z2_reading_chamber` ("Sunken Reading Chamber") / `s2_z3_archive_vault` ("Archive Vault") / `s2_z4_inner_sanctum` ("Inner Sanctum") are now diegetically grounded by this framing — no rename needed.
+
+## §1.6 — Sub-region: Sunken Archive (scholarly overlay palette)
+
+The Cinder-Rust ramp (§2) is the **stratum anchor** — every floor, wall, and vein in S2 draws from it. The Sunken Archive sub-region adds a **scholarly-overlay palette** that lands ON TOP of those anchors as decoration-tier props + mob secondary accents. The overlay is intentionally **muted** so the Cinder substrate stays dominant; if a player squints, they should still read "rust mining tunnel" first, "archive built inside it" second.
+
+### Scholarly overlay palette (additive — does NOT replace §2)
+
+| Role | Hex | Used as | Notes |
+|---|---|---|---|
+| Archive-wood — base | `#4A2E1A` | Shelving frames, reading-desk tops, broken book-spine props | Dark warm-brown; reads as old wood scorched by heat. Sub-1.0 on every channel (HTML5 HDR-clamp safe). |
+| Archive-wood — highlight | `#7A4A2A` | Lit edges of shelving + desk where ember-veins illuminate it | Warm rust-brown; harmonizes with floor-highlight `#6F3826` without duplicating it. |
+| Parchment — aged | `#A89270` | Open books on desks, scattered scroll props, scholarly chalk-scrawled wall notes | Warm tan; reads as parchment under firelight. Distinguishable from mob-skin `#7E5A40` by being lighter + more yellow-shifted. |
+| Parchment — soot-edge | `#5C4030` | Burned book edges, scorched scroll margins | Transitional value between archive-wood-base and parchment-aged; sells "these documents survived heat damage." |
+| Brass — lantern body | `#8C6034` | Wall-mounted scholar lanterns, brass fittings on archive shelving | Warm metal; distinct from `#9C9590` worn-iron (cooler/greyer) so brass-vs-iron is readable at silhouette. |
+| Brass — verdigris pit | `#5A4A30` | Aged-brass spots on lanterns + fittings | Olive-warm dark, only used as 1-2 px accent pits on brass props. Anti-list olive-moss `#5C7044` from §2 stays banned — this is warmer/browner. |
+
+**Anti-list addendum:** the scholarly overlay must NEVER use cool-blue / muted-teal hexes from the retired Sunken-Library indicative palette (`palette.md` original S2 entry). The overlay is *warm-on-warm* per the Cinder Vaults doctrine — if a prop wants to read "ancient and bookish," it does so via parchment-tan + soot-edge + verdigris, NOT via cold-library teal. Cold teals stay reserved for whichever future stratum picks up the Sunken-Library aesthetic (§8 open question 1).
+
+### Sub-region distribution (per-zone weighting)
+
+Drew's four S2 zones each carry a different ratio of Cinder substrate vs Archive overlay. The escalation is **substrate-dominant early → overlay-dominant mid → substrate-reclaims-overlay late** — the scholarly intrusion peaks in the middle of the descent then gets visually overwhelmed by the surrounding tunnels as the player nears the boss.
+
+| Zone | Cinder substrate | Archive overlay | Tonal read |
+|---|---|---|---|
+| `s2_z1_entry_hall` ("Entry Hall of the Archive") | 80% | 20% | Mostly mining-tunnel; one scholarly waymarker (a lantern, a single shelf, chalk-mark on wall) tells the player "scholars came down here." First archive prop is the introduction. |
+| `s2_z2_reading_chamber` ("Sunken Reading Chamber") | 50% | 50% | Balanced — the archive's actual habitable rooms. Shelving on walls, reading desks, scattered parchment props. Mining substrate visible at room edges (vein-lit corners, exposed iron struts) but the floor IS scholarly-authored. |
+| `s2_z3_archive_vault` ("Archive Vault") | 40% | 60% | Overlay-dominant. The deepest functional archive — bookshelves floor-to-ceiling, brass fittings everywhere, scholar's central reading hall. Mining substrate intrudes only through ember-vein bursts breaking through shelving. |
+| `s2_z4_inner_sanctum` ("Inner Sanctum") | 70% | 30% | Substrate reclaims. The archive's innermost shrine, but pressure-warped — shelving collapsed back into mining-stone, books fused to walls by heat, brass fittings melted into rust streaks. The scholarly identity is *failing* here; the cinder is winning. The Archive Sentinel guards what remains. |
+
+This distribution is the **decoration-tier authoring brief** for Drew's W3 chunk authoring (Part C / Stage 2+ of ticket `86c9y7ygj`). It is NOT a hard tile-count target — it's a tonal weighting Drew can use when picking which props go in which zone's chunk pool.
+
+---
+
 ## §2 — Authoritative palette (Cinder-Rust ramp)
 
 All values are sRGB hex. Every Drew tile, prop, mob, and Devon scene element in S2 must come from these codes (or the global cross-stratum ramps in `palette.md` for UI / status / tier / ember).
@@ -212,6 +276,122 @@ The W3-B2 scaffold itself only needs the FIVE hard-need sprites to render a func
 
 ---
 
+## §5.5 — W3 character archetype visual prompt seeds (Sponsor-locked names, hybrid framing)
+
+This section ships the **PixelLab visual prompt seeds** for the three Sponsor-locked W3 mob/boss characters (locked 2026-05-24): Sunken-Scholar, Bone-Catalyst, Archive Sentinel. The seeds reconcile the §1.5 hybrid framing — *miner-substrate beneath scholar-overlay beneath corruption-overlay* — into character designs that read as "scholar who descended into the Cinder Vaults and was transformed by what they found."
+
+**Consumer scope:**
+
+- **Drew** — quotes these silhouette + animation-state notes when authoring `scripts/mobs/SunkenScholar.gd` / `BoneCatalyst.gd` and the Archive Sentinel boss scene. Hit-flash + state-machine wiring follows the M3W-1 PR #271 3-branch resolver pattern + `HIT_FLASH_TINT = Color(1.0, 0.50, 0.50, 1.0)` per `.claude/docs/combat-architecture.md` § "M3W-1 realized implementation."
+- **Sponsor (PixelLab MCP path)** — quotes the prompt seeds when running `mcp__pixellab__create_character` per `.claude/docs/pixellab-pipeline.md` (orchestrator main session only — sub-agents do not have PixelLab tool surface). The prompt-engineering rules in pixellab-pipeline.md § "Prompt engineering — PixelLab interprets constraints literally" apply: lead with the positive feature, demote constraints to setting context, never use absolutist negation near doctrine-critical accents.
+
+**Visual primitive discipline (per uma persona brief):** ColorRect rotated-rect for cones/sweeps, NEVER Polygon2D (PR #137 precedent). Sub-1.0 channels on every tween tint (HTML5 HDR clamp per `.claude/docs/html5-export.md`). All three archetypes follow the AnimatedSprite2D state-anim wiring conventions, NOT new visual primitives.
+
+### Sunken-Scholar — ranged caster (zone `s2_z2_reading_chamber` first appearance)
+
+**Tonal anchor:** "A robed scholar who came down to read the embergrave seams and never came back. Now their robe is heat-scorched, their lantern-staff fused to one hand, and their eyes carry the same `#D24A3C` aggro-glow as the books they came to study."
+
+**Silhouette:**
+- **Robed humanoid**, taller and thinner than the Stoker (per Phase-1 grunt-retint per DECISIONS.md 2026-05-18 + §5 Grunt mob row). Standing height ~32 px (humanoid floor per `.claude/docs/pixel-mcp-pipeline.md` dimension table). Hooded with the cowl pushed back (NOT fully obscuring — eyes must be visible per pixellab-pipeline.md § "Prompt engineering"); reads as "scholar caught reading, robe still flowing."
+- **Lantern-staff in one hand** — a tall thin staff with a small brass-cage lantern mounted at the top. Lantern body in `#8C6034` brass-overlay hex (per §1.6); core glow in `#FF6A2A` ember accent — the SAME hex as player flame. Diegetic: the scholar's lantern was lit by embergrave; that's what fused them. Lantern-staff is the silhouette anchor — readable at 32 px, distinct from any S1 mob silhouette.
+- **Robe** in `#7A1F12` heat-corroded cloth (S2 mob ramp). Hem tattered, soot-stained at the bottom. Parchment-tan `#A89270` accent visible at sleeve cuffs (a scholarly tell underneath the corruption) — 1-2 px accent, NOT a dominant feature.
+- **Eyes** glowing `#D24A3C` aggro eye-glow (cross-stratum constant per §2 + S1 PL-11). Brighter than the lantern when aggro'd — the scholar's gaze becomes the cue.
+
+**Distinct from S1 Shooter:** S1 Shooter is a skeletal-archer silhouette (compact, hunched, bow-armed). Sunken-Scholar is robed-and-tall, staff-armed, vertical-reading silhouette. Player will read them as different threats at silhouette-distance — same logic as why the Stoker grunt-retint reads distinct from S1 Grunt despite shared base (per §5 Grunt row).
+
+**Animation states (Drew's scope — `scripts/mobs/SunkenScholar.gd`):**
+- `idle_<dir>` — robe sway 2-frame loop; lantern flame 2-frame flicker; eyes static at rest-color.
+- `walk_<dir>` — slow processional gait; robe hem drag, lantern bobs in counter-rhythm.
+- `aim_<dir>` — wind-up state: scholar plants staff, lantern flares brighter, eyes ignite `#D24A3C`. **0.6-0.8 s telegraph window** (longer than S1 Shooter to compensate for slower projectile — see ranged-attack telegraph below).
+- `cast_<dir>` — projectile-fire: scholar thrusts the lantern-staff forward, ember-pulse releases from lantern toward target. Frame 0 is the visual peak.
+- `post_fire_recovery_<dir>` — staff returns to ground; lantern dims back to rest. Recovery duration matches S1 Shooter band-state convention (per `.claude/docs/combat-architecture.md` § "Shooter state machine").
+- `hit_<dir>` — 80 ms tint flash via `HIT_FLASH_TINT` on AnimatedSprite2D modulate (M3W-1 resolver path).
+- `die_<dir>` — robe collapses inward, lantern-light gutters out frame-by-frame (the ember IS the soul, leaving). Death-tween follows mob `_die` pipeline per `.claude/docs/combat-architecture.md`.
+
+**Ranged-attack telegraph (distinct from S1 Shooter):** the lantern-flare-before-cast IS the telegraph. S1 Shooter telegraphs via bow-draw silhouette change; Sunken-Scholar telegraphs via **light-source change** (lantern brightens + eyes ignite simultaneously). Player learns to read the lantern brightness as the danger signal. The cast itself is a slow ember-pulse (slower projectile speed than S1 Shooter's arrow — slower bullet, longer telegraph, same effective TTK per the Shooter band-tuning rule in combat-architecture.md).
+
+**Cross-references for Drew:** `.claude/docs/combat-architecture.md` § "Shooter state machine — engagement bands"; `.claude/docs/pixellab-pipeline.md` § "Prompt engineering" + § "Folder-rename + reverse-map"; §5 Sprite reuse table Grunt-retint row.
+
+**PixelLab prompt seed (Sponsor consumes via `mcp__pixellab__create_character`):**
+
+> tall thin robed scholar humanoid with deep hood pushed back showing two bright glowing `#D24A3C` red eyes, holding a brass `#8C6034` lantern-staff with a small ember-orange `#FF6A2A` flame inside, scorched dark red `#7A1F12` cloth robe with tattered hem, tan parchment `#A89270` accent at sleeve cuffs, dark fantasy archive mage, standing pose facing camera, pixel art, bold 1-pixel dark outline, readable silhouette at 32 px, --no ground shadow, complex fur, background, multiple poses, action lines
+
+### Bone-Catalyst — melee bruiser (zone `s2_z3_archive_vault` first appearance)
+
+**Tonal anchor:** "A scholar who became their own reliquary. Heavy bone-fetish bound to their forearms, brass-corroded skull-mask, channel-wind-up tells that read as 'I am gathering pressure.' This is what happens when a Bone-Catalyst-Scholar tries to *understand* the embergrave instead of just studying it — they become the seam."
+
+**Silhouette:**
+- **Hunched bruiser humanoid**, shorter + wider than the Sunken-Scholar (~32×32 compact bruiser per pixel-mcp dimension table; readable mass at small scale per § "Dimension floor by character complexity"). Hunched-forward stance reads aggressive at silhouette.
+- **Bone-fetish forearms** — both forearms wrapped in bound bone fragments (skull-cap fragments, vertebrae, finger-bones). Bones in parchment-aged `#A89270` (the §1.6 overlay color — diegetic: these are the bones of OTHER scholars, taken from the archive's reliquary). Bound-binding ties in `#4A2E1A` archive-wood-base. The forearm silhouette is the gameplay-telegraph anchor (see channel-wind-up below).
+- **Skull-mask** — brass `#8C6034` ceremonial mask over face, with `#5A4A30` verdigris-pit corrosion accents (per §1.6 brass-overlay). Eye-holes glow `#D24A3C` aggro eye-glow.
+- **Robe-tunic** in `#7A1F12` heat-corroded cloth like the Scholar, but shorter (mid-thigh — bruiser silhouette needs leg-readability). Soot-stained `#5C4030` parchment-soot-edge along the hem reads as "this robe got too close to a vein."
+- **No staff, no weapon** — the bone-fetish forearms ARE the weapon. The character reads as "I will hit you with my arms which are now full of other people's bones."
+
+**Distinct from S1 Grunt + S1 Charger:** S1 Grunt is hooded-cultist silhouette (cloth-dominant, melee with short blade). S1 Charger is bestial-quadruped silhouette. Bone-Catalyst is **upright humanoid, weaponless-but-armored-forearms** — a third readable melee shape. The brass mask + bone forearms are the silhouette tells distinguishing them from any S1 silhouette at 32 px.
+
+**Animation states (Drew's scope — `scripts/mobs/BoneCatalyst.gd`):**
+- `idle_<dir>` — heavy breathing 2-frame loop; bone-forearms hang loose. Mask static.
+- `walk_<dir>` — bruiser plodding gait; one arm swings forward, one arm braced (reads as "approaching with weight").
+- `channel_<dir>` — **the wind-up state, load-bearing telegraph**. Bone-Catalyst raises BOTH bone-forearms above head, crosses them in front of mask, pauses. Eyes flare `#D24A3C` brighter. **0.5-0.7 s windup window** — long enough that player can dodge, short enough that it doesn't read as "stunned." Brass mask reads as the focal point of "pressure gathering."
+- `slam_<dir>` — both forearms come down in a hammer-arc, bone-fragments shed mid-swing (1-2 frames of `#A89270` bone-particle bursts). Hitbox spawn on frame 1 of the swing.
+- `recovery_<dir>` — staggered post-swing, arms hang slack, bone-fragments settle.
+- `hit_<dir>` — 80 ms `HIT_FLASH_TINT` modulate. Brass mask briefly visible through tint (reads as "the mask is the durable part").
+- `die_<dir>` — bruiser collapses forward onto bone-forearms; brass mask cracks (1-frame). Bone-particles disperse via CPUParticles2D burst per `.claude/docs/combat-architecture.md` § "Room-parented CPUParticles2D burst" — defer-add to room per the physics-flush rule.
+
+**Melee telegraph (distinct from S1 Grunt + S1 Charger):** the channel-wind-up double-forearm-cross IS the telegraph. S1 Grunt telegraphs via raised-blade-1-frame; S1 Charger telegraphs via rear-back + dash-line. Bone-Catalyst telegraphs via **stationary channel pose** — player learns "when the brass mask centers in the silhouette and both arms cross, the slam is coming." Per ticket Part B (multi-stage `86c9y7ygj`), the channel duration is the tunable balance lever.
+
+**PixelLab prompt seed (Sponsor consumes via `mcp__pixellab__create_character`):**
+
+> hunched bruiser humanoid with brass `#8C6034` ceremonial skull-mask over face showing two bright glowing `#D24A3C` red eye-holes, both forearms wrapped in bound bone fragments in tan parchment `#A89270` with dark wood `#4A2E1A` binding ties, dark red `#7A1F12` heat-corroded short tunic with soot-stained `#5C4030` hem, stocky proportions, dark fantasy bone-priest, standing pose facing camera, pixel art, bold 1-pixel dark outline, readable silhouette at 32 px, --no ground shadow, complex fur, background, multiple poses, action lines, full body robe
+
+### Archive Sentinel — S2 boss (zone `s2_z4_inner_sanctum` boss-approach + Stratum2BossRoom arena)
+
+**Tonal anchor:** "The order's last construct-guardian. Built to protect the books, still doing its job centuries after there is anything left to protect. Stone-and-bone composite the scholars made FROM the archive itself — when the seam-break came, the construct survived. The player meets it standing in the same pose it has held since the scholars stopped coming."
+
+**Silhouette:**
+- **Composite-construct boss-scale**, ~48×48 or larger per pixel-mcp dimension floor (boss / elite mob row). Visually heavier than Stratum1Boss in width — reads as "this thing was built, not born." The S2 boss should feel structurally distinct from Stratum1Boss (the hulking-armored-warden silhouette of S1) — see "Distinct from S1 Boss" below.
+- **Stone-bone composite body** — torso of fitted mining-stone (matched to `#2A1410` wall-base + `#4F2820` iron-strut trim from §2), shoulders + arms wrapped in **bound book-spines** (the books ARE the armor, fused to the construct). Book-spines visible as `#4A2E1A` archive-wood + `#A89270` parchment edges along the upper arms.
+- **No face — instead, an open book where the face should be.** A floor-to-floor large parchment-tan `#A89270` book held permanently open in front of the head-position. The book PAGES emit the `#D24A3C` aggro eye-glow (reads as "the book is the eye; the construct is reading you"). When idle, the book pages dim to a soft `#7A1F12` rest-tone; when aggro'd, the pages flare `#D24A3C` + cast a faint `#FF6A2A` ember-light forward.
+- **Brass `#8C6034` clamps + fittings** at every stone-bone seam — the construct is held together by archive-brass. The brass is the construct's only "scholarly" tell visible at silhouette-distance; everything else reads as stone + book.
+- **Standing on a circular stone base** integrated into the arena floor — the construct never moves from its plinth (boss design lock: the Sentinel is a stationary phase-shift boss, NOT a mobile melee boss per S1 Boss precedent). See boss-arena note below.
+
+**Distinct from S1 Boss (eye-variant grunt-derivative per PR #291):** S1 Boss is a hulking-armored-warden silhouette (humanoid + heavy iron plate + deep-red surcoat). Archive Sentinel is a composite-construct silhouette (stone + bone + book + brass; non-humanoid stance). Player will read the S2 boss as a **different KIND of threat** at silhouette-reveal — same logic as `.claude/docs/audio-architecture.md` § "Tonal pattern — cross-stratum distinct ambient" (stratum identity > cross-stratum economy). The cross-stratum mob aggro eye-glow `#D24A3C` is preserved (cross-stratum constant), but the construct's "eye" being a glowing book is a *new* visual grammar that only S2's hybrid framing makes legible.
+
+**Animation states (Drew's scope — full Stratum2Boss.gd + Stratum2BossRoom.tscn, ticket Part D of `86c9y7ygj`):**
+- `dormant_<frontal>` — idle pose before the boss-room entry sequence triggers. Book pages dim; ember-light off. This is what the player sees on BI-01 (per `team/uma-ux/boss-intro.md`) — the reveal beat.
+- `wake_<frontal>` — BI-03/04 entry-sequence wake animation. Book pages ignite from `#7A1F12` rest to `#D24A3C` aggro over ~0.8-1.2 s; brass clamps reflect ember-light; faint `#FF6A2A` ember-particles rise from the book (CPUParticles2D burst per physics-flush rule). NO movement — the construct rises in *light* not in *body*.
+- `idle_active_<frontal>` — book pages held at aggro-tone, faint page-turn 2-frame loop (decoration only — pages don't actually turn, but a 2-px shimmer along the parchment edge reads as "the book is alive").
+- `cast_<frontal>` — ranged-attack phase: book-pages flare to brightest `#FF6A2A` (NOT the rest `#D24A3C` — the brighter ember frame is the IMPACT cue per `.claude/docs/html5-export.md` § "Burst contrast against high-hue-saturation same-z sprites"). Ember-burst projectile emerges from the book toward player.
+- `slam_telegraph_<frontal>` — melee-zone-attack phase (player in close range): brass clamps tighten visibly (1-px arm-tuck), book pages flare WIDE (white-hot `AFTERSHOCK_FLASH_WHITE` ramp[0] frame for ~50-105 ms per PR #291 v7 precedent), then the construct's stone arms slam down in a `_draw()` + `draw_arc()` circular AOE telegraph (NEVER Polygon2D — per `.claude/docs/html5-export.md` § "Shape OUTLINES" + uma persona hard rules). Circle outline in `#FF6A2A` ember-accent at radius matched to S1 boss slam.
+- `phase_transition_<frontal>` — at boss HP threshold (likely 50% per S1 boss precedent, Drew's call): book PAGE-FLIPS visibly (3-4 frame anim of pages turning), construct's ember-light intensifies, new attack patterns unlock. Audio cue beat per `audio-direction.md`.
+- `hit_<frontal>` — 80 ms `HIT_FLASH_TINT` modulate. Brass clamps + stone-body register the tint; the book-eye does NOT (the book is the aggro signal, immune to hit-flash — visual grammar: "the book is reading you regardless of damage").
+- `die_<frontal>` — book-pages slam closed (final frame); ember-light extinguishes; brass clamps release; stone-body cracks into pieces. Death-tween over ~1.2 s per boss-spec convention; CPUParticles2D burst with the HTML5-impact-frame contrast ramp (white frame at ramp[0]) per PR #291 v7.
+
+**Boss-intro reveal beat (per `boss-intro.md` BI-01):**
+- Player crosses the threshold into Stratum2BossRoom; door-slam audio fires (cross-stratum constant per `boss-intro.md` BI-01).
+- Camera holds on door-close for ~0.3 s.
+- Camera pans to the Sentinel on its plinth in the room's center — book-pages DIM (dormant state, `#7A1F12` rest-tone).
+- Camera zoom-in (per `.claude/docs/camera-layer.md` `request_zoom(1.25, 0.9, sentinel_pos)`).
+- BI-03/04 wake-anim fires: book ignites from dormant → aggro over 0.8-1.2 s, ember-particles rise, brass reflects.
+- Title card displays "Archive Sentinel" (per `boss-intro.md` BI-08 nameplate convention).
+- Boss-music UNIQUE crossfade per DECISIONS.md 2026-05-15 (`mus-boss-stratum2.ogg`, distinct composition from S1 boss music).
+
+**Boss-arena note:** the Sentinel is stationary on its plinth — combat happens AROUND it, not WITH it moving. Drew's boss-room scene authoring should reflect this (arena ~32×24 tiles, sentinel plinth in center, room ports at four cardinal directions for player navigation but ports stay LOCKED during fight per `room-gate` convention). This is a deliberate departure from Stratum1Boss's mobile-melee design — the Archive Sentinel's stillness IS its tonal beat (the construct has been waiting in this exact pose for centuries; movement is the rare cue).
+
+**PixelLab prompt seed (Sponsor consumes via `mcp__pixellab__create_character` — boss-scale, may need `create_character` with `size=72` per pixel-mcp canvas-size trap table):**
+
+> massive stone-and-bone composite construct guardian with no face, instead a large open parchment `#A89270` book held in front of its head with glowing `#D24A3C` red pages, stone torso in dark grey `#2A1410` with iron-strut `#4F2820` accents, shoulders wrapped in bound book-spines in `#4A2E1A` dark wood with `#A89270` parchment edges, brass `#8C6034` clamps at every seam with `#5A4A30` verdigris corrosion, standing on circular stone plinth, no weapon needed - the book IS the eye, dark fantasy archive guardian, head-on facing camera, prominent silhouette, pixel art, bold 1-pixel dark outline, readable at boss scale, --no ground shadow, complex fur, background, multiple poses, action lines, human face, weapon
+
+### Cross-character coordination notes
+
+- **Hit-flash unity.** All three archetypes use the same `HIT_FLASH_TINT = Color(1.0, 0.50, 0.50, 1.0)` per M3W-1 PR #271 convention. Per-mob tints would confuse "I hit something" with "I hit a *specific* something" and break the visual grammar Sponsor signed off at M1 (per combat-architecture.md § "M3W-1 realized implementation").
+- **Aggro eye-glow unity.** All three use `#D24A3C` (S2 cross-stratum constant per §2 + S1 PL-11). The Sentinel's variation (the book-page as the glow surface) is *additive* to this constant, not a replacement — the glow hex is still `#D24A3C`, only the surface it sits on differs.
+- **Ember through-line preserved.** Sunken-Scholar lantern-flame + Archive Sentinel book-cast projectile both use `#FF6A2A` (player flame hex). Diegetic logic: scholars studied the embergrave, became part of it; their light IS the player's light. This is the §1 + §1.5 narrative payoff at the character level.
+- **Hybrid framing iconography distribution.** Sunken-Scholar = **scholar-overlay dominant** (robe + lantern + parchment cuffs). Bone-Catalyst = **corruption-overlay dominant** (bone-fetish + skull-mask, scholarly tells reduced to brass mask alone). Archive Sentinel = **construct-overlay** (stone + book + brass; the original scholarly identity preserved as ARTIFACT, not as person). The three together tell the story: scholar → transformed-scholar → construct-the-scholars-built.
+- **No new visual primitives.** All three are AnimatedSprite2D (per M3W-1 pattern), with `_draw()` + `draw_arc()` for circle-outline telegraphs (Archive Sentinel slam AOE), ColorRect for any sweep/cone cues (NOT Polygon2D — uma persona hard rule + PR #137 precedent). Hit-flash via modulate tween (3-branch resolver per PR #271). CPUParticles2D bursts via the room-parented `call_deferred("add_child", burst)` shape per combat-architecture.md.
+
+---
+
 ## §6 — Accessibility check (daltonization run)
 
 Tested against the three common color-vision differences. Each test poses the same question: **"Can the player tell ROLE-A from ROLE-B at a glance, given pure-color similarity?"** A fail is when two semantically-distinct roles render visually identical to the test population.
@@ -315,24 +495,39 @@ Flagged for Sponsor / Priya / orchestrator. Not all need resolving before Drew's
 5. **Drew's W3-B2 input format — palette doc only, or also a sample frame?** Drew's W3-B2 is a chunk-lib scaffold (architecture-level, no content). For the actual sprite authoring downstream, does Drew want me to ship a 480×270 sample-frame mockup of an S2 R1 in the new palette, or is this doc enough? **Owner:** Drew — coordinate before he starts authoring tile sprites.
 6. **Should S2's `mus-stratum2-bgm` cue (M2 audio) get a directional update from "quiet, eerie, teal-bronze" to "low-pulse, frame-drum-led, rust-saturated"?** The audio direction's S2 BGM line (`audio-direction.md` row 87) was written against the indicative Sunken Library aesthetic. If the biome is now Cinder Vaults, the music should harmonize. **Owner:** Uma — `audio-direction.md` v1.1 revision to land alongside this doc OR queue as a follow-up. Not blocking the visual scaffold.
 7. **Does the ember-accent dual-role (player flame + vein-bright cores) need a Sponsor sanity-check?** The diegetic logic is "your flame and the vein cores are the same substance" — that's a fiction lock that affects S7 / S8 design. Sponsor may want to weigh in before that fiction commitment hardens further. **Owner:** Sponsor — at the M1 sign-off conversation if convenient; otherwise queue for M2 narrative review.
+8. **(M3 ADDED 2026-05-24) Hybrid framing — does the scholarly-overlay weighting per §1.6 (80/50/40/70% Cinder substrate per zone) land tonally at HTML5 soak?** §1.6's per-zone overlay distribution is an authored intuition, not a playtested call. The first time Drew lands populated chunks (ticket `86c9y7ygj` Part C), Sponsor soak will be the gate-of-record for whether the substrate-dominant → overlay-dominant → substrate-reclaims arc reads tonally as designed. If the middle zones (z2/z3) feel insufficiently scholarly OR if z4 feels insufficiently *reclaimed by fire*, the weighting tunes here in §1.6 (no code change; only the prop-distribution brief Drew consumes). **Owner:** Sponsor at first S2-content soak; Uma adjusts §1.6 ratios as needed.
 
 ---
 
 ## Hand-off
 
-- **Drew (W3-B2):** §5 sprite reuse table + §2 authoritative palette. Five hard-need sprites for the scaffold (floor tiles, wall tiles + vein anim, ash-glow node prop, doorway prop, S2 grunt). Five soft-need retints for M2 follow-up. The scaffold can ship with placeholder hex-block-color tiles using the §2 hex codes; polish pass to author actual textures is a separate M2 ticket.
+- **Drew (W3-B2 + W3-T7 multi-stage `86c9y7ygj`):** §5 sprite reuse table + §2 authoritative palette + **§1.5/§1.6 hybrid framing** + **§5.5 W3 character archetype seeds**. Five hard-need sprites for the scaffold (floor tiles, wall tiles + vein anim, ash-glow node prop, doorway prop, S2 grunt). Five soft-need retints for M2 follow-up. The W3-T7 Part B (mob authoring) consumes §5.5 directly — Sunken-Scholar (`scripts/mobs/SunkenScholar.gd`), Bone-Catalyst (`scripts/mobs/BoneCatalyst.gd`), Archive Sentinel (Part D, Stratum2Boss.gd + Stratum2BossRoom.tscn). Visual primitive discipline locked: ColorRect not Polygon2D, sub-1.0 channels, AnimatedSprite2D state-anims per M3W-1 PR #271 resolver pattern. The scaffold can ship with placeholder hex-block-color tiles using the §2 hex codes; polish pass to author actual textures is a separate M2 ticket.
 - **Devon (S2 chunk-lib + lighting impl, M2):** §4 lighting model — two ColorRect overlays + one anim cycle on tile sprites. No Light2D, no shaders, no realtime shadows. Plus the ambient `#FF5A1A` 8% multiply tint and the deepened vignette `#0A0404` 40%.
 - **Priya:** §3 beats 2 + 4 (scree + steam vent mechanic decisions); §8 open questions 1-3.
 - **Tess (M2 acceptance):** §7 tester checklist S2-PL-01 through S2-PL-15. Holds until S2 content ships in M2.
-- **Sponsor:** §8 open question 7 (ember dual-role narrative confirmation), §7 S2-PL-15 (subjective transition signal at S1 → S2 descent).
+- **Sponsor:** §8 open question 7 (ember dual-role narrative confirmation), §8 open question 8 (hybrid-framing tonal soak at first populated S2 chunks), §7 S2-PL-15 (subjective transition signal at S1 → S2 descent). **PixelLab MCP execution path** — Sponsor consumes §5.5 prompt seeds via `mcp__pixellab__create_character` per `.claude/docs/pixellab-pipeline.md`; orchestrator main session runs the tool calls (sub-agents do not have PixelLab surface).
 
 ---
 
 ## Appendix — what we are NOT designing here
 
-- **S2 boss design** (sprite + state machine + arena layout + boss palette sub-biome) — own ticket, M2.
-- **S2 mob roster beyond grunt** (which of charger / shooter / new archetype-tbd populate S2?) — Priya's M2 mob-deploy decision.
-- **S2 chunk layouts** (rooms 1-N, RoomChunk variants, exit logic) — Drew's W3-B2 scaffold + M2 content authoring.
-- **S2 audio cues** beyond the ambient + BGM nudge in §8 q6 — Uma's `audio-direction.md` v1.1 if the BGM directional update gets dispatched.
+- **S2 boss design at scene/state-machine level** (state-machine wiring, arena chunk layout, boss-room scene authoring) — Drew's scope for ticket `86c9y7ygj` Part D. §5.5 Archive Sentinel section ships the *visual direction*; the scene + state-machine + arena layout authoring is downstream. (Pre-amendment this row said "S2 boss design" generally is excluded; the amendment narrows: the *visual direction* for the boss IS now in scope of this doc as of §5.5, but the implementation work remains Drew's.)
+- **S2 mob state-machine balance** (Sunken-Scholar projectile speed tuning, Bone-Catalyst channel-window calibration, Archive Sentinel phase-transition HP thresholds) — Drew's scope at impl time, with Sponsor balance pass at first soak. §5.5 ships the *visual telegraph contracts*; the numeric balance is downstream.
+- **S2 chunk layouts** (rooms 1-N, RoomChunk variants, exit logic) — Drew's W3-B2 scaffold + ticket `86c9y7ygj` Part C content authoring.
+- **S2 audio cues** beyond the ambient + BGM nudge in §8 q6 — Uma's `audio-direction.md` v1.1 if the BGM directional update gets dispatched. Boss-music UNIQUE composition decision holds per DECISIONS.md 2026-05-15.
 - **Cross-stratum visual transitions** (the descend animation between S1 and S2) — exists already in M1 via `DescendScreen.tscn`; only the destination palette changes.
 - **Strata 3-8 authoritative palettes** — they remain "indicative" in `palette.md` until each gets its own design call.
+
+---
+
+## Coordination note — M3 amendment (2026-05-24)
+
+§1.5 (hybrid framing narrative), §1.6 (scholarly-overlay palette + per-zone distribution), §5.5 (W3 character archetype visual prompt seeds), and the §8 q8 addition all landed via a single amendment commit on 2026-05-24 reconciling:
+
+- **PR #360** (merged `14d7c83`, 2026-05-24) — Drew's W3-T7 Stage 1 S2 ZoneDef shells (`s2_z1_entry_hall` / `s2_z2_reading_chamber` / `s2_z3_archive_vault` / `s2_z4_inner_sanctum` with library/archive-themed `display_name`s). Drew's Part-A handoff flagged the doctrine drift between the locked zone names and this doc's Cinder Vaults mining-doctrine framing.
+- **Sponsor decision 2026-05-24** — path (c) hybrid framing: Stratum 2 IS Cinder Vaults at the stratum level; Drew's four zones land as a Sunken-Archive sub-region built INSIDE the abandoned mining tunnels by a scholarly order; mob/boss iconography blends both substrates.
+- **Sponsor-locked W3 character names (2026-05-24)** — Sunken-Scholar (ranged caster), Bone-Catalyst (melee bruiser), Archive Sentinel (S2 boss). Names ship as-locked; this amendment provides the visual direction to make them legible within the hybrid framing.
+
+The amendment is **additive** — every pre-2026-05-24 paragraph of this doc holds verbatim. The §2 Cinder-Rust ramp is unchanged. §5 sprite reuse table is unchanged. §6 daltonization analysis is unchanged. The only fields reshaped are: §1.5/§1.6 sub-region overlay introduction, §5.5 character archetype seeds, §8 q8 addition, Hand-off addendum, and this Coordination note.
+
+Future amendments to the hybrid framing (e.g. if Sponsor's first S2-content soak surfaces that the weighting tunes differently than §1.6 specifies, or if §5.5 character designs need iteration after PixelLab generation) should land as further amendments in this same coordination-note format — date-tagged, additive, cite the trigger PR and Sponsor decision. Do NOT rewrite §1-§7 in place; preserve the audit trail.
