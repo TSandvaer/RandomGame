@@ -440,3 +440,55 @@ Stage 2 ships the first of two new S2 mob archetypes — **Sunken-Scholar** (ran
 **Paired tests:**
 - `tests/test_sunken_scholar_mob_class.gd` — mob-class smoke (instantiation, state-machine boot, full path Idle→Spotted→Aiming→Firing, kite + cornered fallback, band invariants `SHOOT_RANGE = PROJECTILE_SPEED × PROJECTILE_LIFETIME`, differentiation pins vs S1 Shooter, no USER WARNING:).
 - `tests/test_mob_registry_sunken_scholar_pin.gd` — roster registration pin (has_mob / get_mob_def / get_mob_scene / registered_ids / spawn / S2 stratum-scaling math).
+
+### Stage 3 — Bone-Catalyst (melee bruiser)
+
+Stage 3 ships the second of two new S2 mob archetypes — **Bone-Catalyst** (melee bruiser). The class file mechanically mirrors `scripts/mobs/Grunt.gd` (chase → telegraph → strike → recover) but differentiates per Uma's `palette-stratum-2.md` §5.5 Bone-Catalyst character archetype:
+
+| Lever | S1 Grunt | BoneCatalyst (S2) | Why differentiate |
+|---|---|---|---|
+| Telegraph state name | `STATE_TELEGRAPHING_LIGHT` (raised-blade 1-frame tilt) | `STATE_CHANNELING` (stationary forearms-cross pose) | Uma §5.5: "the channel-wind-up double-forearm-cross IS the telegraph" — stationary pose vs Grunt's mid-motion raised blade. Reads as "gathering pressure," not "swinging." |
+| Telegraph duration | `LIGHT_TELEGRAPH_DURATION = 0.40 s` | `CHANNEL_DURATION = 0.60 s` | Uma §5.5: "0.5-0.7 s windup window." Mid-band — long enough to dodge, short enough to avoid reading as "stunned." Pinned by `test_channel_duration_is_in_uma_spec_window`. |
+| Strike-hitbox spec | reach=24 / radius=16 / lifetime=0.10 | reach=30 / radius=20 / lifetime=0.14 | Slam is the routine attack-shape (no heavy-telegraph fallback), so its hitbox is sized between Grunt LIGHT (24/16/0.10) and Grunt HEAVY (36/22/0.18). |
+| Strike knockback | `LIGHT_KNOCKBACK = 120` | `SLAM_KNOCKBACK = 200` | The slam reads heavier visually — knockback matches. |
+| Strike kind | `&"light"` | `&"slam"` | Single attack-shape (no separate light/heavy split). Bruiser doesn't shift gears. |
+| Heavy-telegraph fallback | yes (`HEAVY_TELEGRAPH_HP_FRAC = 0.30`) | NO | Channel-windup IS the bruiser's primary read — adding a second low-HP telegraph would dilute the silhouette grammar. Drop the heavy slot. |
+| `hp_base` | 50 | 70 | Compensation for longer windup — player has more dodge opportunity per attempt, so bruiser must eat more hits before going down. Final balance lever is Sponsor soak. |
+| `damage_base` | 2 | 5 | Bruiser hits hard but tells you it's coming. Sponsor reads "I see the slam coming + got hit anyway" as legible, "I didn't see the swing" as unfair. |
+| `move_speed` | 60 | 50 | Uma §5.5: "bruiser plodding gait." Slower approach reads as heavy mass. Pinned by `test_move_speed_is_slower_than_grunt`. |
+| Telegraph tint (placeholder ColorRect) | vivid red `#FF4D4D` | warm bone-flare `#F2CC80` | Approximates Uma §5.5 "brass mask reads as the focal point of 'pressure gathering'" — warm bone-pale flare on placeholder until PixelLab sprite drops in. Sub-1.0 channels for HTML5 HDR-clamp safety. |
+| Sprite-rest color (placeholder ColorRect) | (Grunt is AnimatedSprite2D) | bone-corroded brown-rust `Color(0.30, 0.18, 0.16, 1)` | Uma §5.5 "heat-corroded short tunic" — distinct from SunkenScholar's parchment-tan at silhouette-distance. Sub-1.0 channels HTML5-safe. |
+
+**Shared with S1 Grunt + S2 SunkenScholar (cross-stratum constants per `palette-stratum-2.md` §2):**
+- `HIT_FLASH_TINT = Color(1.0, 0.50, 0.50, 1.0)` — "I hit something" reads identically across the roster. Pinned by `test_hit_flash_tint_matches_cross_stratum_constant`.
+- Ember-light death-particle ramp (`#FFB066` → `#A02E08`) — diegetic logic per Uma §5.5: "bone-fragments disperse via CPUParticles2D burst" via the unified ember ramp until PixelLab sprite-frames carry per-mob fragment visuals.
+
+**Distinct from S1 Charger (third readable melee shape):**
+- No `STATE_CHARGING` (BoneCatalyst is stationary during the windup; Charger dashes during it).
+- No `get_charge_dir()` API, no `charge_telegraph_started` / `charge_hit_spawned` signals.
+- Channel state is STATIONARY — velocity zero through CHANNEL_DURATION. Pinned by `test_no_charge_dash_unlike_charger`.
+
+**Distinct from S1 Shooter / S2 SunkenScholar (no ranged-attack semantics):**
+- No `STATE_AIMING` / `STATE_FIRING` / `STATE_POST_FIRE_RECOVERY` — pure melee.
+- No `projectile_fired` signal, no `aim_started` signal — `channel_started` is the telegraph signal.
+- No `SHOOT_RANGE` / `KITE_RANGE` band semantics — `SLAM_RANGE` triggers the channel at point-blank range. Pinned by `test_no_projectile_state_unlike_shooter_family`.
+
+**Trace contract (Drew persona rule "No new mob class without trace instrumentation"):**
+- `[combat-trace] BoneCatalyst.pos | pos=(x,y) state=<S> hp=<N> dist_to_player=<D>` — throttled 0.25 s, mirrors `Grunt.pos`. Harness pursuit/observability surface.
+- `[combat-trace] BoneCatalyst._set_state | <old> -> <new> dist=<D> pos=(x,y)` — emits on every state transition.
+- `[combat-trace] BoneCatalyst.{take_damage, _die, _force_queue_free, _play_attack_telegraph, _begin_channel}` — uniform with the Grunt family. Harness greps map 1:1.
+
+**Stage-3 ship state (placeholder sprite):**
+- Sprite is a flat-color ColorRect (bone-corroded brown-rust), 18×16 px (slightly wider than tall — bruiser silhouette per Uma §5.5 "stocky proportions"). Hit-flash 3-branch resolver routes through the ColorRect branch (M3W-3 convention). Pinned by `test_hit_flash_resolves_color_rect_branch_for_placeholder_sprite`.
+- PixelLab sprite generation deferred to a follow-up PR (Sponsor + orchestrator main-session executes `mcp__pixellab__*` per `sub-agent-mcp-tool-surface-scope` memory; BoneCatalyst's PixelLab prompt seed is `palette-stratum-2.md` §5.5).
+- Drop-in mechanic: replace the `Sprite` ColorRect node in `scenes/mobs/BoneCatalyst.tscn` with an `AnimatedSprite2D` of the same name + assign `SpriteFrames`. Resolver branch 1 auto-picks it up — no script edit needed (M3W-1 PR #271 inheritance contract per `.claude/docs/combat-architecture.md` § "M3W-1 realized implementation").
+
+**Out of scope for Stage 3 (deferred to later stages of `86c9y7ygj`):**
+- Archive Sentinel boss (Stage 5) — distinct boss-room topology + stationary-on-plinth shape.
+- S2 chunks consuming `&"bone_catalyst"` in `mob_spawns` (Stage 4 Part C).
+- Stratum-scaling wired into spawn path (`apply_stratum_scaling` API pinned via the registry test, no spawn-path wire-up yet — cross-cutting follow-up).
+- BoneCatalyst-specific bone-fragment death-burst frames (visual layer is a future PixelLab-sprite-frame concern; placeholder uses unified ember ramp).
+
+**Paired tests:**
+- `tests/test_bone_catalyst_mob_class.gd` — mob-class smoke (instantiation, state-machine boot, chase → channel → strike → recover path, channel direction re-resolves at strike time, killed-mid-channel-no-slam, S1-melee-differentiation pins vs Grunt + Charger, channel-duration window pin per Uma §5.5, no USER WARNING:).
+- `tests/test_mob_registry_bone_catalyst_pin.gd` — roster registration pin (has_mob / get_mob_def / get_mob_scene / registered_ids / spawn / S2 stratum-scaling math: 70 × 1.2 = 84 HP, 5 × 1.15 → 6 dmg).
