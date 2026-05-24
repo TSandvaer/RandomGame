@@ -1,35 +1,67 @@
-[gd_resource type="Resource" script_class="ZoneDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ZoneDef" load_steps=6 format=3]
 
-; W3-T7 Stage 1 — S2 ZoneDef authoring (Part A only; ticket `86c9y7ygj`).
+; W3-T7 Stage 4 — S2 zone wiring (ticket 86c9y7ygj Part C).
 ;
-; This file is the geographic SHELL — anchors + procedural_slot_pool are
-; left empty per the Stage 1 dispatch brief. Parts B (S2 mobs), C (S2
-; chunks), and D (S2 boss room) ship in later PRs.
+; Sponsor-locked S2 names (2026-05-24). This zone is the early-stratum
+; exploration zone — first place where the Sunken-Scholar archetype
+; appears (per ticket Part B, Stage 2 PR #364). Tonally balanced per
+; palette-stratum-2.md §1.6 (50% Cinder, 50% Archive overlay — the
+; archive's habitable rooms; reading desks + brass lanterns).
 ;
-; Sponsor-locked S2 names (2026-05-24): ranged mob = Sunken-Scholar.
-; This zone is the early-stratum exploration zone — first place where the
-; Sunken-Scholar archetype appears (per ticket Part B). Tonally a quieter
-; sub-area: low-pressure beat between the entry hall and the archive
-; vault, room for an NPC encounter (post-wave3-sequencing.md §6 SI-5: S2
-; carries 2 stratum NPCs; one will likely anchor here in Part C).
+; Anchors (in zone-graph order):
+;   1. entry    → s2_room04 (Sunken Reading Chamber — 1 Sunken-Scholar
+;                            reading-desk guardian, scholarly overlay
+;                            visible at room scale).
+;   2. npc_room → s2_room02 (Mining Cart Bay; substrate-rich room where
+;                            the scholarly NPC could anchor. Future
+;                            dialogue-tree wiring in W4 NPC content pass
+;                            references this room_id. Per SI-5: 2 stratum
+;                            NPCs in S2; the first one anchors here).
+;   3. exit     → REUSES s2_room04 chunk geometry; distinct room_id.
+;                target_zone_id = &"s2_z3_archive_vault".
 ;
-; TODO Part C: populate `anchors` (entry + ≥1 exit + npc_room slot for
-; the SI-5 NPC) and `procedural_slot_pool` with low-pressure combat
-; chunks per FloorAssembler.assemble_floor.
+; Procedural slot pool: 2 mid-tier chunks combining substrate + overlay
+; archetypes — s2_room02 (Stoker/Charger heat-blasted) + s2_room05
+; (Sunken-Scholar + Bone-Catalyst mixed). The pool's Scholar/Catalyst
+; presence in 1 of 2 picks introduces the locked archetypes
+; non-deterministically (per-character RNG dependent on world_seed).
 ;
 ; Cross-references:
 ;   team/drew-dev/level-chunks.md § "Zone schema" + § "S2 zone roster"
-;   team/uma-ux/palette-stratum-2.md (S2 doctrine palette)
+;   team/uma-ux/palette-stratum-2.md §1.6 (reading-chamber = balanced 50/50)
+;   post-wave3-sequencing.md §6 SI-5 (S2 stratum-NPC roster = 2 NPCs)
 
 [ext_resource type="Script" path="res://resources/level/ZoneDef.gd" id="1_zone"]
+[ext_resource type="Script" path="res://resources/level/ZoneAnchor.gd" id="2_anchor"]
+
+[sub_resource type="Resource" id="Resource_anchor_entry"]
+script = ExtResource("2_anchor")
+room_id = &"s2_z2_entry"
+chunk_id = &"s2_room04"
+anchor_kind = &"entry"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_npc"]
+script = ExtResource("2_anchor")
+room_id = &"s2_z2_lectern_npc"
+chunk_id = &"s2_room02"
+anchor_kind = &"npc_room"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_exit"]
+script = ExtResource("2_anchor")
+room_id = &"s2_z2_descent_to_vault"
+chunk_id = &"s2_room04"
+anchor_kind = &"exit"
+target_zone_id = &"s2_z3_archive_vault"
 
 [resource]
 script = ExtResource("1_zone")
 zone_id = &"s2_z2_reading_chamber"
 display_name = "Sunken Reading Chamber"
 stratum_id = 2
-anchors = []
-procedural_slot_pool = []
+anchors = [SubResource("Resource_anchor_entry"), SubResource("Resource_anchor_npc"), SubResource("Resource_anchor_exit")]
+procedural_slot_pool = [&"s2_room02", &"s2_room05"]
 min_slots_between_anchors = 0
-max_slots_between_anchors = 0
+max_slots_between_anchors = 1
 port_mating_rules = {}

@@ -1,0 +1,88 @@
+[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_s2room01_chunk"]
+
+; Cinder Vaults — Entry Hall base geometry (S2 default chunk visual).
+; Hex-block placeholder geometry per §2 authoritative palette in
+; team/uma-ux/palette-stratum-2.md. Reused as the shared base scene for
+; multiple s2_*.tres chunk_defs (rooms 01 / 04 / 05 / 06 / 07 / 08) — the
+; same way every s1_*.tres chunk_def references s1_room01_chunk.tscn. The
+; chunk_def TRES carries the per-room mob_spawn + port differentiation;
+; this scene is the shared floor + walls.
+;
+; Scholar-overlay distribution (§1.6 weighting) is decoration-tier
+; authoring — applied per-zone in W3-T7 Stage 4 chunk_defs by varying
+; mob_spawn density NOT by altering this base scene. Stage 4's contract is
+; chunk-data + zone-wiring; future polish ticket re-skins this base scene
+; with per-zone overlay props.
+;
+; Walls match the s1_room01_chunk pattern (4 StaticBody2D walls with
+; RectangleShape2D collision) so MultiMobRoom + RoomGate physics behave
+; identically across strata.
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_h"]
+size = Vector2(480, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_v"]
+size = Vector2(32, 256)
+
+[node name="S2Room01Chunk" type="Node2D"]
+
+; Floor — burnt earth `#3F1E1A` (palette-stratum-2.md §2 floor base).
+[node name="Floor" type="ColorRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 256.0
+color = Color(0.247, 0.118, 0.102, 1)
+
+; Walls — collapsed mining stone `#2A1410` (§2 wall base).
+[node name="WallNorth" type="StaticBody2D" parent="."]
+position = Vector2(240, 16)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallNorth"]
+shape = SubResource("RectangleShape2D_wall_h")
+
+[node name="Sprite" type="ColorRect" parent="WallNorth"]
+offset_left = -240.0
+offset_top = -16.0
+offset_right = 240.0
+offset_bottom = 16.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+[node name="WallSouth" type="StaticBody2D" parent="."]
+position = Vector2(240, 240)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallSouth"]
+shape = SubResource("RectangleShape2D_wall_h")
+
+[node name="Sprite" type="ColorRect" parent="WallSouth"]
+offset_left = -240.0
+offset_top = -16.0
+offset_right = 240.0
+offset_bottom = 16.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+[node name="WallWest" type="StaticBody2D" parent="."]
+position = Vector2(16, 128)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallWest"]
+shape = SubResource("RectangleShape2D_wall_v")
+
+[node name="Sprite" type="ColorRect" parent="WallWest"]
+offset_left = -16.0
+offset_top = -128.0
+offset_right = 16.0
+offset_bottom = 128.0
+color = Color(0.165, 0.078, 0.063, 1)
+
+[node name="WallEast" type="StaticBody2D" parent="."]
+position = Vector2(464, 128)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallEast"]
+shape = SubResource("RectangleShape2D_wall_v")
+
+[node name="Sprite" type="ColorRect" parent="WallEast"]
+offset_left = -16.0
+offset_top = -128.0
+offset_right = 16.0
+offset_bottom = 128.0
+color = Color(0.165, 0.078, 0.063, 1)

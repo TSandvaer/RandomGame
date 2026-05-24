@@ -328,14 +328,15 @@ func test_authored_s1_z1_outer_cloister_pool_chunks_resolve() -> void:
 
 func test_authored_s1_z1_outer_cloister_exit_targets_s2() -> void:
 	# Cross-zone transition: exit anchor declares target_zone_id pointing
-	# at S2's first zone. Until S2 zones land in W3, the assembler treats
-	# unresolved target_zone_ids as terminal exits (documented in
-	# level-chunks.md § "Cross-zone transitions").
+	# at S2's first zone. Per W3-T7 Stage 4 (ticket 86c9y7ygj Part C), the
+	# target was re-pointed from the pre-Sponsor-name-lock slug
+	# &"s2_z1_sunken_entrance" to the locked &"s2_z1_entry_hall" after
+	# Sponsor locked S2 names on 2026-05-24.
 	var z: ZoneDef = _load_outer_cloister_zone()
 	var exits: Array[ZoneAnchor] = z.get_anchors_of_kind(&"exit")
 	assert_eq(exits.size(), 1)
 	assert_eq(
 		exits[0].target_zone_id,
-		&"s2_z1_sunken_entrance",
-		"S1 z1 exit must declare cross-zone target into S2"
+		&"s2_z1_entry_hall",
+		"S1 z1 exit must declare cross-zone target into S2 (Sponsor-locked slug)"
 	)

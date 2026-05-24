@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="LevelChunkDef" load_steps=8 format=3]
+
+; Cinder Vaults — Pincer Reliquary.
+; W3-T7 Stage 4 — S2 chunk authoring (ticket 86c9y7ygj).
+;
+; Role: high-pressure procedural-fill chunk. The S2 analog of s1_room07
+; (Pincer Hall) — bruiser-dominant trial gauntlet. Two Bone-Catalysts apply
+; melee pressure while a Sunken-Scholar holds rear position for ranged
+; threat.
+;
+; Mob mix: 2 Bone-Catalyst (flanking pincer positions per the s1_room07
+; multi-charger precedent) + 1 Sunken-Scholar (rear caster — the player
+; must choose: rush the scholar through the pincer, or clear bruisers
+; while eating ranged shots).
+;
+; Ports: WEST entry + EAST exit.
+
+[ext_resource type="Script" path="res://scripts/levels/LevelChunkDef.gd" id="1_chunk"]
+[ext_resource type="Script" path="res://scripts/levels/MobSpawnPoint.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://scripts/levels/ChunkPort.gd" id="3_port"]
+
+[sub_resource type="Resource" id="Resource_s2r7_entry"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(0, 4)
+direction = 3
+tag = &"entry"
+
+[sub_resource type="Resource" id="Resource_s2r7_exit"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(14, 4)
+direction = 1
+tag = &"exit"
+
+[sub_resource type="Resource" id="Resource_s2r7_bruiser_north"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(5, 3)
+mob_id = &"bone_catalyst"
+
+[sub_resource type="Resource" id="Resource_s2r7_bruiser_south"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(6, 5)
+mob_id = &"bone_catalyst"
+
+[sub_resource type="Resource" id="Resource_s2r7_scholar"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(12, 4)
+mob_id = &"sunken_scholar"
+
+[resource]
+script = ExtResource("1_chunk")
+id = &"s2_room07"
+display_name = "Cinder Vaults — Pincer Reliquary"
+size_tiles = Vector2i(15, 8)
+tile_size_px = 32
+scene_path = "res://scenes/levels/chunks/s2_room01_chunk.tscn"
+ports = [SubResource("Resource_s2r7_entry"), SubResource("Resource_s2r7_exit")]
+mob_spawns = [SubResource("Resource_s2r7_bruiser_north"), SubResource("Resource_s2r7_bruiser_south"), SubResource("Resource_s2r7_scholar")]
