@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="LevelChunkDef" load_steps=8 format=3]
+
+; Cinder Vaults — Archive Vault (Reliquary Hall).
+; W3-T7 Stage 4 — S2 chunk authoring (ticket 86c9y7ygj).
+;
+; Role: the quest_target anchor chunk for `s2_z3_archive_vault` — overlay-
+; dominant per palette-stratum-2.md §1.6 (40% Cinder substrate, 60% Archive
+; overlay — the deepest functional archive). Mixed mob roster with scholar
+; majority reads as "this room was theirs."
+;
+; Mob mix: 2 Sunken-Scholar (the archive's last readers — flanking
+; positions for crossfire pressure) + 1 Bone-Catalyst (the reliquary
+; guardian — center-room melee threat).
+;
+; Ports: WEST entry + EAST exit. Quest_target anchor — Track 3 exploration
+; quest (Part E) binds objective resolution here.
+
+[ext_resource type="Script" path="res://scripts/levels/LevelChunkDef.gd" id="1_chunk"]
+[ext_resource type="Script" path="res://scripts/levels/MobSpawnPoint.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://scripts/levels/ChunkPort.gd" id="3_port"]
+
+[sub_resource type="Resource" id="Resource_s2r6_entry"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(0, 4)
+direction = 3
+tag = &"entry"
+
+[sub_resource type="Resource" id="Resource_s2r6_exit"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(14, 4)
+direction = 1
+tag = &"exit"
+
+[sub_resource type="Resource" id="Resource_s2r6_scholar_north"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(11, 2)
+mob_id = &"sunken_scholar"
+
+[sub_resource type="Resource" id="Resource_s2r6_scholar_south"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(11, 6)
+mob_id = &"sunken_scholar"
+
+[sub_resource type="Resource" id="Resource_s2r6_bruiser"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(7, 4)
+mob_id = &"bone_catalyst"
+
+[resource]
+script = ExtResource("1_chunk")
+id = &"s2_room06"
+display_name = "Cinder Vaults — Archive Vault Reliquary"
+size_tiles = Vector2i(15, 8)
+tile_size_px = 32
+scene_path = "res://scenes/levels/chunks/s2_room01_chunk.tscn"
+ports = [SubResource("Resource_s2r6_entry"), SubResource("Resource_s2r6_exit")]
+mob_spawns = [SubResource("Resource_s2r6_scholar_north"), SubResource("Resource_s2r6_scholar_south"), SubResource("Resource_s2r6_bruiser")]

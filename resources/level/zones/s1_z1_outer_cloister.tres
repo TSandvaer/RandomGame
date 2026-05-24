@@ -24,11 +24,14 @@
 ;                                     "two anchors may share chunk geometry,
 ;                                     must have distinct room_ids" per
 ;                                     ZoneAnchor.gd doc).
-;                      target_zone_id = &"s2_z1_sunken_entrance" — cross-zone
+;                      target_zone_id = &"s2_z1_entry_hall" — cross-zone
 ;                      mating per level-chunks.md § "Cross-zone transitions".
-;                      Targets a not-yet-authored S2 zone; the assembler will
-;                      treat the unresolved target_zone_id as a terminal exit
-;                      until S2 zones land in W3.
+;                      Re-targeted in W3-T7 Stage 4 (ticket 86c9y7ygj Part C)
+;                      after Sponsor locked S2 names 2026-05-24 — the Stage 1
+;                      shells (PR #360) authored `s2_z1_entry_hall` per the
+;                      lock; this anchor was still pointing at the pre-lock
+;                      `s2_z1_sunken_entrance` slug. One-line fix per the
+;                      Stage 4 dispatch brief's exit-anchor-mismatch hook.
 ;
 ; Procedural slot pool: 3 mid-tier combat chunks (rooms 03 / 05 / 07). All
 ; three carry the canonical WEST entry + EAST exit ports + non-trivial mob
@@ -109,7 +112,7 @@ script = ExtResource("2_anchor")
 room_id = &"s1_z1_descent"
 chunk_id = &"s1_room08"
 anchor_kind = &"exit"
-target_zone_id = &"s2_z1_sunken_entrance"
+target_zone_id = &"s2_z1_entry_hall"
 
 [resource]
 script = ExtResource("1_zone")

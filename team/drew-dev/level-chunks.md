@@ -492,3 +492,46 @@ Stage 3 ships the second of two new S2 mob archetypes — **Bone-Catalyst** (mel
 **Paired tests:**
 - `tests/test_bone_catalyst_mob_class.gd` — mob-class smoke (instantiation, state-machine boot, chase → channel → strike → recover path, channel direction re-resolves at strike time, killed-mid-channel-no-slam, S1-melee-differentiation pins vs Grunt + Charger, channel-duration window pin per Uma §5.5, no USER WARNING:).
 - `tests/test_mob_registry_bone_catalyst_pin.gd` — roster registration pin (has_mob / get_mob_def / get_mob_scene / registered_ids / spawn / S2 stratum-scaling math: 70 × 1.2 = 84 HP, 5 × 1.15 → 6 dmg).
+
+### Stage 4 — S2 chunk roster (ticket `86c9y7ygj` Part C)
+
+Stage 4 (this PR) authors **6 new S2 LevelChunkDef.tres** files + wires them into the 4 S2 ZoneDef shells from Stage 1 + resolves the pre-Sponsor-name-lock `s1_z1_outer_cloister` exit-anchor `target_zone_id` drift. Per Drew's discretion (per dispatch brief "Lean conservative: ~8 chunks to start"), the S2 roster ships at exactly 8 chunks (2 pre-Stage-4 + 6 new).
+
+**Chunk roster (full S2 set after Stage 4):**
+
+| chunk_id | display_name | Substrate / Overlay weight | Mob roster | EAST port tag | Role in zone wiring |
+|---|---|---|---|---|---|
+| `s2_room01` | Cinder Vaults — Entry Hall Threshold | 80/20 | 1 Sunken-Scholar | `exit` | s2_z1 entry + exit anchor (reused) |
+| `s2_room02` | Cinder Vaults — Mining Cart Bay (pre-Stage-4) | 100/0 substrate | 2 Stoker (grunt-id) + 1 Charger | `exit` | s2_z1/z2 pool; s2_z2 npc_room anchor |
+| `s2_room03` | Cinder Vaults — Vent Chamber (pre-Stage-4) | 100/0 substrate | 1 Stoker + 1 Charger + 1 Shooter | `boss_door` | s2_z3 pool (OPEN_PORT_TAGS-clean for non-boss positions) |
+| `s2_room04` | Cinder Vaults — Sunken Reading Chamber | 50/50 | 1 Sunken-Scholar | `exit` | s2_z2 entry + exit anchor (reused) |
+| `s2_room05` | Cinder Vaults — Bone-Strewn Antechamber | 50/50 | 1 Sunken-Scholar + 1 Bone-Catalyst | `exit` | s2_z3 entry + exit anchor (reused); s2_z2 pool |
+| `s2_room06` | Cinder Vaults — Archive Vault Reliquary | 40/60 | 2 Sunken-Scholar + 1 Bone-Catalyst | `exit` | s2_z3 quest_target anchor; s2_z4 pool |
+| `s2_room07` | Cinder Vaults — Pincer Reliquary | 70/30 | 2 Bone-Catalyst + 1 Sunken-Scholar | `exit` | s2_z4 entry anchor; s2_z4 pool |
+| `s2_room08` | Cinder Vaults — Inner Sanctum Threshold | 70/30 | 2 Sunken-Scholar + 1 Bone-Catalyst | `boss_door` | s2_z4 boss_room + exit anchor (reused) |
+
+**Per palette-stratum-2.md §1.6 substrate-vs-overlay weighting** — chunk density of Sunken-Scholar / Bone-Catalyst (overlay archetypes) escalates substrate-dominant (s2_room01) → balanced (s2_room04/05) → overlay-dominant (s2_room06) → substrate-reclaims (s2_room08). The decoration-tier authoring brief (props per zone) is deferred to a future polish ticket — Stage 4 ships the chunk-data + mob-spawn distribution; visual scholarly overlay (shelving, lanterns, parchment props) lands later. All 6 new chunks reference a shared scene `scenes/levels/chunks/s2_room01_chunk.tscn` (mirrors the s1 pattern of reusing `s1_room01_chunk.tscn` across all 8 s1 chunks).
+
+**Zone wiring (Stage 4 populates the Stage 1 shells):**
+
+- `s2_z1_entry_hall` — anchors=[entry(s2_room01), exit(s2_room01 reused, target=s2_z2_reading_chamber)]; pool=[s2_room02]; substrate-dominant.
+- `s2_z2_reading_chamber` — anchors=[entry(s2_room04), npc_room(s2_room02), exit(s2_room04 reused, target=s2_z3_archive_vault)]; pool=[s2_room02, s2_room05]; balanced.
+- `s2_z3_archive_vault` — anchors=[entry(s2_room05), quest_target(s2_room06), exit(s2_room05 reused, target=s2_z4_inner_sanctum)]; pool=[s2_room05, s2_room03]; overlay-dominant + Track 3 quest_target binding.
+- `s2_z4_inner_sanctum` — anchors=[entry(s2_room07), boss_room(s2_room08, EAST=boss_door), exit(s2_room08 reused, target=&"" terminal)]; pool=[s2_room07, s2_room06]; substrate-reclaims; boss-approach.
+
+All zones use slot range `[0, 1]` per gap (matches s1_z1's SI-8 (b) "SMALL fill range" commitment — narrative reads first, per-character variance second). Total chunks per assembled S2 zone: 2-5 chunks per character per assembly.
+
+**`s1_z1_outer_cloister` exit-anchor mismatch fix:** the S1 zone's exit `target_zone_id` was `&"s2_z1_sunken_entrance"` (pre-Sponsor-name-lock slug from the M3 Tier 3 W1 spike era). Stage 4 re-targets it to `&"s2_z1_entry_hall"` (the Sponsor-locked S2 z1 slug) to close the unresolved-target-zone-id gap flagged in Stage 1's PR #360 final report. The drift was previously inert (assembler treats unresolved cross-zone exits as terminal exits) but now resolves cleanly. Pinned by `test_s1_z1_exit_target_zone_id_matches_s2_z1_entry_hall` in `tests/test_stratum2_room_smoke.gd`.
+
+**Paired tests:**
+- `tests/test_stratum2_room_smoke.gd` (Part F) — per-zone FloorAssembler smoke, N=8 seed mating discipline per Drew persona's sample-size rule, mob_spawn-mob_id resolution via MobRegistry, Stage 2/3 archetype binding drift detectors (Sunken-Scholar surfaces in z2; Bone-Catalyst surfaces in z3), s1_z1 → s2_z1 mismatch fix pin.
+
+**HTML5 escape-clause eligibility (per `.claude/docs/html5-export.md` § "Visual-verification escape clause"):** Stage 4 ships data + chunk authoring + zone wiring with placeholder ColorRect mobs. No tweens, no particles, no Area2D state mutations. Escape clause applies; HTML5 visual gate fires when sprite swap-in lands (separate PR — Sponsor-executed PixelLab generation per pixellab-pipeline.md).
+
+**Out of scope for Stage 4 (deferred to later stages of `86c9y7ygj`):**
+- Stratum2BossRoom + Archive Sentinel (Stage 5 / Part D — distinct boss-room topology + sprites + boss music).
+- S2 quest content (Stage 6 / Part E — Track 3 exploration quests binding to s2_z3 quest_target).
+- S2 NPC dialogue trees (Stage 6 / Part E — 2 NPCs per SI-5, one per anchor in s2_z2 / s2_z3).
+- Decoration-tier overlay props per palette-stratum-2.md §1.6 (shelving, lanterns, parchment — separate visual-polish ticket).
+- Procgen integration into the production room-driver (`Main._load_room_at_index` swap from authored room-cycle to FloorAssembler-driven — W2-T3-impl downstream).
+- PixelLab sprite generation for the 2 new mob archetypes + Archive Sentinel boss.

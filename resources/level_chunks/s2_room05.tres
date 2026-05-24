@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="LevelChunkDef" load_steps=7 format=3]
+
+; Cinder Vaults — Bone-Strewn Antechamber.
+; W3-T7 Stage 4 — S2 chunk authoring (ticket 86c9y7ygj).
+;
+; Role: mid-pressure procedural-fill chunk. First room where Bone-Catalyst
+; appears alongside Sunken-Scholar — establishes the mixed-archetype mid-zone
+; pressure beat per palette-stratum-2.md §5.5 (scholar telegraphs ranged
+; from afar; bruiser closes in with the channel-windup).
+;
+; Mob mix: 1 Sunken-Scholar (rear-positioned for kiting) + 1 Bone-Catalyst
+; (forward-positioned for closing pressure).
+;
+; Ports: WEST entry + EAST exit.
+
+[ext_resource type="Script" path="res://scripts/levels/LevelChunkDef.gd" id="1_chunk"]
+[ext_resource type="Script" path="res://scripts/levels/MobSpawnPoint.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://scripts/levels/ChunkPort.gd" id="3_port"]
+
+[sub_resource type="Resource" id="Resource_s2r5_entry"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(0, 4)
+direction = 3
+tag = &"entry"
+
+[sub_resource type="Resource" id="Resource_s2r5_exit"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(14, 4)
+direction = 1
+tag = &"exit"
+
+[sub_resource type="Resource" id="Resource_s2r5_bruiser"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(7, 4)
+mob_id = &"bone_catalyst"
+
+[sub_resource type="Resource" id="Resource_s2r5_scholar"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(11, 5)
+mob_id = &"sunken_scholar"
+
+[resource]
+script = ExtResource("1_chunk")
+id = &"s2_room05"
+display_name = "Cinder Vaults — Bone-Strewn Antechamber"
+size_tiles = Vector2i(15, 8)
+tile_size_px = 32
+scene_path = "res://scenes/levels/chunks/s2_room01_chunk.tscn"
+ports = [SubResource("Resource_s2r5_entry"), SubResource("Resource_s2r5_exit")]
+mob_spawns = [SubResource("Resource_s2r5_bruiser"), SubResource("Resource_s2r5_scholar")]

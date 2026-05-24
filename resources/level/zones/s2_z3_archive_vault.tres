@@ -1,35 +1,66 @@
-[gd_resource type="Resource" script_class="ZoneDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ZoneDef" load_steps=6 format=3]
 
-; W3-T7 Stage 1 — S2 ZoneDef authoring (Part A only; ticket `86c9y7ygj`).
+; W3-T7 Stage 4 — S2 zone wiring (ticket 86c9y7ygj Part C).
 ;
-; This file is the geographic SHELL — anchors + procedural_slot_pool are
-; left empty per the Stage 1 dispatch brief. Parts B (S2 mobs), C (S2
-; chunks), and D (S2 boss room) ship in later PRs.
+; Sponsor-locked S2 names (2026-05-24). This zone is the mid-stratum
+; exploration zone — first place where Bone-Catalyst (Stage 3 PR #367)
+; appears alongside Sunken-Scholar. Quest_target anchor pins a Track 3
+; exploration-quest objective per Commitment 3 (post-wave3-sequencing.md
+; §1). Overlay-dominant per palette-stratum-2.md §1.6 (40% Cinder, 60%
+; Archive overlay — the deepest functional archive).
 ;
-; Sponsor-locked S2 names (2026-05-24): melee mob = Bone-Catalyst.
-; This zone is the mid-stratum exploration zone — the "archive proper"
-; where the Bone-Catalyst melee archetype first appears alongside the
-; ranged Sunken-Scholar from z2. Pressure escalates here; quest_target
-; anchor likely placed here in Part C per Track 3 exploration-quest
-; design (post-wave3-sequencing.md §1 Commitment 3).
+; Anchors (in zone-graph order):
+;   1. entry        → s2_room05 (Bone-Strewn Antechamber — 1 Sunken-Scholar
+;                                + 1 Bone-Catalyst; first mixed-archetype
+;                                encounter in the zone).
+;   2. quest_target → s2_room06 (Archive Vault Reliquary — 2 Sunken-Scholar
+;                                + 1 Bone-Catalyst; quest objective resolves
+;                                here per Commitment 3).
+;   3. exit         → REUSES s2_room05 chunk geometry; distinct room_id.
+;                    target_zone_id = &"s2_z4_inner_sanctum".
 ;
-; TODO Part C: populate `anchors` (entry + ≥1 exit + quest_target slot)
-; and `procedural_slot_pool` with mid-tier combat chunks containing both
-; Sunken-Scholar + Bone-Catalyst mob spawns per FloorAssembler.
+; Procedural slot pool: 2 mixed-archetype chunks — s2_room05 (mid-pressure
+; mixed) + s2_room03 (Vent Chamber, Stoker/Charger/Shooter substrate;
+; carries `&"boss_door"` EAST tag, treated as a regular open-port by
+; FloorAssembler.OPEN_PORT_TAGS so it mates cleanly in non-boss positions).
+; Per-character RNG picks 0-1 fill chunks per gap from this pool.
 ;
 ; Cross-references:
 ;   team/drew-dev/level-chunks.md § "Zone schema" + § "S2 zone roster"
-;   team/uma-ux/palette-stratum-2.md (S2 doctrine palette)
+;   team/uma-ux/palette-stratum-2.md §1.6 (archive-vault = overlay-dominant 40/60)
+;   post-wave3-sequencing.md §1 Commitment 3 (quest_target anchor binding)
 
 [ext_resource type="Script" path="res://resources/level/ZoneDef.gd" id="1_zone"]
+[ext_resource type="Script" path="res://resources/level/ZoneAnchor.gd" id="2_anchor"]
+
+[sub_resource type="Resource" id="Resource_anchor_entry"]
+script = ExtResource("2_anchor")
+room_id = &"s2_z3_entry"
+chunk_id = &"s2_room05"
+anchor_kind = &"entry"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_quest"]
+script = ExtResource("2_anchor")
+room_id = &"s2_z3_reliquary_hall"
+chunk_id = &"s2_room06"
+anchor_kind = &"quest_target"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_exit"]
+script = ExtResource("2_anchor")
+room_id = &"s2_z3_descent_to_sanctum"
+chunk_id = &"s2_room05"
+anchor_kind = &"exit"
+target_zone_id = &"s2_z4_inner_sanctum"
 
 [resource]
 script = ExtResource("1_zone")
 zone_id = &"s2_z3_archive_vault"
 display_name = "Archive Vault"
 stratum_id = 2
-anchors = []
-procedural_slot_pool = []
+anchors = [SubResource("Resource_anchor_entry"), SubResource("Resource_anchor_quest"), SubResource("Resource_anchor_exit")]
+procedural_slot_pool = [&"s2_room05", &"s2_room03"]
 min_slots_between_anchors = 0
-max_slots_between_anchors = 0
+max_slots_between_anchors = 1
 port_mating_rules = {}

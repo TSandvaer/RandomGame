@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="LevelChunkDef" load_steps=6 format=3]
+
+; Cinder Vaults — Sunken Reading Chamber.
+; W3-T7 Stage 4 — S2 chunk authoring (ticket 86c9y7ygj).
+;
+; Role: the NPC-anchor chunk for `s2_z2_reading_chamber` (the order's
+; functional habitable space per palette-stratum-2.md §1.6 — 50% Cinder
+; substrate, 50% Archive overlay). Low-pressure beat: a single
+; Sunken-Scholar guards the reading-desk shape. Future Part E NPC dialogue
+; tree wiring will attach here.
+;
+; Mob mix: 1 Sunken-Scholar (lone reading-desk guardian — the scholar who
+; got too absorbed in their study to leave when the seam-break came).
+;
+; Ports: WEST entry + EAST exit, standard mating shape.
+
+[ext_resource type="Script" path="res://scripts/levels/LevelChunkDef.gd" id="1_chunk"]
+[ext_resource type="Script" path="res://scripts/levels/MobSpawnPoint.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://scripts/levels/ChunkPort.gd" id="3_port"]
+
+[sub_resource type="Resource" id="Resource_s2r4_entry"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(0, 4)
+direction = 3
+tag = &"entry"
+
+[sub_resource type="Resource" id="Resource_s2r4_exit"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(14, 4)
+direction = 1
+tag = &"exit"
+
+[sub_resource type="Resource" id="Resource_s2r4_scholar"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(10, 3)
+mob_id = &"sunken_scholar"
+
+[resource]
+script = ExtResource("1_chunk")
+id = &"s2_room04"
+display_name = "Cinder Vaults — Sunken Reading Chamber"
+size_tiles = Vector2i(15, 8)
+tile_size_px = 32
+scene_path = "res://scenes/levels/chunks/s2_room01_chunk.tscn"
+ports = [SubResource("Resource_s2r4_entry"), SubResource("Resource_s2r4_exit")]
+mob_spawns = [SubResource("Resource_s2r4_scholar")]
