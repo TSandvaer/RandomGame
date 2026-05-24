@@ -193,3 +193,123 @@ func test_title_color_is_ember_accent() -> void:
 	assert_almost_eq(title_color.r, 1.0, 0.001)
 	assert_almost_eq(title_color.g, 0.416, 0.01)
 	assert_almost_eq(title_color.b, 0.165, 0.01)
+
+
+# ---- Open Map button → WorldMapPanel host wiring ----------------------
+#
+# Regression-pin for ticket `86c9y10fv` Sponsor RC soak P0 (2026-05-24):
+# Sponsor clicked Open Map and saw nothing happen. The bug was NOT that
+# the button signal failed to fire — it was that the panel mounted at
+# layer=70 while DescendScreen sits at layer=100 with a 100%-opaque full-
+# rect BG. The panel WAS in the tree; it was just invisible because the
+# descend chrome was drawn on top.
+#
+# The bug CLASS this group of tests catches: "panel mounted but rendered
+# below an opaque host." Tests assert structural invariants, not just
+# "panel exists after click." A test that only asserted
+# `get_world_map_panel() != null` post-click would have green-passed
+# during the entire bug era (the panel WAS being instantiated and added
+# to the tree).
+
+
+func test_open_map_button_text_matches_constant() -> void:
+	var screen: DescendScreen = _make_screen()
+	var btn: Button = screen.get_open_map_button()
+	assert_not_null(btn, "open-map button exists after _ready")
+	assert_eq(
+		btn.text,
+		DescendScreen.OPEN_MAP_BUTTON_TEXT,
+		"open-map button text matches authoritative constant",
+	)
+
+
+func test_open_map_button_pressed_signal_is_connected() -> void:
+	# Pin the wiring at the signal-connection layer. A regression that
+	# accidentally drops the `pressed.connect(_on_open_map_pressed)` line
+	# at DescendScreen.gd:248 fails here BEFORE any behavior assertion
+	# downstream.
+	var screen: DescendScreen = _make_screen()
+	var btn: Button = screen.get_open_map_button()
+	assert_not_null(btn, "open-map button exists")
+	var conns: Array = btn.pressed.get_connections()
+	assert_gt(
+		conns.size(),
+		0,
+		"open-map button `pressed` signal MUST have at least one listener wired",
+	)
+
+
+func test_pressing_open_map_instantiates_world_map_panel() -> void:
+	# Pin the click → instantiate path. The pre-fix bug was NOT this step
+	# — the panel WAS being instantiated correctly. But if a future
+	# refactor drops the load + add_child path, the test fails before
+	# the visibility-layer test below.
+	var screen: DescendScreen = _make_screen()
+	assert_null(screen.get_world_map_panel(), "panel is null pre-click")
+	screen.press_open_map_for_test()
+	var panel: CanvasLayer = screen.get_world_map_panel()
+	assert_not_null(panel, "panel is non-null after click")
+	assert_true(is_instance_valid(panel), "panel is a live instance")
+
+
+func test_world_map_panel_layer_above_descend_screen_layer() -> void:
+	# REGRESSION PIN — the load-bearing assertion for the 2026-05-24
+	# Sponsor RC soak P0. The bug CLASS this catches: "panel exists but
+	# is visually covered by the opaque host." Without this test, a
+	# refactor that:
+	#   (a) drops the `_world_map_panel.layer = layer + 1` override
+	#   (b) reverts to mounting at root (the prior "alternative
+	#       considered: rejected" framing)
+	#   (c) lowers DescendScreen.layer below 100 in a way that breaks
+	#       the assumption
+	# would all silently regress visibility. The assertion is layer-
+	# arithmetic so it survives any future reshuffle of CanvasLayer
+	# absolute values (e.g., HUD layer migration from 0 → 50).
+	var screen: DescendScreen = _make_screen()
+	screen.press_open_map_for_test()
+	var panel: CanvasLayer = screen.get_world_map_panel()
+	assert_not_null(panel, "panel mounted")
+	assert_gt(
+		panel.layer,
+		screen.layer,
+		(
+			"WorldMapPanel.layer MUST be > DescendScreen.layer so the panel"
+			+ " renders ABOVE the opaque descend BG (Sponsor RC soak P0"
+			+ " 2026-05-24 regression class)"
+		),
+	)
+
+
+func test_repeated_open_map_press_is_idempotent() -> void:
+	# Rapid-click guard — matches the return-button idempotence shape.
+	# Without the early-return at DescendScreen.gd:305 the panel would
+	# orphan-leak on every click after the first.
+	var screen: DescendScreen = _make_screen()
+	screen.press_open_map_for_test()
+	var first_panel: CanvasLayer = screen.get_world_map_panel()
+	assert_not_null(first_panel)
+	screen.press_open_map_for_test()
+	screen.press_open_map_for_test()
+	var third_panel: CanvasLayer = screen.get_world_map_panel()
+	assert_eq(
+		first_panel.get_instance_id(),
+		third_panel.get_instance_id(),
+		"repeated press_open_map returns the same panel instance (idempotent)",
+	)
+
+
+func test_open_map_panel_listens_to_close_requested() -> void:
+	# Pin the close-signal wiring. The pre-fix code had this correctly;
+	# regression-pin so a refactor doesn't accidentally drop the listener
+	# (which would leak the panel — Esc would clear `_open` but not
+	# `_world_map_panel`, and re-press would early-return forever).
+	var screen: DescendScreen = _make_screen()
+	screen.press_open_map_for_test()
+	var panel: CanvasLayer = screen.get_world_map_panel()
+	assert_not_null(panel)
+	var conns: Array = panel.close_requested.get_connections()
+	assert_gt(
+		conns.size(),
+		0,
+		"WorldMapPanel.close_requested MUST have a DescendScreen listener wired",
+	)

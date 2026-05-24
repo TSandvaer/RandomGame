@@ -288,6 +288,18 @@ func _ready() -> void:
 		if target >= 0 and target != 0:
 			print("[Main] DebugFlags.start_room=%d — bypassing Room 01 traversal" % target)
 			_load_room_at_index(target)
+	# DebugFlags.force_descend URL-param soak utility (W2-T5 fix ticket
+	# `86c9y10fv`, 2026-05-24). When `?force_descend=1` is set on the HTML5
+	# URL, open the DescendScreen immediately AFTER the normal Room 01 boot.
+	# This bypasses the boss-kill chain so the Playwright spec for the
+	# "Open Map button → WorldMapPanel mount" path can exercise the click
+	# handler empirically without needing to play through 8 rooms + a boss
+	# fight. Same HTML5-only shape as `start_room`. The descend handoff
+	# (force_descend_for_test → _on_descend_triggered) is the exact same
+	# code path the StratumExit interaction fires in production.
+	if df != null and bool(df.get("force_descend")):
+		print("[Main] DebugFlags.force_descend=true — auto-opening DescendScreen")
+		force_descend_for_test()
 
 
 func _notification(what: int) -> void:

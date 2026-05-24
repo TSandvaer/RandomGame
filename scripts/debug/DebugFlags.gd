@@ -83,11 +83,33 @@ const START_ROOM_DEFAULT: int = -1
 const START_ROOM_MIN: int = 0
 const START_ROOM_MAX: int = 8  # BOSS_ROOM_INDEX in Main.gd
 
+## Force-descend URL query param — Sponsor/Devon soak utility (W2-T5 fix
+## ticket `86c9y10fv`, 2026-05-24). When set on the HTML5 URL,
+## `Main._ready` calls `force_descend_for_test()` AFTER the normal Room 01
+## boot path so the DescendScreen opens immediately without requiring
+## boss-kill traversal. Defaults to false (no force) when missing /
+## malformed / desktop. Same HTML5-only-via-bridge shape as boss_hp_mult /
+## start_room — desktop / headless GUT always reads the default.
+##
+## Usage:
+##   http://localhost:8080/?force_descend=1   → DescendScreen opens at boot
+##   http://localhost:8080/?force_descend=1&start_room=0 → same
+##   http://localhost:8080/                    → normal Room 01 boot
+##
+## Use case: Playwright spec for the W2-T5 RC fix — exercises the
+## DescendScreen "Open Map" button-click → WorldMapPanel-mount → visibility
+## path empirically without needing to play through 8 rooms + boss-kill.
+## Closes the coverage gap that let the original Sponsor RC P0 ship
+## (the render-only `world-map-panel-render.spec.ts` boots the panel by
+## a direct route that bypasses the click handler entirely).
+const FORCE_DESCEND_QUERY_PARAM: String = "force_descend"
+
 # Public state — read by gameplay code, written only via toggle/parse functions.
 var fast_xp_enabled: bool = false
 var test_mode_enabled: bool = false
 var boss_hp_mult: float = BOSS_HP_MULT_DEFAULT
 var start_room: int = START_ROOM_DEFAULT
+var force_descend: bool = false
 
 # Emitted when fast_xp_enabled flips, so HUD/debug overlays can reflect it.
 signal fast_xp_toggled(enabled: bool)
@@ -100,12 +122,13 @@ func _ready() -> void:
 	_resolve_test_mode()
 	_resolve_boss_hp_mult()
 	_resolve_start_room()
+	_resolve_force_descend()
 	# Single boot-time line for Tess's grep.
 	print(
 		(
 			(
 				"[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s"
-				+ " web=%s boss_hp_mult=%.3f start_room=%d"
+				+ " web=%s boss_hp_mult=%.3f start_room=%d force_descend=%s"
 			)
 			% [
 				OS.is_debug_build(),
@@ -114,6 +137,7 @@ func _ready() -> void:
 				OS.has_feature("web"),
 				boss_hp_mult,
 				start_room,
+				force_descend,
 			]
 		)
 	)
@@ -363,3 +387,39 @@ func set_start_room_for_test(index: int) -> void:
 ## in `after_each` so leaked state can't cascade across the test file.
 func reset_start_room_for_test() -> void:
 	start_room = START_ROOM_DEFAULT
+
+
+## Read the `force_descend` URL query param via JavaScriptBridge on HTML5;
+## no-op on desktop / headless GUT. Defaults to false (no force) when
+## absent / malformed. Same HTML5-only-via-bridge shape as boss_hp_mult /
+## start_room. Accepts any non-empty, non-"0", non-"false" value as truthy
+## (matches the test-mode env-var convention).
+func _resolve_force_descend() -> void:
+	force_descend = false
+	if not OS.has_feature("web"):
+		return
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return
+	var bridge: Object = Engine.get_singleton("JavaScriptBridge")
+	var raw_value: Variant = bridge.eval(
+		"new URLSearchParams(window.location.search).get('%s')" % FORCE_DESCEND_QUERY_PARAM,
+		true,
+	)
+	if raw_value == null:
+		return
+	var raw_str: String = str(raw_value).strip_edges().to_lower()
+	if raw_str.is_empty() or raw_str == "null":
+		return
+	if raw_str == "0" or raw_str == "false":
+		return
+	force_descend = true
+
+
+## Test-only: inject force_descend without going through the JS bridge.
+func set_force_descend_for_test(enabled: bool) -> void:
+	force_descend = enabled
+
+
+## Test-only: reset to production default.
+func reset_force_descend_for_test() -> void:
+	force_descend = false
