@@ -399,3 +399,44 @@ Sponsor-locked S2 names (2026-05-24): ranged mob = **Sunken-Scholar**, melee mob
 **Stage 1 acceptance:** smoke tests (`tests/test_s2_zone_defs_load.gd`) pin load + field-read + universal-warning-gate compliance per `.claude/docs/test-conventions.md`. `validate()` is intentionally NOT called at Stage 1 — empty `anchors` would fail the entry/exit invariants; Part C ships the validate() pin once anchors are populated.
 
 **TODO Part C** comments inside each .tres file mark where chunk anchors and procedural slot pools will populate. Per multi-stage-ticket-lifecycle memory, ticket `86c9y7ygj` stays at `in progress` across Parts B/C/D/E — flip `complete` only when ALL stages land.
+
+## S2 mob roster (M3 Tier 3 W3, ticket `86c9y7ygj` Part B)
+
+Stage 2 ships the first of two new S2 mob archetypes — **Sunken-Scholar** (ranged caster). The class file mechanically mirrors `scripts/mobs/Shooter.gd` (telegraph → fire → recovery kiter with sweet-spot band + cornered-fallback per ticket `86c9uehaq` doctrine) but differentiates per Uma's `palette-stratum-2.md` §5.5 character archetype:
+
+| Lever | S1 Shooter | SunkenScholar (S2) | Why differentiate |
+|---|---|---|---|
+| `PROJECTILE_SPEED` | 90 px/s | 60 px/s | Uma §5.5: "slower bullet, longer telegraph, same effective TTK." |
+| `PROJECTILE_LIFETIME` | 1.6 s | 2.4 s | Pairs with the slower speed — same 144 px effective reach, same sweet-spot width. |
+| `SHOOT_RANGE` (derived) | 144 px | 144 px | Band invariant preserved — sweet spot 120..144 px in both. Per `combat-architecture.md` § "Shooter state machine — sweet-spot derivation rule." |
+| `AIM_DURATION` | 0.55 s | 0.85 s | Uma §5.5 telegraph anchor — "lantern flares brighter, eyes ignite" — longer window pairs with brighter visual cue. |
+| `CORNERED_AIM_DURATION` | 0.25 s | 0.30 s | Slightly longer than S1 to pair with the slower bullet (player still has dodge headroom). |
+| `hp_base` | 40 | 50 | Compensation for slower projectile — player has more dodge opportunity per shot. Final balance lever is Sponsor soak. |
+| `damage_base` | 5 | 6 | S2 archetype baseline (~ S1 × 1.15 — see `MobRegistry._STRATUM_SCALING`). Not yet auto-scaled at spawn; `apply_stratum_scaling` test pinned for the future wire-up. |
+| Telegraph tint (placeholder ColorRect) | vivid red `#FF4D4D` | ember-amber `#FF8C4D` | Approximates Uma §5.5 "lantern-staff flare" until PixelLab sprite drops in. Sub-1.0 channels for HTML5 HDR-clamp safety. |
+| Sprite-rest color (placeholder ColorRect) | blue `#5273C7` | parchment-tan `#A89270` | Uma §1.6 scholarly-overlay parchment hex — distinct from S1 Shooter blue at silhouette-distance. |
+
+**Shared with S1 Shooter (cross-stratum constants per `palette-stratum-2.md` §2):**
+- `HIT_FLASH_TINT = Color(1.0, 0.50, 0.50, 1.0)` — "I hit something" reads identically across the roster.
+- Mob aggro eye-glow `#D24A3C` (when AnimatedSprite2D drops in — placeholder ColorRect doesn't yet expose this surface).
+- Ember-light death-particle ramp (`#FF6A2A` → `#A02E08`) — diegetic logic per Uma §5.5: "lantern-light gutters out frame-by-frame — the ember IS the soul, leaving."
+
+**Trace contract (Drew persona rule "No new mob class without trace instrumentation"):**
+- `[combat-trace] SunkenScholar.pos | pos=(x,y) state=<S> hp=<N> dist_to_player=<D>` — throttled 0.25 s, mirrors `Shooter.pos`. Harness pursuit/observability surface.
+- `[combat-trace] SunkenScholar._set_state | <old> -> <new> dist=<D> pos=(x,y)` — emits on every state transition.
+- `[combat-trace] SunkenScholar.{take_damage, _die, _force_queue_free, _play_attack_telegraph, _promote_cornered_to_aiming, _process_aiming, _process_post_fire}` — uniform with the Shooter family. Harness greps map 1:1.
+
+**Stage-2 ship state (placeholder sprite):**
+- Sprite is a flat-color ColorRect (parchment-tan), 16×16 px centered. Hit-flash 3-branch resolver routes through the ColorRect branch (M3W-3 convention).
+- PixelLab sprite generation deferred to a follow-up PR (Sponsor + orchestrator main-session executes `mcp__pixellab__*` per `sub-agent-mcp-tool-surface-scope` memory; SunkenScholar's PixelLab prompt seed is `palette-stratum-2.md` §5.5).
+- Drop-in mechanic: replace the `Sprite` ColorRect node in `scenes/mobs/SunkenScholar.tscn` with an `AnimatedSprite2D` of the same name + assign `SpriteFrames`. Resolver branch 1 auto-picks it up — no script edit needed (M3W-1 PR #271 inheritance contract per `.claude/docs/combat-architecture.md` § "M3W-1 realized implementation").
+
+**Out of scope for Stage 2 (deferred to later stages of `86c9y7ygj`):**
+- Bone-Catalyst (melee, Stage 3) — separate class + scene + .tres + registry entry.
+- Archive Sentinel boss (Stage 5) — distinct boss-room topology.
+- S2 chunks consuming `&"sunken_scholar"` in `mob_spawns` (Stage 4 Part C).
+- Stratum-scaling wired into spawn path (cross-cutting follow-up; `apply_stratum_scaling` API ready, no spawn-path wire-up yet).
+
+**Paired tests:**
+- `tests/test_sunken_scholar_mob_class.gd` — mob-class smoke (instantiation, state-machine boot, full path Idle→Spotted→Aiming→Firing, kite + cornered fallback, band invariants `SHOOT_RANGE = PROJECTILE_SPEED × PROJECTILE_LIFETIME`, differentiation pins vs S1 Shooter, no USER WARNING:).
+- `tests/test_mob_registry_sunken_scholar_pin.gd` — roster registration pin (has_mob / get_mob_def / get_mob_scene / registered_ids / spawn / S2 stratum-scaling math).

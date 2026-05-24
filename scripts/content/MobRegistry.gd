@@ -98,6 +98,15 @@ const _REGISTRATIONS: Dictionary = {
 		"def": "res://resources/mobs/shooter.tres",
 		"scene": "res://scenes/mobs/Shooter.tscn",
 	},
+	# Stratum-2 ranged caster — W3-T7 Stage 2 (ticket 86c9y7ygj).
+	# Mechanically cloned from Shooter (telegraph-fire-recovery kiter); see
+	# `scripts/mobs/SunkenScholar.gd` for the slower-projectile / longer-
+	# telegraph differentiation per Uma `palette-stratum-2.md` §5.5.
+	&"sunken_scholar":
+	{
+		"def": "res://resources/mobs/sunken_scholar.tres",
+		"scene": "res://scenes/mobs/SunkenScholar.tscn",
+	},
 }
 
 # ---- Caches ---------------------------------------------------------
