@@ -442,12 +442,17 @@ var completed_bounties: Array = []
 ## Backfill default `{}` lives in `Save._backfill_v5_tier3_quest_fields`
 ## (renamed to `_backfill_v5_tier3_fields` to cover both quest + world-map
 ## additions; both ride additively on schema v5 per §5).
-## **Type discipline note:** declared as `Dictionary[StringName, bool]` (typed)
-## so insert-paths enforce StringName key type. An untyped Dictionary silently
-## coerces StringName -> String at insert time in Godot 4.3 (PR #362 regression
-## class; see `_normalise_dict_keys_to_stringname` rationale). Typed declaration
-## here PLUS typed local var inside the normaliser are belt-and-braces.
-var discovered_zones: Dictionary[StringName, bool] = {}
+## **Key-type note (Godot 4.3):** Godot 4.3 lacks typed `Dictionary[K, V]`
+## syntax (added in 4.4 — verified empirically against CI parse error "Only
+## arrays can specify collection element types," PR #362 fix attempt v1).
+## The Dictionary is untyped at the field level; runtime stores keys as
+## TYPE_STRING (StringName/String canonicalize on insert into an untyped
+## Variant slot). All `.has(zone_id)` / `.get(zone_id, ...)` lookups still
+## work because Godot's Dictionary lookup is StringName↔String-equivalent.
+## Consumers MUST NOT branch on `typeof(k) == TYPE_STRING_NAME` — see
+## `_normalise_dict_keys_to_stringname` docstring for the canonical key-shape
+## contract under Godot 4.3.
+var discovered_zones: Dictionary = {}
 
 ## Per-character waypoint-discovery dict. Keyed by StringName waypoint id
 ## (convention `<stratum>_<zone>_<waypoint_slug>`). `true` = discovered +
@@ -455,11 +460,10 @@ var discovered_zones: Dictionary[StringName, bool] = {}
 ## with a minimal consumer (panel reads it but no waypoint UI yet —
 ## M4 expansion per ticket Part B).
 ##
-## **Same shape rules as `discovered_zones`** — Dict[StringName, bool],
-## per-character, monotone-grow, JSON-round-trips via String coercion.
-## Typed declaration mirrors `discovered_zones` for same StringName-key
-## enforcement reasons.
-var discovered_waypoints: Dictionary[StringName, bool] = {}
+## **Same shape rules as `discovered_zones`** — untyped Dictionary (Godot
+## 4.3 lacks typed-Dict syntax; see `discovered_zones` for the key-shape
+## contract under Godot 4.3).
+var discovered_waypoints: Dictionary = {}
 
 
 func _ready() -> void:
@@ -2163,24 +2167,34 @@ func restore_from_save_dict(character: Dictionary) -> void:
 	)
 
 
-## Mirror of `_stringify_dict_keys` for the load side. Coerce String keys
-## (from JSON round-trip) back to StringName for in-memory canonicalisation.
-## Tolerates missing entries (returns empty dict on non-Dictionary input).
+## Mirror of `_stringify_dict_keys` for the load side. Normalises keys so the
+## in-memory dict is reachable via StringName lookups (the production access
+## shape).
 ##
-## **Godot 4.3 quirk — typed Dictionary required for StringName key enforcement.**
-## An untyped `Dictionary` silently coerces StringName keys back to String on
-## insert (StringName/String compare-equal, so the engine dedup-replaces with
-## the String form). The typed `Dictionary[StringName, bool]` declaration is
-## load-bearing — without it, `typeof(k) == TYPE_STRING_NAME` reads back FALSE
-## for every key (PR #362 regression-fix; ticket `86c9y10fv` Tess QA).
-## Captured in `.claude/docs/test-conventions.md § "Godot 4.3 untyped-Dictionary
-## StringName-key coercion"`.
+## **Godot 4.3 key-canonicalization note.** Godot 4.3 lacks typed `Dictionary[
+## K, V]` syntax (verified via CI parse error "Only arrays can specify
+## collection element types" — PR #362 fix attempt v1). An untyped Dictionary
+## stores keys as TYPE_STRING when either a String or a StringName is inserted
+## — the engine canonicalizes the two equivalent hash classes. Consequence:
+## the in-memory key-type CANNOT be enforced as TYPE_STRING_NAME under Godot
+## 4.3. **The contract is "lookup-equivalence," not "typeof-equivalence":**
+## `out.has(&"x")` and `out.has("x")` both return true after this helper
+## normalises a String-keyed JSON payload, even though `typeof(key)` reads
+## back as TYPE_STRING for either insert path. Captured in `.claude/docs/
+## test-conventions.md § "Godot 4.3 untyped-Dictionary key canonicalization"`.
+## Tolerates missing entries (returns empty dict on non-Dictionary input).
 static func _normalise_dict_keys_to_stringname(d: Variant) -> Dictionary:
-	var out: Dictionary[StringName, bool] = {}
+	var out: Dictionary = {}
 	if not (d is Dictionary):
 		return out
 	var src: Dictionary = d as Dictionary
 	for k in src.keys():
+		# Wrap as StringName at insert time so consumers reading the key via
+		# `dict.keys()` see a value derived from the StringName path. Note:
+		# under Godot 4.3 the dict canonicalises this to TYPE_STRING anyway
+		# (no typed-Dict syntax to enforce StringName slot), but the wrap
+		# matches the canonical access shape (production reads via
+		# StringName-keyed lookups).
 		out[StringName(String(k))] = bool(src[k])
 	return out
 

@@ -74,9 +74,20 @@ func test_to_save_dict_stringifies_discovered_zones_keys() -> void:
 	assert_true(bool(d["s1_z1_outer_cloister"]))
 
 
-func test_restore_from_save_dict_normalises_string_keys_to_stringname() -> void:
-	# Mirror of above — reading back String-keyed JSON yields StringName-
-	# keyed in-memory state.
+func test_restore_from_save_dict_normalises_keys_for_stringname_lookup() -> void:
+	# Mirror of above — reading back String-keyed JSON yields a dict
+	# reachable via StringName lookups (the production access shape).
+	#
+	# **Key-shape contract under Godot 4.3:** lookup-equivalence, NOT
+	# typeof-equivalence. Godot 4.3 lacks typed `Dictionary[K, V]` syntax,
+	# so an untyped Dictionary canonicalizes StringName↔String keys to
+	# TYPE_STRING on insert regardless of which form was passed in. The
+	# `_normalise_dict_keys_to_stringname` helper wraps every key as
+	# `StringName(String(k))` at insert time for the canonical access
+	# shape; lookups via `&"..."` (StringName literal) and via `"..."`
+	# (String literal) both hit. See helper docstring + .claude/docs/
+	# test-conventions.md § "Godot 4.3 untyped-Dictionary key
+	# canonicalization" for the full rationale.
 	var p: Node = PlayerScript.new()
 	add_child_autofree(p)
 	var character: Dictionary = {
@@ -95,12 +106,21 @@ func test_restore_from_save_dict_normalises_string_keys_to_stringname() -> void:
 	p.call("restore_from_save_dict", character)
 	var restored_zones: Dictionary = p.get("discovered_zones")
 	assert_eq(restored_zones.size(), 2)
-	# Lookup by StringName must hit.
-	assert_true(restored_zones.has(&"s1_z1_outer_cloister"))
-	assert_true(restored_zones.has(&"s2_z3_sunken_library"))
-	# The normalised in-memory dict's keys are StringName.
-	for k in restored_zones.keys():
-		assert_typeof(k, TYPE_STRING_NAME, "in-memory key is StringName, not String")
+	# Lookup by StringName must hit — this is the contract (production reads
+	# via StringName-keyed lookups).
+	assert_true(
+		restored_zones.has(&"s1_z1_outer_cloister"),
+		"StringName lookup hits after restore",
+	)
+	assert_true(
+		restored_zones.has(&"s2_z3_sunken_library"),
+		"StringName lookup hits after restore",
+	)
+	# Lookup by String form also hits (Godot 4.3 lookup is StringName↔String-
+	# equivalent under untyped-Dict semantics).
+	assert_true(restored_zones.has("s1_z1_outer_cloister"), "String lookup also hits")
+	# Values are coerced to bool (defensive — JSON may round-trip as 1/0).
+	assert_true(restored_zones[&"s1_z1_outer_cloister"], "value reachable via StringName key")
 	var restored_waypoints: Dictionary = p.get("discovered_waypoints")
 	assert_eq(restored_waypoints.size(), 1)
 	assert_true(restored_waypoints.has(&"s1_z1_threshold"))
