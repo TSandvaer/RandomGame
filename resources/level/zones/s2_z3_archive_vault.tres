@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="ZoneDef" load_steps=2 format=3]
+
+; W3-T7 Stage 1 — S2 ZoneDef authoring (Part A only; ticket `86c9y7ygj`).
+;
+; This file is the geographic SHELL — anchors + procedural_slot_pool are
+; left empty per the Stage 1 dispatch brief. Parts B (S2 mobs), C (S2
+; chunks), and D (S2 boss room) ship in later PRs.
+;
+; Sponsor-locked S2 names (2026-05-24): melee mob = Bone-Catalyst.
+; This zone is the mid-stratum exploration zone — the "archive proper"
+; where the Bone-Catalyst melee archetype first appears alongside the
+; ranged Sunken-Scholar from z2. Pressure escalates here; quest_target
+; anchor likely placed here in Part C per Track 3 exploration-quest
+; design (post-wave3-sequencing.md §1 Commitment 3).
+;
+; TODO Part C: populate `anchors` (entry + ≥1 exit + quest_target slot)
+; and `procedural_slot_pool` with mid-tier combat chunks containing both
+; Sunken-Scholar + Bone-Catalyst mob spawns per FloorAssembler.
+;
+; Cross-references:
+;   team/drew-dev/level-chunks.md § "Zone schema" + § "S2 zone roster"
+;   team/uma-ux/palette-stratum-2.md (S2 doctrine palette)
+
+[ext_resource type="Script" path="res://resources/level/ZoneDef.gd" id="1_zone"]
+
+[resource]
+script = ExtResource("1_zone")
+zone_id = &"s2_z3_archive_vault"
+display_name = "Archive Vault"
+stratum_id = 2
+anchors = []
+procedural_slot_pool = []
+min_slots_between_anchors = 0
+max_slots_between_anchors = 0
+port_mating_rules = {}

@@ -380,3 +380,22 @@ Zone-to-zone exit/entry mating uses the existing chunk-level port-mating discipl
 **Port-mating discipline preserved.** Cross-zone mating reuses the chunk-level port rules unchanged: opposite directions (north-edge ↔ south-edge), matching tags (`exit` ↔ `entry`), same tile coordinate after offset. Zone schema adds NO new port-mating semantics — it only adds the routing layer that says "this exit port leads to that zone's entry port." The R-PROCGEN.b risk (chunk-port mating gaps at procedural seams) per `risk-register.md` post-v1.1 is mitigated by this reuse: cross-zone seams are mated by the same code path that mates intra-zone seams, so a single port-mating fix lands at both.
 
 **Save-schema implication (additive on v5):** cross-zone exit traversal persists the source zone's clear-state (which anchors visited, which procedural chunks the player entered) under the per-character key. The W2 procgen-spike sibling ticket's `world_seed` save-write is the entry point; this zone schema doesn't add new save fields directly — it adds the `zone_id` namespace that the W2 save-write organizes against.
+
+## S2 zone roster (M3 Tier 3 W3, ticket `86c9y7ygj` Part A)
+
+Stage 1 of the L-XL ticket — geographic shells only. Four S2 ZoneDef.tres files authored at `resources/level/zones/s2_z*.tres` declare zone identity (`zone_id` / `display_name` / `stratum_id = 2`); `anchors` + `procedural_slot_pool` are intentionally empty pending Part C (S2 chunk authoring) and Part D (S2 boss room). The shells exist so quest content (Part E) and any zone_id consumer can reference S2 zones by stable id before chunks land.
+
+| zone_id | display_name | Role per stratum walkthrough |
+|---|---|---|
+| `s2_z1_entry_hall` | Entry Hall of the Archive | Descent-entry zone — first room the player sees crossing from S1. Mob density low; introduces S2 doctrine palette + ambient. |
+| `s2_z2_reading_chamber` | Sunken Reading Chamber | Early-stratum exploration zone — first Sunken-Scholar (ranged) encounter. Anchors a S2 NPC slot (per post-wave3-sequencing.md §6 SI-5: 2 S2 NPCs). Low-pressure beat. |
+| `s2_z3_archive_vault` | Archive Vault | Mid-stratum exploration zone — first Bone-Catalyst (melee) encounter alongside Sunken-Scholar. Pressure escalates; anchors a `quest_target` slot for a Track 3 exploration quest. |
+| `s2_z4_inner_sanctum` | Inner Sanctum | Late-stratum / boss-approach zone — anchors the Archive Sentinel `boss_room` slot (Part D). High-pressure mixed-archetype roster in the procgen pool. Exit `target_zone_id` will reference S3 entry once S3 lands; terminal for M3 Tier 3. |
+
+Sponsor-locked S2 names (2026-05-24): ranged mob = **Sunken-Scholar**, melee mob = **Bone-Catalyst**, boss = **Archive Sentinel**. Zone display_names thread the same library/archive aesthetic for narrative cohesion with the locked mob roster.
+
+**Known follow-up — `s1_z1_outer_cloister` exit target drift.** The S1 zone's exit anchor declares `target_zone_id = &"s2_z1_sunken_entrance"` (per the M3 Tier 3 W1 spike — a name picked before Sponsor locked S2 mob/boss names on 2026-05-24). The S2 z1 shell authored here is `s2_z1_entry_hall`, not `s2_z1_sunken_entrance`. Per the cross-zone-transitions § above, an unresolved `target_zone_id` is treated as a terminal exit by the assembler — so this drift is currently inert (no broken mating). The cleanup is either (a) re-point `s1_z1_outer_cloister` exit to `s2_z1_entry_hall` or (b) rename `s2_z1_entry_hall` → `s2_z1_sunken_entrance`. Defer to Part C when the S2 chunks + entry-mating land; either fix is one-line.
+
+**Stage 1 acceptance:** smoke tests (`tests/test_s2_zone_defs_load.gd`) pin load + field-read + universal-warning-gate compliance per `.claude/docs/test-conventions.md`. `validate()` is intentionally NOT called at Stage 1 — empty `anchors` would fail the entry/exit invariants; Part C ships the validate() pin once anchors are populated.
+
+**TODO Part C** comments inside each .tres file mark where chunk anchors and procedural slot pools will populate. Per multi-stage-ticket-lifecycle memory, ticket `86c9y7ygj` stays at `in progress` across Parts B/C/D/E — flip `complete` only when ALL stages land.
