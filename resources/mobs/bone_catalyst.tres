@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MobDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/content/MobDef.gd" id="1_mob"]
+
+[resource]
+script = ExtResource("1_mob")
+id = &"bone_catalyst"
+display_name = "Bone Catalyst"
+sprite_path = ""
+hp_base = 70
+damage_base = 5
+move_speed = 50.0
+ai_behavior_tag = &"melee_bruiser"
+loot_table = null
+xp_reward = 22

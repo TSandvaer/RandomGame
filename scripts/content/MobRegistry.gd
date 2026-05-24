@@ -107,6 +107,16 @@ const _REGISTRATIONS: Dictionary = {
 		"def": "res://resources/mobs/sunken_scholar.tres",
 		"scene": "res://scenes/mobs/SunkenScholar.tscn",
 	},
+	# Stratum-2 melee bruiser — W3-T7 Stage 3 (ticket 86c9y7ygj).
+	# Mechanically cloned from Grunt (chase → telegraph → strike → recover);
+	# see `scripts/mobs/BoneCatalyst.gd` for the stationary-channel-pose
+	# telegraph (vs Grunt's 1-frame raised-blade, vs Charger's rear-back
+	# dash-line) per Uma `palette-stratum-2.md` §5.5 Bone-Catalyst.
+	&"bone_catalyst":
+	{
+		"def": "res://resources/mobs/bone_catalyst.tres",
+		"scene": "res://scenes/mobs/BoneCatalyst.tscn",
+	},
 }
 
 # ---- Caches ---------------------------------------------------------
