@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Flagship coverage for `LootRoller` — the 10 edge cases from
 ## `team/drew-dev/tres-schemas.md` § "Edge cases the loot-roller tests MUST

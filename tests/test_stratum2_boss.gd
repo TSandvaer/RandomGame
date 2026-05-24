@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for Vault-Forged Stoker (Stratum-2 boss) — paired with W3-T4
 ## (`feat(boss): stratum-2 boss room first impl`) which authors

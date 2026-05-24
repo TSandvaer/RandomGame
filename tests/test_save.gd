@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for Save autoload — JSON round-trip, schema migration,
 ## crash-safe write, and the forward-compat invariants the testing

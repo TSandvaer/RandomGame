@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for Grunt mob — paired with `scripts/mobs/Grunt.gd` and the
 ## first consumer of the TRES content schema (MobDef + LootTableDef).

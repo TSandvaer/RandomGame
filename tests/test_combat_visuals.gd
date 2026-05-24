@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for mob-side combat visual feedback — paired with `Grunt.gd`,
 ## `Charger.gd`, `Shooter.gd`, `Stratum1Boss.gd` per Uma's

@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Paired tests for the M2 W1 UX polish wave (3 tickets, 1 PR):
 ##   - `86c9q5qyd` — Stats panel "Damage <N>" shows equipped weapon damage

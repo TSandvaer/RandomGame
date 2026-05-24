@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Phase B — week-1 GUT backfill (ClickUp 86c9kxx8h).
 ##

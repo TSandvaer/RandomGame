@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for Stratum1Boss — paired with `scripts/mobs/Stratum1Boss.gd`.
 ##

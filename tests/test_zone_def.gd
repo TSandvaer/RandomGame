@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for `ZoneDef` + `ZoneAnchor` + the worked-example
 ## `s1_z1_outer_cloister.tres` (M3 Tier 3 W1 zone-schema spike, ticket

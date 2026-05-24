@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for `FloorAssembler.assemble_floor(zone_def, seed)` (M3 Tier 3 W1
 ## procgen spike Part A, ticket `86c9xub9p`).

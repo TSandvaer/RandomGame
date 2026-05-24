@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Unit + integration tests for `scripts/levels/StratumExit.gd` and its
 ## packed scene. Drew run-006 task spec (`86c9kxx6z`):

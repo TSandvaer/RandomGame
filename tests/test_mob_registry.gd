@@ -1,3 +1,5 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
 ## Tests for MobRegistry autoload — paired with W3-T5
 ## (`feat(content): MobRegistry autoload — stratum-aware mob lookup +
