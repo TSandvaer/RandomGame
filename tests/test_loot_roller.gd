@@ -314,7 +314,7 @@ func test_weighted_pick_distribution_respects_weights() -> void:
 	var heavy_frac: float = float(heavy_count) / float(total)
 	# Expected 0.75; allow 0.7..0.8 band — generous for low N flakiness.
 	assert_between(
-		heavy_frac, 0.70, 0.80, "heavy weight (3 vs 1) -> ~75% picks (got %.3f)" % heavy_frac
+		heavy_frac, 0.70, 0.80, "heavy weight (3 vs 1) -> ~75%% picks (got %.3f)" % heavy_frac
 	)
 
 
