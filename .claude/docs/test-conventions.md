@@ -450,6 +450,46 @@ Run the test once locally. If it passes, the hoist is safe for this file. If it 
 
 **Cite shape.** PR #357 (Devon's `duplicated-load` Stage-2 sweep, ticket `86c9y58pf`) attempted to hoist `OUTER_CLOISTER_ZONE := preload(...)` in `tests/test_zone_def.gd:247` + `tests/test_floor_assembler.gd:493`. Drew's PR review caught the GUT regression (4 failing tests, 5 risky-siblings). The `.tres` itself (`s1_z1_outer_cloister.tres`) shipped via PR #344 (W2-T3 S1 procgen retrofit, merge `ed8ae26`). The trap appears to be structural to Godot 4.3's `preload` semantics but the exact mechanism is uninvestigated — Priya's PR #358 peer-review empirically refuted the "nested-scripted sub-resources" hypothesis (siblings with same structure hoist fine). Future Stage-2 lint sweeps must run the per-file null-check smoke (above) before committing hoists.
 
+## gdlint pragma scopes — inline / file-top / global, and when to use which (PR #365 lesson)
+
+**Three pragma shapes ship with `gdtoolkit/linter`. Each has a distinct scope.**
+
+```gdscript
+# Shape 1 — inline RANGE (next-line through matching `enable`):
+# gdlint:disable=duplicated-load
+var zone: ZoneDef = load("res://...")
+# gdlint:enable=duplicated-load
+
+# Shape 2 — FILE-TOP (above `extends` / `class_name`, no `enable` needed):
+# gdlint:disable=max-public-methods
+# rationale: Director-pattern autoload; high method count IS the design
+extends Node
+class_name AudioDirector
+
+# Shape 3 — global GDLINT-RC disable (applies repo-wide, per `gdlintrc`):
+# (in gdlintrc, NOT in source files)
+disable:
+- class-definitions-order
+```
+
+**Shape 1 (inline range)** — `# gdlint:disable=<rule>` paired with `# gdlint:enable=<rule>`. Disables the rule only between the two markers. Use for 1-2 sites per file where you want the rest of the file to keep enforcing the rule. The `duplicated-load` section above is the worked example.
+
+**Shape 2 (file-top, no `enable`)** — `# gdlint:disable=<rule>` placed ABOVE `extends` / `class_name` disables the rule from that point through EOF. The gdtoolkit regex (`gdtoolkit/linter/__init__.py:188-202`) treats a `disable` without a paired `enable` as range-to-EOF. Use when every public method in the file (or every reasonable instance of the rule's trigger) is intentional — Director-pattern autoloads, UI panels, GUT test fixture classes. Pair with a one-line rationale comment so future readers know why the file-scope disable is justified.
+
+**Shape 3 (global gdlintrc disable)** — adds the rule name to the `disable:` list in `gdlintrc`. Applies repo-wide; no per-file pragma needed. Use when the rule's spirit doesn't fit the project's design grammar at all (`class-definitions-order` is the current precedent — Godot's `@onready`-then-`func` ordering is intentional and would trip the rule on every Godot file).
+
+**Decision rubric — when to pick which:**
+
+| Situation | Shape | Why |
+|---|---|---|
+| 1-2 lines in an otherwise-conforming file need the exception | Inline range | Surgical; rest of file keeps enforcement |
+| Every instance of the rule in this file is intentional (e.g. an autoload's API breadth) | File-top + rationale | One disable + one rationale comment per file; rationale lives near the code |
+| The rule's spirit doesn't fit the project's design grammar at all | Global `gdlintrc` | Repo-wide; avoid per-file pragma churn on every analogous file |
+
+**Threshold heuristic between file-top and global:** if 100% of the rule's findings across the repo are intentional (`class-definitions-order` was the canonical case), prefer global. If most are intentional but a few are genuine refactor candidates (Devon's max-public-methods sweep classification: 23 of 25 were intentional + 2 ambiguous), prefer file-top — keeps the rationale-cite per file and leaves the rule active for future-file analysis.
+
+**Cite shape.** PR #365 (Devon's Stage-2 max-public-methods sweep, ticket `86c9y58vn`, commit `0248bd7`) — 25 file-top pragmas added across `scripts/audio/AudioDirector.gd` + `scripts/player/Player.gd` + 23 GUT test classes; zero refactor candidates. The gdtoolkit regex semantics that govern file-top scope-to-EOF live at `gdtoolkit/linter/__init__.py:188-202` (empirically verified pre-commit; cite class is "build-tool mechanics," not project-pinned). The existing `class-definitions-order` global-disable precedent lives at `gdlintrc:21-30` and is the worked example of Shape 3.
+
 ## Bare-test deferred-fixture auto-fire trap (PR #306 lesson)
 
 **What it is.** A GUT test instantiates `Stratum1BossRoom` (or any room with a `_ready` that does `call_deferred("_assemble_room_fixtures")`) directly, awaits a frame for the deferred call to drain, and then asserts on `_entry_sequence_active` state — but the test fails because `_assemble_room_fixtures()` auto-fires `trigger_entry_sequence()` **after one frame** when `_boss != null`. The bare-test premise (no boss should mean no auto-fire) collides with the production code's "if you brought a boss, kick the sequence off" convenience.
@@ -548,6 +588,104 @@ If the test exists, the pattern applies. The cost is one ~20-line helper script 
 **Alternative considered (rejected):** instantiating the real `Player.new()` instead of a stub. Rejected because `Player` carries the full scene/input/audio/animation dependency surface — instantiation pulls in dozens of unrelated subsystems, and any one of them warning during test setup pollutes `NoWarningGuard`. The narrow-stub pattern is the right granularity.
 
 **Cite shape.** PR #352 / commit `4e33717` introduced this pattern; helper file lives at `tests/test_helpers/player_stub_for_quest_router.gd`. The same shape applies to any future test that needs a Player-stand-in or any other game-object stub.
+
+## Typed `Dictionary[K, V]` is Godot 4.4+ — assert lookup-equivalence, not typeof (PR #362 lesson)
+
+**What it is.** A GUT test wants to pin "this Dictionary uses `StringName` keys, not `String` keys" and reaches for the typed-collection syntax — `var d: Dictionary[StringName, bool] = {}` — OR asserts `typeof(k) == TYPE_STRING_NAME` over the keys. Both shapes CI-parse-error on Godot 4.3 with `Only arrays can specify collection element types.` The fix is not to retype the contract; it's to assert the property the production code actually depends on: **lookup-equivalence**.
+
+**Root cause.** Godot 4.3's GDScript parser supports typed Arrays (`Array[Foo]`) but NOT typed Dictionaries (`Dictionary[K, V]`). Typed Dictionaries were added in Godot 4.4. Any source file that includes the syntax — including inline-`source_code`-via-`GDScript.new()` test stubs — fails to compile on 4.3. Likewise the `typeof(k) == TYPE_STRING_NAME` equivalence test is a fragile proxy: a Dictionary keyed with `String` literals that happen to round-trip via `StringName(s)` lookups is functionally equivalent for the consumer's purpose, so a typeof-equivalence assertion is testing the wrong invariant.
+
+**Fix shape — assert what the consumer actually does.** Production code reads the Dictionary via `dict.has(StringName(zone_id))` (or `dict[StringName(zone_id)]`). The test contract is therefore: **given the keys supplied, does the consumer's `StringName`-coerced lookup find them?** Pin the lookup directly:
+
+```gdscript
+# WRONG — typed-collection syntax fails to parse on Godot 4.3
+var discovered: Dictionary[StringName, bool] = {}
+assert_true(typeof(discovered.keys()[0]) == TYPE_STRING_NAME)
+
+# RIGHT — assert the lookup the production code performs
+var discovered: Dictionary = {}
+discovered[StringName("s1_z1_outer_cloister")] = true
+assert_true(discovered.has(StringName("s1_z1_outer_cloister")),
+    "panel.has(StringName(zone_id)) must find the discovered key")
+```
+
+**Adjacent foot-gun — typed loop variables ARE supported in 4.3.** `for btn: Button in _stratum_buttons:` parses and runs fine on Godot 4.3; only `Dictionary[K, V]` is the gap. Don't reach for an untyped `for x in ...` workaround when the loop-variable type-annotation works — it's just the typed-collection-literal syntax that's 4.4+.
+
+**Forward-compat property.** The lookup-equivalence pattern works UNCHANGED on Godot 4.4 once typed Dictionaries land. The consumer-of-record assertion (`dict.has(StringName(s))`) is correct regardless of whether the Dictionary's keys are statically typed `StringName` or dynamically typed Variant-holding-StringName. No sunset action needed when the engine upgrades — the test stays accurate.
+
+**Apply when.** Any GUT test pinning a `Dictionary` contract on a panel / controller / save-payload surface where the producer writes `StringName` keys and the consumer reads via `dict.has(StringName(x))`. Other live surfaces: discovered-zones / discovered-waypoints maps, dialogue branch-key dictionaries, quest-state action payloads.
+
+**Cite shape.** PR #362 (Devon's world-map UI minimal, ticket `86c9y10fv`, respin SHA `a8eae88`). Tess's QA-iteration hypothesised typed-Dict as the contract fix; CI rejected it with the parse-error. Devon's actual fix landed on lookup-equivalence assertions (test renamed from `..._normalises_string_keys_to_stringname` → `..._normalises_keys_for_stringname_lookup` to match the actual Godot 4.3 contract).
+
+## `queue_free` + same-name re-`add_child` auto-renames the new node — `remove_child` first (PR #362 lesson)
+
+**What it is.** A UI panel rebuilds its child list on state-change by calling `queue_free()` on the old children and `add_child()`-ing new ones with the same names in the same frame. Tests that `find_child("ZoneRow_<id>", true, false)` against the panel return `null`, even though the panel renders correctly to the screen. The new children silently received auto-renamed identities — `@ZoneRow_<id>@N` — because `queue_free()` defers the actual removal to the next process-frame, and Godot's `add_child` collision-avoidance renames the new node when a sibling with the same name still exists in the tree.
+
+**Root cause.** `queue_free()` does NOT remove the node from its parent immediately. It schedules the node for destruction at the next idle frame. Between the `queue_free()` call and the actual removal, the node is STILL a child of the parent — so `add_child(new_node_with_same_name)` collides with the doomed-but-still-attached sibling. Godot's collision-avoidance kicks in and auto-renames the new node to `@<original_name>@N` (the `@`-prefix convention for engine-assigned names). The panel renders fine because draw order doesn't care about names; tests break because `find_child` lookups are name-keyed.
+
+**False-confidence cliff.** Headless renderer-check tests pass (the visible output is correct), the panel SHIPS, and the lookup-keyed regression tests fail in CI with cryptic null-returns from `find_child`. Author reads "panel renders fine" + "find_child returns null" and reaches for a Playwright-perception explanation when the actual cause is in-frame name collision. Recognize the signature: `find_child("<exact_known_name>", true, false) == null` against a panel that visually renders the row.
+
+**Fix shape — `remove_child` synchronously before `queue_free`.**
+
+```gdscript
+# WRONG — queue_free alone leaves the node attached for one frame
+for row: Control in _zone_rows:
+    if is_instance_valid(row):
+        row.queue_free()       # node stays as child until next idle frame
+_zone_rows.clear()
+# subsequent add_child with same name auto-renames to @ZoneRow_...@N
+
+# RIGHT — detach synchronously, then queue for destruction
+for row: Control in _zone_rows:
+    if is_instance_valid(row):
+        if row.get_parent() != null:
+            row.get_parent().remove_child(row)
+        row.queue_free()
+_zone_rows.clear()
+# add_child with same name now succeeds — sibling name is free
+```
+
+`remove_child(child)` returns synchronously and detaches `child` from the parent's child list immediately; `child.queue_free()` then schedules destruction of the detached node. The name is freed the instant `remove_child` returns, so the subsequent `add_child(new_child)` with the same name has no collision.
+
+**Scope — affects both GUT lookup-keyed tests AND Playwright trace-line tests that read child names.** GUT `find_child` and Playwright `[combat-trace]` lines that interpolate child node-names both fail silently on the auto-rename. The visible draw output is correct, so no human-soak surface catches it; the failure mode is test-layer-only.
+
+**Apply when.** Any UI rebuild path that:
+- Iterates children for tear-down with `queue_free()` only
+- Then immediately `add_child()`s replacement nodes with the SAME names in the SAME frame
+- Is consumed by tests that lookup children by name (`find_child`, `get_node`, name-pattern asserts)
+
+The fix is mechanical and always-safe: pair every `queue_free()` of a soon-to-be-replaced child with a synchronous `remove_child()` before it. Treat as a per-tear-down-block invariant.
+
+**Cite shape.** PR #362 (Devon's world-map UI minimal, ticket `86c9y10fv`, respin SHA `a8eae88`) at `scripts/ui/WorldMapPanel.gd::_render_stratum_list` and `::_render_zone_list`. Both functions originally shipped with `queue_free`-only; Tess QA iterations 2 + 3 surfaced the `find_child` regression with cryptic null-returns; Devon's respin paired each `queue_free` with a synchronous `remove_child` first. *Note: file lives on PR #362's branch (`devon/w2-t5-world-map-ui-minimal`) at this writing; lands on main at the same path post-merge.*
+
+## Playwright specs must exercise user-input paths, not just render-when-instantiated (PR #362 Sponsor-soak regression)
+
+**The trap.** A Playwright spec that boots the panel directly (via debug entry-point / autoload / scene-instance) and asserts the panel renders correctly is a **render-when-instantiated** test — it verifies "if the panel opens, it looks right." Such a spec passes even if **nothing in production actually opens the panel**. When a user-facing button is the canonical production entry point, a render-only spec cannot catch a missing / broken / disconnected signal handler on that button.
+
+**Empirical case — PR #362 → 2026-05-24 Sponsor soak.** Devon's W2-T5 World-Map UI (PR #362, merged `3af355e`, ticket `86c9y10fv`) shipped with:
+
+- `tests/playwright/specs/world-map-panel-render.spec.ts` — verified panel renders correctly when instantiated. GREEN.
+- `tests/test_world_map_panel_renders_stratum_list.gd` — GUT spec verified panel-when-mocked. GREEN.
+- `tests/test_world_map_panel_geometry_glyphs_no_unicode.gd` — geometry-marker regression-guard. GREEN.
+
+All three specs passed; CI green on all 3 lanes; Tess APPROVED. Ticket flipped `ready for qa test`. Sponsor pulled the release-build artifact for `0ae625c`, played to the descent screen, clicked the "Open Map" button on `DescendScreen` — and **nothing happened**. The soak log (run page `26358134724`, build SHA `0ae625c`) shows ZERO trace lines from any click handler, `WorldMapPanel.open`, or `DescendScreen._on_open_map_pressed`; only the open-game-world `[combat-trace] CameraDirector.state / Player.pos / Player.coll_diag` heartbeat ticking behind the descent-screen overlay.
+
+Empirical conclusion: the Open Map button's `pressed` signal was **either unconnected, connected to an empty handler, or silently no-op**. Render-only Playwright + GUT coverage missed it because none of the three specs exercised the BUTTON-CLICK → panel-open path end-to-end.
+
+**Rule — for any UI surface gated by user input (button press, hotkey, menu item, drag-drop):**
+
+The Playwright spec MUST simulate the actual user input and assert the side-effect, not just verify the panel renders correctly when externally instantiated. Two specs are NOT redundant — they cover orthogonal failure modes:
+
+1. **Render-when-instantiated spec** — boots the panel via test entry-point, asserts visual primitives (no Polygon2D, no Unicode glyphs, correct PANEL_LAYER, etc.). Catches the panel-implementation defects.
+2. **User-input-path spec** — drives the game to the surface that gates the panel (descent screen / inventory key / menu), simulates the input (`page.click('button:has-text("Open Map")')`), then asserts the panel-open side-effect fires (panel visible, side-effect trace line emitted, expected layout). Catches the wiring defects.
+
+**Detection signature.** A render-only spec passing while the production user-input path is broken produces a specific failure mode: tests green, CI green, Tess approves on mechanical correctness, **but Sponsor's first soak surfaces "nothing happens when I click X."** When a Playwright spec for a UI panel exists but its name is `*-render.spec.ts` (rendering only), pair-check that a `*-click.spec.ts` OR `*-flow.spec.ts` (user-input path) also exists for any button / hotkey / menu entry that opens it in production.
+
+**For the orchestrator (review-time discipline).** When reviewing a PR that adds a user-facing button / hotkey, grep the PR diff for two patterns: (a) a click-handler or signal-connect site, AND (b) a Playwright spec that simulates the user input. If only one exists, request the other before merge. Devon's PR #362 had (a) — but (a) was broken — and was missing (b) entirely; this is the gap class.
+
+**Test-author defensive layer (suggested addition).** A trace emit in every click handler — `[combat-trace] DescendScreen._on_open_map_pressed | <state>` — makes the failure debugger-visible: empty trace on Sponsor soak immediately localizes the bug to the click-handler layer, not the panel-render layer. Future Sponsor-soak logs become diagnostic.
+
+**Cite shape.** PR #362 (Devon's W2-T5 World-Map UI, merged commit `3af355e`, ticket `86c9y10fv`). Sponsor's 2026-05-24 soak log on artifact `https://github.com/TSandvaer/RandomGame/actions/runs/26358134724/artifacts/7184200637` (build SHA `0ae625c`) is the empirical evidence. The fix PR is in flight at this writing under branch `devon/w2-t5-open-map-button-fix` and will add (i) the wiring fix on `scripts/screens/DescendScreen.gd`, (ii) the trace emit on the click handler, AND (iii) the user-input-path Playwright spec that pins the regression structurally.
 
 ## Spike-class specs — diag-build-gated activation pattern (PR #314 finding)
 

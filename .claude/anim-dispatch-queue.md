@@ -13,6 +13,7 @@ Tracked across away-mode ticks. Each tick: check this file, dispatch the next `p
 - NPC Vendor: `d3d753c3-d9b7-4b44-8515-1ec99ca498c4`
 - NPC Anvil-keeper: `2a2da74d-c6c0-4a60-a0e3-ae6b50fa74ff`
 - NPC Bounty-poster: `70806893-cd64-4e7d-b8ae-d01954e2cced`
+- Sunken-Scholar (S2 ranged): `49f4d921-00e0-4d0e-a842-8479d7ff7891`
 
 ## Queue
 
@@ -50,6 +51,11 @@ Tracked across away-mode ticks. Each tick: check this file, dispatch the next `p
 | done | NPC Vendor | breathing-idle | vendor-talk |
 | done | NPC Anvil-keeper | breathing-idle | anvil-talk |
 | done | NPC Bounty-poster | breathing-idle | bounty-talk |
+| done | Sunken-Scholar | sad-walk | sunken-scholar-walk |
+| in flight | Sunken-Scholar | picking-up | sunken-scholar-aim |
+| pending | Sunken-Scholar | throw-object | sunken-scholar-cast |
+| pending | Sunken-Scholar | taking-punch | sunken-scholar-hit-react |
+| pending | Sunken-Scholar | falling-back-death | sunken-scholar-die |
 
 ## Tick protocol
 

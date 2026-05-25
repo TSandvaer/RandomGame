@@ -82,9 +82,24 @@ is always square (regardless of `body_type` or `size`) and is always ~`size × 1
 
 **Empirical size → canvas table (extend as more sizes are observed):**
 
-| `size` param | observed canvas |
-|---|---|
-| 48 | 68×68 |
+| `size` param | observed canvas | observed in project |
+|---|---|---|
+| 32 | 48×48 | (DO NOT USE for humanoid mobs — too small vs roster, see below) |
+| 48 | 68×68 | Player / Grunt / Grunt v2 / Charger / Shooter / NPCs / PracticeDummy — **project humanoid mob scale** |
+| 56 | 80×80 | Stratum1Boss — **project boss scale** |
+
+**Project roster scale doctrine (PR #364→Sunken-Scholar miscall 2026-05-24).** Match the
+`size` param to the EXISTING ROSTER, not to any literal "N px" reference in an Uma direction
+doc. The project's humanoid mob scale is `size=48` (→ 68×68 canvas, ~48 px character height);
+bosses are `size=56` (→ 80×80 canvas). A new humanoid mob created with `size=32` will render
+visibly chibi-shrunken next to a Grunt at `size=48` in the same room — even if a doc cites
+"32 px standing height" the right reading is "32 px is the dimension-table FLOOR, not the
+target for THIS character." Uma's `palette-stratum-2.md §5.5` Sunken-Scholar entry empirically
+hit this trap: the "Standing height ~32 px (humanoid floor per pixel-mcp-pipeline.md
+dimension table)" line was misread literally as `size=32`; the right call was `size=48` to
+match every other character in the PixelLab account. **Before dispatching a `create_character`
+call: log into pixellab.ai → confirm the canvas size of the closest existing analog (Grunt
+for melee, Shooter for ranged, Stratum1Boss for boss) and match.**
 
 **Consequence:** To hit per-character target dimensions from the art-pass brief (e.g. Charger
 48×32 landscape, Grunt 32×48 portrait), the PixelLab output must be cropped after import:

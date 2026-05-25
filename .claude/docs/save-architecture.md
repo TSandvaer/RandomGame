@@ -67,6 +67,31 @@ Some fields warrant BOTH a `has()`-guard read AND an unconditional backfill. Exa
 
 Belt-and-braces is acceptable for high-stakes fields (anything Player or Save depends on). For low-stakes fields, pick one pattern based on the access surface.
 
+## Main-side wiring — `to_save_dict` / `restore_from_save_dict` existence ≠ invocation (PR #362 finding)
+
+**The trap:** a per-system `to_save_dict` / `restore_from_save_dict` method is inert until something calls it. The canonical call-site is `scenes/Main.gd::_persist_to_save` (write) and `scenes/Main.gd::_load_save_or_defaults` (read). Adding the methods on the system (e.g. `Player.gd`) is necessary but NOT sufficient — Main.gd must explicitly invoke them, and that wiring step is easy to miss in a multi-PR feature.
+
+**Worked example — PR #352 → PR #362 (3-week gap):**
+
+- PR #352 (commit `8a0cc76`, ticket `86c9y7ydg`) added `Player.to_save_dict` (`scripts/player/Player.gd:2045`) and `Player.restore_from_save_dict` (`scripts/player/Player.gd:2071`) for `active_bounty` / `completed_bounties`, plus the `_backfill_v5_tier3_quest_fields` migration. GUT tests at the Save.gd-migrate seam passed.
+- The methods were never wired into `Main._persist_to_save` (`scenes/Main.gd:1106`) or `Main._load_save_or_defaults` (`scenes/Main.gd:1060`). In-memory Player state never round-tripped; the fields survived only because the migration backfill wrote non-null defaults on every load.
+- PR #362 (commit `9393473`, ticket `86c9y10fv`) closed the gap with one-line invocations on both sides.
+
+**Why the defect was silent:**
+
+- The backfill from PR #352 provided non-null shapes, so nothing crashed on read.
+- Tests covered the Save.gd-migrate seam (payload-in → payload-out), not the integration seam (live Player → Main → Save → Main → live Player).
+- Method presence in `Player.gd` reads as "wired" on a casual grep; the call-site absence in `Main.gd` is the load-bearing fact, and grepping for the call-site (not the definition) is the discriminator.
+
+**Future-PR checklist — every PR adding a `to_save_dict` surface or field:**
+
+1. **Add or extend the method** on the system (`Player.gd` / `QuestState.gd` / `Inventory.gd` / new system).
+2. **Add the migration-side handling** if the field needs a real value at runtime (see `_backfill_<scope>_<fields>` pattern above) or read-site default (see `has()`-guard pattern above).
+3. **Wire the call-site in `scenes/Main.gd`** — confirm `_persist_to_save` writes the dict into the payload AND `_load_save_or_defaults` reads it back. Grep for the method name across `scenes/` not just for its definition.
+4. **Add an integration-surface test** that exercises Main↔system↔Save↔Main, not just Save.gd-migrate in isolation. If the test only loads a payload through `Save.migrate()` and asserts on the output dict, it will green-pass even when Main never calls the method.
+
+**Generalisable rule:** any future system with a save surface (mobs, quest-state, inventory, world-map, NPC roster) is subject to the same three-seam audit — system-method exists, migration handles it, Main invokes it. Backfill masking is the failure mode that makes this silent; one grep for the call-site per added field is the mechanical mitigation.
+
 ## Cross-references
 
 - `team/devon-dev/save-schema-v5-tier3-additions.md` — additive surface authoring notes; §2.1 + §2.5 cover the active_bounty / completed_bounties case-study

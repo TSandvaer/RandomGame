@@ -41,6 +41,7 @@ These are non-negotiable. Memory rules at `~/.claude/projects/c--Trunk-PRIVATE-R
 - **Orchestrator never codes.** Don't read source, grep, trace bugs, or edit code. Dispatch agents from symptoms instead.
 - **Always parallel dispatch.** Every tick has 3-5 agents in flight; tickets aren't progress, dispatches are.
 - **Tightened final-report contract.** Sub-agent reports to orchestrator are TIGHT (≤200 words, PR URL + verdict + blockers + doc-updates line). Detailed content goes in PR body + Self-Test Report. Memory: `tightened-final-report-contract`.
+- **ALWAYS give Sponsor a direct artifact download URL for soak.** Any message that expects Sponsor to launch / install / soak a build MUST contain the fully-resolved `https://github.com/<owner>/<repo>/actions/runs/<run_id>/artifacts/<artifact_id>` URL inline — no placeholders, no "scroll to Artifacts" instructions, no run-page-only references, no `<run-id>` template strings. If the artifact ID isn't yet known (build in progress), commit explicitly to provide the resolved URL when ready and follow through. Memory: `sponsor-soak-artifact-links` — re-flagged 3 times (PR #143 May 6, PR #304 May 22, W2-T5 May 24). Sponsor has explicitly escalated this rule to hard-rule status 2026-05-24.
 
 ## Detailed Documentation
 
