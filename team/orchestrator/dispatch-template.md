@@ -4,6 +4,16 @@ Standard snippets the orchestrator pastes into every Agent brief. Centralizing t
 
 **Reference order:** orchestrator authors a task-specific brief, then appends or inlines the snippets below as needed. Don't quote the whole template — pick the relevant blocks.
 
+## When to use this template
+
+Every dispatch to a named persona (Priya / Uma / Devon / Drew / Tess) via the `Agent` tool uses this template. The orchestrator picks the relevant mandatory + situational blocks, inlines them into the task-specific brief, and fires the dispatch (always with `run_in_background: true` per memory `agents-always-in-background.md`).
+
+**Excluded:** ad-hoc Read-only investigations or one-shot survey questions that don't open a PR (e.g., a quick file inspection the orchestrator runs itself, or a non-named general-purpose agent for a research-only probe). The template assumes PR-producing work in a role worktree.
+
+**Mandatory blocks** (always included): Worktree state, Scoped contract, ClickUp lifecycle, Final-report shape, Doc-update reporting, Done clause (which carries the reviewer-track gate), Lesson reminder, STATE.md update, Merge identity.
+
+**Situational blocks** (included when the predicate matches): Self-Test Report (UX-visible PRs), Visual-primitive test bar (tween / modulate / Polygon2D / CPUParticles2D PRs), HTML5-visual-gated merge-gate (gated-class PRs), Vocabulary contract (parallel dispatches sharing a NEW concept).
+
 ---
 
 ## Scoped contract (mandatory in every dispatch)
@@ -37,6 +47,28 @@ Replace placeholders with the task-specific scope. Skip the block only for trivi
 ```
 
 Replace `<your-role>` with the literal role name (priya / uma / devon / drew / tess) and `<task-name>` with a kebab-case task slug.
+
+## Vocabulary contract (parallel dispatches sharing a NEW concept)
+
+When dispatching two or more agents in parallel where both will reference a NEW shared concept — a new autoload identifier, a new `Resource` subclass, a new signal name, a new scene path, a new constant, or any newly-introduced identifier crossing PR boundaries — include the block below in BOTH briefs verbatim so both agents read identical names.
+
+**Default = Pattern A (sequence).** Dispatch the type-author first (typically the role that owns the canonical location of the new identifier — Devon for autoloads / engine classes / signals; Drew for scene-tree paths / mob `Resource` subclasses; Uma for design-spec constants). Merge their PR. THEN dispatch the consumer(s) against the merged-on-main vocabulary. Costs one merge cycle of latency; eliminates vocabulary divergence by construction.
+
+**Pattern B (parallel with contract)** is acceptable only when the orchestrator has high confidence about all names upfront AND parallelism is load-bearing. Both briefs MUST carry this block verbatim:
+
+```markdown
+**Vocabulary contract (both author + reviewer read identical names — divergence = REQUEST_CHANGES, not NIT):**
+
+- **Identifier name:** `<ExactName>` (e.g. autoload `CameraDirector`, class `S2BoneCatalyst`, signal `boss_defeated`)
+- **Defining file:** `<exact res:// path>` (e.g. `res://scripts/camera/CameraDirector.gd`)
+- **Constant / enum / discriminator values:** `<exact strings or numerics>` (e.g. `STATUS_IN_PROGRESS = "in progress"`)
+- **Cross-file consumers:** list each `res://` path that imports / references the identifier
+- **Signal payload shape (if applicable):** `signal_name(arg1: Type, arg2: Type)` exact ordering
+```
+
+**Cross-review check.** When peer-reviewing one parallel PR sharing a concept with another in-flight PR, grep the sibling branch for the identifier names + verify they match yours. Vocabulary divergence is mergeability-blocking — file `REQUEST_CHANGES`, not `APPROVE_WITH_NITS`. (See "Three-verdict cross-review format" below.)
+
+**Why:** User-global rule `Parallel-agent shared-concept vocabulary discipline` (codified after ClaudeTeam M3-10, 2026-05-25, where Felix + Maya invented divergent type names — `PersonaGroup` vs `CollapsedPersonaGroup` — under a shape-only contract; the second PR was non-mergeable and required a reconciliation re-dispatch). RG hasn't hit this yet but has parallel-dispatch patterns (W3-T7 Stage 3+4 in flight today; Devon ↔ Drew on shared scenes) where it could. Cheap insurance.
 
 ## Lesson reminder (mandatory in every dispatch)
 
@@ -151,6 +183,70 @@ The **Regression guard** line is non-negotiable. It forces every dispatch to pro
 
 The **Reviewer-track hard-gate** line is non-negotiable. MARIAN-TUTOR codified the equivalent rule at `:194` of their dispatch template; the audit (2026-05-23) found Embergrave had been operating on the same convention implicitly — every merge had a peer `APPROVE` comment — but the rule was nowhere written down. Codifying it here removes the silent-convention failure mode (a future agent might skip peer-review on a "trivial" PR and merge directly). Foundation: memory `tess-cant-self-qa-peer-review` (the existing rule this generalizes) + `shared-git-identity-blocks-formal-pr-approval` (the workaround the rule cites).
 
+## Three-verdict cross-review format (peer-reviewer-side)
+
+Peer reviewers (Drew / Devon — and Tess on test PRs) post their verdict via `gh pr comment <N> --body-file <path>` per `shared-git-identity-blocks-formal-pr-approval` (the harness blocks `gh pr review --approve` on shared git identity). The verdict header is the FIRST line of the comment body so the orchestrator + future-readers can scan PR threads at a glance.
+
+```markdown
+## REVIEW VERDICT: APPROVE | APPROVE_WITH_NITS | REQUEST_CHANGES
+```
+
+Three valid verdicts — all are load-bearing. Pick the right one; don't downgrade or upgrade out of conflict-avoidance.
+
+### APPROVE
+
+PR ships as-is. No outstanding issues. Reviewer has nothing to flag beyond an LGTM.
+
+```markdown
+## REVIEW VERDICT: APPROVE
+
+Reviewed PR #NNN against AC1-AC3. Paired tests present and exercise the failure mode (tests/test_foo.gd:42-89). CI green on commit <SHA>. No NITs.
+
+Self-Test Report screenshot covers AC1 + AC2 visually; AC3 is harness-asserted via test_foo_ac3.gd:120 — confirmed locally.
+```
+
+### APPROVE_WITH_NITS
+
+**The mergeable-with-followup verdict.** PR meets all acceptance criteria and SHIPS as-is — but the reviewer has non-blocking quality issues worth tracking. The orchestrator auto-files a `chore(...): <PR-N> NITs follow-up` ticket scoped to the NITs comment text, then admin-merges the PR.
+
+Per memory `auto-execute-classes-without-sponsor-ack` rule 6, NITs-ticket-creation from APPROVE_WITH_NITS comments is in the auto-execute class when scope is mechanically derivable from a numbered list with file:line refs. Does NOT apply if the reviewer flags any NIT as "needs discussion" or scope-expanding.
+
+```markdown
+## REVIEW VERDICT: APPROVE_WITH_NITS
+
+PR meets AC1-AC4. Paired tests present. CI green on commit <SHA>. Mergeable.
+
+NITs (non-blocking, file as follow-up ticket):
+1. scripts/foo/Bar.gd:42 — magic number `0.5` should be a named const for clarity
+2. tests/test_bar.gd:88 — duplicate assertion block, dedupe candidate
+3. resources/level_chunks/zone_a_001.tres:15 — `mob_spawns[2]` position 320 looks 1px off the chunk grid; verify with Drew next pass
+
+NITs are mechanical; no scope expansion. Auto-file follow-up per `auto-execute-classes-without-sponsor-ack` rule 6.
+```
+
+**Do NOT downgrade to `APPROVE`** — silently drops the NITs, they regress on the next PR touching the same surface.
+**Do NOT upgrade to `REQUEST_CHANGES`** — incorrectly blocks a shippable PR; the NITs aren't AC-blocking.
+
+When file overlap + downstream timing permits, the orchestrator may also absorb the NITs into the next-scheduled downstream PR touching the same files (Path Y pattern per `auto-execute-classes-without-sponsor-ack` rule 6 NITs-absorption); close the NITs ticket as duplicate-of-downstream.
+
+### REQUEST_CHANGES
+
+PR does NOT merge until the listed issues are resolved. Reserved for: AC not met, test gap on the failure mode, vocabulary divergence with parallel PR (see Vocabulary contract block above), HTML5-visual-gated PR missing self-soak section, claim-fidelity violation in the Self-Test Report (per `tightened-final-report-contract` Amendment), regression-guard missing on a feature PR.
+
+```markdown
+## REVIEW VERDICT: REQUEST_CHANGES
+
+AC2 not met — the death-tween fires but `tween.is_valid()` is the only assertion; per Visual-primitive test bar Tier 1, need `assert_ne(target_color, rest_color)` to catch the white-on-white class.
+
+Required changes:
+1. tests/test_grunt_death.gd:62 — add `assert_ne(end_color, Color.WHITE)` after the tween-fires assertion
+2. scripts/mobs/S1Grunt.gd:118 — modulate target is set on parent CharacterBody2D; per Tier 2 needs to set on the visible Sprite2D child instead (cascade trap)
+
+Re-dispatch with these resolved + the same brief.
+```
+
+**Reviewer self-discipline:** if you're tempted to `APPROVE` to avoid friction but you have NITs, use `APPROVE_WITH_NITS`. If you're tempted to `REQUEST_CHANGES` because something looks suboptimal but doesn't block AC + doesn't regress quality, use `APPROVE_WITH_NITS`. The three-verdict shape exists precisely to prevent the binary "ship clean or block" trap.
+
 ## Final-report shape — TIGHT + cite-able evidence (mandatory in every dispatch)
 
 ```markdown
@@ -229,6 +325,60 @@ This block is non-negotiable in every dispatch. The Stop hook already runs for s
 The harness denies self-merge of one's own PR via `gh pr review --approve` (returns "can not approve your own pull request" — harness identity matches author). Workaround:
 - For test PRs Tess approves: deliver approval via `gh pr comment <PR#> --body "LGTM, signing off"` then merge via `gh api PUT repos/.../pulls/<PR#>/merge -f merge_method=squash`. Tess has authority for this on test PRs.
 - For other roles: don't try to self-merge. Open the PR and stop.
+
+## Pre-dispatch checklist (orchestrator-side)
+
+Run this checklist BEFORE firing the `Agent` call. Catches missing blocks at dispatch time when fixing them is a one-line brief edit — not after the agent's burned cycles on an under-specified task.
+
+- [ ] **Worktree-concurrency check.** Scan in-flight `Agent` tasks for any whose worktree maps to the target persona. If one exists, do NOT dispatch — queue the new task to fire after the first's `<task-notification>`, or reassign by surface (per user-global `Sub-agent worktree-concurrency discipline`).
+- [ ] **Fresh `main` pull.** The role worktree's branch will be force-created from `origin/main` by Step 0 — confirm `git fetch origin` ran in this orchestrator tick (or include it in the brief's Step 0 as the existing template does).
+- [ ] **Ticket ID + body included verbatim** in the brief (sub-agents lack `mcp__clickup__*` tools per `sub-agent-mcp-tool-surface-scope`; they read the ticket body from the brief, not from the board).
+- [ ] **Branch name** follows `<role>/<id>-<slug>` format.
+- [ ] **Scoped contract block present** — owned files, read-only references, OOS, conflict rule. OOS named explicitly; if the agent should not touch a tempting adjacent file, NAME IT.
+- [ ] **Reviewer named** per Done clause reviewer-track (game-side → Drew, harness/inventory → Devon, Tess PRs → peer by surface, Priya docs → Devon or Drew by surface).
+- [ ] **ClickUp lifecycle block present** — orchestrator pre-flipped to `in progress` in the same tool round as this dispatch.
+- [ ] **Final-report contract block present** — TIGHT + cite-able evidence + return at `ready for qa test`, do NOT wait for merge.
+- [ ] **Doc-update reporting block present** — agent must surface `Doc updates: ...` line in final report.
+- [ ] **Lesson reminder, STATE.md update, Merge identity, Done clause** all present.
+- [ ] **If parallel dispatch shares a NEW concept:** Vocabulary contract block present in BOTH briefs verbatim, OR Pattern A sequencing chosen (type-author first → consumer next). See Vocabulary contract above.
+- [ ] **If UX-visible:** Self-Test Report block present.
+- [ ] **If tween / modulate / Polygon2D / CPUParticles2D / Area2D-state surface:** Visual-primitive test bar block present + HTML5-visual-gated merge-gate block present.
+- [ ] **`run_in_background: true`** on the Agent call per `agents-always-in-background`. Foreground dispatch blocks the orchestrator's turn until the slowest parallel agent returns; main thread floods with sub-agent tool calls and Sponsor can't reach the orchestrator.
+- [ ] **`name:` set** on the Agent call to a recognizable handle (e.g. `name: "drew-w3-t8"`) so `SendMessage` / `TaskOutput` can address the agent later if needed.
+
+## Persona-specific overrides
+
+Short notes per role. The mandatory + situational blocks above are the contract floor; these are the deltas worth flagging per persona at dispatch time.
+
+### Drew (game content + level chunks)
+
+- **HTML5 visual-verification gate** triggers heavily for Drew's surface (mob death tweens, modulate, Polygon2D mob art, CPUParticles2D effects, room-gate Area2D state, level-chunk visual loading). Default-include the Visual-primitive test bar + HTML5-visual-gated merge-gate blocks unless the PR is strictly `.tres`-data or `chore`.
+- **Self-Test Report self-soak in incognito + DevTools** mandatory before posting per memory `html5-visual-gated-author-self-soak`. PR #291's two-iteration GUT+CI-claimed-complete failure is the cautionary tale.
+- **Reviewer:** Devon for engine/harness adjacency; otherwise Drew is reviewed by Devon by default (cross-lane per TEAM.md).
+
+### Devon (engine + harness lead)
+
+- **Engine / autoload / `Resource`-class introductions** are common Vocabulary-contract triggers. When Devon introduces a new autoload or signal that Drew/Tess will consume, default to Pattern A (sequence): Devon merges first, Drew/Tess dispatch against the merged vocabulary.
+- **Lint sweep PRs (`chore(test|build)`)** skip the Self-Test Report + Visual-primitive blocks but still need Done clause + Reviewer (Drew by default for harness work; engine-adjacent lint can be Drew or Tess).
+- **Build / CI / `.github/workflows/` changes** — Devon's lane; reviewer is Drew unless the change is Playwright-harness-specific (then Tess can review the spec side, Devon is still PR author).
+
+### Tess (QA / test design)
+
+- **Tess can't self-QA.** Tess-authored PRs need a Drew or Devon peer reviewer to satisfy the testing-bar's QA gate (memory `tess-cant-self-qa-peer-review`). Pick the peer by PR surface — game-side → Drew, harness/inventory/engine → Devon.
+- **Self-merge denied by harness** on `gh pr review --approve` of own PR (shared git identity). Workaround for test PRs: deliver approval via `gh pr comment <PR#> --body "LGTM, signing off"` then merge via `gh api PUT repos/.../pulls/<PR#>/merge -f merge_method=squash`. Tess has authority for this on test PRs.
+- **In-flight QA state matters when scheduling Tess as author** — per memory `tess-targeting-brief-checks-inflight-qa`, before dispatching Tess-consumer scaffold work, check Tess's current QA load. If QA-loaded, queue OR re-shape to Drew/Devon for the parallel portion. Treat Tess scaffold throughput as ~0.5× calendar.
+
+### Uma (UX / visual / audio direction)
+
+- **Visual prompts → Drew impl** is the common shape. Uma authors a spec under `team/uma-ux/` (palettes, boss intro choreography, copy, audio cues); the spec consumer is named in the brief; Drew (or Devon if engine-adjacent) implements.
+- **No Self-Test Report on spec-only PRs** unless the spec is consumed by an in-flight `feat` PR in the same tool round (per Self-Test Report block above — `design(spec)` is in the required-class only when consumed).
+- **MCP-driven asset gen (PixelLab / pixel-mcp / bgclear.ai)** runs in the orch main session, not Uma sub-agent dispatch — per memory `sub-agent-mcp-tool-surface-scope`, non-clickup MCP tools don't inherit to sub-agents. Uma writes the prompt + Drew (or Sponsor for MJ-class) executes the gen.
+
+### Priya (Project Leader / coordination)
+
+- **Priya does NOT spawn peers** — she authors process docs, retros, backlogs, M3 design seeds. The orchestrator dispatches workers based on her recommendations.
+- **`team/DECISIONS.md` is Priya-only** (weekly batch-PR cadence, Mondays). Other roles' final reports include `Decision draft:` lines; Priya batches them via `decisions-batch-pr-template.md`. Per the project CLAUDE.md "Doc conventions" section.
+- **Reviewer:** Devon OR Drew per `auto-execute-classes-without-sponsor-ack` § peer-reviewer-selection-by-surface (engine-adjacent docs → Devon; game-side / content docs → Drew). Priya orch-docs PRs WITH peer-reviewer attached + CI green are in the auto-merge class per rule 6 — orchestrator merges without Sponsor sign-off.
 
 ## Worktree cleanup (orchestrator-side, post-merge)
 
