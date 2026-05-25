@@ -118,7 +118,18 @@ The `quest_failed` branch exists in the `DialogueTreeDef` schema but is **not cu
 
 ### CanvasLayer + PANEL_LAYER ordering
 
-`PANEL_LAYER = 90`. InventoryPanel uses `80`. DialoguePanel sits above inventory so a future "dialogue-during-inventory" interaction renders correctly. The controller's single-session guard prevents this today, but the layer ordering future-proofs.
+`PANEL_LAYER = 90`. InventoryPanel uses `80`. WorldMapPanel uses `70`. DialoguePanel sits above inventory so a future "dialogue-during-inventory" interaction renders correctly. The controller's single-session guard prevents this today, but the layer ordering future-proofs.
+
+**Cross-screen overlay trap (PR #368 lesson).** When a Panel (`PANEL_LAYER = N`) is opened OVER a Screen (e.g. `DescendScreen` at layer `100`) that has a 100%-opaque background, the panel renders BEHIND the screen and is invisible to the user — even though the panel did open and is receiving input. The symptom looks identical to "button-click handler not wired" because nothing visibly happens; the click handler IS firing, the panel IS instantiating, the panel just has nothing to render onto because the screen's opaque BG paints over it. Empirical case: PR #362's WorldMapPanel @ `PANEL_LAYER = 70` opened correctly when its button was clicked on DescendScreen @ layer `100`, but Sponsor's soak saw nothing happen; PR #368 fix moved the panel ABOVE the screen's layer.
+
+**Differential-diagnosis discipline.** When a button-click "does nothing" and zero `[combat-trace]` lines fire on the click path, the candidate causes are:
+
+1. **Handler not wired** — `pressed` signal not `connect`ed to anything, OR connected but handler is empty / errors silently.
+2. **Handler wired but no trace** — handler IS running, panel IS opening, but no `[combat-trace]` line exists on the open path so empirical evidence is missing. The bug may be in a downstream layer (rendering, visibility, layer-ordering, modulate=0, etc.) — NOT in the click path.
+
+**The triage rule:** before assuming (1), grep the handler-target script for a `[combat-trace]` line on the open path. If absent, add ONE trace and re-soak — that disambiguates (1) from (2). PR #368 fix added two `[combat-trace]` lines to the click path specifically so future Sponsor-soaks have empirical visibility on the firing path.
+
+**Layer-ordering check:** any time a Panel is shown over a Screen (Descent / Hub / Game-over / etc.), verify `Panel.layer > Screen.layer` AND/OR the screen's BG is not fully opaque. The cleanest pattern is a GUT regression-pin asserting `panel.layer > screen.layer` at build-time — see `tests/test_descend_screen.gd::test_panel_layer_above_screen_layer` (PR #368) for the worked example.
 
 ### Input model
 
