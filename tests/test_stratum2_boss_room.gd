@@ -1,105 +1,283 @@
+# gdlint:disable=max-public-methods
+# GUT test class — high test_* count IS the design (one test per scenario).
 extends GutTest
-## Integration tests for the Stratum-2 boss room — paired with W3-T4
-## (`feat(boss): stratum-2 boss room first impl`) which authors
-## `resources/level_chunks/s2_boss_room.tres` +
-## `scenes/levels/Stratum2BossRoom.tscn`.
+## Integration tests for Stratum2BossRoom — paired with `scripts/levels/Stratum2BossRoom.gd`
+## and `scenes/levels/Stratum2BossRoom.tscn`.
 ##
-## **Scaffold-only**: This file ships with `pending()` stubs that compile so
-## CI's GUT step doesn't trip on parse errors. Tess fills in each test with
-## real assertions when Drew's W3-T4 PR lands the production .tscn + .tres
-## resources. Mirrors the W1-T12 / W2-T10 parallel-acceptance pattern.
+## Coverage per W3-T7 Stage 5 dispatch (ticket 86c9y7ygj Part D) + testing bar:
+##   1. Scene loads + script wires.
+##   2. Boss spawns at center plinth (synchronous from `_ready`).
+##   3. Sentinel starts DORMANT (intro fairness).
+##   4. Door trigger built + monitoring after deferred fixture pass
+##      (regression pin against ticket 86c9tv8uf class — physics-flush fix).
+##   5. StratumExit spawned + inactive at room ready, activates on boss death.
+##   6. trigger_entry_sequence fires entry_sequence_started signal.
+##   7. trigger_entry_sequence is idempotent (multiple calls = single fire).
+##   8. ENTRY_SEQUENCE_DURATION constant pinned to 1.8 s (Uma spec lock).
+##   9. complete_entry_sequence_for_test fast-forwards to IDLE_ACTIVE.
+##  10. Boss death emits boss_defeated + stratum_exit_unlocked.
+##  11. ARENA_BOUNDS pinned to 1024×768 (Uma §5.5 spec lock).
+##  12. Scene .tscn carries four cardinal walls + floor (anti-regression
+##      against silent wall-removal that would let player walk out mid-fight).
 ##
-## See `team/tess-qa/m2-acceptance-plan-week-3.md` § W3-T4 for the
-## acceptance criteria this file pins (the boss-room scene-assembly subset
-## of W3-T4-AC1..AC12 — entry sequence, door trigger, mining-shaft layout).
-##
-## Sibling pattern: `tests/test_stratum1_boss_room.gd` — canonical
-## boss-room scene-assembly + entry-sequence + door-trigger structure.
+## Replaces the pre-Stage-5 pending-stub scaffold that previously occupied
+## this file (the W3-T4 placeholder tests; those were authored before Stage 5
+## ticketing locked the Stratum2BossRoom scope under `86c9y7ygj` Part D, so
+## the scaffold's W3-T4 cite is historically stale).
 
-# ---- Boss room scene + chunk_def basics -----------------------------
+const BossRoomScript: Script = preload("res://scripts/levels/Stratum2BossRoom.gd")
+const SentinelScript: Script = preload("res://scripts/mobs/ArchiveSentinel.gd")
+const BOSS_ROOM_SCENE: PackedScene = preload("res://scenes/levels/Stratum2BossRoom.tscn")
 
-
-func test_s2_boss_room_chunk_def_loads() -> void:
-	pending("awaiting W3-T4 — Drew authors resources/level_chunks/s2_boss_room.tres")
+# ---- Test isolation ---------------------------------------------------
 
 
-func test_s2_boss_room_scene_instantiates() -> void:
-	pending("awaiting W3-T4 — Drew authors scenes/levels/Stratum2BossRoom.tscn")
+func before_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+	# Reset CameraDirector state — the room's `_engage_camera_for_boss_room`
+	# sets follow_target + world_bounds; leaks into next test otherwise.
+	var cam: Node = Engine.get_main_loop().root.get_node_or_null("CameraDirector")
+	if cam != null and cam.has_method("reset_to_player"):
+		cam.reset_to_player(0.0)
 
 
-func test_s2_boss_room_uses_mining_shaft_cathedral_layout() -> void:
-	pending("awaiting W3-T4 — assert layout matches Priya §W3-T4 'mining-shaft cathedral' spec")
+func after_each() -> void:
+	var d: Node = Engine.get_main_loop().root.get_node_or_null("TimeScaleDirector")
+	if d != null and d.has_method("reset"):
+		d.reset()
+	Engine.time_scale = 1.0
+	var cam: Node = Engine.get_main_loop().root.get_node_or_null("CameraDirector")
+	if cam != null and cam.has_method("reset_to_player"):
+		cam.reset_to_player(0.0)
 
 
-# ---- Entry sequence (mirrors boss-intro.md Beat-1..Beat-5) ----------
+# ---- Helpers ----------------------------------------------------------
 
 
-func test_s2_boss_room_auto_fires_entry_sequence_on_room_load() -> void:
-	## Mirror of Stratum1BossRoom auto-fire pattern in combat-architecture.md
-	## § "Room-load triggers vs. body_entered triggers". The room itself
-	## fires the trigger from _ready, not relying on body_entered alone.
-	pending('awaiting W3-T4 — Stratum2BossRoom._ready call_deferred("trigger_entry_sequence")')
+class FakePlayerBody:
+	extends CharacterBody2D
+	# A real CharacterBody2D so the door trigger's body_entered overlap
+	# fires. We don't need any AI on it; just a body on the player layer.
+
+	func _init() -> void:
+		# Player layer = bit 2.
+		collision_layer = 1 << 1
 
 
-func test_s2_boss_room_entry_sequence_completes_within_2_seconds() -> void:
-	pending("awaiting W3-T4 — entry sequence Beat-1..Beat-5 lands within ~1.8s per boss-intro.md")
+func _make_room() -> Stratum2BossRoom:
+	var packed: PackedScene = BOSS_ROOM_SCENE
+	var room: Stratum2BossRoom = packed.instantiate()
+	add_child_autofree(room)
+	return room
 
 
-func test_s2_boss_starts_in_dormant_state_pre_entry() -> void:
-	pending("awaiting W3-T4 — boss state == STATE_DORMANT before entry sequence trigger")
+# ---- 1: scene loads + room script wires -----------------------------
 
 
-func test_s2_boss_transitions_to_idle_after_entry_sequence() -> void:
-	pending("awaiting W3-T4 — state advances DORMANT → IDLE after entry sequence completes")
+func test_boss_room_scene_loads() -> void:
+	var packed: PackedScene = BOSS_ROOM_SCENE
+	assert_not_null(packed, "Stratum2BossRoom.tscn must load")
+	var instance: Node = packed.instantiate()
+	assert_true(instance is Stratum2BossRoom, "root is Stratum2BossRoom typed")
+	instance.free()
 
 
-# ---- Door-trigger fallback (defensive, mirror M1 boss room) ---------
+# ---- 2: boss spawned synchronously at plinth + DORMANT --------------
 
 
-func test_s2_boss_room_door_trigger_exists_as_fallback() -> void:
-	## Per combat-architecture.md § Room-load triggers vs. body_entered:
-	## the door trigger remains as a defensive fallback even when auto-fire
-	## via _ready is the primary path.
-	pending("awaiting W3-T4 — Stratum2BossRoom has door-trigger Area2D for fallback")
+func test_room_spawns_boss_at_plinth_dormant() -> void:
+	var room: Stratum2BossRoom = _make_room()
+	# `_spawn_boss` stays synchronous in `_ready`, so the boss is available
+	# immediately. Door trigger built in deferred fixture pass.
+	var boss: ArchiveSentinel = room.get_boss()
+	assert_not_null(boss, "boss spawned synchronously at room _ready")
+	assert_true(boss is ArchiveSentinel, "boss is ArchiveSentinel typed")
+	assert_eq(
+		boss.global_position,
+		Stratum2BossRoom.PLINTH_POSITION,
+		"boss spawned at center plinth (512, 384)"
+	)
+	# Sentinel starts DORMANT per Uma BI-19 (no attack during intro).
+	assert_true(boss.is_dormant(), "Sentinel starts dormant — wakes at end of intro")
 
 
-func test_s2_boss_room_door_trigger_idempotent_with_auto_fire() -> void:
-	pending(
+# ---- 3: Physics-flush fix — door trigger enters tree + monitors -----
+#
+# Regression gate against ticket 86c9tv8uf class. Mirrors S1 BossRoom's
+# equivalent test. The Stratum2BossRoom is loaded from a port-traversal
+# callback whose physics-flush context is the same root-cause class as
+# S1's Room 08 → boss-room load.
+
+
+func test_door_trigger_enters_tree_and_monitors_after_deferred_pass() -> void:
+	var room: Stratum2BossRoom = _make_room()
+	# Pre-drain: deferred fixture pass has NOT landed; door trigger absent.
+	assert_null(
+		room.get_door_trigger(),
+		"door trigger NOT built synchronously in _ready (deferred out of physics-flush window)"
+	)
+	await get_tree().process_frame
+	# Post-drain: deferred `_assemble_room_fixtures` ran.
+	var trigger: Area2D = room.get_door_trigger()
+	assert_not_null(
+		trigger, "REGRESSION-86c9tv8uf-class: door trigger Area2D built in deferred fixture pass"
+	)
+	assert_true(
+		trigger.is_inside_tree(),
+		"REGRESSION-86c9tv8uf-class: door trigger Area2D inserted in scene tree"
+	)
+	assert_eq(trigger.get_parent(), room, "door trigger parented under the boss room")
+	assert_true(
+		trigger.monitoring,
 		(
-			"awaiting W3-T4 — trigger_entry_sequence is idempotent"
-			+ " (auto-fire + door-trigger don't double-fire)"
+			"REGRESSION-86c9tv8uf-class: door trigger Area2D monitoring ACTIVE — "
+			+ "body_entered can fire so the player can leave the boss room"
 		)
 	)
-
-
-func test_s2_boss_room_door_trigger_built_with_call_deferred() -> void:
-	## Per combat-architecture.md § Physics-flush rule and ticket 86c9p1fgf —
-	## any Area2D add path on boss rooms should follow the deferred pattern.
-	pending(
-		"awaiting W3-T4 — door-trigger Area2D inserted via call_deferred per physics-flush rule"
+	# CollisionShape2D child must be present (Area2D with no shape is inert).
+	var has_shape: bool = false
+	for c: Node in trigger.get_children():
+		if c is CollisionShape2D:
+			has_shape = true
+	assert_true(has_shape, "door trigger Area2D carries its CollisionShape2D")
+	# StratumExit also spawned in deferred pass.
+	assert_not_null(
+		room.get_stratum_exit(),
+		"REGRESSION-86c9tv8uf-class: StratumExit spawned in the deferred fixture pass"
 	)
 
 
-# ---- Stratum exit + StratumProgression integration ------------------
+# ---- 4: door trigger fires entry sequence ---------------------------
 
 
-func test_s2_boss_room_spawns_stratum_exit_on_boss_death() -> void:
-	pending("awaiting W3-T4 — StratumExit spawn fires after boss_died (mirror M1 boss room)")
+func test_trigger_entry_sequence_fires_signal() -> void:
+	var room: Stratum2BossRoom = _make_room()
+	watch_signals(room)
+	room.trigger_entry_sequence()
+	assert_signal_emitted(room, "entry_sequence_started")
+	assert_true(room.is_entry_sequence_active())
+	assert_false(room.is_entry_sequence_completed())
 
 
-func test_s2_boss_room_emits_stratum_exit_unlocked_signal() -> void:
-	pending("awaiting W3-T4 — stratum_exit_unlocked signal fires post-boss-defeat")
+func test_trigger_entry_sequence_is_idempotent() -> void:
+	var room: Stratum2BossRoom = _make_room()
+	watch_signals(room)
+	room.trigger_entry_sequence()
+	room.trigger_entry_sequence()
+	room.trigger_entry_sequence()
+	assert_signal_emit_count(
+		room,
+		"entry_sequence_started",
+		1,
+		"entry sequence fires exactly once even if trigger overlaps multiple times"
+	)
 
 
-func test_s2_boss_room_save_tick_fires_post_boss_defeat() -> void:
-	pending("awaiting W3-T4 — Save.save_game() fires on stratum_exit_unlocked event chain")
+# ---- 5: ENTRY_SEQUENCE_DURATION constant lock -----------------------
 
 
-# ---- Integration: full s1 → s2 → r2 → r3 → boss traversal -----------
-##
-## Gated on W3-T2 (s2_room02 + s2_room03) AND W3-T4 (boss room) both
-## landing. When only one of the two has landed, this test stays pending.
+func test_entry_sequence_duration_constant_is_1_8s() -> void:
+	# Static contract — Uma's spec says 1.8 s. If this constant ever drifts,
+	# tests bounce so we don't silently break Uma's beat-timing intent.
+	assert_almost_eq(
+		Stratum2BossRoom.ENTRY_SEQUENCE_DURATION,
+		1.8,
+		0.001,
+		"entry sequence is exactly 1.8 s per Uma boss-intro.md (Stratum-2 mirrors Stratum-1 timing)"
+	)
 
 
-func test_full_s2_traversal_r1_through_boss() -> void:
-	pending("awaiting W3-T2 + W3-T4 — full S1 descent → S2 R1..R3 → boss room flow")
+# ---- 6: complete_entry_sequence_for_test fast-forwards -------------
+
+
+func test_complete_entry_sequence_for_test_drives_to_idle_active() -> void:
+	# The test helper should drain BOTH the 1.8 s entry timer AND the boss's
+	# ~417 ms wake-anim window so tests immediately observe IDLE_ACTIVE
+	# (combat-ready, damage-eligible). Mirrors S1 BossRoom helper shape.
+	var room: Stratum2BossRoom = _make_room()
+	# Drain the deferred fixture pass so the entry sequence auto-fires.
+	await get_tree().process_frame
+	# At this point the auto-fire from `_assemble_room_fixtures` engaged
+	# the entry sequence — `_entry_sequence_active = true`, boss DORMANT.
+	# Use the helper to fast-forward.
+	room.complete_entry_sequence_for_test()
+	assert_true(room.is_entry_sequence_completed())
+	var boss: ArchiveSentinel = room.get_boss()
+	assert_not_null(boss)
+	assert_eq(
+		boss.get_state(),
+		ArchiveSentinel.STATE_IDLE_ACTIVE,
+		"complete_entry_sequence_for_test fast-forwards through wake-anim to IDLE_ACTIVE"
+	)
+
+
+# ---- 7: ARENA_BOUNDS pin ----------------------------------------------
+
+
+func test_arena_bounds_constant_is_1024x768() -> void:
+	# Static contract — Uma §5.5 specifies ~32×24 tiles at 32 px/tile =
+	# 1024×768 world units. If this drifts the camera continuous-scroll
+	# bounds + the placeholder wall positions all drift in lockstep,
+	# silently changing the boss-arena shape. The test pins the contract.
+	assert_eq(
+		Stratum2BossRoom.ARENA_BOUNDS,
+		Rect2(0, 0, 1024, 768),
+		"arena bounds = ~32×24 tiles (1024×768 world units) per Uma §5.5"
+	)
+	assert_eq(
+		Stratum2BossRoom.PLINTH_POSITION,
+		Vector2(512, 384),
+		"plinth position = arena center"
+	)
+
+
+# ---- 8: boss death emits boss_defeated + stratum_exit_unlocked -----
+
+
+func test_boss_death_emits_room_signals() -> void:
+	var room: Stratum2BossRoom = _make_room()
+	await get_tree().process_frame  # drain deferred fixture pass + entry auto-fire
+	room.complete_entry_sequence_for_test()
+	var boss: ArchiveSentinel = room.get_boss()
+	# Boss should be combat-ready now.
+	assert_eq(boss.get_state(), ArchiveSentinel.STATE_IDLE_ACTIVE)
+	# Kill in two stages, draining the phase-transition window between them
+	# (the phase-2 boundary is at 50% HP = 350 of the 700 archive_sentinel
+	# baseline). Phase-transition rejects damage entirely, so we MUST drain
+	# the 0.6 s window before applying the killing blow.
+	watch_signals(room)
+	boss.take_damage(350, Vector2.ZERO, null)  # 700 → 350 = phase 2 boundary
+	boss._physics_process(ArchiveSentinel.PHASE_TRANSITION_DURATION + 0.01)
+	boss.take_damage(350, Vector2.ZERO, null)  # 350 → 0 (fatal)
+	assert_true(boss.is_dead(), "boss dies after second hit drains HP to 0")
+	# Room handler subscribes to boss_died; should emit both room signals.
+	assert_signal_emitted(room, "stratum_exit_unlocked", "stratum_exit_unlocked fires on boss death")
+	assert_signal_emitted(room, "boss_defeated", "boss_defeated fires on boss death")
+	assert_true(room.is_stratum_exit_unlocked())
+
+
+# ---- 9: arena walls + floor scene topology --------------------------
+
+
+func test_room_scene_carries_arena_walls() -> void:
+	# Verify the .tscn scene authoring includes the four cardinal walls +
+	# floor. A regression that drops a wall in the scene file would let
+	# the player walk out of the arena mid-fight — caught here.
+	var room: Stratum2BossRoom = _make_room()
+	var wall_names: Array = ["WallNorth", "WallSouth", "WallWest", "WallEast"]
+	for wname: String in wall_names:
+		var w: Node = room.get_node_or_null(wname)
+		assert_not_null(w, "scene has wall '%s'" % wname)
+		assert_true(w is StaticBody2D, "wall '%s' is StaticBody2D" % wname)
+		var has_shape: bool = false
+		for c: Node in w.get_children():
+			if c is CollisionShape2D:
+				has_shape = true
+		assert_true(has_shape, "wall '%s' has CollisionShape2D child" % wname)
+	# Floor present (ColorRect at the standard near-black tone).
+	var floor_node: Node = room.get_node_or_null("ArenaFloor")
+	assert_not_null(floor_node, "scene has ArenaFloor")
+	assert_true(floor_node is ColorRect, "ArenaFloor is ColorRect")

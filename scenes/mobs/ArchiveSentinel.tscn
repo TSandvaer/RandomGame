@@ -1,0 +1,50 @@
+[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_archive_sentinel"]
+
+; W3-T7 Stage 5 — Archive Sentinel boss scene (ticket 86c9y7ygj Part D).
+;
+; Stage 5 ship state: placeholder Sprite is a flat-color ColorRect at
+; composite-construct scale (~48×48) per Uma's `palette-stratum-2.md`
+; §5.5 silhouette anchor "stone-bone composite body, ~48×48 or larger
+; per pixel-mcp dimension floor (boss / elite mob row)".
+;
+; Color: Color(0.32, 0.20, 0.18, 1) — stone-bone-composite brown per the
+; dispatch brief. The ColorRect renders the construct as a single
+; readable silhouette; AnimatedSprite2D drop-in via scene-swap (PixelLab-
+; generated frames) is OOS for Stage 5 per ticket — Sponsor or
+; orchestrator main-session executes via `mcp__pixellab__*`.
+;
+; CollisionShape2D radius: 24 px (mirrors S1 boss collision_shape — the
+; same plinth-footprint that the player navigates around). The visible
+; sprite (48×48 ColorRect) is wider than the collision shape so the
+; player can graze the visual without taking contact damage from the
+; static body — the construct's "danger" is conveyed via the slam-AOE
+; circle indicator, not the body silhouette.
+;
+; collision_layer = 8 (enemy, bit 4), collision_mask = 3 (world bit 1 +
+; player bit 2). Same shape as Stratum1Boss + every other enemy in the
+; project — mirrors DECISIONS.md 2026-05-01 collision-layer convention.
+;
+; Cross-references:
+;   scripts/mobs/ArchiveSentinel.gd (controller)
+;   scenes/mobs/Stratum1Boss.tscn (S1 scene precedent — same node shape)
+;   team/uma-ux/palette-stratum-2.md §5.5
+
+[ext_resource type="Script" path="res://scripts/mobs/ArchiveSentinel.gd" id="1_sentinel"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_sentinel"]
+radius = 24.0
+
+[node name="ArchiveSentinel" type="CharacterBody2D"]
+collision_layer = 8
+collision_mask = 3
+script = ExtResource("1_sentinel")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_sentinel")
+
+[node name="Sprite" type="ColorRect" parent="."]
+offset_left = -24.0
+offset_top = -24.0
+offset_right = 24.0
+offset_bottom = 24.0
+color = Color(0.32, 0.2, 0.18, 1)
