@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="MobDef" load_steps=3 format=3]
+
+; W3-T7 Stage 5 — Archive Sentinel boss MobDef (ticket 86c9y7ygj Part D).
+;
+; The Stratum-2 boss is a stationary phase-shift construct per Uma's
+; `team/uma-ux/palette-stratum-2.md` §5.5 Archive Sentinel — composite
+; stone-bone-book guardian rooted to a center plinth. Combat happens
+; AROUND it (NOT mobile melee per S1 boss). Phase-2 transition at ~50%
+; HP unlocks the slam telegraph (cast-only in phase 1).
+;
+; Stratum-scaling table (MobRegistry._STRATUM_SCALING) is NOT applied
+; from the spawn path yet — these are the BASELINE values per the W3-T7
+; Stage 5 dispatch. If a future balance pass routes stratum scaling into
+; ArchiveSentinelRoom.spawn(), the +20% HP / +15% damage multipliers
+; would land as new instance values without source-side mutation.
+;
+; Baseline rationale:
+;   - hp_base = 700 — slightly larger HP envelope than S1 boss (600) so
+;     the late-stratum-2 climax feels meatier than the S1 climax.
+;     Phase boundary (50% = 350 HP) is the player-readable beat;
+;     remaining 350 HP is the post-transition phase where slam unlocks.
+;   - damage_base = 14 — between S1 boss (12) and a hypothetical S3 boss
+;     (~16). Damage formula scales mob_def.damage_base through
+;     Damage.compute_mob_damage with player Vigor mitigation, so the raw
+;     value is the source of truth.
+;   - move_speed = 0.0 — STATIONARY. The construct never moves from its
+;     plinth. Set to zero so any future move_and_slide call short-
+;     circuits to no-op (defensive — the script's _physics_process
+;     explicitly zeroes velocity so this should never matter, but a
+;     non-zero move_speed in an inherited Grunt-style refactor would
+;     cause drift).
+;   - ai_behavior_tag = &"archive_sentinel" — distinct from S1 boss
+;     (&"stratum1_boss") so future AI dispatcher logic keys per-boss.
+;   - loot_table = boss_drops.tres — reuses the S1 boss loot table for
+;     Stage 5. Stage 6 (or a follow-up balance pass) can author a
+;     dedicated s2_boss_drops.tres with stratum-2-flavored item pool.
+;   - xp_reward = 350 — scaled up from S1 boss (250). Same +40%
+;     leverage as hp_base — keeps reward-to-effort ratio approximately
+;     constant.
+;
+; Cross-references:
+;   .claude/docs/combat-architecture.md § "Adding a new mob class"
+;   team/uma-ux/palette-stratum-2.md §5.5 Archive Sentinel
+;   resources/mobs/stratum1_boss.tres (S1 precedent)
+
+[ext_resource type="Script" path="res://scripts/content/MobDef.gd" id="1_mob"]
+[ext_resource type="Resource" path="res://resources/loot_tables/boss_drops.tres" id="2_loot"]
+
+[resource]
+script = ExtResource("1_mob")
+id = &"archive_sentinel"
+display_name = "Archive Sentinel"
+sprite_path = ""
+hp_base = 700
+damage_base = 14
+move_speed = 0.0
+ai_behavior_tag = &"archive_sentinel"
+loot_table = ExtResource("2_loot")
+xp_reward = 350
