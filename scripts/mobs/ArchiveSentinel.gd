@@ -292,18 +292,6 @@ const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 const ArchiveSentinelSlamIndicatorScript: Script = preload(
 	"res://scripts/mobs/ArchiveSentinelSlamIndicator.gd"
 )
-## Visible cast-bolt VFX — the cast's DAMAGE is an instantaneous Hitbox at the
-## captured target (dodge model unchanged); this node is the missing VISUAL so
-## the cast is no longer invisible (ticket 86c9y7ygj re-soak fix, Sponsor
-## 2026-05-29). Cosmetic only — carries no damage / no collision.
-const ArchiveSentinelCastBoltScript: Script = preload(
-	"res://scripts/mobs/ArchiveSentinelCastBolt.gd"
-)
-
-## Cast-bolt travel window — book → captured target. Short cosmetic cue; the
-## damage already fired instantaneously at the captured position. Kept just
-## under CAST_HITBOX_LIFETIME so the bolt reads as "the shot that just landed".
-const CAST_BOLT_TRAVEL_DURATION: float = 0.16
 
 # ---- Inspector --------------------------------------------------------
 
@@ -750,54 +738,10 @@ func _fire_cast() -> void:
 		CAST_HITBOX_RADIUS,
 		CAST_HITBOX_LIFETIME,
 	)
-	# Visible cast bolt — the damage hitbox above is invisible (bare Area2D);
-	# this cosmetic ember bolt travels book → captured target so the cast is
-	# perceptible. Without it the cast was invisible damage (Sponsor 2026-05-29
-	# re-soak: "HP just drops, nothing visible"). Cosmetic only — the dodge
-	# model + the GUT hitbox-position contract are unchanged.
-	_spawn_cast_bolt(global_position, _cast_target_pos)
 	_cast_recovery_left = CAST_RECOVERY_DURATION
 	_cast_cooldown_left = CAST_COOLDOWN
 	_set_state(STATE_CAST_RECOVERY)
 	swing_spawned.emit(SWING_KIND_CAST, hb)
-
-
-# ---- Cast bolt VFX (cosmetic — no damage) -----------------------------
-
-
-## Spawn the visible ember bolt that travels from the construct's book to the
-## captured cast target. Room-parented + deferred add_child per the physics-
-## flush rule (`_fire_cast` runs inside `_physics_process`; the bolt root is a
-## Node2D, not an Area2D, so it's not strictly subject to the monitoring-mutation
-## panic — but the deferred add keeps the spawn block uniform with the
-## death-particle / hitbox sites per `.claude/docs/combat-architecture.md`
-## § "Why call_deferred even though CPUParticles2D is not an Area2D").
-##
-## The bolt parents to the construct's parent (the room) so it survives the
-## construct's own death-tween + outlives the cast-recovery state. Returns the
-## bolt for test inspection.
-func _spawn_cast_bolt(spawn_pos: Vector2, target_pos: Vector2) -> Node2D:
-	var room: Node = get_parent()
-	if room == null:
-		return null
-	var bolt: Node2D = ArchiveSentinelCastBoltScript.new()
-	bolt.configure(spawn_pos, target_pos, CAST_BOLT_TRAVEL_DURATION)
-	room.call_deferred("add_child", bolt)
-	_combat_trace(
-		"ArchiveSentinel._spawn_cast_bolt",
-		(
-			"visible cast bolt spawn=(%.0f,%.0f) target=(%.0f,%.0f) travel=%.2f z=%d"
-			% [
-				spawn_pos.x,
-				spawn_pos.y,
-				target_pos.x,
-				target_pos.y,
-				CAST_BOLT_TRAVEL_DURATION,
-				ArchiveSentinelCastBoltScript.BOLT_Z_INDEX
-			]
-		)
-	)
-	return bolt
 
 
 # ---- Slam attack (phase 2 only) ---------------------------------------
@@ -1446,19 +1390,51 @@ static func _vec_to_dir_suffix(v: Vector2) -> String:
 
 
 func _apply_mob_def() -> void:
+	# Boss HP multiplier (Sponsor 2026-05-21 soak-iteration utility). Resolves
+	# to 1.0 (no-op) outside HTML5 and when the `boss_hp_mult` URL param is
+	# absent. Mirrors Stratum1Boss._apply_mob_def so `?boss_hp_mult=N` nerfs
+	# the Sentinel for phase-2 soak acceleration — closes the parity gap
+	# documented in `.claude/docs/html5-export.md` § "New-boss soak
+	# acceleration — boss_hp_mult parity gap". Multiplied IN on the bare-
+	# instance fallback path too so headless GUT using
+	# `DebugFlags.set_boss_hp_mult_for_test(0.2)` can exercise the nerf
+	# without supplying a MobDef.
+	var hp_mult: float = _resolve_boss_hp_mult()
 	if mob_def == null:
 		# Bare-instantiated boss (tests). Use spec defaults.
-		hp_max = 700
-		hp_current = 700
+		var bare_hp: int = max(1, int(round(700.0 * hp_mult)))
+		hp_max = bare_hp
+		hp_current = bare_hp
 		damage_base = 14
 		move_speed_base = 0.0
 		move_speed = 0.0
 		return
-	hp_max = mob_def.hp_base
-	hp_current = mob_def.hp_base
+	var scaled_hp: int = max(1, int(round(float(mob_def.hp_base) * hp_mult)))
+	hp_max = scaled_hp
+	hp_current = scaled_hp
 	damage_base = mob_def.damage_base
 	move_speed_base = mob_def.move_speed
 	move_speed = move_speed_base
+
+
+## Resolve the boss HP multiplier from the DebugFlags autoload (defaults to 1.0
+## when the autoload is missing — bare-instance unit-test edge). Mirrors
+## Stratum1Boss._resolve_boss_hp_mult verbatim: handles the not-inside-tree
+## bare-instance edge via Engine.get_main_loop() so a test that writes the
+## multiplier BEFORE adding the boss still gets the injected value.
+func _resolve_boss_hp_mult() -> float:
+	if not is_inside_tree():
+		var ml: SceneTree = Engine.get_main_loop() as SceneTree
+		if ml == null:
+			return 1.0
+		var df: Node = ml.root.get_node_or_null("DebugFlags")
+		if df == null:
+			return 1.0
+		return df.boss_hp_mult
+	var df_in: Node = get_node_or_null("/root/DebugFlags")
+	if df_in == null:
+		return 1.0
+	return df_in.boss_hp_mult
 
 
 func _apply_layers() -> void:

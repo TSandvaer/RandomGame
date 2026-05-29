@@ -40,12 +40,18 @@ extends Node2D
 ## SceneTreeTimer safety-net frees it even if the tween hangs (mirrors the mob
 ## death-tween safety-net convention).
 
-## Ember-orange bolt body — sub-1.0 channels (HTML5 HDR-clamp safe). Mirrors the
-## Projectile.tscn ember-tone (0.95,0.7,0.25) but warmer to read as "book-fire"
-## per Uma §5.5 ember-light language.
-const BOLT_COLOR: Color = Color(1.0, 0.69, 0.4, 1.0)  # #FFB066 ember-light
-const BOLT_SIZE: Vector2 = Vector2(14.0, 14.0)
+## Ember-accent bolt body — Uma §5.5 boss-projectile ember-burst `#FF6A2A`.
+## Sub-1.0 channels (HTML5 HDR-clamp safe). The bolt body is rotated 45° (see
+## BOLT_ROTATION) so the square ColorRect reads as a diamond ember-shard rather
+## than a flat block — a zero-cost shape upgrade over the soak-round-2 plain
+## square ("not pretty but it's there", Sponsor 2026-05-29) that keeps the
+## renderer-safe ColorRect body + the visibility-trace contract unchanged.
+const BOLT_COLOR: Color = Color(1.0, 0.416, 0.165, 1.0)  # #FF6A2A ember-accent (Uma §5.5)
+const BOLT_SIZE: Vector2 = Vector2(13.0, 13.0)
 const BOLT_Z_INDEX: int = 1
+
+## 45° rotation makes the square body read as a diamond ember-shard.
+const BOLT_ROTATION: float = PI * 0.25
 
 ## Impact flash — a brief bright pop at the target on arrival so the landing
 ## point is unmistakable. Sub-1.0 warm-white (breaks the ember-on-floor blend
@@ -78,6 +84,11 @@ func _ready() -> void:
 	_bolt.size = BOLT_SIZE
 	# Center the rect on the node origin so it travels centered on the line.
 	_bolt.position = -BOLT_SIZE * 0.5
+	# Rotate 45° about the body center so the square reads as a diamond
+	# ember-shard. pivot_offset = center keeps the rotation centered on the
+	# travel line (without it, ColorRect rotates about its top-left corner).
+	_bolt.pivot_offset = BOLT_SIZE * 0.5
+	_bolt.rotation = BOLT_ROTATION
 	add_child(_bolt)
 
 	_tween = create_tween()
@@ -137,6 +148,9 @@ func _on_arrival() -> void:
 	_bolt.color = IMPACT_COLOR
 	_bolt.size = IMPACT_SIZE
 	_bolt.position = -IMPACT_SIZE * 0.5
+	# Impact pop reads better as an upright burst — drop the diamond rotation.
+	_bolt.pivot_offset = IMPACT_SIZE * 0.5
+	_bolt.rotation = 0.0
 
 
 func _safety_free() -> void:

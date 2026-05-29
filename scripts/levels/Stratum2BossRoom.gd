@@ -101,6 +101,32 @@ const ENTRY_SEQUENCE_DURATION: float = 1.8
 const ARENA_BOUNDS: Rect2 = Rect2(0, 0, 1024, 768)
 const ARENA_FOLLOW_DEADZONE: Vector2 = Vector2(40, 24)
 
+## Arena zoom-out — Sponsor soak-round-2 finding ("characters too big") fix.
+##
+## **Diagnosed cause (b) — boss-room default zoom miscalibrated for the wider
+## arena.** S1 rooms (incl. S1 boss room) are viewport-native 480×270, so the
+## CameraDirector default (normalized 1.0 = BASELINE_ZOOM 2.6667× engine, which
+## maps the 1280×720 viewport onto exactly 480×270 world px) renders them at the
+## intended scale. The S2 arena is 1024×768 — 2.13× wider / 2.84× taller than
+## the baseline viewport-world window. At default zoom the camera shows only
+## ~480×270 of the arena, so boss + player render at full baseline scale while
+## the player sees <half the arena → "too zoomed in / characters too big".
+##
+## The arena is intentionally larger-than-screen (Diablo-style continuous
+## scroll), so the fix is NOT "fit the whole arena" (that would need normalized
+## ~0.35, below the 0.5 CameraDirector floor anyway). It is "zoom OUT to read
+## the arena + combatants at an appropriate scale". At normalized 0.5 the
+## viewport-world window is `LOGICAL_VIEWPORT_BASE / (BASELINE_ZOOM * 0.5)` =
+## (1280,720)/(1.3334,1.3334) = 960×540 world px — ~2× the content the baseline
+## shows, with the deadzone-follow + ARENA_BOUNDS clamp handling the residual
+## scroll. 0.5 is the CameraDirector MIN_NORMALIZED_ZOOM (widest allowed view).
+##
+## Scope: boss-room-specific (S1 unaffected — it stays 480×270 viewport-native
+## at default zoom). NOT a game-wide camera change. The S1 boss room's only
+## non-default zoom is the T16 death ember-rise (1.5×, fired at boss-death).
+const ARENA_CAMERA_ZOOM: float = 0.5
+const ARENA_CAMERA_ZOOM_DURATION: float = 0.0
+
 ## Center plinth position — where the Sentinel spawns + remains rooted.
 ## Center of the 1024×768 arena = (512, 384).
 const PLINTH_POSITION: Vector2 = Vector2(512.0, 384.0)
@@ -501,6 +527,14 @@ func _engage_camera_for_boss_room() -> void:
 		cd.follow_target(player, ARENA_FOLLOW_DEADZONE)
 	if cd.has_method("set_world_bounds"):
 		cd.set_world_bounds(ARENA_BOUNDS)
+	# Zoom OUT for the wider 1024×768 arena so combatants read at an
+	# appropriate scale (Sponsor soak-round-2 "characters too big" fix —
+	# diagnosed cause (b), see ARENA_CAMERA_ZOOM). anchor = Vector2.ZERO keeps
+	# player-follow; the bounds-clamp above keeps the wider view inside the
+	# arena. Instant (duration 0.0) since the player drops straight into the
+	# arena via start_room=9 / production room-load — no easing beat needed.
+	if cd.has_method("request_zoom"):
+		cd.request_zoom(ARENA_CAMERA_ZOOM, ARENA_CAMERA_ZOOM_DURATION)
 
 
 func _resolve_camera_director() -> Node:

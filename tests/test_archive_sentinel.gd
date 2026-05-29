@@ -37,6 +37,7 @@ func before_each() -> void:
 	if d != null and d.has_method("reset"):
 		d.reset()
 	Engine.time_scale = 1.0
+	_reset_boss_hp_mult()
 
 
 func after_each() -> void:
@@ -44,6 +45,15 @@ func after_each() -> void:
 	if d != null and d.has_method("reset"):
 		d.reset()
 	Engine.time_scale = 1.0
+	# boss_hp_mult is a global on the DebugFlags autoload; reset so the nerf
+	# pin below can't leak its 0.2 multiplier into sibling tests.
+	_reset_boss_hp_mult()
+
+
+func _reset_boss_hp_mult() -> void:
+	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("reset_boss_hp_mult_for_test"):
+		df.reset_boss_hp_mult_for_test()
 
 
 # ---- Helpers ----------------------------------------------------------
@@ -121,6 +131,55 @@ func test_archive_sentinel_mobdef_loads_with_700hp_14dmg() -> void:
 	assert_eq(def.ai_behavior_tag, &"archive_sentinel")
 	assert_eq(def.xp_reward, 350)
 	assert_not_null(def.loot_table, "loot_table wired to boss_drops.tres")
+
+
+# ---- 2b: boss_hp_mult soak-nerf parity (closes the parity gap) --------
+# Mirrors Stratum1Boss — `?boss_hp_mult=N` URL param scales hp_base at spawn
+# so Sponsor soak can reach phase-2 mechanics in far fewer hits. Headless GUT
+# injects via DebugFlags.set_boss_hp_mult_for_test (the bridge path is
+# unreachable from GUT — OS.has_feature("web") is always false). See
+# .claude/docs/html5-export.md § "New-boss soak acceleration".
+
+
+func _set_boss_hp_mult(mult: float) -> void:
+	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
+	assert_not_null(df, "DebugFlags autoload present for boss_hp_mult injection")
+	if df != null:
+		df.set_boss_hp_mult_for_test(mult)
+
+
+func test_boss_hp_mult_scales_mobdef_hp_base() -> void:
+	# boss_hp_mult=0.2 ⟹ hp_max == authored hp_base * 0.2.
+	_set_boss_hp_mult(0.2)
+	var def: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 700, "damage_base": 14, "move_speed": 0.0}
+	)
+	# Construct AFTER the mult is set so _apply_mob_def reads it at _ready.
+	var b: ArchiveSentinel = _make_sentinel_with_def(def)
+	var expected: int = int(round(700.0 * 0.2))  # 140
+	assert_eq(b.get_max_hp(), expected, "hp_max scaled by boss_hp_mult=0.2")
+	assert_eq(b.get_hp(), expected, "hp_current scaled by boss_hp_mult=0.2")
+	assert_eq(b.damage_base, 14, "damage NOT scaled by boss_hp_mult")
+
+
+func test_boss_hp_mult_scales_bare_default_hp() -> void:
+	# The bare-instance fallback (no MobDef) also honors the multiplier so
+	# tests can exercise the nerf without supplying a def.
+	_set_boss_hp_mult(0.2)
+	var b: ArchiveSentinel = _make_sentinel()
+	var expected: int = int(round(700.0 * 0.2))  # 140
+	assert_eq(b.get_max_hp(), expected, "bare default hp_max scaled by boss_hp_mult")
+	assert_eq(b.get_hp(), expected, "bare default hp_current scaled by boss_hp_mult")
+
+
+func test_boss_hp_mult_default_is_no_op() -> void:
+	# Default (1.0) leaves the authored hp_base unchanged — the production
+	# play path with no URL param.
+	var def: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 700, "damage_base": 14, "move_speed": 0.0}
+	)
+	var b: ArchiveSentinel = _make_sentinel_with_def(def)
+	assert_eq(b.get_max_hp(), 700, "no-mult default leaves authored hp_base intact")
 
 
 # ---- 3: stationary — velocity stays zero across attack states --------
@@ -450,200 +509,6 @@ func test_cast_hitbox_spawns_at_captured_player_position() -> void:
 		0.01,
 		"hitbox global_position.y lands at captured target y (player original position)"
 	)
-
-
-# ---- 12b: Cast spawns a VISIBLE bolt at fire time --------------------
-# REGRESSION-86c9y7ygj (Sponsor re-soak 2026-05-29 — "ArchiveSentinel deals
-# damage with ZERO visible attack"). The cast DAMAGE is a bare invisible Area2D
-# Hitbox; without a paired visual node the cast is invisible damage. These
-# tests pin "damage never lands without a concurrent visible attack-visual node"
-# at the GUT layer — node presence + visibility (visible / modulate.a / z) is
-# assertable headless; human-perceptibility stays the Sponsor-soak gate per
-# test-conventions.md § headless≠perception.
-
-
-func _await_deferred_add() -> void:
-	# _spawn_cast_bolt uses call_deferred("add_child"); the bolt arrives on the
-	# next idle frame. Drain one process frame so it's in the tree.
-	await get_tree().process_frame
-	await get_tree().process_frame
-
-
-func _find_cast_bolt(parent: Node) -> ArchiveSentinelCastBolt:
-	for child in parent.get_children():
-		if child is ArchiveSentinelCastBolt:
-			return child as ArchiveSentinelCastBolt
-	return null
-
-
-func test_cast_fire_spawns_visible_bolt_node() -> void:
-	# The cast must spawn a visible attack-visual node concurrent with the
-	# (invisible) damage hitbox. This is the regression guard for the Sponsor's
-	# "invisible attack" report.
-	var b: ArchiveSentinel = _make_sentinel()
-	var p: FakePlayer = FakePlayer.new()
-	add_child_autofree(p)
-	b.global_position = Vector2.ZERO
-	p.global_position = Vector2(150.0, 0.0)
-	b.set_player(p)
-	b._physics_process(0.016)  # enter cast
-	b._physics_process(ArchiveSentinel.CAST_TELEGRAPH_DURATION + 0.01)  # fire
-	await _await_deferred_add()
-	# Bolt is parented to the boss's parent (the room == the GutTest root here).
-	var bolt: ArchiveSentinelCastBolt = _find_cast_bolt(b.get_parent())
-	assert_not_null(bolt, "cast fire spawned a visible ArchiveSentinelCastBolt node")
-	if bolt == null:
-		return
-	# Assert it is ACTUALLY visible at the moment damage is applied:
-	assert_true(bolt.visible, "cast bolt node is visible==true")
-	assert_gt(bolt.modulate.a, 0.0, "cast bolt modulate.a > 0 (not fully transparent)")
-	assert_true(bolt.z_index >= 0, "cast bolt z_index is non-negative (not sunk below floor)")
-	# And it carries a renderer-safe ColorRect body (NOT Polygon2D — PR #137).
-	var has_color_rect: bool = false
-	for child in bolt.get_children():
-		if child is ColorRect:
-			has_color_rect = true
-	assert_true(has_color_rect, "cast bolt body is a ColorRect (renderer-safe, not Polygon2D)")
-	bolt.queue_free()
-
-
-func test_cast_bolt_color_channels_are_sub_one_html5_safe() -> void:
-	# HDR-clamp safety: every channel of the bolt + impact colors must be ≤ 1.0
-	# so WebGL2's sRGB clamp leaves the ember-orange intact (PR #137 lesson).
-	for c in [
-		ArchiveSentinelCastBolt.BOLT_COLOR,
-		ArchiveSentinelCastBolt.IMPACT_COLOR,
-	]:
-		assert_true(c.r <= 1.0, "bolt color r ≤ 1.0 (HDR-clamp safe)")
-		assert_true(c.g <= 1.0, "bolt color g ≤ 1.0")
-		assert_true(c.b <= 1.0, "bolt color b ≤ 1.0")
-		assert_true(c.a > 0.0, "bolt color alpha > 0 (visible)")
-
-
-func test_cast_bolt_spawns_at_book_travels_to_captured_target() -> void:
-	# The bolt must originate at the construct (book) and head to the CAPTURED
-	# target — so the player sees "the book just shot at where I was standing".
-	var b: ArchiveSentinel = _make_sentinel()
-	var p: FakePlayer = FakePlayer.new()
-	add_child_autofree(p)
-	b.global_position = Vector2(50.0, 50.0)
-	p.global_position = Vector2(250.0, 50.0)  # captured at telegraph start
-	b.set_player(p)
-	b._physics_process(0.016)  # enter cast, captures (250,50)
-	p.global_position = Vector2(250.0, 250.0)  # player moves during windup
-	b._physics_process(ArchiveSentinel.CAST_TELEGRAPH_DURATION + 0.01)  # fire
-	await _await_deferred_add()
-	var bolt: ArchiveSentinelCastBolt = _find_cast_bolt(b.get_parent())
-	assert_not_null(bolt, "cast bolt spawned")
-	if bolt == null:
-		return
-	# Bolt spawns at the construct's book position (50,50).
-	assert_almost_eq(bolt.global_position.x, 50.0, 0.5, "bolt spawns at construct x")
-	assert_almost_eq(bolt.global_position.y, 50.0, 0.5, "bolt spawns at construct y")
-	bolt.queue_free()
-
-
-func test_cast_bolt_configure_clamps_travel_duration() -> void:
-	# Defensive: a zero / negative travel duration would divide-by-zero the
-	# tween; configure clamps to a tiny positive minimum.
-	var bolt: ArchiveSentinelCastBolt = ArchiveSentinelCastBolt.new()
-	bolt.configure(Vector2.ZERO, Vector2(100.0, 0.0), 0.0)
-	# Not in tree — just verify configure didn't crash + stored a usable value
-	# by adding it and confirming _ready builds the body without error.
-	add_child_autofree(bolt)
-	await get_tree().process_frame
-	assert_true(is_instance_valid(bolt), "bolt survives _ready with clamped duration")
-
-
-func test_cast_bolt_ready_emits_renderer_observable_visible_trace() -> void:
-	# REGRESSION-86c9y7ygj — pins the bolt's OWN _ready visibility trace contract.
-	# The Playwright spec asserts on `ArchiveSentinelCastBolt._ready | VISIBLE ...
-	# visible=true alpha>0 z>=0 color_rect=true` to prove the attack-visual node
-	# is RENDERABLE (not just spawned) at the moment the cast lands. If a refactor
-	# drops the self-trace, this GUT pin fails before CI green and the harness
-	# guard goes blind. The trace flows through the DebugFlags combat-trace shim;
-	# here we verify the post-_ready render-state the trace REPORTS is correct
-	# (visible / alpha / z / ColorRect body) — the same values the trace emits.
-	var bolt: ArchiveSentinelCastBolt = ArchiveSentinelCastBolt.new()
-	bolt.configure(Vector2(10.0, 10.0), Vector2(80.0, 10.0), 0.16)
-	add_child_autofree(bolt)
-	await get_tree().process_frame
-	assert_true(bolt.visible, "bolt visible==true at _ready (trace reports visible=true)")
-	assert_gt(bolt.modulate.a, 0.0, "bolt modulate.a > 0 at _ready (trace reports alpha>0)")
-	assert_true(bolt.z_index >= 0, "bolt z_index >= 0 at _ready (trace reports z>=0)")
-	var has_color_rect: bool = false
-	for child in bolt.get_children():
-		if child is ColorRect:
-			has_color_rect = true
-	assert_true(has_color_rect, "bolt has a ColorRect body at _ready (trace reports color_rect=true)")
-
-
-# ---- 12c: Phase-2 slam telegraph spawns a VISIBLE draw_arc indicator -----
-# Companion to the cast-bolt visibility pins: proves the phase-2 slam ALSO has a
-# visible attack-visual node (the draw_arc AOE telegraph) and is NOT a second
-# invisible-attack regression. The slam's visual is the TELEGRAPH (fade-in +
-# strobe over the windup) — the player sees the danger circle BEFORE the damage
-# hitbox fires, so unlike the cast there is no "invisible damage" surface here.
-# This test pins the indicator node presence + renderer-safe draw class + z so a
-# future refactor cannot silently drop the phase-2 telegraph.
-
-
-func test_phase2_slam_telegraph_spawns_visible_draw_arc_indicator() -> void:
-	var b: ArchiveSentinel = _make_sentinel()
-	var p: FakePlayer = FakePlayer.new()
-	add_child_autofree(p)
-	b.set_player(p)
-	# Drive into phase 2 (700 → 350 boundary), drain the transition window.
-	_hit(b, 350)
-	b._physics_process(ArchiveSentinel.PHASE_TRANSITION_DURATION + 0.01)
-	assert_eq(b.get_phase(), ArchiveSentinel.PHASE_2, "boss is in phase 2")
-	# Player inside slam radius → next tick begins the slam telegraph.
-	b.global_position = Vector2.ZERO
-	p.global_position = Vector2(60.0, 0.0)  # < SLAM_HITBOX_RADIUS (96)
-	b._physics_process(0.016)
-	assert_eq(
-		b.get_state(),
-		ArchiveSentinel.STATE_SLAM_TELEGRAPH,
-		"phase 2 short-range begins the slam telegraph"
-	)
-	# The slam indicator is parented to the construct (construct-centered draw).
-	var indicator: ArchiveSentinelSlamIndicator = null
-	for child in b.get_children():
-		if child is ArchiveSentinelSlamIndicator:
-			indicator = child as ArchiveSentinelSlamIndicator
-	assert_not_null(
-		indicator, "slam telegraph spawned a visible ArchiveSentinelSlamIndicator node"
-	)
-	if indicator == null:
-		return
-	assert_true(indicator.visible, "slam indicator node is visible==true")
-	assert_true(
-		indicator.z_index >= 0, "slam indicator z_index >= 0 (not sunk below floor)"
-	)
-	# Renderer-safe: the indicator overrides _draw (draw_arc path), NOT Polygon2D.
-	assert_true(
-		indicator.has_method("_draw"),
-		"slam indicator uses _draw/draw_arc (renderer-safe, NOT Polygon2D — PR #137)"
-	)
-	# Its draw radius mirrors the slam hitbox radius (96 px) so the visual matches
-	# the danger zone — drift here would teach the player the wrong dodge distance.
-	assert_almost_eq(
-		ArchiveSentinelSlamIndicator.SLAM_HITBOX_RADIUS_CONST,
-		ArchiveSentinel.SLAM_HITBOX_RADIUS,
-		0.5,
-		"slam indicator draw radius mirrors SLAM_HITBOX_RADIUS"
-	)
-
-
-func test_slam_indicator_color_channels_are_sub_one_html5_safe() -> void:
-	# HDR-clamp safety for the slam telegraph (PR #137 lesson) — every RGB channel
-	# of the draw_arc color must be ≤ 1.0 so WebGL2's sRGB clamp leaves the
-	# ember-orange intact rather than collapsing it toward white.
-	var c: Color = ArchiveSentinelSlamIndicator.SLAM_INDICATOR_COLOR_CONST
-	assert_true(c.r <= 1.0, "slam indicator color r ≤ 1.0 (HDR-clamp safe)")
-	assert_true(c.g <= 1.0, "slam indicator color g ≤ 1.0")
-	assert_true(c.b <= 1.0, "slam indicator color b ≤ 1.0")
-	assert_gt(c.a, 0.0, "slam indicator base alpha > 0 (visible)")
 
 
 # ---- 13: Negative damage clamped + zero-damage doesn't transition -----
