@@ -80,6 +80,13 @@ const ARENA_BOUNDS_TRACE = /\[combat-trace\] CameraDirector\.set_world_bounds \|
 const FOLLOW_TRACE = /\[combat-trace\] CameraDirector\.follow_target \| target=Player deadzone=\(40\.0,24\.0\)/;
 const SENTINEL_WAKE_TRACE = /\[combat-trace\] ArchiveSentinel\.wake/;
 
+// Cast attack traces. `_fire_cast` is the DAMAGE event (a bare invisible
+// Area2D hitbox); `_spawn_cast_bolt` is the concurrent VISIBLE attack-visual
+// node. The regression these guard against: damage landing with NO visible
+// attack (Sponsor re-soak 2026-05-29 — "HP just drops, nothing visible").
+const CAST_FIRE_TRACE = /\[combat-trace\] ArchiveSentinel\._fire_cast \|/;
+const CAST_BOLT_TRACE = /\[combat-trace\] ArchiveSentinel\._spawn_cast_bolt \| visible cast bolt/;
+
 test.describe("Stratum2BossRoom production wiring (W3-T7 Stage 6)", () => {
   test("?start_room=9 boots into the S2 boss room; continuous-scroll engages; Sentinel wakes; no warnings", async ({
     page,
@@ -153,6 +160,32 @@ test.describe("Stratum2BossRoom production wiring (W3-T7 Stage 6)", () => {
         "ArchiveSentinel.wake fired — entry sequence auto-fired + boss woke"
       ).toBeDefined();
     }).toPass({ timeout: 8_000 });
+
+    // 4b. CAST IS VISIBLE — damage never lands without a concurrent visible
+    //     attack-visual node. The boss wakes with the Player inside AGGRO_RADIUS
+    //     (640 px; plinth↔spawn ~327 px) so it auto-casts without player input.
+    //     `_fire_cast` is the (invisible) damage event; `_spawn_cast_bolt` is the
+    //     visible bolt spawned in the SAME _fire_cast call. The original bug
+    //     (ticket 86c9y7ygj re-soak) was `_fire_cast` firing with NO visible
+    //     node — this assertion would have caught it.
+    await expect(async () => {
+      const fireLine = capture.getLines().find((l) => CAST_FIRE_TRACE.test(l.text));
+      expect(
+        fireLine,
+        "ArchiveSentinel cast fired (damage event) — boss engaged the player"
+      ).toBeDefined();
+    }).toPass({ timeout: 15_000 });
+
+    // The visible bolt MUST be present once a cast has fired. If `_fire_cast`
+    // appears in the stream but `_spawn_cast_bolt` does not, the cast dealt
+    // invisible damage — the exact Sponsor-reported regression.
+    const castFired = capture.getLines().some((l) => CAST_FIRE_TRACE.test(l.text));
+    const boltSpawned = capture.getLines().some((l) => CAST_BOLT_TRACE.test(l.text));
+    expect(
+      !castFired || boltSpawned,
+      "cast damage never lands without a concurrent visible cast-bolt node " +
+        "(_fire_cast present ⟹ _spawn_cast_bolt present)"
+    ).toBe(true);
 
     // 5. No physics-flush panic during the boss-room deferred fixture pass.
     const panicLine = capture.findUnexpectedLine(

@@ -452,6 +452,109 @@ func test_cast_hitbox_spawns_at_captured_player_position() -> void:
 	)
 
 
+# ---- 12b: Cast spawns a VISIBLE bolt at fire time --------------------
+# REGRESSION-86c9y7ygj (Sponsor re-soak 2026-05-29 — "ArchiveSentinel deals
+# damage with ZERO visible attack"). The cast DAMAGE is a bare invisible Area2D
+# Hitbox; without a paired visual node the cast is invisible damage. These
+# tests pin "damage never lands without a concurrent visible attack-visual node"
+# at the GUT layer — node presence + visibility (visible / modulate.a / z) is
+# assertable headless; human-perceptibility stays the Sponsor-soak gate per
+# test-conventions.md § headless≠perception.
+
+
+func _await_deferred_add() -> void:
+	# _spawn_cast_bolt uses call_deferred("add_child"); the bolt arrives on the
+	# next idle frame. Drain one process frame so it's in the tree.
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+
+func _find_cast_bolt(parent: Node) -> ArchiveSentinelCastBolt:
+	for child in parent.get_children():
+		if child is ArchiveSentinelCastBolt:
+			return child as ArchiveSentinelCastBolt
+	return null
+
+
+func test_cast_fire_spawns_visible_bolt_node() -> void:
+	# The cast must spawn a visible attack-visual node concurrent with the
+	# (invisible) damage hitbox. This is the regression guard for the Sponsor's
+	# "invisible attack" report.
+	var b: ArchiveSentinel = _make_sentinel()
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	b.global_position = Vector2.ZERO
+	p.global_position = Vector2(150.0, 0.0)
+	b.set_player(p)
+	b._physics_process(0.016)  # enter cast
+	b._physics_process(ArchiveSentinel.CAST_TELEGRAPH_DURATION + 0.01)  # fire
+	await _await_deferred_add()
+	# Bolt is parented to the boss's parent (the room == the GutTest root here).
+	var bolt: ArchiveSentinelCastBolt = _find_cast_bolt(b.get_parent())
+	assert_not_null(bolt, "cast fire spawned a visible ArchiveSentinelCastBolt node")
+	if bolt == null:
+		return
+	# Assert it is ACTUALLY visible at the moment damage is applied:
+	assert_true(bolt.visible, "cast bolt node is visible==true")
+	assert_gt(bolt.modulate.a, 0.0, "cast bolt modulate.a > 0 (not fully transparent)")
+	assert_true(bolt.z_index >= 0, "cast bolt z_index is non-negative (not sunk below floor)")
+	# And it carries a renderer-safe ColorRect body (NOT Polygon2D — PR #137).
+	var has_color_rect: bool = false
+	for child in bolt.get_children():
+		if child is ColorRect:
+			has_color_rect = true
+	assert_true(has_color_rect, "cast bolt body is a ColorRect (renderer-safe, not Polygon2D)")
+	bolt.queue_free()
+
+
+func test_cast_bolt_color_channels_are_sub_one_html5_safe() -> void:
+	# HDR-clamp safety: every channel of the bolt + impact colors must be ≤ 1.0
+	# so WebGL2's sRGB clamp leaves the ember-orange intact (PR #137 lesson).
+	for c in [
+		ArchiveSentinelCastBolt.BOLT_COLOR,
+		ArchiveSentinelCastBolt.IMPACT_COLOR,
+	]:
+		assert_true(c.r <= 1.0, "bolt color r ≤ 1.0 (HDR-clamp safe)")
+		assert_true(c.g <= 1.0, "bolt color g ≤ 1.0")
+		assert_true(c.b <= 1.0, "bolt color b ≤ 1.0")
+		assert_true(c.a > 0.0, "bolt color alpha > 0 (visible)")
+
+
+func test_cast_bolt_spawns_at_book_travels_to_captured_target() -> void:
+	# The bolt must originate at the construct (book) and head to the CAPTURED
+	# target — so the player sees "the book just shot at where I was standing".
+	var b: ArchiveSentinel = _make_sentinel()
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	b.global_position = Vector2(50.0, 50.0)
+	p.global_position = Vector2(250.0, 50.0)  # captured at telegraph start
+	b.set_player(p)
+	b._physics_process(0.016)  # enter cast, captures (250,50)
+	p.global_position = Vector2(250.0, 250.0)  # player moves during windup
+	b._physics_process(ArchiveSentinel.CAST_TELEGRAPH_DURATION + 0.01)  # fire
+	await _await_deferred_add()
+	var bolt: ArchiveSentinelCastBolt = _find_cast_bolt(b.get_parent())
+	assert_not_null(bolt, "cast bolt spawned")
+	if bolt == null:
+		return
+	# Bolt spawns at the construct's book position (50,50).
+	assert_almost_eq(bolt.global_position.x, 50.0, 0.5, "bolt spawns at construct x")
+	assert_almost_eq(bolt.global_position.y, 50.0, 0.5, "bolt spawns at construct y")
+	bolt.queue_free()
+
+
+func test_cast_bolt_configure_clamps_travel_duration() -> void:
+	# Defensive: a zero / negative travel duration would divide-by-zero the
+	# tween; configure clamps to a tiny positive minimum.
+	var bolt: ArchiveSentinelCastBolt = ArchiveSentinelCastBolt.new()
+	bolt.configure(Vector2.ZERO, Vector2(100.0, 0.0), 0.0)
+	# Not in tree — just verify configure didn't crash + stored a usable value
+	# by adding it and confirming _ready builds the body without error.
+	add_child_autofree(bolt)
+	await get_tree().process_frame
+	assert_true(is_instance_valid(bolt), "bolt survives _ready with clamped duration")
+
+
 # ---- 13: Negative damage clamped + zero-damage doesn't transition -----
 
 

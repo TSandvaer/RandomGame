@@ -292,6 +292,18 @@ const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 const ArchiveSentinelSlamIndicatorScript: Script = preload(
 	"res://scripts/mobs/ArchiveSentinelSlamIndicator.gd"
 )
+## Visible cast-bolt VFX — the cast's DAMAGE is an instantaneous Hitbox at the
+## captured target (dodge model unchanged); this node is the missing VISUAL so
+## the cast is no longer invisible (ticket 86c9y7ygj re-soak fix, Sponsor
+## 2026-05-29). Cosmetic only — carries no damage / no collision.
+const ArchiveSentinelCastBoltScript: Script = preload(
+	"res://scripts/mobs/ArchiveSentinelCastBolt.gd"
+)
+
+## Cast-bolt travel window — book → captured target. Short cosmetic cue; the
+## damage already fired instantaneously at the captured position. Kept just
+## under CAST_HITBOX_LIFETIME so the bolt reads as "the shot that just landed".
+const CAST_BOLT_TRAVEL_DURATION: float = 0.16
 
 # ---- Inspector --------------------------------------------------------
 
@@ -738,10 +750,54 @@ func _fire_cast() -> void:
 		CAST_HITBOX_RADIUS,
 		CAST_HITBOX_LIFETIME,
 	)
+	# Visible cast bolt — the damage hitbox above is invisible (bare Area2D);
+	# this cosmetic ember bolt travels book → captured target so the cast is
+	# perceptible. Without it the cast was invisible damage (Sponsor 2026-05-29
+	# re-soak: "HP just drops, nothing visible"). Cosmetic only — the dodge
+	# model + the GUT hitbox-position contract are unchanged.
+	_spawn_cast_bolt(global_position, _cast_target_pos)
 	_cast_recovery_left = CAST_RECOVERY_DURATION
 	_cast_cooldown_left = CAST_COOLDOWN
 	_set_state(STATE_CAST_RECOVERY)
 	swing_spawned.emit(SWING_KIND_CAST, hb)
+
+
+# ---- Cast bolt VFX (cosmetic — no damage) -----------------------------
+
+
+## Spawn the visible ember bolt that travels from the construct's book to the
+## captured cast target. Room-parented + deferred add_child per the physics-
+## flush rule (`_fire_cast` runs inside `_physics_process`; the bolt root is a
+## Node2D, not an Area2D, so it's not strictly subject to the monitoring-mutation
+## panic — but the deferred add keeps the spawn block uniform with the
+## death-particle / hitbox sites per `.claude/docs/combat-architecture.md`
+## § "Why call_deferred even though CPUParticles2D is not an Area2D").
+##
+## The bolt parents to the construct's parent (the room) so it survives the
+## construct's own death-tween + outlives the cast-recovery state. Returns the
+## bolt for test inspection.
+func _spawn_cast_bolt(spawn_pos: Vector2, target_pos: Vector2) -> Node2D:
+	var room: Node = get_parent()
+	if room == null:
+		return null
+	var bolt: Node2D = ArchiveSentinelCastBoltScript.new()
+	bolt.configure(spawn_pos, target_pos, CAST_BOLT_TRAVEL_DURATION)
+	room.call_deferred("add_child", bolt)
+	_combat_trace(
+		"ArchiveSentinel._spawn_cast_bolt",
+		(
+			"visible cast bolt spawn=(%.0f,%.0f) target=(%.0f,%.0f) travel=%.2f z=%d"
+			% [
+				spawn_pos.x,
+				spawn_pos.y,
+				target_pos.x,
+				target_pos.y,
+				CAST_BOLT_TRAVEL_DURATION,
+				ArchiveSentinelCastBoltScript.BOLT_Z_INDEX
+			]
+		)
+	)
+	return bolt
 
 
 # ---- Slam attack (phase 2 only) ---------------------------------------
