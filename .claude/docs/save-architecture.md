@@ -1,16 +1,16 @@
 # Save Architecture — version-gate, additive reads, backfill patterns
 
-What this doc covers: the load-bearing patterns used by `scripts/save/Save.gd` to handle save-data evolution across schema versions. The system shipped incrementally — `_upgrade_payload` version-gate (v0→v1→v2→v3→v4), `has()`-guard additive reads for forward-compat fields (W2-T6 era), and unconditional-backfill outside the version-gate for tier-3 quest fields (PR #352). Each pattern has a distinct when-to-use and when-not-to-use.
+What this doc covers: the load-bearing patterns used by `scripts/save/Save.gd` to handle save-data evolution across schema versions. The system shipped incrementally — the `migrate()` version-gate (v0→v1→…→v5), `has()`-guard additive reads for forward-compat fields (W2-T6 era), and unconditional-backfill outside the version-gate for tier-3 quest fields (PR #352). Each pattern has a distinct when-to-use and when-not-to-use.
 
-## Version-gate pattern — `_upgrade_payload(payload, from_version)`
+## Version-gate pattern — `migrate(data, from_version)`
 
-The canonical migration path: when `Save.gd::migrate()` sees a save-file whose `schema_version` is older than the runtime's `CURRENT_SCHEMA_VERSION`, it calls `_upgrade_payload(payload, from_version)` which dispatches per-version transformer functions (`_migrate_v0_to_v1`, `_migrate_v1_to_v2`, ...) in sequence. Each transformer is a pure function: take a payload at version `N`, return a payload shaped for version `N+1`.
+The canonical migration path: `Save.gd::migrate(data, from_version)` takes the on-disk payload plus its `from_version` and runs a sequence of inline `if from_version < N:` gates, each calling a per-version transformer function (`_migrate_v0_to_v1`, `_migrate_v1_to_v2`, …) in order. Each transformer is a pure function: take a payload at version `N`, return a payload shaped for version `N+1`. (Saves whose `from_version` exceeds the runtime `SCHEMA_VERSION` are passed through as-is with a `WarningBus`-routed warning.)
 
 **When to use:** when a save-schema change is non-backward-compatible — a field rename, a type change, a structure flattening, a removed field that needs translation. The version-gate guarantees old saves get explicit handling; the per-version chain is straightforward to test (one fixture per version, assert each step).
 
 **When NOT to use:** for additive fields where the read-site can default cleanly (see `has()`-guard pattern below). Bumping the schema-version every time you add a field is high-cost — every migration step has to be authored, paired with a test fixture, and verified end-to-end. Reserve version-bumps for genuinely breaking changes.
 
-**Cite:** `scripts/save/Save.gd::_upgrade_payload` (line varies — grep for the function). Test fixtures live at `tests/test_save_migration.gd` with one test per version-step.
+**Cite:** `scripts/save/Save.gd::migrate` dispatches the `_migrate_vN_to_vN+1` chain (grep for the function names — `SCHEMA_VERSION` is the runtime version constant). Test fixtures live at `tests/test_save_migration.gd` with one test per version-step.
 
 ## Additive `has()`-guard read pattern — same-version forward-compat
 
@@ -39,16 +39,17 @@ The pattern shipped with PR #352 (`scripts/save/Save.gd::migrate()` calls `_back
 
 ```gdscript
 # scripts/save/Save.gd::migrate (simplified)
-func migrate(payload: Dictionary) -> Dictionary:
-    var from_version = payload.get("schema_version", 0)
-    if from_version < CURRENT_SCHEMA_VERSION:
-        payload = _upgrade_payload(payload, from_version)
-    # backfill runs AFTER the version-gate, on every load
-    _backfill_v5_tier3_quest_fields(payload)
-    return payload
+func migrate(data: Dictionary, from_version: int) -> Dictionary:
+    var out := data.duplicate(true)
+    if from_version < 1: out = _migrate_v0_to_v1(out)
+    # ... per-version gates up to v5 ...
+    if from_version < 5: out = _migrate_v4_to_v5(out)
+    # backfill runs AFTER the version-gate, on every load (returns the dict)
+    out = _backfill_v5_tier3_quest_fields(out)
+    return out
 ```
 
-**Why the unconditional placement (outside the version-gate):** Tier-3 quest fields were added inside the v5 era — the build that introduced them was already on `schema_version = 5`. A save written by an earlier v5 build (before the quest fields landed) reads as `schema_version = 5` too — but it lacks the fields. The version-gate sees `from_version == CURRENT_SCHEMA_VERSION` and skips `_upgrade_payload` entirely; without the unconditional backfill, the missing-field state propagates to the read sites.
+**Why the unconditional placement (outside the version-gate):** Tier-3 quest fields were added inside the v5 era — the build that introduced them was already on `schema_version = 5`. A save written by an earlier v5 build (before the quest fields landed) reads as `schema_version = 5` too — but it lacks the fields. The version-gate sees `from_version == SCHEMA_VERSION` and skips every `_migrate_vN_to_vN+1` step (all the `if from_version < N` gates are false); without the unconditional backfill, the missing-field state propagates to the read sites.
 
 **The trap this avoids:** treating "save is on the current schema version" as equivalent to "save has every field the current build expects." That equivalence holds across version-bumps (because the migration chain enforces it) but NOT across feature additions within a version (because nothing enforces it). The unconditional backfill is the feature-addition counterpart of the version-gate's version-bump enforcement.
 
@@ -73,8 +74,8 @@ Belt-and-braces is acceptable for high-stakes fields (anything Player or Save de
 
 **Worked example — PR #352 → PR #362 (3-week gap):**
 
-- PR #352 (commit `8a0cc76`, ticket `86c9y7ydg`) added `Player.to_save_dict` (`scripts/player/Player.gd:2045`) and `Player.restore_from_save_dict` (`scripts/player/Player.gd:2071`) for `active_bounty` / `completed_bounties`, plus the `_backfill_v5_tier3_quest_fields` migration. GUT tests at the Save.gd-migrate seam passed.
-- The methods were never wired into `Main._persist_to_save` (`scenes/Main.gd:1106`) or `Main._load_save_or_defaults` (`scenes/Main.gd:1060`). In-memory Player state never round-tripped; the fields survived only because the migration backfill wrote non-null defaults on every load.
+- PR #352 (commit `8a0cc76`, ticket `86c9y7ydg`) added `scripts/player/Player.gd::to_save_dict` and `scripts/player/Player.gd::restore_from_save_dict` for `active_bounty` / `completed_bounties`, plus the `_backfill_v5_tier3_quest_fields` migration. GUT tests at the Save.gd-migrate seam passed.
+- The methods were never wired into `scenes/Main.gd::_persist_to_save` or `scenes/Main.gd::_load_save_or_defaults`. In-memory Player state never round-tripped; the fields survived only because the migration backfill wrote non-null defaults on every load.
 - PR #362 (commit `9393473`, ticket `86c9y10fv`) closed the gap with one-line invocations on both sides.
 
 **Why the defect was silent:**
