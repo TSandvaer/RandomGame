@@ -521,4 +521,12 @@ This file is the orchestrator's source of truth between heartbeat ticks. Each ro
 
 ## Sponsor sign-off queue
 
-(empty — next entry will be M1 First Playable build.)
+### 2026-05-29 — S2 traversal shape: procgen-driven (A) vs hand-authored sequence (B) — BLOCKS ticket `86ca1m0ph`
+
+**Surfaced by:** PR #376 (W3-T7 Stage 6) diagnose-via-trace — all authored S2 content (zones #360, SunkenScholar #364, BoneCatalyst #367, chunks #369, boss room #374/#376) is UNREACHABLE in normal play; `Main._on_descend_restart_run` reloads S1 Room01 as a placeholder, real S2 transition deferred in three "post-M2 W3" in-code comments. Reachable only via the `?start_room=9` debug param.
+
+**The decision:** how should descend → S2 traverse?
+- **Option A (Priya-recommended):** procgen-driven — descend → `FloorAssembler.assemble_floor(S2 ZoneDefs, world_seed)`. W2-T3 assembler (`86c9y1045`) is COMPLETE; `86c9y7ygj` Part A authored S2 ZoneDefs to feed it. Realizes the Diablo-shape per-character randomized-map vision (Commitment 5) directly. Size M-L.
+- **Option B:** hand-authored static S2 room sequence first (mirror S1 linear-index pattern), defer procgen traversal. Faster to reachable-S2; builds a throwaway linear sequence procgen later replaces; loses per-character S2 randomization until a follow-up. Size M.
+
+**Why this is Sponsor-strategic (not orchestrator-auto):** depends on procgen-vs-hand-authored S2 traversal sequencing + M3 Tier-3 calendar pressure — a scope/sequence call, on the never-auto-decide list. Ticket `86ca1m0ph` is shaped scope-conditional and **must NOT dispatch until A vs B is locked.**
