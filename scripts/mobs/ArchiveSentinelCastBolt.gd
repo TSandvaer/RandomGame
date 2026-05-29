@@ -94,6 +94,42 @@ func _ready() -> void:
 	)
 	safety.timeout.connect(_safety_free)
 
+	# Renderer-observable visibility trace — emitted from _ready (the bolt is NOW
+	# in the tree, modulate is its real on-screen value, z is set). This is the
+	# load-bearing "the visible attack node is actually VISIBLE when the cast
+	# lands" signal the Playwright spec asserts on. `ArchiveSentinel._spawn_cast_bolt`
+	# traces the spawn INTENT (before the deferred add); THIS line proves the node
+	# rendered visible. Regression guard for the Sponsor "HP just drops, nothing
+	# visible" re-soak (ticket 86c9y7ygj) — node-presence + visibility is
+	# assertable headless; human-perceptibility stays the Sponsor-soak gate.
+	_emit_visible_trace()
+
+
+## Emit the on-screen visibility state via the DebugFlags combat-trace shim (same
+## shim ArchiveSentinel uses). Reads `visible`, `modulate.a`, `z_index`, and the
+## body type back AFTER mount so the values are renderer-truth, not spawn-intent.
+func _emit_visible_trace() -> void:
+	if not is_inside_tree():
+		return
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags")
+	if df == null or not df.has_method("combat_trace"):
+		return
+	var body_is_color_rect: bool = _bolt != null and _bolt is ColorRect
+	df.combat_trace(
+		"ArchiveSentinelCastBolt._ready",
+		(
+			"VISIBLE bolt pos=(%.0f,%.0f) visible=%s alpha=%.2f z=%d color_rect=%s"
+			% [
+				global_position.x,
+				global_position.y,
+				str(visible),
+				modulate.a,
+				z_index,
+				str(body_is_color_rect),
+			]
+		)
+	)
+
 
 func _on_arrival() -> void:
 	if _bolt == null or not is_instance_valid(_bolt):

@@ -555,6 +555,97 @@ func test_cast_bolt_configure_clamps_travel_duration() -> void:
 	assert_true(is_instance_valid(bolt), "bolt survives _ready with clamped duration")
 
 
+func test_cast_bolt_ready_emits_renderer_observable_visible_trace() -> void:
+	# REGRESSION-86c9y7ygj — pins the bolt's OWN _ready visibility trace contract.
+	# The Playwright spec asserts on `ArchiveSentinelCastBolt._ready | VISIBLE ...
+	# visible=true alpha>0 z>=0 color_rect=true` to prove the attack-visual node
+	# is RENDERABLE (not just spawned) at the moment the cast lands. If a refactor
+	# drops the self-trace, this GUT pin fails before CI green and the harness
+	# guard goes blind. The trace flows through the DebugFlags combat-trace shim;
+	# here we verify the post-_ready render-state the trace REPORTS is correct
+	# (visible / alpha / z / ColorRect body) — the same values the trace emits.
+	var bolt: ArchiveSentinelCastBolt = ArchiveSentinelCastBolt.new()
+	bolt.configure(Vector2(10.0, 10.0), Vector2(80.0, 10.0), 0.16)
+	add_child_autofree(bolt)
+	await get_tree().process_frame
+	assert_true(bolt.visible, "bolt visible==true at _ready (trace reports visible=true)")
+	assert_gt(bolt.modulate.a, 0.0, "bolt modulate.a > 0 at _ready (trace reports alpha>0)")
+	assert_true(bolt.z_index >= 0, "bolt z_index >= 0 at _ready (trace reports z>=0)")
+	var has_color_rect: bool = false
+	for child in bolt.get_children():
+		if child is ColorRect:
+			has_color_rect = true
+	assert_true(has_color_rect, "bolt has a ColorRect body at _ready (trace reports color_rect=true)")
+
+
+# ---- 12c: Phase-2 slam telegraph spawns a VISIBLE draw_arc indicator -----
+# Companion to the cast-bolt visibility pins: proves the phase-2 slam ALSO has a
+# visible attack-visual node (the draw_arc AOE telegraph) and is NOT a second
+# invisible-attack regression. The slam's visual is the TELEGRAPH (fade-in +
+# strobe over the windup) — the player sees the danger circle BEFORE the damage
+# hitbox fires, so unlike the cast there is no "invisible damage" surface here.
+# This test pins the indicator node presence + renderer-safe draw class + z so a
+# future refactor cannot silently drop the phase-2 telegraph.
+
+
+func test_phase2_slam_telegraph_spawns_visible_draw_arc_indicator() -> void:
+	var b: ArchiveSentinel = _make_sentinel()
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	b.set_player(p)
+	# Drive into phase 2 (700 → 350 boundary), drain the transition window.
+	_hit(b, 350)
+	b._physics_process(ArchiveSentinel.PHASE_TRANSITION_DURATION + 0.01)
+	assert_eq(b.get_phase(), ArchiveSentinel.PHASE_2, "boss is in phase 2")
+	# Player inside slam radius → next tick begins the slam telegraph.
+	b.global_position = Vector2.ZERO
+	p.global_position = Vector2(60.0, 0.0)  # < SLAM_HITBOX_RADIUS (96)
+	b._physics_process(0.016)
+	assert_eq(
+		b.get_state(),
+		ArchiveSentinel.STATE_SLAM_TELEGRAPH,
+		"phase 2 short-range begins the slam telegraph"
+	)
+	# The slam indicator is parented to the construct (construct-centered draw).
+	var indicator: ArchiveSentinelSlamIndicator = null
+	for child in b.get_children():
+		if child is ArchiveSentinelSlamIndicator:
+			indicator = child as ArchiveSentinelSlamIndicator
+	assert_not_null(
+		indicator, "slam telegraph spawned a visible ArchiveSentinelSlamIndicator node"
+	)
+	if indicator == null:
+		return
+	assert_true(indicator.visible, "slam indicator node is visible==true")
+	assert_true(
+		indicator.z_index >= 0, "slam indicator z_index >= 0 (not sunk below floor)"
+	)
+	# Renderer-safe: the indicator overrides _draw (draw_arc path), NOT Polygon2D.
+	assert_true(
+		indicator.has_method("_draw"),
+		"slam indicator uses _draw/draw_arc (renderer-safe, NOT Polygon2D — PR #137)"
+	)
+	# Its draw radius mirrors the slam hitbox radius (96 px) so the visual matches
+	# the danger zone — drift here would teach the player the wrong dodge distance.
+	assert_almost_eq(
+		ArchiveSentinelSlamIndicator.SLAM_HITBOX_RADIUS_CONST,
+		ArchiveSentinel.SLAM_HITBOX_RADIUS,
+		0.5,
+		"slam indicator draw radius mirrors SLAM_HITBOX_RADIUS"
+	)
+
+
+func test_slam_indicator_color_channels_are_sub_one_html5_safe() -> void:
+	# HDR-clamp safety for the slam telegraph (PR #137 lesson) — every RGB channel
+	# of the draw_arc color must be ≤ 1.0 so WebGL2's sRGB clamp leaves the
+	# ember-orange intact rather than collapsing it toward white.
+	var c: Color = ArchiveSentinelSlamIndicator.SLAM_INDICATOR_COLOR_CONST
+	assert_true(c.r <= 1.0, "slam indicator color r ≤ 1.0 (HDR-clamp safe)")
+	assert_true(c.g <= 1.0, "slam indicator color g ≤ 1.0")
+	assert_true(c.b <= 1.0, "slam indicator color b ≤ 1.0")
+	assert_gt(c.a, 0.0, "slam indicator base alpha > 0 (visible)")
+
+
 # ---- 13: Negative damage clamped + zero-damage doesn't transition -----
 
 

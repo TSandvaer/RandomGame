@@ -87,6 +87,26 @@ const SENTINEL_WAKE_TRACE = /\[combat-trace\] ArchiveSentinel\.wake/;
 const CAST_FIRE_TRACE = /\[combat-trace\] ArchiveSentinel\._fire_cast \|/;
 const CAST_BOLT_TRACE = /\[combat-trace\] ArchiveSentinel\._spawn_cast_bolt \| visible cast bolt/;
 
+// Renderer-observable visibility trace emitted from the bolt's OWN _ready (after
+// the deferred add lands — modulate / z / visible are on-screen truth, NOT
+// spawn-intent). `visible=true alpha>0 z>=0 color_rect=true` is the assertable
+// "the attack node is actually visible at the moment the cast lands" signal.
+// This is STRONGER than the spawn-trace implication: it proves not just that a
+// node was spawned, but that the spawned node is in a renderable state.
+const CAST_BOLT_VISIBLE_TRACE =
+  /\[combat-trace\] ArchiveSentinelCastBolt\._ready \| VISIBLE bolt pos=\([-\d]+,[-\d]+\) visible=true alpha=([\d.]+) z=(\d+) color_rect=true/;
+
+// Phase-2 slam-telegraph trace. `_begin_slam_telegraph` spawns the renderer-safe
+// `draw_arc` AOE indicator (`_spawn_slam_indicator`). Slam is phase-2-only
+// (HP ≤ 50%) + requires the player within SLAM_HITBOX_RADIUS, so a passive
+// `?start_room=9` boot does NOT reach it — this implication guard only fires IF
+// a slam telegraph occurs (defends against a future invisible-slam regression
+// without fabricating a phase-2 harness drive; phase-2 render is proven by the
+// GUT pin + the author self-soak screenshot). `_fire_slam_hit` is the damage;
+// `_spawn_slam_indicator` is the visible telegraph that MUST precede it.
+const SLAM_FIRE_TRACE = /\[combat-trace\] ArchiveSentinel\._fire_slam_hit \|/;
+const SLAM_INDICATOR_TRACE = /\[combat-trace\] ArchiveSentinel\._spawn_slam_indicator \| radius=/;
+
 test.describe("Stratum2BossRoom production wiring (W3-T7 Stage 6)", () => {
   test("?start_room=9 boots into the S2 boss room; continuous-scroll engages; Sentinel wakes; no warnings", async ({
     page,
@@ -185,6 +205,44 @@ test.describe("Stratum2BossRoom production wiring (W3-T7 Stage 6)", () => {
       !castFired || boltSpawned,
       "cast damage never lands without a concurrent visible cast-bolt node " +
         "(_fire_cast present ⟹ _spawn_cast_bolt present)"
+    ).toBe(true);
+
+    // 4c. RENDERER-OBSERVABLE VISIBILITY — the spawned bolt is NOT just present
+    //     but actually in a renderable state at mount (visible==true, alpha>0,
+    //     z>=0, ColorRect body). This is the brief-mandated assertion that the
+    //     attack-visual node is visible at the moment player damage applies. The
+    //     spawn-presence guard above proves the node exists; THIS proves it
+    //     renders. The bolt's own _ready emits the trace after the deferred add,
+    //     so the values are on-screen truth.
+    await expect(async () => {
+      const visibleLine = capture
+        .getLines()
+        .find((l) => CAST_BOLT_VISIBLE_TRACE.test(l.text));
+      expect(
+        visibleLine,
+        "ArchiveSentinelCastBolt rendered visible (visible=true, alpha>0, z>=0, " +
+          "ColorRect body) — the attack-visual node is renderable, not just spawned"
+      ).toBeDefined();
+      // Pin alpha > 0 from the captured group so a 0.00 alpha (invisible) fails.
+      const m = visibleLine?.text.match(CAST_BOLT_VISIBLE_TRACE);
+      const alpha = m ? parseFloat(m[1]) : 0;
+      expect(alpha, "cast bolt on-screen alpha is > 0 (not fully transparent)").toBeGreaterThan(0);
+    }).toPass({ timeout: 15_000 });
+
+    // 4d. PHASE-2 SLAM TELEGRAPH IS VISIBLE (implication guard). Slam is
+    //     phase-2-only (HP ≤ 50%) + requires the player within 96 px, so this
+    //     passive boot does NOT reach it — but IF a slam ever fires in this
+    //     stream, the visible draw_arc telegraph indicator MUST have been
+    //     spawned. Guards a future invisible-slam regression WITHOUT fabricating
+    //     a phase-2 harness drive (no-silent-harness-compensation). Phase-2
+    //     render is positively proven by the GUT pin + the author self-soak
+    //     screenshot; this is the cheap regression backstop in the smoke path.
+    const slamFired = capture.getLines().some((l) => SLAM_FIRE_TRACE.test(l.text));
+    const slamTelegraphed = capture.getLines().some((l) => SLAM_INDICATOR_TRACE.test(l.text));
+    expect(
+      !slamFired || slamTelegraphed,
+      "slam damage never lands without a preceding visible draw_arc telegraph " +
+        "(_fire_slam_hit present ⟹ _spawn_slam_indicator present)"
     ).toBe(true);
 
     // 5. No physics-flush panic during the boss-room deferred fixture pass.
