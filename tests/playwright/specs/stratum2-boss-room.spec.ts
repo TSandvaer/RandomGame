@@ -107,6 +107,21 @@ const CAST_BOLT_VISIBLE_TRACE =
 const SLAM_FIRE_TRACE = /\[combat-trace\] ArchiveSentinel\._fire_slam_hit \|/;
 const SLAM_INDICATOR_TRACE = /\[combat-trace\] ArchiveSentinel\._spawn_slam_indicator \| radius=/;
 
+// Phase-blink reposition traces (W3-T7 Stage 6 — Uma §5.5a). The Sentinel
+// blinks (instant reposition + VFX) at the tail of a completed cast volley,
+// gated by the ~2.5s phase-1 floor + suppress-at-max-range. A `?start_room=9`
+// boot keeps the player inside AGGRO_RADIUS and NOT at max range, so the boss
+// casts → recovers → blinks within the boot window. `_fire_blink` is the
+// reposition decision; `ArchiveSentinelBlinkVfx._ready | VISIBLE` is the
+// renderer-observable VFX-node-mounted signal (same shape as the cast-bolt
+// visibility trace). The regression these guard: a reposition that teleports
+// the body with NO traversal VFX (would read as a generic-teleport bug per
+// Uma §5.5a) — `_fire_blink` present ⟹ the VFX node mounted visible.
+const BLINK_FIRE_TRACE =
+  /\[combat-trace\] ArchiveSentinel\._fire_blink \| depart_idx=\d+ depart=\([-\d]+,[-\d]+\) -> target_idx=(\d+) arrival=\([-\d]+,[-\d]+\)/;
+const BLINK_VFX_VISIBLE_TRACE =
+  /\[combat-trace\] ArchiveSentinelBlinkVfx\._ready \| VISIBLE blink depart=\([-\d]+,[-\d]+\) arrival=\([-\d]+,[-\d]+\) z=(\d+) preglow=true/;
+
 test.describe("Stratum2BossRoom production wiring (W3-T7 Stage 6)", () => {
   test("?start_room=9 boots into the S2 boss room; continuous-scroll engages; Sentinel wakes; no warnings", async ({
     page,
@@ -243,6 +258,32 @@ test.describe("Stratum2BossRoom production wiring (W3-T7 Stage 6)", () => {
       !slamFired || slamTelegraphed,
       "slam damage never lands without a preceding visible draw_arc telegraph " +
         "(_fire_slam_hit present ⟹ _spawn_slam_indicator present)"
+    ).toBe(true);
+
+    // 4e. PHASE-BLINK REPOSITION FIRES + VFX IS VISIBLE (W3-T7 Stage 6).
+    //     The boss casts → recovers → blinks once per volley (gated by the
+    //     ~2.5s phase-1 floor). With the player inside AGGRO_RADIUS and NOT at
+    //     max range, the boot window reaches at least one blink. The blink VFX
+    //     node mounts visible (its own _ready VISIBLE trace, preglow present).
+    //     This proves the reposition is a phase-shift WITH traversal VFX, not a
+    //     generic teleport (Uma §5.5a "must read as phase-shift, not teleport").
+    await expect(async () => {
+      const blinkLine = capture.getLines().find((l) => BLINK_FIRE_TRACE.test(l.text));
+      expect(
+        blinkLine,
+        "ArchiveSentinel._fire_blink fired — the construct phase-blinked to a " +
+          "different plinth at the tail of a cast volley"
+      ).toBeDefined();
+    }).toPass({ timeout: 20_000 });
+
+    // Implication guard: a blink decision MUST mount the visible traversal VFX.
+    const blinkFired = capture.getLines().some((l) => BLINK_FIRE_TRACE.test(l.text));
+    const blinkVfxVisible = capture.getLines().some((l) => BLINK_VFX_VISIBLE_TRACE.test(l.text));
+    expect(
+      !blinkFired || blinkVfxVisible,
+      "phase-blink never repositions the body without a visible traversal VFX " +
+        "(_fire_blink present ⟹ ArchiveSentinelBlinkVfx mounted visible) — reads " +
+        "as a phase-shift, not a generic teleport (Uma §5.5a)"
     ).toBe(true);
 
     // 5. No physics-flush panic during the boss-room deferred fixture pass.
