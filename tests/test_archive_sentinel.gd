@@ -226,11 +226,7 @@ func test_phase1_uses_cast_at_short_range() -> void:
 		ArchiveSentinel.STATE_CAST,
 		"phase 1 picks cast even when player is in slam radius"
 	)
-	assert_ne(
-		b.get_state(),
-		ArchiveSentinel.STATE_SLAM_TELEGRAPH,
-		"phase 1 does NOT use slam"
-	)
+	assert_ne(b.get_state(), ArchiveSentinel.STATE_SLAM_TELEGRAPH, "phase 1 does NOT use slam")
 
 
 func test_phase1_cast_fires_swing_spawned_with_cast_kind() -> void:
@@ -310,9 +306,7 @@ func test_phase2_picks_slam_at_short_range() -> void:
 	p.global_position = Vector2(60.0, 0.0)  # < SLAM_HITBOX_RADIUS (96)
 	b._physics_process(0.016)
 	assert_eq(
-		b.get_state(),
-		ArchiveSentinel.STATE_SLAM_TELEGRAPH,
-		"phase 2 picks slam at short range"
+		b.get_state(), ArchiveSentinel.STATE_SLAM_TELEGRAPH, "phase 2 picks slam at short range"
 	)
 
 
@@ -329,9 +323,7 @@ func test_phase2_uses_cast_at_long_range_even_when_slam_unlocked() -> void:
 	b.global_position = Vector2.ZERO
 	p.global_position = Vector2(300.0, 0.0)  # > SLAM_HITBOX_RADIUS, < AGGRO
 	b._physics_process(0.016)
-	assert_eq(
-		b.get_state(), ArchiveSentinel.STATE_CAST, "phase 2 falls back to cast at long range"
-	)
+	assert_eq(b.get_state(), ArchiveSentinel.STATE_CAST, "phase 2 falls back to cast at long range")
 
 
 # ---- 7: Damage-immunity gates -----------------------------------------
@@ -352,9 +344,7 @@ func test_waking_ignores_damage() -> void:
 	var hp_before: int = b.get_hp()
 	_hit(b, 100)
 	assert_eq(
-		b.get_hp(),
-		hp_before,
-		"WAKING rejects damage (extends intro-fairness through standup)"
+		b.get_hp(), hp_before, "WAKING rejects damage (extends intro-fairness through standup)"
 	)
 
 
@@ -365,11 +355,7 @@ func test_phase_transition_ignores_damage() -> void:
 	assert_true(b.is_in_phase_transition())
 	var hp_during: int = b.get_hp()
 	_hit(b, 99)
-	assert_eq(
-		b.get_hp(),
-		hp_during,
-		"PHASE_TRANSITION rejects damage (stagger immune)"
-	)
+	assert_eq(b.get_hp(), hp_during, "PHASE_TRANSITION rejects damage (stagger immune)")
 
 
 # ---- 8: boss_died emits exactly once ---------------------------------
@@ -398,9 +384,7 @@ func test_knockback_does_not_set_velocity() -> void:
 	# "the construct does not flinch".
 	var b: ArchiveSentinel = _make_sentinel()
 	b.take_damage(10, Vector2(500.0, -500.0), null)
-	assert_eq(
-		b.velocity, Vector2.ZERO, "knockback ignored — construct stays on its plinth"
-	)
+	assert_eq(b.velocity, Vector2.ZERO, "knockback ignored — construct stays on its plinth")
 
 
 # ---- 10: Layers + masks ----------------------------------------------
@@ -409,11 +393,7 @@ func test_knockback_does_not_set_velocity() -> void:
 func test_collision_layer_is_enemy() -> void:
 	var b: ArchiveSentinel = _make_sentinel()
 	# Enemy = bit 4 = 8. (LAYER_ENEMY = 1 << 3.)
-	assert_eq(
-		b.collision_layer,
-		ArchiveSentinel.LAYER_ENEMY,
-		"collision_layer = enemy (bit 4)"
-	)
+	assert_eq(b.collision_layer, ArchiveSentinel.LAYER_ENEMY, "collision_layer = enemy (bit 4)")
 
 
 func test_collision_mask_is_world_plus_player() -> void:
@@ -634,7 +614,9 @@ func test_cast_bolt_ready_emits_renderer_observable_visible_trace() -> void:
 	for child in bolt.get_children():
 		if child is ColorRect:
 			has_color_rect = true
-	assert_true(has_color_rect, "bolt has a ColorRect body at _ready (trace reports color_rect=true)")
+	assert_true(
+		has_color_rect, "bolt has a ColorRect body at _ready (trace reports color_rect=true)"
+	)
 
 
 # ---- 12c: Phase-2 slam telegraph spawns a VISIBLE draw_arc indicator -----
@@ -670,15 +652,11 @@ func test_phase2_slam_telegraph_spawns_visible_draw_arc_indicator() -> void:
 	for child in b.get_children():
 		if child is ArchiveSentinelSlamIndicator:
 			indicator = child as ArchiveSentinelSlamIndicator
-	assert_not_null(
-		indicator, "slam telegraph spawned a visible ArchiveSentinelSlamIndicator node"
-	)
+	assert_not_null(indicator, "slam telegraph spawned a visible ArchiveSentinelSlamIndicator node")
 	if indicator == null:
 		return
 	assert_true(indicator.visible, "slam indicator node is visible==true")
-	assert_true(
-		indicator.z_index >= 0, "slam indicator z_index >= 0 (not sunk below floor)"
-	)
+	assert_true(indicator.z_index >= 0, "slam indicator z_index >= 0 (not sunk below floor)")
 	# Renderer-safe: the indicator overrides _draw (draw_arc path), NOT Polygon2D.
 	assert_true(
 		indicator.has_method("_draw"),
@@ -726,3 +704,209 @@ func test_zero_damage_does_not_trigger_phase_check() -> void:
 	_hit(b, 0)
 	assert_signal_emit_count(b, "phase_changed", 0)
 	assert_eq(b.get_phase(), ArchiveSentinel.PHASE_1)
+
+
+# =====================================================================
+# Phase-blink reposition (W3-T7 Stage 6, ticket 86c9y7ygj) — Uma section 5.5a.
+# The Sentinel does NOT walk/chase; it phase-blinks (instant reposition +
+# VFX) between cast volleys to one of 4 fixed plinth-points. Coverage:
+#   B1. select_blink_target_idx picks FARTHEST-from-player.
+#   B2. select_blink_target_idx NEVER picks the current index (never adjacent).
+#   B3. Cadence hard-floor blocks a second blink until the floor elapses.
+#   B4. Floor differs phase 1 (2.5s) vs phase 2 (1.5s) — phase-2 tightens.
+#   B5. Suppress-at-max-range: no blink when player is beyond suppress range.
+#   B6. No move_and_slide / velocity stays ZERO — reposition is a teleport.
+#   B7. Blink target is one of the 4 fixed plinth-points (arena-bounded).
+#   B8. PLINTH_OFFSETS sub-arena bound + channel-safe VFX color sanity.
+# =====================================================================
+
+
+func _make_sentinel_at(pos: Vector2) -> ArchiveSentinel:
+	# A blink-ready sentinel rooted at pos with the plinth origin captured.
+	var b: ArchiveSentinel = _make_sentinel()
+	b.global_position = pos
+	b._ensure_plinth_origin()
+	return b
+
+
+# ---- B1: target-select picks the FARTHEST candidate -------------------
+
+
+func test_select_blink_target_idx_picks_farthest_from_player() -> void:
+	var candidates: Array = [
+		Vector2(0, 0),
+		Vector2(100, 0),
+		Vector2(200, 0),
+		Vector2(300, 0),
+	]
+	var idx: int = ArchiveSentinel.select_blink_target_idx(candidates, 1, Vector2(10, 0))
+	assert_eq(idx, 3, "picks the candidate farthest from the player")
+
+
+func test_select_blink_target_idx_player_near_far_end_picks_near_end() -> void:
+	var candidates: Array = [
+		Vector2(0, 0),
+		Vector2(100, 0),
+		Vector2(200, 0),
+		Vector2(300, 0),
+	]
+	var idx: int = ArchiveSentinel.select_blink_target_idx(candidates, 2, Vector2(290, 0))
+	assert_eq(idx, 0, "player near high end gives farthest at index 0")
+
+
+# ---- B2: never re-picks the current index (never adjacent) ------------
+
+
+func test_select_blink_target_idx_never_returns_current_index() -> void:
+	var candidates: Array = [
+		Vector2(0, 0),
+		Vector2(100, 0),
+		Vector2(200, 0),
+		Vector2(300, 0),
+	]
+	var idx: int = ArchiveSentinel.select_blink_target_idx(candidates, 0, Vector2(300, 0))
+	assert_ne(idx, 0, "never re-picks the currently-occupied plinth")
+	assert_eq(idx, 1, "falls to the next-farthest non-current candidate")
+
+
+# ---- B3: cadence hard-floor blocks back-to-back blinks ----------------
+
+
+func test_blink_floor_blocks_second_blink_until_elapsed() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(540, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+
+	var fired_1: bool = b.try_blink_for_test()
+	assert_true(fired_1, "first blink fires (floor was clear)")
+	assert_gt(b.get_blink_floor_left(), 0.0, "floor armed after blink")
+
+	var fired_2: bool = b.try_blink_for_test()
+	assert_false(fired_2, "second blink blocked while floor is armed")
+
+	b._blink_floor_left = 0.0
+	b._blink_in_progress = false
+	var fired_3: bool = b.try_blink_for_test()
+	assert_true(fired_3, "blink eligible again once floor elapses")
+
+
+# ---- B4: phase-2 floor is tighter than phase-1 ------------------------
+
+
+func test_blink_floor_tightens_in_phase_2() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(540, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+
+	assert_eq(b.get_phase(), ArchiveSentinel.PHASE_1)
+	b.try_blink_for_test()
+	var floor_p1: float = b.get_blink_floor_left()
+	assert_almost_eq(floor_p1, ArchiveSentinel.BLINK_FLOOR_PHASE_1, 0.001)
+
+	b.phase = ArchiveSentinel.PHASE_2
+	b._blink_floor_left = 0.0
+	b._blink_in_progress = false
+	b.try_blink_for_test()
+	var floor_p2: float = b.get_blink_floor_left()
+	assert_almost_eq(floor_p2, ArchiveSentinel.BLINK_FLOOR_PHASE_2, 0.001)
+
+	assert_lt(floor_p2, floor_p1, "phase-2 cadence is tighter than phase-1")
+
+
+# ---- B5: suppress-at-max-range ----------------------------------------
+
+
+func test_blink_suppressed_when_player_at_max_range() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	var far: float = ArchiveSentinel.AGGRO_RADIUS * ArchiveSentinel.BLINK_SUPPRESS_RANGE_FRAC + 50.0
+	p.global_position = Vector2(512, 384) + Vector2(far, 0)
+	add_child_autofree(p)
+	b.set_player(p)
+
+	var fired: bool = b.try_blink_for_test()
+	assert_false(fired, "no blink when player is already at max range")
+	assert_eq(b.get_blink_floor_left(), 0.0, "floor not armed when suppressed")
+
+
+func test_blink_not_suppressed_when_player_in_range() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(560, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	var fired: bool = b.try_blink_for_test()
+	assert_true(fired, "blink fires when player is in-range (not suppressed)")
+
+
+# ---- B6: no move_and_slide — velocity stays ZERO, reposition is teleport
+
+
+func test_blink_reposition_is_teleport_velocity_stays_zero() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(560, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+
+	b.try_blink_for_test()
+	assert_eq(b.velocity, Vector2.ZERO, "velocity ZERO right after blink fire")
+
+	for _i in 40:
+		await get_tree().process_frame
+		assert_eq(b.velocity, Vector2.ZERO, "velocity stays ZERO every frame of blink")
+
+	var landed_on_plinth: bool = false
+	for off in ArchiveSentinel.PLINTH_OFFSETS:
+		if b.global_position.distance_to(Vector2(512, 384) + off) < 0.5:
+			landed_on_plinth = true
+	assert_true(landed_on_plinth, "construct landed exactly on a fixed plinth-point")
+
+
+# ---- B7: blink target is one of the 4 fixed plinth-points -------------
+
+
+func test_blink_target_is_a_fixed_plinth_point() -> void:
+	var origin: Vector2 = Vector2(512, 384)
+	var b: ArchiveSentinel = _make_sentinel_at(origin)
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(560, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+
+	var before_idx: int = b.get_current_plinth_idx()
+	b.try_blink_for_test()
+	var after_idx: int = b.get_current_plinth_idx()
+	assert_ne(after_idx, before_idx, "plinth index changed on blink")
+	assert_true(
+		after_idx >= 0 and after_idx < ArchiveSentinel.PLINTH_OFFSETS.size(),
+		"target index in the fixed plinth set"
+	)
+
+
+# ---- B8: plinth offsets arena-bounded + VFX channels HDR-safe ---------
+
+
+func test_plinth_offsets_are_arena_bounded() -> void:
+	var center: Vector2 = Vector2(512, 384)
+	for off in ArchiveSentinel.PLINTH_OFFSETS:
+		var pos: Vector2 = center + off
+		assert_true(pos.x > 80 and pos.x < 944, "plinth x inside arena interior: %s" % pos)
+		assert_true(pos.y > 80 and pos.y < 688, "plinth y inside arena interior: %s" % pos)
+
+
+func test_blink_vfx_color_channels_are_sub_one_html5_safe() -> void:
+	var colors: Array = [
+		ArchiveSentinelBlinkVfx.EMBER_MOTE_COLOR,
+		ArchiveSentinelBlinkVfx.GLYPH_FLECK_COLOR,
+		ArchiveSentinelBlinkVfx.SEAM_COLOR,
+		ArchiveSentinelBlinkVfx.IMPACT_FLARE_COLOR,
+	]
+	for c in colors:
+		assert_true((c as Color).r <= 1.0, "r le 1.0 (HDR-clamp safe): %s" % c)
+		assert_true((c as Color).g <= 1.0, "g le 1.0: %s" % c)
+		assert_true((c as Color).b <= 1.0, "b le 1.0: %s" % c)
