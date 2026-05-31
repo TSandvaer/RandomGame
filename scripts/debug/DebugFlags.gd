@@ -69,7 +69,9 @@ const BOSS_HP_MULT_MAX: float = 5.0
 ## always reads the default. Trace line emitted on boot lists the resolved value.
 ##
 ## Usage:
-##   http://localhost:8080/?start_room=8                 → drops into boss room
+##   http://localhost:8080/?start_room=8                 → drops into S1 boss room
+##   http://localhost:8080/?start_room=9                 → drops into S2 boss room
+##                                                           (W3-T7 Stage 6)
 ##   http://localhost:8080/?start_room=8&boss_hp_mult=0.1 → boss room + 60 HP boss
 ##                                                           (phase 2 in ~1 hit)
 ##   http://localhost:8080/                              → Room 01 (production)
@@ -78,10 +80,15 @@ const BOSS_HP_MULT_MAX: float = 5.0
 ## phase-transition slow-mo) without needing to clear Rooms 01-07 first. The
 ## AC4 Playwright spec stops at Room 05 on a game-side death-physics-flush
 ## blocker (out of scope for boss-visual PRs); start_room bypasses that.
+##
+## **W3-T7 Stage 6 (ticket `86c9y7ygj`):** START_ROOM_MAX raised 8 → 9 so
+## `?start_room=9` reaches the newly-wired Stratum2BossRoom terminal index
+## (`Main.S2_BOSS_ROOM_INDEX`). The Stratum2BossRoom self-soak + Playwright
+## spec boot via this hook — the production `_load_room_at_index(9)` path.
 const START_ROOM_QUERY_PARAM: String = "start_room"
 const START_ROOM_DEFAULT: int = -1
 const START_ROOM_MIN: int = 0
-const START_ROOM_MAX: int = 8  # BOSS_ROOM_INDEX in Main.gd
+const START_ROOM_MAX: int = 9  # S2_BOSS_ROOM_INDEX in Main.gd (Stage 6)
 
 ## Force-descend URL query param — Sponsor/Devon soak utility (W2-T5 fix
 ## ticket `86c9y10fv`, 2026-05-24). When set on the HTML5 URL,
