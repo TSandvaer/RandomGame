@@ -43,8 +43,26 @@ signal stratum_descended
 
 const SAVE_SLOT: int = 0
 
-## Room sequence — 8 stratum-1 rooms then the boss room. Indexed by
-## `_current_room_index`.
+## Room sequence — 8 stratum-1 rooms, the S1 boss room, then the S2 boss
+## room as a terminal index. Indexed by `_current_room_index`.
+##
+## **W3-T7 Stage 6 (ticket `86c9y7ygj`) — S2 boss room reachability.** The
+## Stratum2BossRoom was authored standalone through Stages 1-5 with no
+## `_load_room_at_index` consumer (unreachable in production play). Stage 6
+## appends it at index 9 (`S2_BOSS_ROOM_INDEX`) so it is reachable via the
+## SAME production room-load mechanism every other room uses — and via the
+## `DebugFlags.start_room=9` URL hook for soak / Playwright.
+##
+## **Why a terminal index, NOT a full S2 room-sequence.** Main.gd has no S2
+## zone progression: the descend flow (`_on_descend_restart_run`) reloads
+## Room01 with S2 audio as a placeholder (DescendScreen subtitle: "Coming in
+## M2"); the real S2 scene transition is deferred "post-M2 W3" per three
+## in-code comments. Authoring an S2 room-by-room sequence is a separate
+## ticket-class (descend → S2 Room01 → … → S2 boss). Stage 6's scope is
+## "make the boss room REACHABLE" — appending it at a terminal index + the
+## start_room hook satisfies that without fabricating an S2 progression that
+## doesn't exist. When the real S2 sequence lands, this terminal entry stays
+## valid as the S2 sequence's final room.
 const ROOM_SCENE_PATHS: Array[String] = [
 	"res://scenes/levels/Stratum1Room01.tscn",
 	"res://scenes/levels/Stratum1Room02.tscn",
@@ -55,9 +73,20 @@ const ROOM_SCENE_PATHS: Array[String] = [
 	"res://scenes/levels/Stratum1Room07.tscn",
 	"res://scenes/levels/Stratum1Room08.tscn",
 	"res://scenes/levels/Stratum1BossRoom.tscn",
+	"res://scenes/levels/Stratum2BossRoom.tscn",
 ]
 
+## Index of the S1 boss room. The room-clear auto-advance (`_on_room_cleared`)
+## still treats this as the S1 terminal — it does NOT auto-advance into the
+## S2 boss room (descend is the inter-stratum gate). The S2 boss room is
+## reached via `start_room=9` (soak) or the future S2 sequence, never by
+## linear room-clear from the S1 boss.
 const BOSS_ROOM_INDEX: int = 8
+
+## W3-T7 Stage 6 — terminal index of the Stratum-2 boss room. Reachable via
+## `_load_room_at_index(9)` (start_room hook / future S2 sequence). Wired in
+## `_wire_room_signals` through the shared boss-room branch.
+const S2_BOSS_ROOM_INDEX: int = 9
 
 ## Room IDs for StratumProgression bookkeeping (matches the chunk_def.id
 ## fields in the .tres files). One-to-one with ROOM_SCENE_PATHS.
@@ -71,6 +100,7 @@ const ROOM_IDS: Array[StringName] = [
 	&"s1_room07",
 	&"s1_room08",
 	&"s1_boss_room",
+	&"s2_boss_room",  # W3-T7 Stage 6 — terminal S2 boss room
 ]
 
 ## M3 Tier 3 W2-T5 (ticket `86c9y10fv`) — world-map discovery hook.
@@ -95,7 +125,8 @@ const ROOM_INDEX_TO_ZONE_ID: Array[StringName] = [
 	&"s1_z1_outer_cloister",  # Room 06
 	&"s1_z1_outer_cloister",  # Room 07
 	&"s1_z1_outer_cloister",  # Room 08
-	&"s1_z1_outer_cloister",  # Boss room — still part of S1 z1
+	&"s1_z1_outer_cloister",  # S1 Boss room — still part of S1 z1
+	&"s2_z4_inner_sanctum",  # W3-T7 Stage 6 — S2 boss room = S2 zone 4 (inner sanctum)
 ]
 
 const PLAYER_SCENE_PATH: String = "res://scenes/player/Player.tscn"
@@ -172,6 +203,12 @@ var _vignette: Vignette = null
 var _current_room: Node = null
 var _current_room_index: int = 0
 var _boss_room: Stratum1BossRoom = null
+## W3-T7 Stage 6 — generic boss-room handle. Set for BOTH the S1 boss room
+## (index 8) and the S2 boss room (index 9). `_boss_room` (typed
+## Stratum1BossRoom) stays null for the S2 room; the generic node handle is
+## used for the cross-boss `get_stratum_exit()` read in
+## `_on_stratum_exit_unlocked`. Both rooms expose `get_stratum_exit()`.
+var _boss_room_node: Node = null
 var _loot_spawner: MobLootSpawner = null
 
 ## Room01 onboarding gate (ticket 86c9qbb3k). When the Room01 PracticeDummy
@@ -544,6 +581,7 @@ func _load_room_at_index(index: int) -> void:
 		_current_room.queue_free()
 		_current_room = null
 		_boss_room = null
+		_boss_room_node = null
 	var packed: PackedScene = load(ROOM_SCENE_PATHS[index]) as PackedScene
 	if packed == null:
 		push_error("[Main] failed to load room scene %s" % ROOM_SCENE_PATHS[index])
@@ -593,7 +631,12 @@ func _load_room_at_index(index: int) -> void:
 	# fire from any S1 room's _ready, but routing through Main lets the
 	# idempotence guard see the whole room-cycle without each room script
 	# having to know about audio.
-	if index != BOSS_ROOM_INDEX:
+	# W3-T7 Stage 6: the S2 boss room (index 9) is NOT an S1 room — skip the
+	# S1 ambient bed. The S2 boss room crossfades to `mus-boss-stratum2.ogg`
+	# from its own `entry_sequence_completed` handler (see
+	# `Stratum2BossRoom._on_entry_sequence_completed_audio`); starting S1
+	# ambient here would fight that crossfade.
+	if index != BOSS_ROOM_INDEX and index != S2_BOSS_ROOM_INDEX:
 		var ad: Node = _audio_director()
 		if ad != null and ad.has_method("play_stratum1_ambient"):
 			ad.play_stratum1_ambient()
@@ -619,23 +662,44 @@ func _wire_room_signals(room: Node, index: int) -> void:
 		if not room.is_connected("room_cleared", _on_room_cleared):
 			room.connect("room_cleared", _on_room_cleared)
 	# Boss room: subscribe to entry-sequence + boss_died + stratum_exit_unlocked.
-	if index == BOSS_ROOM_INDEX:
+	#
+	# **W3-T7 Stage 6 (ticket `86c9y7ygj`) — shared boss-room branch.** Both
+	# Stratum1BossRoom (index 8) and Stratum2BossRoom (index 9) expose the
+	# SAME signal surface (`get_boss()` returning a boss with `boss_died` +
+	# `damaged` + `phase_changed`, `stratum_exit_unlocked`, `boss_defeated`).
+	# The branch is therefore loosely-typed (`Node` + `has_signal` guards)
+	# rather than `as Stratum1BossRoom` so the S2 boss room flows through the
+	# identical wiring without a parallel branch. `_boss_room` keeps its
+	# `Stratum1BossRoom` field type for the S1-specific `get_stratum_exit()`
+	# read in `_on_stratum_exit_unlocked`; for the S2 room it's resolved via
+	# the generic `_boss_room_node` Node handle (both expose `get_stratum_exit`).
+	if index == BOSS_ROOM_INDEX or index == S2_BOSS_ROOM_INDEX:
+		_boss_room_node = room
+		# Keep the typed `_boss_room` pointer only for the S1 room (S1-specific
+		# call sites that need the concrete type). For S2 it stays null and the
+		# generic node handle is used.
 		_boss_room = room as Stratum1BossRoom
-		if _boss_room != null:
-			# Wire the boss too (same Levels.gain_xp + loot drop path).
-			# The boss is spawned by the room's _spawn_boss, which runs on
-			# the room's _ready. By the time we get here _ready has fired.
-			var boss: Stratum1Boss = _boss_room.get_boss()
+		# Wire the boss too (same Levels.gain_xp + loot drop path). The boss is
+		# spawned by the room's _spawn_boss on the room's _ready, which has
+		# fired by the time we get here. Single-pipeline loot rule (ticket
+		# `86c9uemdg`): Main's MobLootSpawner is the SOLE boss-loot pipeline —
+		# the boss room does NOT spawn its own loot. `_wire_mob` subscribes to
+		# the boss's `boss_died` so `ArchiveSentinel.boss_died` lands here.
+		if room.has_method("get_boss"):
+			var boss: Node = room.get_boss()
 			if boss != null:
 				_wire_mob(boss)
-			if not _boss_room.stratum_exit_unlocked.is_connected(_on_stratum_exit_unlocked):
-				_boss_room.stratum_exit_unlocked.connect(_on_stratum_exit_unlocked)
-			# M3-T4 — defeat title card. Lazy-instantiated per kill via
-			# the room's `boss_defeated` signal. Card subscribes once here
-			# (idempotent via `is_connected`); it `queue_free`s itself when
-			# the fade-out completes. See `scripts/ui/BossDefeatedTitleCard.gd`.
-			if not _boss_room.boss_defeated.is_connected(_on_boss_defeated):
-				_boss_room.boss_defeated.connect(_on_boss_defeated)
+		if room.has_signal("stratum_exit_unlocked"):
+			if not room.is_connected("stratum_exit_unlocked", _on_stratum_exit_unlocked):
+				room.connect("stratum_exit_unlocked", _on_stratum_exit_unlocked)
+		# M3-T4 — defeat title card. Lazy-instantiated per kill via the room's
+		# `boss_defeated` signal. Card subscribes once here (idempotent via
+		# `is_connected`); it `queue_free`s itself when the fade-out completes.
+		# The card reads `display_name` via tolerant lookups, so it renders
+		# the S2 boss name ("ARCHIVE SENTINEL") without an S2-specific path.
+		if room.has_signal("boss_defeated"):
+			if not room.is_connected("boss_defeated", _on_boss_defeated):
+				room.connect("boss_defeated", _on_boss_defeated)
 	else:
 		# Room01 has no `room_cleared` signal. Wire a fallback: when the last
 		# spawned mob dies, treat that as "cleared." This keeps the AC2 first-
@@ -1269,10 +1333,14 @@ func _on_room_cleared(_room_id: Variant = null) -> void:
 ## New Game + run simply instantiates a fresh node.
 ##
 ## **Signal payload** matches `Stratum1BossRoom.boss_defeated(boss: Stratum1Boss,
-## death_position: Vector2)`. The card only needs `boss` for the
-## `display_name` templating; `death_position` is forwarded for future
-## use (anchored card variants are out of scope for T4).
-func _on_boss_defeated(boss: Stratum1Boss, death_position: Vector2) -> void:
+## death_position: Vector2)` AND `Stratum2BossRoom.boss_defeated(boss:
+## ArchiveSentinel, death_position: Vector2)` (W3-T7 Stage 6). The `boss`
+## param is loosely typed `Node` so BOTH boss types connect cleanly — a
+## typed `Stratum1Boss` param would refuse the ArchiveSentinel payload at
+## connect time. The card only needs `boss` for the `display_name`
+## templating (read via tolerant lookups), so the loose type is safe;
+## `death_position` is forwarded for future anchored-card variants.
+func _on_boss_defeated(boss: Node, death_position: Vector2) -> void:
 	var packed: PackedScene = load(BOSS_DEFEATED_TITLE_CARD_SCENE_PATH) as PackedScene
 	if packed == null:
 		push_warning(
@@ -1313,8 +1381,20 @@ func _on_boss_defeated(boss: Stratum1Boss, death_position: Vector2) -> void:
 	# disturbing the other (e.g. if a "post-card cinematic" beat lands
 	# between F3 vignette and F3 camera). Same shape as the audio-resume
 	# wiring above — soft no-ops when the autoload / Vignette is absent.
+	# On card-dismiss, restore the boss room's RESTING camera, NOT the game-wide
+	# player-default. The boss room owns what "resting" means: the S1 boss room's
+	# resting zoom IS the CameraDirector default (so `restore_resting_camera()`
+	# is byte-equivalent to the legacy `reset_to_player()` follow-restore), but
+	# the S2 arena holds a standing 0.5 zoom-out that must SURVIVE the boss death
+	# (Sponsor re-soak #4 — boss death over-zoomed the arena). Prefer the room's
+	# own re-assert hook; fall back to `reset_to_player()` only when the active
+	# boss room doesn't expose it (defensive — every production boss room does).
+	# See `Stratum2BossRoom.restore_resting_camera` for the bug this guards.
 	var cam: Node = _camera_director()
-	if cam != null and cam.has_method("reset_to_player"):
+	if _boss_room_node != null and _boss_room_node.has_method("restore_resting_camera"):
+		var room: Node = _boss_room_node
+		card.title_card_dismissed.connect(func() -> void: room.restore_resting_camera())
+	elif cam != null and cam.has_method("reset_to_player"):
 		card.title_card_dismissed.connect(func() -> void: cam.reset_to_player())
 	if _vignette != null and _vignette.has_method("boss_defeat_return"):
 		card.title_card_dismissed.connect(func() -> void: _vignette.boss_defeat_return())
@@ -1324,15 +1404,21 @@ func _on_boss_defeated(boss: Stratum1Boss, death_position: Vector2) -> void:
 func _on_stratum_exit_unlocked() -> void:
 	# Boss is dead — drop loot already happened via _on_mob_died (the boss's
 	# `boss_died` was wired in _wire_mob). Mark boss room cleared.
+	#
+	# W3-T7 Stage 6: use the generic `_boss_room_node` handle so both the S1
+	# boss room (index 8) and S2 boss room (index 9) resolve their StratumExit
+	# + mark the right ROOM_IDS entry. `_current_room_index` distinguishes the
+	# two so the cleared-mark targets the correct room id.
 	var sp: Node = _stratum_progression()
-	if sp != null:
-		sp.mark_cleared(ROOM_IDS[BOSS_ROOM_INDEX])
+	if sp != null and _current_room_index >= 0 and _current_room_index < ROOM_IDS.size():
+		sp.mark_cleared(ROOM_IDS[_current_room_index])
 	_persist_to_save()
 	# Wire the StratumExit's descend signal so we open the descend screen
-	# when the player walks to the portal + presses E.
-	if _boss_room == null:
+	# when the player walks to the portal + presses E. Both boss rooms expose
+	# `get_stratum_exit()`; resolve via the generic node handle.
+	if _boss_room_node == null or not _boss_room_node.has_method("get_stratum_exit"):
 		return
-	var exit: StratumExit = _boss_room.get_stratum_exit()
+	var exit: StratumExit = _boss_room_node.get_stratum_exit()
 	if exit == null:
 		return
 	if not exit.descend_triggered.is_connected(_on_descend_triggered):
@@ -1528,7 +1614,11 @@ func _refresh_level_widget() -> void:
 func _refresh_room_label() -> void:
 	if _room_label == null:
 		return
-	if _current_room_index == BOSS_ROOM_INDEX:
+	if _current_room_index == S2_BOSS_ROOM_INDEX:
+		# W3-T7 Stage 6 — S2 boss room label.
+		_room_label.text = "STRATUM 2 · BOSS"
+		_room_label.add_theme_color_override("font_color", Color(0.823, 0.290, 0.235, 1.0))
+	elif _current_room_index == BOSS_ROOM_INDEX:
 		_room_label.text = "STRATUM 1 · BOSS"
 		_room_label.add_theme_color_override("font_color", Color(0.823, 0.290, 0.235, 1.0))
 	else:

@@ -19,6 +19,8 @@ extends GutTest
 ##  11. ARENA_BOUNDS pinned to 1024×768 (Uma §5.5 spec lock).
 ##  12. Scene .tscn carries four cardinal walls + floor (anti-regression
 ##      against silent wall-removal that would let player walk out mid-fight).
+##  13. (Stage 6) BossNameplate reused from S1 — spawned in deferred fixture
+##      pass, slides on entry_sequence_completed, opt-out when path empty.
 ##
 ## Replaces the pre-Stage-5 pending-stub scaffold that previously occupied
 ## this file (the W3-T4 placeholder tests; those were authored before Stage 5
@@ -234,6 +236,46 @@ func test_arena_bounds_constant_is_1024x768() -> void:
 	)
 
 
+# ---- 7b: arena-zoom calibration (soak-round-2 "characters too big" fix) -
+
+
+func test_arena_camera_zoom_constant_is_widest_allowed() -> void:
+	# Static contract — the wider 1024×768 arena needs the camera zoomed OUT
+	# vs the S1 viewport-native 480×270 default. 0.5 is CameraDirector's
+	# MIN_NORMALIZED_ZOOM (widest view). If this drifts back toward 1.0 the
+	# Sponsor "characters too big" regression re-opens. See ARENA_CAMERA_ZOOM
+	# rationale in Stratum2BossRoom.gd.
+	assert_eq(
+		Stratum2BossRoom.ARENA_CAMERA_ZOOM,
+		0.5,
+		"arena camera zooms OUT to 0.5 normalized (widest allowed) for the 1024×768 arena"
+	)
+
+
+func test_engage_camera_requests_zoom_out_for_arena() -> void:
+	# Behavioral pin — engaging the boss-room camera must zoom the
+	# CameraDirector OUT to ARENA_CAMERA_ZOOM (not leave it at the 1.0 default
+	# that renders the wide arena too tight). Drives the real CameraDirector
+	# autoload via a player in the "player" group, matching production.
+	var cam: Node = Engine.get_main_loop().root.get_node_or_null("CameraDirector")
+	if cam == null or not cam.has_method("current_zoom"):
+		pass_test("CameraDirector autoload absent in this GUT surface — skip behavioral pin")
+		return
+	var player: FakePlayerBody = FakePlayerBody.new()
+	player.add_to_group("player")
+	add_child_autofree(player)
+	var room: Stratum2BossRoom = _make_room()
+	await get_tree().process_frame  # drain deferred fixture pass (engages camera)
+	assert_almost_eq(
+		cam.current_zoom(),
+		Stratum2BossRoom.ARENA_CAMERA_ZOOM,
+		0.001,
+		"boss-room engage zooms camera OUT to ARENA_CAMERA_ZOOM"
+	)
+	# Guard against the regression's exact shape: zoom must be < default 1.0.
+	assert_lt(cam.current_zoom(), 1.0, "arena zoom is wider than the 480×270 default")
+
+
 # ---- 8: boss death emits boss_defeated + stratum_exit_unlocked -----
 
 
@@ -281,3 +323,63 @@ func test_room_scene_carries_arena_walls() -> void:
 	var floor_node: Node = room.get_node_or_null("ArenaFloor")
 	assert_not_null(floor_node, "scene has ArenaFloor")
 	assert_true(floor_node is ColorRect, "ArenaFloor is ColorRect")
+
+
+# ---- 10: BossNameplate reused from S1 + slides on entry complete (Stage 6) ----
+#
+# W3-T7 Stage 6 (ticket 86c9y7ygj): the Stage-5 `_spawn_boss_nameplate`
+# no-op hook is now a real spawn reusing `res://scenes/ui/BossNameplate.tscn`
+# (NOT a parallel S2 nameplate). The banner is spawned hidden in the deferred
+# fixture pass; `_complete_entry_sequence` calls `show_for(boss)` to start the
+# slide-in.
+
+
+func test_boss_nameplate_spawns_in_deferred_fixture_pass() -> void:
+	var room: Stratum2BossRoom = _make_room()
+	# Pre-drain: deferred fixture pass has NOT landed; nameplate absent.
+	assert_null(
+		room.get_boss_nameplate(),
+		"boss nameplate NOT spawned synchronously in _ready (deferred fixture pass)"
+	)
+	await get_tree().process_frame
+	# Post-drain: nameplate spawned + parented under the room.
+	var nameplate: Node = room.get_boss_nameplate()
+	assert_not_null(nameplate, "Stage 6: BossNameplate spawned in deferred fixture pass")
+	assert_eq(nameplate.get_parent(), room, "nameplate parented under the boss room (room lifecycle)")
+	# Reuse-the-S1-banner contract: the spawned node is the BossNameplate class
+	# (NOT a parallel S2-specific nameplate).
+	assert_true(nameplate is BossNameplate, "Stage 6: reuses the S1 BossNameplate class, not a parallel one")
+	# Hidden by default until show_for fires.
+	assert_false(nameplate.is_shown(), "nameplate hidden until entry sequence completes")
+
+
+func test_boss_nameplate_shows_on_entry_sequence_complete() -> void:
+	var room: Stratum2BossRoom = _make_room()
+	await get_tree().process_frame  # drain deferred fixture pass + entry auto-fire
+	var nameplate: Node = room.get_boss_nameplate()
+	assert_not_null(nameplate, "nameplate spawned")
+	assert_false(nameplate.is_shown(), "nameplate hidden during entry sequence (Beats 1-4)")
+	# Completing the entry sequence (Beat 4 → Beat 5 boundary) triggers the
+	# slide-in via show_for(boss).
+	room.complete_entry_sequence_for_test()
+	assert_true(
+		nameplate.is_shown(),
+		"Stage 6: nameplate slides in on entry_sequence_completed (Uma boss-intro.md BI-07)"
+	)
+
+
+func test_boss_nameplate_opt_out_when_scene_path_empty() -> void:
+	# The spawn guards on `boss_nameplate_scene_path == ""` so a test (or a
+	# future config) can opt out cleanly without crashing the room boot.
+	var packed: PackedScene = BOSS_ROOM_SCENE
+	var room: Stratum2BossRoom = packed.instantiate()
+	room.boss_nameplate_scene_path = ""
+	add_child_autofree(room)
+	await get_tree().process_frame
+	assert_null(
+		room.get_boss_nameplate(),
+		"empty boss_nameplate_scene_path opts out of the nameplate spawn cleanly"
+	)
+	# Completing the entry sequence must NOT crash with no nameplate present.
+	room.complete_entry_sequence_for_test()
+	assert_true(room.is_entry_sequence_completed(), "entry sequence completes fine without a nameplate")

@@ -292,6 +292,100 @@ const DamageScript: Script = preload("res://scripts/combat/Damage.gd")
 const ArchiveSentinelSlamIndicatorScript: Script = preload(
 	"res://scripts/mobs/ArchiveSentinelSlamIndicator.gd"
 )
+## Visible cast-bolt VFX — the cast's DAMAGE is an instantaneous Hitbox at the
+## captured target (dodge model unchanged); this node is the missing VISUAL so
+## the cast is no longer invisible (ticket 86c9y7ygj re-soak fix, Sponsor
+## 2026-05-29). Cosmetic only — carries no damage / no collision.
+const ArchiveSentinelCastBoltScript: Script = preload(
+	"res://scripts/mobs/ArchiveSentinelCastBolt.gd"
+)
+
+## Cast-bolt travel window — book → captured target. Short cosmetic cue; the
+## damage already fired instantaneously at the captured position. Kept just
+## under CAST_HITBOX_LIFETIME so the bolt reads as "the shot that just landed".
+const CAST_BOLT_TRAVEL_DURATION: float = 0.16
+
+## Phase-blink reposition VFX (cosmetic — no damage / no collision).
+const ArchiveSentinelBlinkVfxScript: Script = preload(
+	"res://scripts/mobs/ArchiveSentinelBlinkVfx.gd"
+)
+
+# ---- Phase-blink reposition (Uma §5.5a — Sponsor 2026-05-30 soak revision) --
+# The Sentinel does NOT walk/chase (move_speed_base stays 0.0, no
+# move_and_slide). It PHASE-BLINKS (instant reposition + 3-beat VFX) between
+# cast volleys, to one of 4 fixed plinth-points. Binding spec:
+# `team/uma-ux/palette-stratum-2.md` §5.5a.
+
+## Candidate plinth-points as OFFSETS from the construct's initial plinth
+## (center). Center + 10-/2-/6-o'clock interior positions per §5.5 boss-arena
+## note. Offsets (not absolute coords) so a bare-instanced test boss + the
+## production (512,384)-centered arena both get a valid arena-bounded set.
+## Arena interior is ~48..976 × ~48..720 (1024×768 walls 32px thick); these
+## offsets keep every candidate well inside the locked ports with dodge-room.
+const PLINTH_OFFSETS: Array[Vector2] = [
+	Vector2(0, 0),  # center
+	Vector2(-212, -154),  # 10 o'clock (upper-left)
+	Vector2(212, -154),  # 2 o'clock (upper-right)
+	Vector2(0, 216),  # 6 o'clock (bottom)
+]
+
+## Blink hard-floor (real-time between blinks) — phase 1 vs phase 2. Phase 1 is
+## a slow deliberate positioning puzzle; phase 2 tightens to a pressure tool
+## ("the book has lost patience"). Uma §5.5a item 4 feel-targets; Drew's balance
+## lever.
+##
+## RETUNE (Sponsor re-soak `d101b83`, 2026-05-31): the original 2.5/1.5 floors
+## let the construct reposition every ~2.8 s cast cycle, so a 1-damage-fist
+## player never accumulated enough hits to push the boss through its HP-gated
+## phase transitions — Sponsor "moves around too much (too fast), didn't get to
+## phase 2/3". Floors roughly doubled (per the brief's "roughly double, or more"
+## lever) AND composed with the every-N-volleys gate + defensive-range gate below
+## so an ATTACKING player gets clear, repeatable windows. P1 2.5 → 5.0,
+## P2 1.5 → 3.5.
+const BLINK_FLOOR_PHASE_1: float = 5.0
+const BLINK_FLOOR_PHASE_2: float = 3.5
+
+## Volleys-per-blink gate (RETUNE 2026-05-31). The construct blinks only every
+## Nth completed cast volley rather than every volley (Uma §5.5a item 4 "blink
+## once per completed cast volley" softened to "every N volleys" — Drew's balance
+## lever per the Appendix S2-state-machine exclusion). Composes with the hard
+## floor: a blink requires BOTH the volley count AND the floor to be satisfied.
+## Phase 1 = every 2nd volley (slow positioning puzzle); phase 2 = every volley
+## (the "lost patience" pressure beat). This is the dominant landability lever —
+## at CAST_COOLDOWN 1.5 + telegraph 0.9 + recovery 0.4 ≈ 2.8 s/volley, every-2nd
+## in P1 means a blink at most every ~5.6 s, giving the player a full clear
+## window to land hits between repositions.
+const BLINK_VOLLEYS_PER_BLINK_PHASE_1: int = 2
+const BLINK_VOLLEYS_PER_BLINK_PHASE_2: int = 1
+
+## Defensive-blink range (RETUNE 2026-05-31, Uma §5.5a item 4 "only blink
+## defensively when the player closes within some range"). The construct only
+## repositions when the player has closed INSIDE this radius (i.e. is positioned
+## to land melee hits). A player kept at distance — or a ranged player — does not
+## trigger a blink, so the construct does not chase forever and an attacker who
+## backs off keeps the construct planted. Combined with suppress-at-max-range
+## below this gives the band: [close → blink defensively] .. [far → suppress] ..
+## [max range → suppress]. Set just above SLAM_HITBOX_RADIUS (96) so "in melee /
+## about-to-be-in-melee" reads as the defensive trigger.
+const BLINK_DEFENSIVE_RANGE: float = 160.0
+
+## Suppress-at-max-range gate — if the player is already at/near AGGRO_RADIUS
+## (beyond cast reach and not pressing), there's no gaze-angle to re-close, so
+## don't blink away from someone already far (Uma §5.5a item 4b). Expressed as a
+## fraction of AGGRO_RADIUS so it tracks the aggro tuning.
+const BLINK_SUPPRESS_RANGE_FRAC: float = 0.95
+
+## Arrival-telegraph pre-roll — the construct's body stays invisible (mid-blink)
+## this long after the instant reposition while the arrival motes converge +
+## book-eye pre-glows, BEFORE the body reforms. The read/punish window. Mirrors
+## the VFX node's ARRIVAL_TELEGRAPH_PREROLL.
+const BLINK_REFORM_PREROLL: float = 0.160
+
+## Body dissolve/reform fade durations — the construct's own `modulate.a` round-
+## trips through 0 across the blink (NOT hide() — the alpha-fade IS the read per
+## §5.5a item 2). Departure fade-out, then reform fade-in after the pre-roll.
+const BLINK_DISSOLVE_DURATION: float = 0.140
+const BLINK_REFORM_DURATION: float = 0.140
 
 # ---- Inspector --------------------------------------------------------
 
@@ -378,6 +472,37 @@ var _attack_telegraph_tween: Tween = null
 var _slam_indicator: Node2D = null
 var _slam_indicator_tween: Tween = null
 
+# ---- Phase-blink runtime ----------------------------------------------
+
+## The construct's initial plinth (center) — captured at first physics tick so
+## PLINTH_OFFSETS resolve to absolute arena positions. Lazily captured because a
+## bare-instanced test boss may have its global_position set after _ready.
+var _plinth_origin: Vector2 = Vector2.ZERO
+var _plinth_origin_captured: bool = false
+
+## Index into PLINTH_OFFSETS of the candidate the construct currently occupies.
+## Starts at 0 (center). Target-selection never re-picks this index.
+var _current_plinth_idx: int = 0
+
+## Wall-clock since the last blink completed — gated against the phase floor.
+## Starts large so the FIRST eligible volley can blink immediately.
+var _blink_floor_left: float = 0.0
+
+## Body-fade tween ref — kept so death-mid-blink can cancel + restore alpha.
+var _blink_body_tween: Tween = null
+
+## True while the construct is mid-blink (dissolved/reforming). Suppresses any
+## re-entrant blink trigger. Cleared when the reform completes.
+var _blink_in_progress: bool = false
+
+## Completed-cast-volley counter since the last blink (RETUNE 2026-05-31). Each
+## cast volley (cast → fire → recovery-tail) increments this; a blink is gated to
+## fire only on every Nth volley per `_blink_volleys_per_blink()`. Reset to 0
+## when a blink fires. `try_blink_for_test()` bypasses this gate (it tests the
+## floor / suppress / target-select logic in isolation), so the GUT B-tests stay
+## stable; production routes through `_process_cast_recovery` which honors it.
+var _volleys_since_blink: int = 0
+
 
 func _ready() -> void:
 	_apply_mob_def()
@@ -408,6 +533,17 @@ func get_phase() -> int:
 	return phase
 
 
+## Ordered phase-boundary fractions (descending) — the HP fractions at which
+## the construct changes phase, as fractions of max_hp. The Sentinel is a
+## 2-phase boss with a single boundary at 50%, so this returns `[0.50]`.
+## Consumers (notably `BossNameplate`) derive segment count = len + 1 and the
+## per-phase fill spans from this list, so the nameplate's phase model tracks
+## the boss's actual phase count instead of hard-coding 3 segments. Read-only
+## introspection — does NOT change any phase logic (ticket 86ca1m0at).
+func get_phase_boundary_fracs() -> Array:
+	return [PHASE_2_HP_FRAC]
+
+
 func is_dead() -> bool:
 	return _is_dead
 
@@ -431,6 +567,31 @@ func is_in_phase_transition() -> bool:
 ## True in phase 2 — drives any phase-2-only behavior consumers want to gate.
 func is_phase_2() -> bool:
 	return phase == PHASE_2
+
+
+## True while the construct is mid-blink (dissolved / reforming). Exposed for
+## tests + any external observer that should hold off (e.g. a camera that
+## shouldn't re-frame mid-phase-shift).
+func is_blinking() -> bool:
+	return _blink_in_progress
+
+
+## Index of the plinth-point the construct currently occupies (0 = center).
+func get_current_plinth_idx() -> int:
+	return _current_plinth_idx
+
+
+## Remaining real-time on the blink hard-floor (0 = a blink is eligible).
+func get_blink_floor_left() -> float:
+	return _blink_floor_left
+
+
+## Test-only: drive a blink attempt from the current state without simulating a
+## full cast volley. Returns true if a blink fired. Production fires via
+## `_process_cast_recovery`'s tail; this exposes the same gated entry point for
+## headless GUT (cadence-floor, suppress-at-max-range, target-select coverage).
+func try_blink_for_test() -> bool:
+	return _try_blink_reposition()
 
 
 ## Inject the player target. Tests + spawner use this for determinism.
@@ -641,11 +802,7 @@ func _process_idle_active(_delta: float) -> void:
 	# Phase 2 only: prefer slam if cooldown is clear and player is in slam
 	# radius. Otherwise (phase 1, or phase 2 with slam on cooldown, or
 	# player outside slam radius) fall through to cast.
-	if (
-		phase >= PHASE_2
-		and _slam_cooldown_left <= 0.0
-		and dist <= SLAM_HITBOX_RADIUS
-	):
+	if phase >= PHASE_2 and _slam_cooldown_left <= 0.0 and dist <= SLAM_HITBOX_RADIUS:
 		_begin_slam_telegraph()
 		return
 	# Cast is the default attack — available in both phases at any range
@@ -661,7 +818,24 @@ func _process_cast_telegraph(_delta: float) -> void:
 
 func _process_cast_recovery(_delta: float) -> void:
 	if _cast_recovery_left <= 0.0:
+		# Blink-on-cast-recovery (Uma §5.5a item 4): a completed cast volley =
+		# the full cast → recovery cycle, so the tail of cast-recovery is the
+		# blink seam. RETUNE 2026-05-31 — gated by THREE conditions now (was
+		# floor + suppress only): (1) every-Nth-volley count, (2) the phase
+		# floor, (3) defensive-range (player must have closed in) + suppress-at-
+		# max-range. The every-N-volleys gate is the dominant landability lever
+		# — it guarantees the player a full clear window between repositions.
+		# If a blink fires, it owns the transition back to combat.
+		_volleys_since_blink += 1
+		if _volleys_since_blink >= _blink_volleys_per_blink() and _try_blink_reposition():
+			_volleys_since_blink = 0
+			return
 		_set_state(STATE_IDLE_ACTIVE)
+
+
+## Volleys required between blinks for the current phase (RETUNE 2026-05-31).
+func _blink_volleys_per_blink() -> int:
+	return BLINK_VOLLEYS_PER_BLINK_PHASE_2 if phase >= PHASE_2 else BLINK_VOLLEYS_PER_BLINK_PHASE_1
 
 
 func _process_slam_telegraph(_delta: float) -> void:
@@ -701,7 +875,7 @@ func _fire_cast() -> void:
 	var dmg: int = int(round(float(formula_dmg) * CAST_DAMAGE_MULTIPLIER))
 
 	# Direction from the construct toward the captured cast target.
-	var dir: Vector2 = (_cast_target_pos - global_position)
+	var dir: Vector2 = _cast_target_pos - global_position
 	var dir_norm: Vector2 = dir.normalized() if dir.length_squared() > 0.0 else Vector2.RIGHT
 
 	# Distance from construct to captured target — the hitbox is positioned
@@ -738,10 +912,327 @@ func _fire_cast() -> void:
 		CAST_HITBOX_RADIUS,
 		CAST_HITBOX_LIFETIME,
 	)
+	# Visible cast bolt — the damage hitbox above is invisible (bare Area2D);
+	# this cosmetic ember bolt travels book → captured target so the cast is
+	# perceptible. Without it the cast was invisible damage (Sponsor 2026-05-29
+	# re-soak: "HP just drops, nothing visible"). Cosmetic only — the dodge
+	# model + the GUT hitbox-position contract are unchanged.
+	_spawn_cast_bolt(global_position, _cast_target_pos)
 	_cast_recovery_left = CAST_RECOVERY_DURATION
 	_cast_cooldown_left = CAST_COOLDOWN
 	_set_state(STATE_CAST_RECOVERY)
 	swing_spawned.emit(SWING_KIND_CAST, hb)
+
+
+# ---- Cast bolt VFX (cosmetic — no damage) -----------------------------
+
+
+## Spawn the visible ember bolt that travels from the construct's book to the
+## captured cast target. Room-parented + deferred add_child per the physics-
+## flush rule (`_fire_cast` runs inside `_physics_process`; the bolt root is a
+## Node2D, not an Area2D, so it's not strictly subject to the monitoring-mutation
+## panic — but the deferred add keeps the spawn block uniform with the
+## death-particle / hitbox sites per `.claude/docs/combat-architecture.md`
+## § "Why call_deferred even though CPUParticles2D is not an Area2D").
+##
+## The bolt parents to the construct's parent (the room) so it survives the
+## construct's own death-tween + outlives the cast-recovery state. Returns the
+## bolt for test inspection.
+func _spawn_cast_bolt(spawn_pos: Vector2, target_pos: Vector2) -> Node2D:
+	var room: Node = get_parent()
+	if room == null:
+		return null
+	var bolt: Node2D = ArchiveSentinelCastBoltScript.new()
+	bolt.configure(spawn_pos, target_pos, CAST_BOLT_TRAVEL_DURATION)
+	room.call_deferred("add_child", bolt)
+	_combat_trace(
+		"ArchiveSentinel._spawn_cast_bolt",
+		(
+			"visible cast bolt spawn=(%.0f,%.0f) target=(%.0f,%.0f) travel=%.2f z=%d"
+			% [
+				spawn_pos.x,
+				spawn_pos.y,
+				target_pos.x,
+				target_pos.y,
+				CAST_BOLT_TRAVEL_DURATION,
+				ArchiveSentinelCastBoltScript.BOLT_Z_INDEX
+			]
+		)
+	)
+	return bolt
+
+
+# ---- Phase-blink reposition (Uma §5.5a) -------------------------------
+
+
+## Capture the construct's center plinth on first use so PLINTH_OFFSETS resolve
+## to absolute arena positions. Lazy because a bare-instanced test boss may set
+## global_position after _ready.
+func _ensure_plinth_origin() -> void:
+	if _plinth_origin_captured:
+		return
+	_plinth_origin = global_position
+	_plinth_origin_captured = true
+
+
+## Resolve the absolute world position of a plinth candidate by index.
+func _plinth_pos(idx: int) -> Vector2:
+	_ensure_plinth_origin()
+	return _plinth_origin + PLINTH_OFFSETS[idx]
+
+
+## Current real-time blink floor (phase 2 tightens the cadence). Uma §5.5a item4.
+func _blink_floor_for_phase() -> float:
+	return BLINK_FLOOR_PHASE_2 if phase >= PHASE_2 else BLINK_FLOOR_PHASE_1
+
+
+## Pure selection helper — pick the candidate index FARTHEST from the player,
+## NEVER the currently-occupied index (Uma §5.5a item 3: "pick the candidate
+## FARTHEST from the player's current position"; "Never blinks adjacent to the
+## player"). Extracted + static-friendly so unit tests pin the selection without
+## simulating physics. Ties broken by lowest index (deterministic).
+##
+##   `candidates`  — absolute world positions of every plinth.
+##   `current_idx` — the index to exclude (construct is standing there).
+##   `player_pos`  — the player's current world position.
+## Returns the chosen index, or `current_idx` if no other candidate exists.
+static func select_blink_target_idx(
+	candidates: Array, current_idx: int, player_pos: Vector2
+) -> int:
+	var best_idx: int = current_idx
+	var best_dist_sq: float = -1.0
+	for i in candidates.size():
+		if i == current_idx:
+			continue
+		var d_sq: float = (candidates[i] as Vector2).distance_squared_to(player_pos)
+		if d_sq > best_dist_sq:
+			best_dist_sq = d_sq
+			best_idx = i
+	return best_idx
+
+
+## Build the absolute candidate array for the live boss (test seam).
+func _plinth_candidates() -> Array:
+	_ensure_plinth_origin()
+	var out: Array = []
+	for off in PLINTH_OFFSETS:
+		out.append(_plinth_origin + off)
+	return out
+
+
+## Whether the blink is suppressed because the player is already at max range
+## (Uma §5.5a item 4b — no gaze-angle to re-close; don't blink away from someone
+## already far). Suppress when the player is beyond BLINK_SUPPRESS_RANGE_FRAC of
+## AGGRO_RADIUS. No player → suppress (nothing to re-fix on).
+func _blink_suppressed_at_max_range() -> bool:
+	if _player == null:
+		return true
+	var dist: float = global_position.distance_to(_player.global_position)
+	return dist >= AGGRO_RADIUS * BLINK_SUPPRESS_RANGE_FRAC
+
+
+## Defensive-blink gate (RETUNE 2026-05-31, Uma §5.5a item 4 "only blink
+## defensively when the player closes within some range"). The blink only fires
+## when the player has closed INSIDE BLINK_DEFENSIVE_RANGE — i.e. is positioned
+## to land hits. A player kept at a distance leaves the construct planted (it
+## does not chase a ranged / kiting player forever). No player → not defensive
+## (nothing to deny). Returns true when a defensive reposition is warranted.
+func _blink_player_within_defensive_range() -> bool:
+	if _player == null:
+		return false
+	var dist: float = global_position.distance_to(_player.global_position)
+	return dist <= BLINK_DEFENSIVE_RANGE
+
+
+## Slam-commit gate (Sponsor re-soak #4, 2026-05-31): the construct must COMMIT
+## to a telegraphed slam (red strobing aura circle) — telegraph → hit resolves —
+## before it is eligible to blink away. Without this gate a blink fired from the
+## cast-recovery seam (or any future trigger seam) overlapping a live slam
+## teleports the construct AND its construct-parented slam indicator off the
+## telegraphed footprint, so the red circle visibly abandons mid-windup. Suppress
+## a blink whenever a slam is telegraphing OR mid-execution (telegraph + recovery
+## window). Precise: this covers ONLY the slam window — once the slam resolves
+## (back to IDLE_ACTIVE / cast cadence) the construct resumes normal blink
+## eligibility, so the between-attacks blink cadence is unaffected.
+##
+## NOTE — cast telegraph is intentionally NOT gated here. The cast's
+## perceptible windup is the ember cast-bolt that fires AT `_fire_cast` time and
+## travels independently of the construct; the blink seam is the TAIL of
+## cast-recovery (`_process_cast_recovery`), which by construction only runs
+## AFTER `_fire_cast` has already resolved the cast. So a cast never has an
+## in-flight telegraph at the moment the blink is attempted — there is no
+## abandon-mid-windup analog for the cast. (Flagged per the dispatch brief's
+## cast-telegraph check.)
+func _is_slam_active() -> bool:
+	if _state == STATE_SLAM_TELEGRAPH or _state == STATE_SLAM_RECOVERY:
+		return true
+	# Defensive: the timer window can be non-zero a frame before/after the
+	# state flips (e.g. `_fire_slam_hit` re-arms recovery on the same tick the
+	# telegraph drains). Gate on the telegraph timer too so the suppression has
+	# no single-frame gap at the telegraph→hit boundary.
+	return _slam_telegraph_left > 0.0
+
+
+## Attempt a once-per-volley phase-blink. Returns true if a blink fired (the
+## caller must NOT also re-enter IDLE_ACTIVE — the blink owns the transition).
+## Gates: not already mid-blink, floor elapsed, not suppressed-at-max-range, a
+## valid different target exists.
+func _try_blink_reposition() -> bool:
+	# Bare preconditions (no per-reason trace): dead / mid-blink / floor not yet
+	# elapsed. The floor is folded in here so the function stays under the
+	# max-returns lint ceiling while the traced suppression reasons below keep
+	# their own diagnostic lines.
+	if _is_dead or _blink_in_progress or _blink_floor_left > 0.0:
+		return false
+	# Slam-commit gate (Sponsor re-soak #4): never blink away while a slam is
+	# telegraphing or mid-execution — the construct commits to the slam first.
+	# Checked BEFORE the range gates so the trace reads "SUPPRESSED slam active"
+	# rather than a misleading range reason. Resumes normal blink eligibility
+	# once the slam resolves.
+	if _is_slam_active():
+		_combat_trace(
+			"ArchiveSentinel._try_blink_reposition",
+			(
+				"SUPPRESSED slam active (state=%s telegraph_left=%.2f) — committing to slam"
+				% [_state, _slam_telegraph_left]
+			)
+		)
+		return false
+	if _blink_suppressed_at_max_range():
+		_combat_trace(
+			"ArchiveSentinel._try_blink_reposition",
+			"SUPPRESSED player at max range (no gaze-angle to re-close)"
+		)
+		return false
+	# Defensive-only gate (RETUNE 2026-05-31): blink ONLY when the player has
+	# closed inside the defensive range — an attacking player gets repositioned-
+	# away (the clear window), a distant / ranged player leaves the construct
+	# planted (no forever-chase). This is the band between "in melee → blink" and
+	# "far → suppress".
+	if not _blink_player_within_defensive_range():
+		_combat_trace(
+			"ArchiveSentinel._try_blink_reposition",
+			"SUPPRESSED player outside defensive range (no close-pressure to deny)"
+		)
+		return false
+	var candidates: Array = _plinth_candidates()
+	var player_pos: Vector2 = _player.global_position if _player != null else global_position
+	var target_idx: int = select_blink_target_idx(candidates, _current_plinth_idx, player_pos)
+	if target_idx == _current_plinth_idx:
+		return false  # no alternate plinth (degenerate single-candidate set)
+	_fire_blink(target_idx)
+	return true
+
+
+## Execute the blink: instant `global_position` set to the target plinth + the
+## 3-beat VFX. NO move_and_slide, NO position tween — teleport, not glide
+## (engineering constraint). The construct's BODY alpha-fades out (dissolve),
+## teleports while invisible, then reforms after the arrival-telegraph pre-roll
+## (the read/punish window). The world-space motes/flecks/seam-shimmer are owned
+## by the room-parented VFX node (physics-flush rule: `_fire_blink` runs from
+## `_physics_process`, so the VFX node is deferred-added to the room).
+func _fire_blink(target_idx: int) -> void:
+	_ensure_plinth_origin()
+	var depart_pos: Vector2 = global_position
+	var arrival_pos: Vector2 = _plinth_pos(target_idx)
+	_blink_in_progress = true
+	_combat_trace(
+		"ArchiveSentinel._fire_blink",
+		(
+			"depart_idx=%d depart=(%.0f,%.0f) -> target_idx=%d arrival=(%.0f,%.0f) phase=%d floor=%.2f"
+			% [
+				_current_plinth_idx,
+				depart_pos.x,
+				depart_pos.y,
+				target_idx,
+				arrival_pos.x,
+				arrival_pos.y,
+				phase,
+				_blink_floor_for_phase()
+			]
+		)
+	)
+	# Spawn the world-space traversal VFX (motes + flecks + floor-seam +
+	# arrival pre-glow). Room-parented + deferred-add per physics-flush rule.
+	_spawn_blink_vfx(depart_pos, arrival_pos)
+	# Body dissolve/teleport/reform — alpha round-trips through 0 (NOT hide()).
+	_run_blink_body_sequence(arrival_pos)
+	# Arm the floor + record the new plinth NOW (so even a death mid-blink
+	# leaves a consistent index).
+	_current_plinth_idx = target_idx
+	_blink_floor_left = _blink_floor_for_phase()
+
+
+## Spawn the room-parented blink VFX node. Cosmetic only.
+func _spawn_blink_vfx(depart_pos: Vector2, arrival_pos: Vector2) -> Node2D:
+	var room: Node = get_parent()
+	if room == null:
+		return null
+	var vfx: Node2D = ArchiveSentinelBlinkVfxScript.new()
+	vfx.configure(depart_pos, arrival_pos)
+	room.call_deferred("add_child", vfx)
+	return vfx
+
+
+## Body alpha-fade → teleport → reform tween. The teleport (`global_position`
+## set) happens at the dissolve/travel boundary while alpha == 0, so the body is
+## never visibly sliding. After the reposition the body holds invisible through
+## the arrival-telegraph pre-roll (read window), then fades back in. On reform
+## completion, clears `_blink_in_progress` and re-enters IDLE_ACTIVE.
+func _run_blink_body_sequence(arrival_pos: Vector2) -> void:
+	if not _captured_modulate_at_rest:
+		_modulate_at_rest = modulate
+		_captured_modulate_at_rest = true
+	var rest_alpha: float = _modulate_at_rest.a
+	if _blink_body_tween != null and _blink_body_tween.is_valid():
+		_blink_body_tween.kill()
+	if not is_inside_tree():
+		# Bare-instance edge — apply the teleport instantly, skip the tween.
+		global_position = arrival_pos
+		_blink_in_progress = false
+		return
+	_blink_body_tween = create_tween()
+	# Beat 1 — dissolve: fade body alpha to 0 over the departure window.
+	_blink_body_tween.tween_property(self, "modulate:a", 0.0, BLINK_DISSOLVE_DURATION)
+	# Boundary — instant teleport while invisible (NOT a position tween).
+	_blink_body_tween.tween_callback(func() -> void: global_position = arrival_pos)
+	# Travel-gap + arrival pre-roll — hold invisible (the read/punish window).
+	_blink_body_tween.tween_interval(BLINK_REFORM_PREROLL)
+	# Beat 3 — reform: fade body alpha back to rest.
+	_blink_body_tween.tween_property(self, "modulate:a", rest_alpha, BLINK_REFORM_DURATION)
+	_blink_body_tween.tween_callback(_on_blink_reform_complete)
+
+
+func _on_blink_reform_complete() -> void:
+	_blink_in_progress = false
+	if _is_dead:
+		return
+	# Re-enter combat from the new plinth.
+	if _state == STATE_CAST_RECOVERY:
+		_set_state(STATE_IDLE_ACTIVE)
+	_combat_trace(
+		"ArchiveSentinel._on_blink_reform_complete",
+		(
+			"reformed at plinth_idx=%d pos=(%.0f,%.0f)"
+			% [_current_plinth_idx, global_position.x, global_position.y]
+		)
+	)
+
+
+## Cancel an in-flight body blink tween + restore the rest alpha. Called from
+## `_die` so a death mid-dissolve (body alpha == 0) doesn't leave the construct
+## invisible for its death-tween (which fades scale + alpha FROM the current
+## value — if that's already 0 the death is invisible). Restoring rest alpha
+## first makes the death-tween read correctly from the construct's full pose.
+func _cancel_blink_body_tween() -> void:
+	if _blink_body_tween != null and _blink_body_tween.is_valid():
+		_blink_body_tween.kill()
+		_blink_body_tween = null
+	_blink_in_progress = false
+	if _captured_modulate_at_rest:
+		modulate.a = _modulate_at_rest.a
+	else:
+		modulate.a = 1.0
 
 
 # ---- Slam attack (phase 2 only) ---------------------------------------
@@ -868,6 +1359,9 @@ func _begin_phase_transition(target_phase: int) -> void:
 	# Cooldowns intentionally NOT cleared — phase 2 should respect that
 	# the last cast / slam happened recently. The cast_cooldown remains so
 	# the construct doesn't double-cast at the phase boundary.
+	# RETUNE 2026-05-31: reset the volley counter so phase 2's tighter
+	# every-volley cadence starts clean from the transition, not mid-count.
+	_volleys_since_blink = 0
 	_set_state(STATE_PHASE_TRANSITION)
 	# Phase-transition slow-mo (mirrors S1 Boss T3 — Uma BI-16, BI-17).
 	# Routes through `TimeScaleDirector` per the migration policy.
@@ -920,6 +1414,7 @@ func _die() -> void:
 	velocity = Vector2.ZERO
 	_cancel_attack_telegraph_tween()
 	_force_free_slam_indicator()
+	_cancel_blink_body_tween()
 	_set_state(STATE_DEAD)
 	# boss_died fires at the START of the death sequence (same contract as
 	# Stratum1Boss per Uma `combat-visual-feedback.md` §3a). Subscribers
@@ -1307,6 +1802,8 @@ func _tick_timers(delta: float) -> void:
 		_phase_transition_left = max(0.0, _phase_transition_left - delta)
 	if _wake_left > 0.0:
 		_wake_left = max(0.0, _wake_left - delta)
+	if _blink_floor_left > 0.0:
+		_blink_floor_left = max(0.0, _blink_floor_left - delta)
 
 
 func _set_state(new_state: StringName) -> void:
@@ -1390,19 +1887,51 @@ static func _vec_to_dir_suffix(v: Vector2) -> String:
 
 
 func _apply_mob_def() -> void:
+	# Boss HP multiplier (Sponsor 2026-05-21 soak-iteration utility). Resolves
+	# to 1.0 (no-op) outside HTML5 and when the `boss_hp_mult` URL param is
+	# absent. Mirrors Stratum1Boss._apply_mob_def so `?boss_hp_mult=N` nerfs
+	# the Sentinel for phase-2 soak acceleration — closes the parity gap
+	# documented in `.claude/docs/html5-export.md` § "New-boss soak
+	# acceleration — boss_hp_mult parity gap". Multiplied IN on the bare-
+	# instance fallback path too so headless GUT using
+	# `DebugFlags.set_boss_hp_mult_for_test(0.2)` can exercise the nerf
+	# without supplying a MobDef.
+	var hp_mult: float = _resolve_boss_hp_mult()
 	if mob_def == null:
 		# Bare-instantiated boss (tests). Use spec defaults.
-		hp_max = 700
-		hp_current = 700
+		var bare_hp: int = max(1, int(round(700.0 * hp_mult)))
+		hp_max = bare_hp
+		hp_current = bare_hp
 		damage_base = 14
 		move_speed_base = 0.0
 		move_speed = 0.0
 		return
-	hp_max = mob_def.hp_base
-	hp_current = mob_def.hp_base
+	var scaled_hp: int = max(1, int(round(float(mob_def.hp_base) * hp_mult)))
+	hp_max = scaled_hp
+	hp_current = scaled_hp
 	damage_base = mob_def.damage_base
 	move_speed_base = mob_def.move_speed
 	move_speed = move_speed_base
+
+
+## Resolve the boss HP multiplier from the DebugFlags autoload (defaults to 1.0
+## when the autoload is missing — bare-instance unit-test edge). Mirrors
+## Stratum1Boss._resolve_boss_hp_mult verbatim: handles the not-inside-tree
+## bare-instance edge via Engine.get_main_loop() so a test that writes the
+## multiplier BEFORE adding the boss still gets the injected value.
+func _resolve_boss_hp_mult() -> float:
+	if not is_inside_tree():
+		var ml: SceneTree = Engine.get_main_loop() as SceneTree
+		if ml == null:
+			return 1.0
+		var df: Node = ml.root.get_node_or_null("DebugFlags")
+		if df == null:
+			return 1.0
+		return df.boss_hp_mult
+	var df_in: Node = get_node_or_null("/root/DebugFlags")
+	if df_in == null:
+		return 1.0
+	return df_in.boss_hp_mult
 
 
 func _apply_layers() -> void:

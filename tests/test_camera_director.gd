@@ -838,3 +838,111 @@ func test_set_world_bounds_negative_size_refused_with_warning() -> void:
 		Rect2(),
 		"negative-size bounds refused — clamp remains disabled"
 	)
+
+
+# ---- HTML5 minimize/restore zoom re-assert ----------------------------
+#
+# Bug class: HTML5 `canvas_resize_policy=2` (adaptive) re-runs the
+# `canvas_items` stretch on minimize→restore, clobbering `_camera.zoom` back
+# to the scene default WITHOUT updating the GDScript mirror
+# (`_current_normalized_zoom`). A naive `request_zoom` re-fire no-ops against
+# the idempotence guard (`CameraDirector.gd` ~ idempotence block in
+# `request_zoom`) because the mirror still reads the correct value. Fix:
+# `_on_window_size_changed` (connected to viewport `size_changed` in `_ready`)
+# defers `_reassert_owned_camera_state`, which re-projects the mirror onto the
+# engine camera directly. These tests pin the re-assert path so a regression
+# (lost connection / removed re-write / accidental request_zoom routing) fails
+# CI. Source: `scripts/camera/CameraDirector.gd` `_on_window_size_changed` +
+# `_reassert_owned_camera_state`.
+
+
+func test_size_changed_reasserts_clobbered_zoom() -> void:
+	# Put the director at a non-default zoom (the S2-arena class: 0.5×).
+	_director.request_zoom(0.5, 0.0)
+	assert_almost_eq(_director.current_zoom(), 0.5, 0.001, "precondition: mirror at 0.5×")
+	var cam: Camera2D = _director.get_camera()
+	# Simulate the HTML5 stretch reset clobbering the engine zoom behind the
+	# director's back — the mirror (_current_normalized_zoom) stays correct.
+	cam.zoom = CameraDirector.BASELINE_ZOOM
+	assert_almost_eq(
+		cam.zoom.x, 2.6667, 0.001, "precondition: engine zoom clobbered to baseline (2.6667)"
+	)
+	# Emit the same signal the viewport fires on minimize→restore.
+	get_viewport().size_changed.emit()
+	# The handler defers one frame (lets the stretch recompute settle); await it.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	# Engine zoom re-projected from the (still-correct) mirror: BASELINE * 0.5.
+	assert_almost_eq(
+		cam.zoom.x,
+		2.6667 * 0.5,
+		0.001,
+		"size_changed re-asserts engine zoom from mirror (BASELINE * 0.5 = 1.3333)"
+	)
+	assert_almost_eq(
+		_director.current_zoom(), 0.5, 0.001, "mirror unchanged by re-assert (still 0.5)"
+	)
+
+
+func test_size_changed_reassert_holds_non_default_death_zoom() -> void:
+	# The S1 death-cinematic zoom (1.5×) must also survive a restore.
+	_director.request_zoom(1.5, 0.0)
+	var cam: Camera2D = _director.get_camera()
+	cam.zoom = CameraDirector.BASELINE_ZOOM  # clobber
+	get_viewport().size_changed.emit()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_almost_eq(
+		cam.zoom.x, 2.6667 * 1.5, 0.001, "1.5× death-zoom restored (BASELINE * 1.5 = 4.0)"
+	)
+
+
+func test_size_changed_reassert_holds_pinned_anchor() -> void:
+	# A pinned anchor (non-zero) must be re-held after a restore when no
+	# position tween is in flight.
+	_director.request_zoom(1.0, 0.0, Vector2(300, 120))
+	var cam: Camera2D = _director.get_camera()
+	# Clobber both zoom and position behind the director's back.
+	cam.zoom = CameraDirector.BASELINE_ZOOM * 2.0
+	cam.global_position = Vector2(999, 999)
+	get_viewport().size_changed.emit()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_almost_eq(cam.zoom.x, 2.6667, 0.001, "pinned-anchor case: zoom re-asserted to 1.0×")
+	assert_eq(cam.global_position, Vector2(300, 120), "pinned anchor re-held after restore")
+	# Cleanup: release the pin so after_each's reset_to_player leaves clean state.
+	_director.reset_to_player(0.0)
+
+
+func test_size_changed_reassert_preserves_follow_and_bounds_state() -> void:
+	# follow_target + world_bounds are read live by _process every tick; the
+	# stretch reset doesn't touch those members. Assert they survive a restore
+	# (the re-assert must not clear them) and the clamp re-applies against the
+	# restored zoom on the next tick.
+	var t: Node2D = Node2D.new()
+	add_child_autofree(t)
+	t.global_position = Vector2(5000, 100)  # far outside any bounds
+	_director.request_zoom(0.5, 0.0)
+	_director.follow_target(t, Vector2(40, 24))
+	_director.set_world_bounds(Rect2(0, 0, 1440, 270))
+	var cam: Camera2D = _director.get_camera()
+	cam.zoom = CameraDirector.BASELINE_ZOOM  # clobber zoom
+	get_viewport().size_changed.emit()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_almost_eq(cam.zoom.x, 2.6667 * 0.5, 0.001, "zoom restored under active follow/bounds")
+	assert_true(_director.is_following_target(), "follow_target survives restore")
+	assert_eq(_director.get_world_bounds(), Rect2(0, 0, 1440, 270), "world_bounds survives restore")
+	# Cleanup.
+	_director.clear_follow_target()
+	_director.clear_world_bounds()
+	_director.reset_to_player(0.0)
+
+
+func test_viewport_size_changed_is_connected_after_ready() -> void:
+	# Regression guard: if the _ready connection is dropped, the re-assert
+	# never fires and the bug returns silently. Pin the wiring directly.
+	assert_true(
+		get_viewport().size_changed.is_connected(_director._on_window_size_changed),
+		"CameraDirector subscribes to viewport size_changed (minimize/restore re-assert wiring)"
+	)

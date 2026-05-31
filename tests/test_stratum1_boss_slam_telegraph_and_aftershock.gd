@@ -597,7 +597,8 @@ func test_start_room_default_is_no_override() -> void:
 
 func test_start_room_accepts_valid_indices() -> void:
 	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
-	for i in [0, 1, 4, 8]:
+	# W3-T7 Stage 6 — index 9 (S2 boss room) is now a valid start-room target.
+	for i in [0, 1, 4, 8, 9]:
 		df.set_start_room_for_test(i)
 		assert_eq(int(df.start_room), i, "valid index %d is accepted as-is" % i)
 	df.reset_start_room_for_test()
@@ -605,9 +606,10 @@ func test_start_room_accepts_valid_indices() -> void:
 
 func test_start_room_clamps_out_of_range() -> void:
 	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
-	# Above MAX (8): clamps DOWN to 8.
+	# W3-T7 Stage 6 — START_ROOM_MAX raised 8 → 9 (S2 boss room reachable).
+	# Above MAX (9): clamps DOWN to 9.
 	df.set_start_room_for_test(99)
-	assert_eq(int(df.start_room), 8, "super-MAX input clamps to START_ROOM_MAX=8")
+	assert_eq(int(df.start_room), 9, "super-MAX input clamps to START_ROOM_MAX=9 (S2 boss room)")
 	# Below 0 via the setter's special-case: explicit reset to -1.
 	df.set_start_room_for_test(-5)
 	assert_eq(

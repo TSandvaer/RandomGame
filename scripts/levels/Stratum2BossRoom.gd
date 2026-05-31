@@ -32,10 +32,20 @@ extends Node2D
 ##      first-kill pattern (`Stratum1BossRoom._skip_eligible`) is per-
 ##      boss; the Sentinel can adopt the same shape in a Stage 6 follow-
 ##      up if subsequent-fight onboarding becomes a real consumer.
-##   5. **No BossNameplate scene wired yet** (Stage 5 ship scope). The
-##      `_spawn_boss_nameplate` hook is left in as a no-op so a future
-##      Stage 6 nameplate scene can drop in without re-plumbing the
-##      room's `_assemble_room_fixtures` pass.
+##   5. **BossNameplate reused from S1 (Stage 6, ticket `86c9y7ygj`).** The
+##      Stage-5 `_spawn_boss_nameplate` no-op hook is now a real spawn that
+##      reuses `res://scenes/ui/BossNameplate.tscn` (the same M3-T2-W3-T13
+##      banner S1 BossRoom uses) — NOT a parallel S2-specific nameplate, per
+##      the Stage-6 dispatch brief ("Reuse the S1 boss nameplate scene if one
+##      exists; don't author a parallel one"). The banner slides down on
+##      `entry_sequence_completed` (Uma `boss-intro.md` BI-07, 0.4 s) and
+##      shows the Sentinel's `display_name` ("ARCHIVE SENTINEL"). **Known
+##      cosmetic mismatch (follow-up, not a Stage-6 fix):** BossNameplate is
+##      authored for a 3-phase boss (3 segments); ArchiveSentinel is 2-phase
+##      (`PHASE_2_HP_FRAC=0.50`). The banner name + threat label + slide-in
+##      render correctly; the 3-segment phase bar is a visual mismatch for a
+##      2-phase boss. Parameterizing the nameplate's segment count is scope
+##      expansion — filed as a follow-up ticket rather than bundled.
 ##
 ## **Boss loot single-pipeline rule (inherited from S1 BossRoom).** Loot
 ## is owned by Main's `MobLootSpawner` subscribed to the Sentinel's
@@ -91,6 +101,32 @@ const ENTRY_SEQUENCE_DURATION: float = 1.8
 const ARENA_BOUNDS: Rect2 = Rect2(0, 0, 1024, 768)
 const ARENA_FOLLOW_DEADZONE: Vector2 = Vector2(40, 24)
 
+## Arena zoom-out — Sponsor soak-round-2 finding ("characters too big") fix.
+##
+## **Diagnosed cause (b) — boss-room default zoom miscalibrated for the wider
+## arena.** S1 rooms (incl. S1 boss room) are viewport-native 480×270, so the
+## CameraDirector default (normalized 1.0 = BASELINE_ZOOM 2.6667× engine, which
+## maps the 1280×720 viewport onto exactly 480×270 world px) renders them at the
+## intended scale. The S2 arena is 1024×768 — 2.13× wider / 2.84× taller than
+## the baseline viewport-world window. At default zoom the camera shows only
+## ~480×270 of the arena, so boss + player render at full baseline scale while
+## the player sees <half the arena → "too zoomed in / characters too big".
+##
+## The arena is intentionally larger-than-screen (Diablo-style continuous
+## scroll), so the fix is NOT "fit the whole arena" (that would need normalized
+## ~0.35, below the 0.5 CameraDirector floor anyway). It is "zoom OUT to read
+## the arena + combatants at an appropriate scale". At normalized 0.5 the
+## viewport-world window is `LOGICAL_VIEWPORT_BASE / (BASELINE_ZOOM * 0.5)` =
+## (1280,720)/(1.3334,1.3334) = 960×540 world px — ~2× the content the baseline
+## shows, with the deadzone-follow + ARENA_BOUNDS clamp handling the residual
+## scroll. 0.5 is the CameraDirector MIN_NORMALIZED_ZOOM (widest allowed view).
+##
+## Scope: boss-room-specific (S1 unaffected — it stays 480×270 viewport-native
+## at default zoom). NOT a game-wide camera change. The S1 boss room's only
+## non-default zoom is the T16 death ember-rise (1.5×, fired at boss-death).
+const ARENA_CAMERA_ZOOM: float = 0.5
+const ARENA_CAMERA_ZOOM_DURATION: float = 0.0
+
 ## Center plinth position — where the Sentinel spawns + remains rooted.
 ## Center of the 1024×768 arena = (512, 384).
 const PLINTH_POSITION: Vector2 = Vector2(512.0, 384.0)
@@ -119,6 +155,13 @@ const PLINTH_POSITION: Vector2 = Vector2(512.0, 384.0)
 ## and activated via `boss_died` plumbing.
 @export_file("*.tscn") var stratum_exit_scene_path: String = "res://scenes/levels/StratumExit.tscn"
 
+## Stage 6 (ticket `86c9y7ygj`) — res:// path to the BossNameplate scene.
+## Reuses the S1 M3-T2-W3-T13 banner (NOT a parallel S2 nameplate). Lazy-
+## spawned in `_assemble_room_fixtures`; shown on `entry_sequence_completed`
+## via `show_for(boss)`. Indirected via export so tests can opt in/out
+## cleanly (set to "" to skip the spawn).
+@export_file("*.tscn") var boss_nameplate_scene_path: String = "res://scenes/ui/BossNameplate.tscn"
+
 ## World-space position of the stratum exit portal. Default places it at
 ## the room's north port (mid-top edge of the arena) — opposite the
 ## entry door, so the player walks "deeper" to descend.
@@ -135,6 +178,10 @@ var _entry_started_time_ms: int = 0
 var _entry_completed_time_ms: int = 0
 var _stratum_exit_unlocked: bool = false
 var _stratum_exit: StratumExit = null
+## Stage 6 (ticket `86c9y7ygj`) — BossNameplate instance (typed loosely as
+## Node for test-friendliness; production resolves to BossNameplate via the
+## scene load in `_spawn_boss_nameplate`). Mirrors S1 BossRoom's field.
+var _boss_nameplate: Node = null
 
 
 func _ready() -> void:
@@ -159,6 +206,10 @@ func _assemble_room_fixtures() -> void:
 		return
 	_build_door_trigger()
 	_spawn_stratum_exit()
+	# Stage 6 (ticket `86c9y7ygj`) — spawn the boss nameplate (reused S1
+	# banner). Hidden by default; `_complete_entry_sequence` calls
+	# `show_for(boss)` at T+1.8 s to start the slide-in tween (Uma BI-07).
+	_spawn_boss_nameplate()
 	# Engage continuous-scroll camera against the arena bounds.
 	_engage_camera_for_boss_room()
 	# HTML5-only datapoint — confirms the deferred fixture pass ran and the
@@ -200,6 +251,12 @@ func get_stratum_exit() -> StratumExit:
 	return _stratum_exit
 
 
+## Stage 6 — boss nameplate accessor (typed loosely so tests with the
+## nameplate scene opted-out get a null cleanly). Mirrors S1 BossRoom.
+func get_boss_nameplate() -> Node:
+	return _boss_nameplate
+
+
 func is_entry_sequence_active() -> bool:
 	return _entry_sequence_active
 
@@ -210,6 +267,24 @@ func is_entry_sequence_completed() -> bool:
 
 func is_stratum_exit_unlocked() -> bool:
 	return _stratum_exit_unlocked
+
+
+## Re-assert the arena's RESTING camera state (follow + ARENA_BOUNDS clamp +
+## the standing ARENA_CAMERA_ZOOM 0.5 zoom-out). Called by
+## `Main._on_boss_defeated` on title-card dismiss.
+##
+## **Why this exists (Sponsor re-soak #4 fix).** The shared `_on_boss_defeated`
+## handler previously hardwired `CameraDirector.reset_to_player()` on card
+## dismiss — correct for the S1 boss room (return from the transient T16 1.5×
+## ember-rise to the default 1.0 view), but WRONG for the S2 arena: the arena's
+## standing 0.5 zoom-out (the "characters too big" soak-round-2 fix) is meant to
+## HOLD for the whole boss-room lifetime, not reset on the boss's death. The
+## hardwired reset clobbered it back to normalized 1.0 (= 2.6667 engine), leaving
+## the player over-zoomed for the post-death walk to the StratumExit. This hook
+## lets the room re-assert ITS resting zoom instead of the game-wide default.
+## Re-runs the same engage logic used on room-entry — idempotent.
+func restore_resting_camera() -> void:
+	_engage_camera_for_boss_room()
 
 
 ## Force-fire the entry sequence (used by tests that don't simulate physics
@@ -308,6 +383,17 @@ func _complete_entry_sequence() -> void:
 	_entry_sequence_active = false
 	_entry_completed_time_ms = Time.get_ticks_msec()
 	entry_sequence_completed.emit()
+	# Stage 6 — kick the nameplate slide-in at the Beat 4 → Beat 5 boundary
+	# (Uma `boss-intro.md` BI-07, 0.4 s ease-out). Fires AFTER
+	# `entry_sequence_completed.emit()` so subscribers see the signal before
+	# the nameplate animates. Guarded on null + has_method so the room boots
+	# fine when the nameplate scene is opted-out (bare-test surface).
+	if (
+		_boss_nameplate != null
+		and is_instance_valid(_boss_nameplate)
+		and _boss_nameplate.has_method("show_for")
+	):
+		_boss_nameplate.call("show_for", _boss)
 	# Wake the Sentinel now that Beats 1–4 are over.
 	if _boss != null and not _boss.is_dead():
 		_boss.wake()
@@ -350,6 +436,34 @@ func _spawn_stratum_exit() -> void:
 	_stratum_exit = node
 	_stratum_exit.portal_position = stratum_exit_position
 	add_child(_stratum_exit)
+
+
+## Stage 6 (ticket `86c9y7ygj`) — lazy-spawn the BossNameplate CanvasLayer
+## at room assembly. Reuses the S1 `res://scenes/ui/BossNameplate.tscn`
+## banner (NOT a parallel S2 nameplate). Stays hidden (modulate.a = 0,
+## offscreen above the top edge) until `_complete_entry_sequence` calls
+## `show_for(boss)`. Adding it as a child of the room means the nameplate is
+## freed cleanly when the room is freed — same lifecycle as the door trigger
+## + stratum exit. Mirrors `Stratum1BossRoom._spawn_boss_nameplate` verbatim.
+##
+## Tests opt out by setting `boss_nameplate_scene_path = ""`. The
+## `_complete_entry_sequence` `show_for` call guards on null + has_method so
+## the room boots fine without the scene.
+func _spawn_boss_nameplate() -> void:
+	if boss_nameplate_scene_path == "":
+		return
+	var packed: PackedScene = load(boss_nameplate_scene_path) as PackedScene
+	if packed == null:
+		push_warning(
+			"[Stratum2BossRoom] BossNameplate scene missing at '%s'" % boss_nameplate_scene_path
+		)
+		return
+	var node: Node = packed.instantiate()
+	if node == null:
+		push_warning("[Stratum2BossRoom] BossNameplate failed to instantiate")
+		return
+	_boss_nameplate = node
+	add_child(_boss_nameplate)
 
 
 # ---- Diagnostics ------------------------------------------------------
@@ -431,6 +545,14 @@ func _engage_camera_for_boss_room() -> void:
 		cd.follow_target(player, ARENA_FOLLOW_DEADZONE)
 	if cd.has_method("set_world_bounds"):
 		cd.set_world_bounds(ARENA_BOUNDS)
+	# Zoom OUT for the wider 1024×768 arena so combatants read at an
+	# appropriate scale (Sponsor soak-round-2 "characters too big" fix —
+	# diagnosed cause (b), see ARENA_CAMERA_ZOOM). anchor = Vector2.ZERO keeps
+	# player-follow; the bounds-clamp above keeps the wider view inside the
+	# arena. Instant (duration 0.0) since the player drops straight into the
+	# arena via start_room=9 / production room-load — no easing beat needed.
+	if cd.has_method("request_zoom"):
+		cd.request_zoom(ARENA_CAMERA_ZOOM, ARENA_CAMERA_ZOOM_DURATION)
 
 
 func _resolve_camera_director() -> Node:
