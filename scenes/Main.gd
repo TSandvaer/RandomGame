@@ -1381,8 +1381,20 @@ func _on_boss_defeated(boss: Node, death_position: Vector2) -> void:
 	# disturbing the other (e.g. if a "post-card cinematic" beat lands
 	# between F3 vignette and F3 camera). Same shape as the audio-resume
 	# wiring above — soft no-ops when the autoload / Vignette is absent.
+	# On card-dismiss, restore the boss room's RESTING camera, NOT the game-wide
+	# player-default. The boss room owns what "resting" means: the S1 boss room's
+	# resting zoom IS the CameraDirector default (so `restore_resting_camera()`
+	# is byte-equivalent to the legacy `reset_to_player()` follow-restore), but
+	# the S2 arena holds a standing 0.5 zoom-out that must SURVIVE the boss death
+	# (Sponsor re-soak #4 — boss death over-zoomed the arena). Prefer the room's
+	# own re-assert hook; fall back to `reset_to_player()` only when the active
+	# boss room doesn't expose it (defensive — every production boss room does).
+	# See `Stratum2BossRoom.restore_resting_camera` for the bug this guards.
 	var cam: Node = _camera_director()
-	if cam != null and cam.has_method("reset_to_player"):
+	if _boss_room_node != null and _boss_room_node.has_method("restore_resting_camera"):
+		var room: Node = _boss_room_node
+		card.title_card_dismissed.connect(func() -> void: room.restore_resting_camera())
+	elif cam != null and cam.has_method("reset_to_player"):
 		card.title_card_dismissed.connect(func() -> void: cam.reset_to_player())
 	if _vignette != null and _vignette.has_method("boss_defeat_return"):
 		card.title_card_dismissed.connect(func() -> void: _vignette.boss_defeat_return())

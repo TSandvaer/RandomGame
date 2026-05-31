@@ -269,6 +269,24 @@ func is_stratum_exit_unlocked() -> bool:
 	return _stratum_exit_unlocked
 
 
+## Re-assert the arena's RESTING camera state (follow + ARENA_BOUNDS clamp +
+## the standing ARENA_CAMERA_ZOOM 0.5 zoom-out). Called by
+## `Main._on_boss_defeated` on title-card dismiss.
+##
+## **Why this exists (Sponsor re-soak #4 fix).** The shared `_on_boss_defeated`
+## handler previously hardwired `CameraDirector.reset_to_player()` on card
+## dismiss — correct for the S1 boss room (return from the transient T16 1.5×
+## ember-rise to the default 1.0 view), but WRONG for the S2 arena: the arena's
+## standing 0.5 zoom-out (the "characters too big" soak-round-2 fix) is meant to
+## HOLD for the whole boss-room lifetime, not reset on the boss's death. The
+## hardwired reset clobbered it back to normalized 1.0 (= 2.6667 engine), leaving
+## the player over-zoomed for the post-death walk to the StratumExit. This hook
+## lets the room re-assert ITS resting zoom instead of the game-wide default.
+## Re-runs the same engage logic used on room-entry — idempotent.
+func restore_resting_camera() -> void:
+	_engage_camera_for_boss_room()
+
+
 ## Force-fire the entry sequence (used by tests that don't simulate physics
 ## overlap). The Area2D body_entered handler also calls this in production.
 func trigger_entry_sequence() -> void:
