@@ -94,6 +94,43 @@ func _make_fake_boss(
 	return fb
 
 
+## 2-phase boss stub — like FakeBoss but exposes `get_phase_boundary_fracs()`
+## returning `[0.50]` (single boundary, 2 phases). Mirrors the ArchiveSentinel
+## phase contract so the nameplate-parameterization tests don't need a full
+## construct instance. Ticket 86ca1m0at.
+class FakeTwoPhaseBoss:
+	extends Node
+	signal damaged(amount: int, hp_remaining: int, source: Node)
+	signal phase_changed(new_phase: int)
+	signal boss_died(mob, death_position: Vector2, mob_def)
+	var mob_def: FakeMobDef = null
+	var hp_current: int = 140
+	var hp_max: int = 140
+	var phase: int = 1
+	var boundary_fracs: Array = [0.50]
+
+	func get_max_hp() -> int:
+		return hp_max
+
+	func get_phase() -> int:
+		return phase
+
+	func get_phase_boundary_fracs() -> Array:
+		return boundary_fracs
+
+
+func _make_two_phase_boss(hp_max: int = 140) -> FakeTwoPhaseBoss:
+	var fb: FakeTwoPhaseBoss = FakeTwoPhaseBoss.new()
+	var fd: FakeMobDef = FakeMobDef.new()
+	fd.display_name = "Archive Sentinel"
+	fb.mob_def = fd
+	fb.hp_max = hp_max
+	fb.hp_current = hp_max
+	fb.phase = 1
+	add_child_autofree(fb)
+	return fb
+
+
 # ---- Test 1: scene loads + composition primitives ---------------------
 
 
@@ -415,3 +452,142 @@ func test_boss_died_dismisses_pulse_and_ghost_tweens() -> void:
 	# Re-emitting boss_died is also a no-op (no crash, no resurrection).
 	fb.boss_died.emit(fb, Vector2.ZERO, null)
 	assert_false(np.is_pulse_active(), "second boss_died is idempotent — still no pulse")
+
+
+# ---- Phase-count parameterization (ticket 86ca1m0at) ------------------
+# Root cause of Sponsor 2026-05-31 soak "boss never transitioned into phase 3,
+# bar froze, sudden death": the ArchiveSentinel is a 2-PHASE boss, but the
+# nameplate hard-coded a 3-segment / 0.66-0.33 model. Its final visible segment
+# drained to 0 at hp = round(max*0.33) while the boss correctly fought on to 0
+# with no further phase emit — bar appeared frozen for the last third of the
+# fight. Fix: parameterize segment count + boundary fracs from the bound boss's
+# get_phase_boundary_fracs(). These tests pin the 2-phase render + the fill math
+# at BOTH boss_hp_mult=1.0 (hp_max=700) and 0.2 (hp_max=140).
+
+
+func test_two_phase_boss_renders_two_segments() -> void:
+	# A boss reporting [0.50] (single boundary) → 2 segments + 1 separator.
+	var np: BossNameplate = _make_nameplate()
+	var fb: FakeTwoPhaseBoss = _make_two_phase_boss(140)
+	np.show_for(fb)
+	assert_not_null(np.get_segment_fg(1), "segment 1 exists")
+	assert_not_null(np.get_segment_fg(2), "segment 2 exists")
+	assert_null(np.get_segment_fg(3), "segment 3 does NOT exist on a 2-phase boss (no orphan)")
+	assert_not_null(np.get_phase_label(1), "phase label 1 exists")
+	assert_not_null(np.get_phase_label(2), "phase label 2 exists")
+	assert_null(np.get_phase_label(3), "phase label 3 does NOT exist")
+	assert_not_null(np.get_segment_separator(0), "separator 0 (between seg 1 and 2) exists")
+	assert_null(np.get_segment_separator(1), "separator 1 does NOT exist (only 1 separator)")
+
+
+func test_three_phase_default_boss_still_renders_three_segments() -> void:
+	# Regression guard — a boss WITHOUT get_phase_boundary_fracs() (or the S1
+	# Warden with [0.66, 0.33]) still renders 3 segments. FakeBoss has no
+	# override → default 3-segment path.
+	var np: BossNameplate = _make_nameplate()
+	var fb: FakeBoss = _make_fake_boss("Warden", 600)
+	np.show_for(fb)
+	assert_not_null(np.get_segment_fg(3), "3-phase fallback still renders segment 3")
+	assert_not_null(np.get_segment_separator(1), "3-phase fallback still has 2nd separator")
+
+
+func test_two_phase_fill_drains_at_real_50pct_boundary_not_66() -> void:
+	# Phase 1 of a 2-phase boss spans hp_max..round(max*0.50). The fill must hit
+	# 0 at the REAL 50% boundary (70 of 140), NOT at the old hard-coded 66% (92).
+	var np: BossNameplate = _make_nameplate()
+	var fb: FakeTwoPhaseBoss = _make_two_phase_boss(140)
+	np.show_for(fb)
+	# At hp=92 (old 66% threshold) the phase-1 fill must still be POSITIVE — the
+	# old model would have clamped it to 0 here (the freeze bug).
+	fb.hp_current = 92
+	fb.damaged.emit(48, 92, null)
+	var fg1: ColorRect = np.get_segment_fg(1)
+	var width_at_92: float = fg1.offset_right - fg1.offset_left
+	assert_gt(width_at_92, 0.0, "phase-1 segment still has fill at hp=92 (NOT frozen at old 66%)")
+	# At the real boundary hp=70, phase-1 fill reaches 0.
+	fb.hp_current = 70
+	fb.damaged.emit(22, 70, null)
+	var width_at_70: float = fg1.offset_right - fg1.offset_left
+	assert_almost_eq(width_at_70, 0.0, 0.01, "phase-1 segment drains to 0 at the real 50% boundary")
+
+
+func test_two_phase_final_segment_does_not_freeze_before_death_mult_02() -> void:
+	# THE SPONSOR SCENARIO at boss_hp_mult=0.2 (hp_max=140). After the boss emits
+	# phase_changed(2), the phase-2 (FINAL) segment must drain smoothly to 0 only
+	# at hp=0 — NOT freeze at hp=round(140*0.33)=46 (the old 3-phase model's
+	# phase-2 floor). Pre-fix the bar froze from hp=46 down to death.
+	var np: BossNameplate = _make_nameplate()
+	var fb: FakeTwoPhaseBoss = _make_two_phase_boss(140)
+	np.show_for(fb)
+	# Cross into phase 2.
+	fb.phase = 2
+	fb.phase_changed.emit(2)
+	assert_eq(np.get_current_phase(), 2, "nameplate advanced to phase 2")
+	var fg2: ColorRect = np.get_segment_fg(2)
+	# At hp=46 (old phase-2 floor) the FINAL segment must still have fill.
+	fb.hp_current = 46
+	fb.damaged.emit(1, 46, null)
+	var width_at_46: float = fg2.offset_right - fg2.offset_left
+	assert_gt(width_at_46, 0.0, "final segment still draining at hp=46 (NOT frozen — the bug)")
+	# At hp=18 (Sponsor's observed deep-low-HP, still phase 2) fill is small but
+	# strictly between the hp=46 value and 0 — the bar is MOVING, not frozen.
+	fb.hp_current = 18
+	fb.damaged.emit(1, 18, null)
+	var width_at_18: float = fg2.offset_right - fg2.offset_left
+	assert_gt(width_at_18, 0.0, "final segment still has fill at hp=18")
+	assert_lt(width_at_18, width_at_46, "fill keeps DECREASING hp=46 -> hp=18 (bar not frozen)")
+	# At hp=0 the final segment is empty.
+	fb.hp_current = 0
+	fb.damaged.emit(18, 0, null)
+	var width_at_0: float = fg2.offset_right - fg2.offset_left
+	assert_almost_eq(width_at_0, 0.0, 0.01, "final segment empty exactly at death")
+
+
+func test_two_phase_final_segment_does_not_freeze_before_death_mult_10() -> void:
+	# Same as above at boss_hp_mult=1.0 (hp_max=700) — proves the bug is NOT
+	# mult-dependent: the 3-phase model desyncs at full HP too (old phase-2 floor
+	# = round(700*0.33) = 231; the bar would freeze from hp=231 to death).
+	var np: BossNameplate = _make_nameplate()
+	var fb: FakeTwoPhaseBoss = _make_two_phase_boss(700)
+	np.show_for(fb)
+	fb.phase = 2
+	fb.phase_changed.emit(2)
+	var fg2: ColorRect = np.get_segment_fg(2)
+	# hp=231 (old phase-2 floor at full HP) — final segment must still drain.
+	fb.hp_current = 231
+	fb.damaged.emit(1, 231, null)
+	var width_at_231: float = fg2.offset_right - fg2.offset_left
+	assert_gt(width_at_231, 0.0, "final segment still draining at hp=231 (mult=1.0; NOT frozen)")
+	fb.hp_current = 80
+	fb.damaged.emit(1, 80, null)
+	var width_at_80: float = fg2.offset_right - fg2.offset_left
+	assert_lt(width_at_80, width_at_231, "fill keeps decreasing 231 -> 80 at full HP")
+	assert_gt(width_at_80, 0.0, "still nonzero at hp=80")
+
+
+func test_real_archive_sentinel_binds_to_two_segments() -> void:
+	# Integration — a REAL ArchiveSentinel instance (not a stub) must drive the
+	# nameplate to exactly 2 segments via its get_phase_boundary_fracs() == [0.50].
+	var ArchiveSentinelScript := load("res://scripts/mobs/ArchiveSentinel.gd")
+	var boss = ArchiveSentinelScript.new()
+	boss.skip_intro_for_tests = true
+	add_child_autofree(boss)
+	# Sanity: the boss reports a single 0.50 boundary.
+	var fracs: Array = boss.get_phase_boundary_fracs()
+	assert_eq(fracs.size(), 1, "ArchiveSentinel reports exactly 1 phase boundary (2-phase)")
+	assert_almost_eq(float(fracs[0]), 0.50, 0.001, "boundary is 50%")
+	var np: BossNameplate = _make_nameplate()
+	np.show_for(boss)
+	assert_not_null(np.get_segment_fg(2), "real Sentinel binds segment 2")
+	assert_null(np.get_segment_fg(3), "real Sentinel does NOT render an orphan segment 3")
+
+
+func test_stratum1_boss_reports_two_boundaries() -> void:
+	# Drift-detector — the S1 Warden must report [0.66, 0.33] so it still renders
+	# 3 segments. Pins the boss-side introspection contract.
+	var s1 = Stratum1BossScript.new()
+	add_child_autofree(s1)
+	var fracs: Array = s1.get_phase_boundary_fracs()
+	assert_eq(fracs.size(), 2, "S1 Warden reports 2 boundaries (3-phase)")
+	assert_almost_eq(float(fracs[0]), 0.66, 0.001, "first boundary 66%")
+	assert_almost_eq(float(fracs[1]), 0.33, 0.001, "second boundary 33%")

@@ -132,14 +132,29 @@ const PULSE_PERIOD: float = 1.0 / PULSE_HZ
 ## T18 — Pulse threshold (active segment HP fraction).
 const PULSE_THRESHOLD_FRACTION: float = 0.10
 
-## Phase-transition HP thresholds — must match Stratum1Boss.PHASE_2_HP_FRAC /
-## PHASE_3_HP_FRAC exactly. The nameplate is read-only on boss state, but
-## these are repeated here so the segment driver can compute active-segment
-## fill % independently when only `hp_current` + `hp_max` are observable.
-## A drift between these and the boss controller is a regression — pinned
-## by GUT test `test_phase_thresholds_match_boss_controller`.
+## Phase-transition HP thresholds — these are the DEFAULT (S1 Warden 3-phase)
+## boundary fractions, used when no bound boss exposes `get_phase_boundary_fracs()`
+## (e.g. legacy test stubs). The nameplate is read-only on boss state; these
+## let the segment driver compute active-segment fill % independently when only
+## `hp_current` + `hp_max` are observable.
+##
+## **Phase-count parameterization (ticket 86ca1m0at, Sponsor 2026-05-31 soak).**
+## The nameplate is NO LONGER hard-locked to a 3-phase boss. At `show_for(boss)`
+## time it reads the bound boss's `get_phase_boundary_fracs()` (descending
+## boundary fracs) and rebuilds its segment row to `len + 1` segments, computing
+## fills from those fracs. The 2-phase ArchiveSentinel (`[0.50]`) renders 2
+## segments; the 3-phase Warden (`[0.66, 0.33]`) renders 3. **Root cause of the
+## Sponsor's "boss never transitioned into phase 3, bar froze, sudden death"**:
+## the boss is 2-phase (single emit `phase_changed(2)`), but the nameplate's
+## hard-coded 0.66/0.33 + 3-segment model meant its phase-2 fill drained to 0 at
+## hp = round(max*0.33) while the boss kept taking damage to 0 with no further
+## phase emit — the PHASE-3 segment never lit and the bar appeared frozen for the
+## final ~third of the fight.
 const PHASE_2_HP_FRAC: float = 0.66
 const PHASE_3_HP_FRAC: float = 0.33
+
+## Default boundary fractions when no boss override is available (S1 3-phase).
+const DEFAULT_BOUNDARY_FRACS: Array = [PHASE_2_HP_FRAC, PHASE_3_HP_FRAC]
 
 # ---- Palette (locked from Uma palette.md + boss-intro.md) -------------
 
@@ -246,10 +261,18 @@ var _slide_tween: Tween = null
 var _shown: bool = false
 var _slide_in_done: bool = false
 var _dismissed: bool = false
-var _current_phase: int = 1  # Phases 1..3 (boss starts in phase 1).
+var _current_phase: int = 1  # Phases 1..N (boss starts in phase 1).
 var _hp_max_cached: int = 0
 ## Bound boss — kept so we can disconnect on dismiss and to read state.
 var _boss: Node = null
+
+## Runtime phase model — parameterized from the bound boss at `show_for`
+## (ticket 86ca1m0at). `_segment_count` = number of phase segments rendered
+## (defaults to SEGMENT_COUNT; rebuilt to match the boss's phase count).
+## `_boundary_fracs` = descending HP-boundary fractions (defaults to S1's
+## [0.66, 0.33]; replaced by the boss's `get_phase_boundary_fracs()`).
+var _segment_count: int = SEGMENT_COUNT
+var _boundary_fracs: Array = DEFAULT_BOUNDARY_FRACS.duplicate()
 
 
 func _init() -> void:
@@ -284,6 +307,10 @@ func show_for(boss: Node) -> void:
 	_apply_boss_name(boss)
 	_hp_max_cached = _read_hp_max(boss)
 	_current_phase = _read_initial_phase(boss)
+	# Parameterize the segment count + phase-boundary fracs from the bound boss
+	# (ticket 86ca1m0at) BEFORE the initial paint, so a 2-phase boss renders 2
+	# segments + drives its fill math off the boss's real thresholds.
+	_configure_phase_model(boss)
 	_subscribe_to_boss_signals(boss)
 	# Initial segment paint — segments 1..3 start at full fill; the current
 	# phase's segment animates on hit, future segments stay locked at 100%
@@ -330,20 +357,21 @@ func get_threat_glyph_label() -> Label:
 
 
 func get_phase_label(phase: int) -> Label:
-	# `phase` is 1-indexed (1..3); array is 0-indexed.
-	if phase < 1 or phase > SEGMENT_COUNT:
+	# `phase` is 1-indexed; array is 0-indexed. Bound by the actual built count
+	# (a 2-phase nameplate has only 2 labels) — not the SEGMENT_COUNT max.
+	if phase < 1 or phase > _phase_labels.size():
 		return null
 	return _phase_labels[phase - 1]
 
 
 func get_segment_fg(phase: int) -> ColorRect:
-	if phase < 1 or phase > SEGMENT_COUNT:
+	if phase < 1 or phase > _segment_fgs.size():
 		return null
 	return _segment_fgs[phase - 1]
 
 
 func get_segment_ghost(phase: int) -> ColorRect:
-	if phase < 1 or phase > SEGMENT_COUNT:
+	if phase < 1 or phase > _segment_ghosts.size():
 		return null
 	return _segment_ghosts[phase - 1]
 
@@ -356,7 +384,7 @@ func get_segment_separator(index: int) -> ColorRect:
 
 
 func get_pulse_outline(phase: int) -> ColorRect:
-	if phase < 1 or phase > SEGMENT_COUNT:
+	if phase < 1 or phase > _pulse_outlines.size():
 		return null
 	return _pulse_outlines[phase - 1]
 
@@ -505,14 +533,82 @@ func _build_text_labels() -> void:
 	_root.add_child(_threat_label)
 
 
+## Runtime per-segment width — BAR_WIDTH split across `_segment_count` segments
+## with (N-1) separators between. At the default 3 segments this equals the
+## SEGMENT_WIDTH constant; at 2 segments each segment is wider.
+func _runtime_segment_width() -> float:
+	var n: int = maxi(1, _segment_count)
+	return (BAR_WIDTH - float(n - 1) * SEGMENT_SEPARATOR_WIDTH) / float(n)
+
+
+## Read the bound boss's phase model and adopt its segment count + boundary
+## fractions (ticket 86ca1m0at). Falls back to the S1 3-phase default for any
+## boss/stub that does not expose `get_phase_boundary_fracs()`. If the resolved
+## segment count differs from the row already built (the default 3), the segment
+## row is torn down + rebuilt to N segments before the initial paint.
+func _configure_phase_model(boss: Node) -> void:
+	var fracs: Array = DEFAULT_BOUNDARY_FRACS.duplicate()
+	if boss != null and boss.has_method("get_phase_boundary_fracs"):
+		var reported: Array = boss.call("get_phase_boundary_fracs")
+		if reported != null and reported.size() >= 1:
+			fracs = reported.duplicate()
+	# Boundaries must be strictly descending fractions in (0,1); segment count
+	# is boundaries + 1. Clamp to [1, SEGMENT_COUNT] — the row composition + the
+	# `PHASE_LABEL_TEMPLATE` only have art for up to SEGMENT_COUNT phases.
+	_boundary_fracs = fracs
+	var new_count: int = clampi(fracs.size() + 1, 1, SEGMENT_COUNT)
+	if new_count != _segment_count:
+		_segment_count = new_count
+		_rebuild_segment_row()
+	else:
+		_segment_count = new_count
+
+
+## Tear down the existing segment row + rebuild it at the current
+## `_segment_count`. Used when the bound boss's phase count differs from the
+## default. All per-segment node arrays + their tweens are cleared first.
+func _rebuild_segment_row() -> void:
+	# Kill any in-flight tweens that reference the about-to-be-freed nodes.
+	for t in _ghost_tweens:
+		if t != null and (t as Tween).is_valid():
+			(t as Tween).kill()
+	for t in _separator_flash_tweens:
+		if t != null and (t as Tween).is_valid():
+			(t as Tween).kill()
+	if _active_pulse_tween != null and _active_pulse_tween.is_valid():
+		_active_pulse_tween.kill()
+	_active_pulse_tween = null
+	_active_pulse_segment_index = -1
+	# Free the old segment-row nodes.
+	for arr in [_phase_labels, _segment_ghosts, _segment_fgs, _pulse_outlines, _segment_separators]:
+		for node in arr:
+			if node != null and is_instance_valid(node):
+				node.queue_free()
+	_phase_labels.clear()
+	_segment_ghosts.clear()
+	_segment_fgs.clear()
+	_pulse_outlines.clear()
+	_segment_separators.clear()
+	_ghost_tweens = []
+	_separator_flash_tweens = []
+	for _i in range(_segment_count):
+		_ghost_tweens.append(null)
+	for _i in range(maxi(0, _segment_count - 1)):
+		_separator_flash_tweens.append(null)
+	_build_segment_row()
+
+
 func _build_segment_row() -> void:
-	# Phase labels (PHASE 1 / PHASE 2 / PHASE 3) — above each segment.
+	# Phase labels (PHASE 1 / PHASE 2 / ...) — above each segment.
 	# Y baseline: 28..40 (above the bar which sits at 40..52).
 	# Bar X starts at INNER_PADDING_X = 24; spans BAR_WIDTH = 432.
 	var bar_x_start: float = INNER_PADDING_X
 	var bar_y_top: float = 40.0
-	for i in range(SEGMENT_COUNT):
-		var seg_x: float = bar_x_start + i * (SEGMENT_WIDTH + SEGMENT_SEPARATOR_WIDTH)
+	# Segment width scales with the runtime segment count so N segments fill the
+	# BAR_WIDTH cleanly (2-phase boss → 2 wide segments; 3-phase → 3 narrower).
+	var seg_w: float = _runtime_segment_width()
+	for i in range(_segment_count):
+		var seg_x: float = bar_x_start + i * (seg_w + SEGMENT_SEPARATOR_WIDTH)
 		# Phase label.
 		var lbl: Label = Label.new()
 		lbl.name = "PhaseLabel%d" % (i + 1)
@@ -523,7 +619,7 @@ func _build_segment_row() -> void:
 		lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		lbl.offset_left = seg_x
 		lbl.offset_top = 28.0
-		lbl.offset_right = seg_x + SEGMENT_WIDTH
+		lbl.offset_right = seg_x + seg_w
 		lbl.offset_bottom = 40.0
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_phase_labels.append(lbl)
@@ -537,7 +633,7 @@ func _build_segment_row() -> void:
 		ghost.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		ghost.offset_left = seg_x
 		ghost.offset_top = bar_y_top
-		ghost.offset_right = seg_x + SEGMENT_WIDTH
+		ghost.offset_right = seg_x + seg_w
 		ghost.offset_bottom = bar_y_top + BAR_HEIGHT
 		_segment_ghosts.append(ghost)
 		_root.add_child(ghost)
@@ -550,7 +646,7 @@ func _build_segment_row() -> void:
 		fg.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		fg.offset_left = seg_x
 		fg.offset_top = bar_y_top
-		fg.offset_right = seg_x + SEGMENT_WIDTH
+		fg.offset_right = seg_x + seg_w
 		fg.offset_bottom = bar_y_top + BAR_HEIGHT
 		_segment_fgs.append(fg)
 		_root.add_child(fg)
@@ -564,14 +660,14 @@ func _build_segment_row() -> void:
 		# 4 strips like the panel border, but inline as a single composite
 		# node-tree.
 		var pulse: ColorRect = _build_pulse_outline_rect(
-			"PulseOutline%d" % (i + 1), seg_x, bar_y_top, SEGMENT_WIDTH, BAR_HEIGHT
+			"PulseOutline%d" % (i + 1), seg_x, bar_y_top, seg_w, BAR_HEIGHT
 		)
 		_pulse_outlines.append(pulse)
 		_root.add_child(pulse)
 
-		# Separators between segments (only between 0..1 and 1..2).
-		if i < SEGMENT_COUNT - 1:
-			var sep_x: float = seg_x + SEGMENT_WIDTH
+		# Separators between adjacent segments (N-1 separators for N segments).
+		if i < _segment_count - 1:
+			var sep_x: float = seg_x + seg_w
 			var sep: ColorRect = ColorRect.new()
 			sep.name = "SegmentSeparator%d" % (i + 1)
 			sep.color = EMBER_ORANGE
@@ -692,8 +788,8 @@ func _paint_initial_segment_state() -> void:
 	# `_build_segment_row` step already sized them); refresh colors based
 	# on current phase. Foreground stays 100% width on every segment at
 	# show-time because we paint phases on phase_changed events (initial
-	# phase is 1 — segments 2/3 stay at 100% width but 60% brightness).
-	for i in range(SEGMENT_COUNT):
+	# phase is 1 — future segments stay at 100% width but 60% brightness).
+	for i in range(_segment_count):
 		var p: int = i + 1
 		_segment_fgs[i].color = _color_for_segment_phase(p)
 		# Set the foreground width based on phase state.
@@ -715,8 +811,8 @@ func _set_segment_fg_fill(phase: int, fraction: float) -> void:
 		return
 	var clamped: float = clampf(fraction, 0.0, 1.0)
 	var fg: ColorRect = _segment_fgs[i]
-	# Width = SEGMENT_WIDTH * fraction. offset_right = offset_left + width.
-	fg.offset_right = fg.offset_left + SEGMENT_WIDTH * clamped
+	# Width = runtime-segment-width * fraction. offset_right = offset_left + width.
+	fg.offset_right = fg.offset_left + _runtime_segment_width() * clamped
 
 
 func _set_segment_ghost_fill(phase: int, fraction: float) -> void:
@@ -725,11 +821,11 @@ func _set_segment_ghost_fill(phase: int, fraction: float) -> void:
 		return
 	var clamped: float = clampf(fraction, 0.0, 1.0)
 	var ghost: ColorRect = _segment_ghosts[i]
-	ghost.offset_right = ghost.offset_left + SEGMENT_WIDTH * clamped
+	ghost.offset_right = ghost.offset_left + _runtime_segment_width() * clamped
 
 
 func _apply_phase_label_state() -> void:
-	for i in range(SEGMENT_COUNT):
+	for i in range(_segment_count):
 		var p: int = i + 1
 		_phase_labels[i].add_theme_color_override("font_color", _color_for_phase_label(p))
 
@@ -824,25 +920,27 @@ func _on_boss_damaged(_amount: int, hp_remaining: int, _source: Node) -> void:
 func _compute_active_segment_fill(hp_remaining: int) -> float:
 	if _hp_max_cached <= 0:
 		return 0.0
-	var p2_threshold: int = int(round(float(_hp_max_cached) * PHASE_2_HP_FRAC))
-	var p3_threshold: int = int(round(float(_hp_max_cached) * PHASE_3_HP_FRAC))
-	# Clamp current phase to 1..3 defensively.
-	var phase: int = clampi(_current_phase, 1, SEGMENT_COUNT)
-	if phase == 1:
-		# Phase 1 spans hp_max..p2_threshold.
-		var span: float = float(_hp_max_cached - p2_threshold)
-		if span <= 0.0:
-			return 0.0
-		return clampf(float(hp_remaining - p2_threshold) / span, 0.0, 1.0)
-	if phase == 2:
-		var span2: float = float(p2_threshold - p3_threshold)
-		if span2 <= 0.0:
-			return 0.0
-		return clampf(float(hp_remaining - p3_threshold) / span2, 0.0, 1.0)
-	# Phase 3 spans p3_threshold..0.
-	if p3_threshold <= 0:
+	# Generic N-phase fill (ticket 86ca1m0at). The active phase `p` (1-indexed)
+	# spans [ceiling_hp .. floor_hp] where:
+	#   ceiling_frac = 1.0           if p == 1, else _boundary_fracs[p-2]
+	#   floor_frac   = 0.0           if p > num_boundaries, else _boundary_fracs[p-1]
+	# Fill = (hp - floor_hp) / (ceiling_hp - floor_hp), clamped to [0,1]. This
+	# tracks the boss's REAL boundaries, so the bar no longer drains to 0 before
+	# the boss's last phase (the Sponsor-soak "frozen bar + sudden death" cause).
+	var num_boundaries: int = _boundary_fracs.size()
+	var phase: int = clampi(_current_phase, 1, _segment_count)
+	var ceiling_frac: float = 1.0
+	if phase > 1 and (phase - 2) < num_boundaries:
+		ceiling_frac = float(_boundary_fracs[phase - 2])
+	var floor_frac: float = 0.0
+	if (phase - 1) < num_boundaries:
+		floor_frac = float(_boundary_fracs[phase - 1])
+	var ceiling_hp: float = round(float(_hp_max_cached) * ceiling_frac)
+	var floor_hp: float = round(float(_hp_max_cached) * floor_frac)
+	var span: float = ceiling_hp - floor_hp
+	if span <= 0.0:
 		return 0.0
-	return clampf(float(hp_remaining) / float(p3_threshold), 0.0, 1.0)
+	return clampf((float(hp_remaining) - floor_hp) / span, 0.0, 1.0)
 
 
 func _start_ghost_drain_tween(phase: int, target_fraction: float) -> void:
@@ -858,7 +956,7 @@ func _start_ghost_drain_tween(phase: int, target_fraction: float) -> void:
 	var ghost: ColorRect = _segment_ghosts[i]
 	# Compute the target offset_right value (matches the foreground when
 	# the ghost finishes draining).
-	var target_offset_right: float = ghost.offset_left + SEGMENT_WIDTH * target_fraction
+	var target_offset_right: float = ghost.offset_left + _runtime_segment_width() * target_fraction
 	var t: Tween = create_tween()
 	(
 		t
@@ -876,9 +974,9 @@ func _on_boss_phase_changed(new_phase: int) -> void:
 	# the same phase (or backward) is a no-op.
 	if new_phase <= _current_phase:
 		return
-	if new_phase > SEGMENT_COUNT:
-		# Defensive — out-of-range phase emit. Cap at last segment.
-		new_phase = SEGMENT_COUNT
+	if new_phase > _segment_count:
+		# Defensive — out-of-range phase emit. Cap at the last built segment.
+		new_phase = _segment_count
 	# Stop the pulse on the previously-active segment (if it was pulsing).
 	_stop_pulse_for_segment(_current_phase)
 	# Drain previously-active segment to 0 (visual completion).
@@ -892,7 +990,7 @@ func _on_boss_phase_changed(new_phase: int) -> void:
 	_apply_phase_label_state()
 	# Repaint segment colors (completed stays 0 width but color update is
 	# defensive against future paint cycles).
-	for i in range(SEGMENT_COUNT):
+	for i in range(_segment_count):
 		var p: int = i + 1
 		_segment_fgs[i].color = _color_for_segment_phase(p)
 	# Flash the separator immediately before the new active segment.
