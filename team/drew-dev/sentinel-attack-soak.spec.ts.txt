@@ -1,0 +1,85 @@
+/**
+ * drew-sentinel-attack-soak.spec.ts — author self-soak for the ArchiveSentinel
+ * invisible-attack re-soak fix (ticket 86c9y7ygj, Sponsor 2026-05-29).
+ *
+ * This spec is the AUTHOR SELF-SOAK gate per `html5-visual-gated-author-self-soak`:
+ * it boots the PRODUCTION `?start_room=9` artifact, waits for the Sentinel's
+ * auto-cast on wake, and captures a screenshot DURING the cast-bolt travel
+ * window so the visible ember bolt is on-screen at capture time. It also dumps
+ * the cast-visibility traces for the Self-Test Report.
+ *
+ * It is NOT part of the CI run set — it is grep-skipped by filename in CI and
+ * run manually against the downloaded artifact:
+ *
+ *   RELEASE_BUILD_ARTIFACT_PATH=/tmp/embergrave-soak-c7023db \
+ *     npx playwright test drew-sentinel-attack-soak.spec.ts --project=chromium
+ *
+ * Phase-2 SLAM telegraph render is proven deterministically by the GUT pin
+ * `test_phase2_slam_telegraph_spawns_visible_draw_arc_indicator` (drives the
+ * boss to phase 2 + asserts the draw_arc indicator node is visible). The
+ * production build cannot reach phase 2 passively (700 HP, fistless player),
+ * so the slam human-perceptibility screenshot uses the diag build
+ * `diag/sentinel-attack-soak` (Sentinel hp_base nerfed) — see Self-Test Report.
+ */
+
+import { test, expect } from "../fixtures/test-base";
+import { ConsoleCapture } from "../fixtures/console-capture";
+
+const CAST_FIRE_TRACE = /\[combat-trace\] ArchiveSentinel\._fire_cast \|/;
+const CAST_BOLT_SPAWN_TRACE =
+  /\[combat-trace\] ArchiveSentinel\._spawn_cast_bolt \| visible cast bolt/;
+const CAST_BOLT_VISIBLE_TRACE =
+  /\[combat-trace\] ArchiveSentinelCastBolt\._ready \| VISIBLE bolt/;
+
+test("ArchiveSentinel cast bolt renders VISIBLE at ?start_room=9 (production re-soak)", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const capture = new ConsoleCapture(page);
+  capture.attach();
+
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:8000";
+  await page.goto(`${baseURL}/?start_room=9`, { waitUntil: "domcontentloaded" });
+
+  // Boot.
+  await capture.waitForLine(/\[Main\] M1 play-loop ready/, 30_000);
+  const buildLine = capture.getLines().find((l) => /\[BuildInfo\] build:/.test(l.text));
+  console.log("BUILD:", buildLine?.text);
+
+  // Wait for the boss to cast (auto-fires on wake — player at ~328 px is inside
+  // AGGRO_RADIUS=640).
+  await capture.waitForLine(CAST_FIRE_TRACE, 20_000);
+
+  // The visible bolt _ready trace MUST follow — capture it for the report.
+  await capture.waitForLine(CAST_BOLT_VISIBLE_TRACE, 5_000);
+
+  // Capture a burst of screenshots across ~1s so at least one lands during a
+  // bolt-travel window (the bolt lives ~0.16s + flash; casts repeat on cooldown).
+  for (let i = 0; i < 12; i++) {
+    await page.screenshot({
+      path: `/tmp/sentinel-cast-soak-${String(i).padStart(2, "0")}.png`,
+      fullPage: false,
+    });
+    await page.waitForTimeout(120);
+  }
+
+  // Report the cast-visibility evidence.
+  const fireLines = capture.getLines().filter((l) => CAST_FIRE_TRACE.test(l.text));
+  const spawnLines = capture.getLines().filter((l) => CAST_BOLT_SPAWN_TRACE.test(l.text));
+  const visibleLines = capture.getLines().filter((l) => CAST_BOLT_VISIBLE_TRACE.test(l.text));
+
+  console.log("\n=== CAST VISIBILITY EVIDENCE ===");
+  console.log(`_fire_cast (damage events):       ${fireLines.length}`);
+  console.log(`_spawn_cast_bolt (spawn intent):  ${spawnLines.length}`);
+  console.log(`CastBolt._ready (rendered visible):${visibleLines.length}`);
+  for (const l of visibleLines.slice(0, 3)) console.log("  ", l.text);
+
+  // Every fired cast must have a concurrent rendered-visible bolt.
+  expect(fireLines.length).toBeGreaterThan(0);
+  expect(visibleLines.length).toBeGreaterThan(0);
+  // No invisible damage: at least as many visible bolts as fire events
+  // (1:1 — the bolt spawns inside _fire_cast).
+  expect(visibleLines.length).toBeGreaterThanOrEqual(fireLines.length);
+
+  capture.detach();
+});

@@ -236,6 +236,46 @@ func test_arena_bounds_constant_is_1024x768() -> void:
 	)
 
 
+# ---- 7b: arena-zoom calibration (soak-round-2 "characters too big" fix) -
+
+
+func test_arena_camera_zoom_constant_is_widest_allowed() -> void:
+	# Static contract — the wider 1024×768 arena needs the camera zoomed OUT
+	# vs the S1 viewport-native 480×270 default. 0.5 is CameraDirector's
+	# MIN_NORMALIZED_ZOOM (widest view). If this drifts back toward 1.0 the
+	# Sponsor "characters too big" regression re-opens. See ARENA_CAMERA_ZOOM
+	# rationale in Stratum2BossRoom.gd.
+	assert_eq(
+		Stratum2BossRoom.ARENA_CAMERA_ZOOM,
+		0.5,
+		"arena camera zooms OUT to 0.5 normalized (widest allowed) for the 1024×768 arena"
+	)
+
+
+func test_engage_camera_requests_zoom_out_for_arena() -> void:
+	# Behavioral pin — engaging the boss-room camera must zoom the
+	# CameraDirector OUT to ARENA_CAMERA_ZOOM (not leave it at the 1.0 default
+	# that renders the wide arena too tight). Drives the real CameraDirector
+	# autoload via a player in the "player" group, matching production.
+	var cam: Node = Engine.get_main_loop().root.get_node_or_null("CameraDirector")
+	if cam == null or not cam.has_method("current_zoom"):
+		pass_test("CameraDirector autoload absent in this GUT surface — skip behavioral pin")
+		return
+	var player: FakePlayerBody = FakePlayerBody.new()
+	player.add_to_group("player")
+	add_child_autofree(player)
+	var room: Stratum2BossRoom = _make_room()
+	await get_tree().process_frame  # drain deferred fixture pass (engages camera)
+	assert_almost_eq(
+		cam.current_zoom(),
+		Stratum2BossRoom.ARENA_CAMERA_ZOOM,
+		0.001,
+		"boss-room engage zooms camera OUT to ARENA_CAMERA_ZOOM"
+	)
+	# Guard against the regression's exact shape: zoom must be < default 1.0.
+	assert_lt(cam.current_zoom(), 1.0, "arena zoom is wider than the 480×270 default")
+
+
 # ---- 8: boss death emits boss_defeated + stratum_exit_unlocked -----
 
 

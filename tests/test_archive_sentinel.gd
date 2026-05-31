@@ -37,6 +37,7 @@ func before_each() -> void:
 	if d != null and d.has_method("reset"):
 		d.reset()
 	Engine.time_scale = 1.0
+	_reset_boss_hp_mult()
 
 
 func after_each() -> void:
@@ -44,6 +45,15 @@ func after_each() -> void:
 	if d != null and d.has_method("reset"):
 		d.reset()
 	Engine.time_scale = 1.0
+	# boss_hp_mult is a global on the DebugFlags autoload; reset so the nerf
+	# pin below can't leak its 0.2 multiplier into sibling tests.
+	_reset_boss_hp_mult()
+
+
+func _reset_boss_hp_mult() -> void:
+	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("reset_boss_hp_mult_for_test"):
+		df.reset_boss_hp_mult_for_test()
 
 
 # ---- Helpers ----------------------------------------------------------
@@ -123,6 +133,55 @@ func test_archive_sentinel_mobdef_loads_with_700hp_14dmg() -> void:
 	assert_not_null(def.loot_table, "loot_table wired to boss_drops.tres")
 
 
+# ---- 2b: boss_hp_mult soak-nerf parity (closes the parity gap) --------
+# Mirrors Stratum1Boss — `?boss_hp_mult=N` URL param scales hp_base at spawn
+# so Sponsor soak can reach phase-2 mechanics in far fewer hits. Headless GUT
+# injects via DebugFlags.set_boss_hp_mult_for_test (the bridge path is
+# unreachable from GUT — OS.has_feature("web") is always false). See
+# .claude/docs/html5-export.md § "New-boss soak acceleration".
+
+
+func _set_boss_hp_mult(mult: float) -> void:
+	var df: Node = Engine.get_main_loop().root.get_node_or_null("DebugFlags")
+	assert_not_null(df, "DebugFlags autoload present for boss_hp_mult injection")
+	if df != null:
+		df.set_boss_hp_mult_for_test(mult)
+
+
+func test_boss_hp_mult_scales_mobdef_hp_base() -> void:
+	# boss_hp_mult=0.2 ⟹ hp_max == authored hp_base * 0.2.
+	_set_boss_hp_mult(0.2)
+	var def: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 700, "damage_base": 14, "move_speed": 0.0}
+	)
+	# Construct AFTER the mult is set so _apply_mob_def reads it at _ready.
+	var b: ArchiveSentinel = _make_sentinel_with_def(def)
+	var expected: int = int(round(700.0 * 0.2))  # 140
+	assert_eq(b.get_max_hp(), expected, "hp_max scaled by boss_hp_mult=0.2")
+	assert_eq(b.get_hp(), expected, "hp_current scaled by boss_hp_mult=0.2")
+	assert_eq(b.damage_base, 14, "damage NOT scaled by boss_hp_mult")
+
+
+func test_boss_hp_mult_scales_bare_default_hp() -> void:
+	# The bare-instance fallback (no MobDef) also honors the multiplier so
+	# tests can exercise the nerf without supplying a def.
+	_set_boss_hp_mult(0.2)
+	var b: ArchiveSentinel = _make_sentinel()
+	var expected: int = int(round(700.0 * 0.2))  # 140
+	assert_eq(b.get_max_hp(), expected, "bare default hp_max scaled by boss_hp_mult")
+	assert_eq(b.get_hp(), expected, "bare default hp_current scaled by boss_hp_mult")
+
+
+func test_boss_hp_mult_default_is_no_op() -> void:
+	# Default (1.0) leaves the authored hp_base unchanged — the production
+	# play path with no URL param.
+	var def: MobDef = ContentFactory.make_mob_def(
+		{"hp_base": 700, "damage_base": 14, "move_speed": 0.0}
+	)
+	var b: ArchiveSentinel = _make_sentinel_with_def(def)
+	assert_eq(b.get_max_hp(), 700, "no-mult default leaves authored hp_base intact")
+
+
 # ---- 3: stationary — velocity stays zero across attack states --------
 
 
@@ -167,11 +226,7 @@ func test_phase1_uses_cast_at_short_range() -> void:
 		ArchiveSentinel.STATE_CAST,
 		"phase 1 picks cast even when player is in slam radius"
 	)
-	assert_ne(
-		b.get_state(),
-		ArchiveSentinel.STATE_SLAM_TELEGRAPH,
-		"phase 1 does NOT use slam"
-	)
+	assert_ne(b.get_state(), ArchiveSentinel.STATE_SLAM_TELEGRAPH, "phase 1 does NOT use slam")
 
 
 func test_phase1_cast_fires_swing_spawned_with_cast_kind() -> void:
@@ -251,9 +306,7 @@ func test_phase2_picks_slam_at_short_range() -> void:
 	p.global_position = Vector2(60.0, 0.0)  # < SLAM_HITBOX_RADIUS (96)
 	b._physics_process(0.016)
 	assert_eq(
-		b.get_state(),
-		ArchiveSentinel.STATE_SLAM_TELEGRAPH,
-		"phase 2 picks slam at short range"
+		b.get_state(), ArchiveSentinel.STATE_SLAM_TELEGRAPH, "phase 2 picks slam at short range"
 	)
 
 
@@ -270,9 +323,7 @@ func test_phase2_uses_cast_at_long_range_even_when_slam_unlocked() -> void:
 	b.global_position = Vector2.ZERO
 	p.global_position = Vector2(300.0, 0.0)  # > SLAM_HITBOX_RADIUS, < AGGRO
 	b._physics_process(0.016)
-	assert_eq(
-		b.get_state(), ArchiveSentinel.STATE_CAST, "phase 2 falls back to cast at long range"
-	)
+	assert_eq(b.get_state(), ArchiveSentinel.STATE_CAST, "phase 2 falls back to cast at long range")
 
 
 # ---- 7: Damage-immunity gates -----------------------------------------
@@ -293,9 +344,7 @@ func test_waking_ignores_damage() -> void:
 	var hp_before: int = b.get_hp()
 	_hit(b, 100)
 	assert_eq(
-		b.get_hp(),
-		hp_before,
-		"WAKING rejects damage (extends intro-fairness through standup)"
+		b.get_hp(), hp_before, "WAKING rejects damage (extends intro-fairness through standup)"
 	)
 
 
@@ -306,11 +355,7 @@ func test_phase_transition_ignores_damage() -> void:
 	assert_true(b.is_in_phase_transition())
 	var hp_during: int = b.get_hp()
 	_hit(b, 99)
-	assert_eq(
-		b.get_hp(),
-		hp_during,
-		"PHASE_TRANSITION rejects damage (stagger immune)"
-	)
+	assert_eq(b.get_hp(), hp_during, "PHASE_TRANSITION rejects damage (stagger immune)")
 
 
 # ---- 8: boss_died emits exactly once ---------------------------------
@@ -339,9 +384,7 @@ func test_knockback_does_not_set_velocity() -> void:
 	# "the construct does not flinch".
 	var b: ArchiveSentinel = _make_sentinel()
 	b.take_damage(10, Vector2(500.0, -500.0), null)
-	assert_eq(
-		b.velocity, Vector2.ZERO, "knockback ignored — construct stays on its plinth"
-	)
+	assert_eq(b.velocity, Vector2.ZERO, "knockback ignored — construct stays on its plinth")
 
 
 # ---- 10: Layers + masks ----------------------------------------------
@@ -350,11 +393,7 @@ func test_knockback_does_not_set_velocity() -> void:
 func test_collision_layer_is_enemy() -> void:
 	var b: ArchiveSentinel = _make_sentinel()
 	# Enemy = bit 4 = 8. (LAYER_ENEMY = 1 << 3.)
-	assert_eq(
-		b.collision_layer,
-		ArchiveSentinel.LAYER_ENEMY,
-		"collision_layer = enemy (bit 4)"
-	)
+	assert_eq(b.collision_layer, ArchiveSentinel.LAYER_ENEMY, "collision_layer = enemy (bit 4)")
 
 
 func test_collision_mask_is_world_plus_player() -> void:
@@ -452,6 +491,262 @@ func test_cast_hitbox_spawns_at_captured_player_position() -> void:
 	)
 
 
+# ---- 12b: Cast spawns a VISIBLE bolt at fire time --------------------
+# REGRESSION-86c9y7ygj (Sponsor re-soak 2026-05-29 — "ArchiveSentinel deals
+# damage with ZERO visible attack"). The cast DAMAGE is a bare invisible Area2D
+# Hitbox; without a paired visual node the cast is invisible damage. These
+# tests pin "damage never lands without a concurrent visible attack-visual node"
+# at the GUT layer — node presence + visibility (visible / modulate.a / z) is
+# assertable headless; human-perceptibility stays the Sponsor-soak gate per
+# test-conventions.md § headless≠perception.
+
+
+func _await_deferred_add() -> void:
+	# _spawn_cast_bolt uses call_deferred("add_child"); the bolt arrives on the
+	# next idle frame. Drain one process frame so it's in the tree.
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+
+## Snapshot the cast-bolt set currently parented under `parent`. Used to exclude
+## pre-existing / orphaned bolts left by a SIBLING test before firing this test's
+## cast — `bolt.queue_free()` is deferred, so a prior test's bolt can still be in
+## `get_children()` when the next test searches the shared GutTest root. Without
+## the exclusion, `_find_cast_bolt` could return a stale sibling bolt (the
+## test-isolation half of the 86c9y7ygj cast-bolt failure — observed only in the
+## full-file / full-suite run, never in isolation).
+func _snapshot_cast_bolts(parent: Node) -> Array:
+	var out: Array = []
+	for child in parent.get_children():
+		if child is ArchiveSentinelCastBolt:
+			out.append(child)
+	return out
+
+
+## Return THIS test's freshly-spawned bolt: the first ArchiveSentinelCastBolt
+## under `parent` that is NOT in `exclude` (the pre-fire snapshot). Isolation-
+## robust against orphaned sibling bolts on the shared root.
+func _find_new_cast_bolt(parent: Node, exclude: Array) -> ArchiveSentinelCastBolt:
+	for child in parent.get_children():
+		if child is ArchiveSentinelCastBolt and not exclude.has(child):
+			return child as ArchiveSentinelCastBolt
+	return null
+
+
+func test_cast_fire_spawns_visible_bolt_node() -> void:
+	# The cast must spawn a visible attack-visual node concurrent with the
+	# (invisible) damage hitbox. This is the regression guard for the Sponsor's
+	# "invisible attack" report.
+	var b: ArchiveSentinel = _make_sentinel()
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	b.global_position = Vector2.ZERO
+	p.global_position = Vector2(150.0, 0.0)
+	b.set_player(p)
+	# Snapshot any pre-existing (orphaned-sibling) bolts on the shared root BEFORE
+	# firing so we resolve THIS test's fresh bolt, not a stale one.
+	var pre_bolts: Array = _snapshot_cast_bolts(b.get_parent())
+	b._physics_process(0.016)  # enter cast
+	b._physics_process(ArchiveSentinel.CAST_TELEGRAPH_DURATION + 0.01)  # fire
+	await _await_deferred_add()
+	# Bolt is parented to the boss's parent (the room == the GutTest root here).
+	var bolt: ArchiveSentinelCastBolt = _find_new_cast_bolt(b.get_parent(), pre_bolts)
+	assert_not_null(bolt, "cast fire spawned a visible ArchiveSentinelCastBolt node")
+	if bolt == null:
+		return
+	# Assert it is ACTUALLY visible at the moment damage is applied:
+	assert_true(bolt.visible, "cast bolt node is visible==true")
+	assert_gt(bolt.modulate.a, 0.0, "cast bolt modulate.a > 0 (not fully transparent)")
+	assert_true(bolt.z_index >= 0, "cast bolt z_index is non-negative (not sunk below floor)")
+	# And it carries a renderer-safe ColorRect body (NOT Polygon2D — PR #137).
+	var has_color_rect: bool = false
+	for child in bolt.get_children():
+		if child is ColorRect:
+			has_color_rect = true
+	assert_true(has_color_rect, "cast bolt body is a ColorRect (renderer-safe, not Polygon2D)")
+	bolt.queue_free()
+
+
+func test_cast_bolt_color_channels_are_sub_one_html5_safe() -> void:
+	# HDR-clamp safety: every channel of the bolt + impact colors must be ≤ 1.0
+	# so WebGL2's sRGB clamp leaves the ember-orange intact (PR #137 lesson).
+	for c in [
+		ArchiveSentinelCastBolt.BOLT_COLOR,
+		ArchiveSentinelCastBolt.IMPACT_COLOR,
+	]:
+		assert_true(c.r <= 1.0, "bolt color r ≤ 1.0 (HDR-clamp safe)")
+		assert_true(c.g <= 1.0, "bolt color g ≤ 1.0")
+		assert_true(c.b <= 1.0, "bolt color b ≤ 1.0")
+		assert_true(c.a > 0.0, "bolt color alpha > 0 (visible)")
+
+
+func test_cast_bolt_spawns_at_book_travels_to_captured_target() -> void:
+	# The bolt must ORIGINATE at the construct (book) and head to the CAPTURED
+	# target — so the player sees "the book just shot at where I was standing".
+	#
+	# ROOT-CAUSE NOTE (test-contract refresh, ticket 86c9y7ygj). The two prior
+	# diagnoses were BOTH right and COMPOUND — settled empirically on this HEAD:
+	#
+	#   (1) TRAVEL-TWEEN (fails in ISOLATION). The old assertion read
+	#       `bolt.global_position` after `_await_deferred_add()` (two process-frame
+	#       drains). `ArchiveSentinelCastBolt._ready` immediately starts a travel
+	#       tween (`tween_property(self, "global_position", target,
+	#       CAST_BOLT_TRAVEL_DURATION=0.16)`), so by the second drained frame the
+	#       bolt has already travelled most of the way toward the target —
+	#       empirically `global_position.x ≈ 195–219` in isolation (varies with
+	#       headless frame jitter). NOT the blink (blink never fires here — no
+	#       cast-recovery drain). FIX: assert the IMMUTABLE configured origin
+	#       (`_spawn_pos`) + target (`_target_pos`), not the travelled position.
+	#       (`_spawn_pos` / `_target_pos` reads match the existing in-file
+	#       convention — `_blink_floor_left`, `_volleys_since_blink`,
+	#       `_cast_cooldown_left` are all read directly.)
+	#
+	#   (2) ORPHAN-LEAK (fails ONLY in full-file/full-suite). The sibling
+	#       `test_cast_fire_spawns_visible_bolt_node` (boss@(0,0), player@(150,0))
+	#       runs first; its `bolt.queue_free()` is DEFERRED, so under full-suite
+	#       load its bolt lingers on the shared GutTest root. A first-match
+	#       `_find_cast_bolt` then returned that STALE bolt (spawn=(0,0),
+	#       target=(150,0)) instead of this test's fresh one. FIX: snapshot
+	#       pre-existing bolts before firing + resolve via `_find_new_cast_bolt`
+	#       (exclude the snapshot). Applied to BOTH cast-bolt-finding tests.
+	var b: ArchiveSentinel = _make_sentinel()
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	b.global_position = Vector2(50.0, 50.0)
+	p.global_position = Vector2(250.0, 50.0)  # captured at telegraph start
+	b.set_player(p)
+	# Snapshot pre-existing (orphaned-sibling) bolts BEFORE firing — the
+	# test-isolation half of this fix. A sibling test's `bolt.queue_free()` is
+	# deferred, so its bolt can still be on the shared root when this test
+	# searches; excluding the snapshot resolves THIS test's fresh bolt. Observed
+	# only in the full-file / full-suite run (a sibling bolt with spawn=(0,0)
+	# target=(150,0) leaked from test_cast_fire_spawns_visible_bolt_node), never
+	# in isolation — which is why the two prior diagnoses (travel-tween vs
+	# orphan-leak) disagreed: BOTH are real and compound.
+	var pre_bolts: Array = _snapshot_cast_bolts(b.get_parent())
+	b._physics_process(0.016)  # enter cast, captures (250,50)
+	p.global_position = Vector2(250.0, 250.0)  # player moves during windup
+	b._physics_process(ArchiveSentinel.CAST_TELEGRAPH_DURATION + 0.01)  # fire
+	await _await_deferred_add()
+	var bolt: ArchiveSentinelCastBolt = _find_new_cast_bolt(b.get_parent(), pre_bolts)
+	assert_not_null(bolt, "cast bolt spawned")
+	if bolt == null:
+		return
+	# ORIGIN contract — the bolt was configured to spawn at the construct's book
+	# position (50,50). `_spawn_pos` is immutable; `global_position` has by now
+	# travelled toward the captured target via the bolt's own travel tween.
+	assert_almost_eq(bolt._spawn_pos.x, 50.0, 0.5, "bolt originates at construct x")
+	assert_almost_eq(bolt._spawn_pos.y, 50.0, 0.5, "bolt originates at construct y")
+	# TARGET contract — the bolt travels toward the CAPTURED target (250,50), NOT
+	# the player's post-windup position (250,250). Pins the dodge-snapshot model.
+	assert_almost_eq(bolt._target_pos.x, 250.0, 0.5, "bolt travels toward captured target x")
+	assert_almost_eq(
+		bolt._target_pos.y, 50.0, 0.5, "bolt travels toward captured target y (not 250)"
+	)
+	bolt.queue_free()
+
+
+func test_cast_bolt_configure_clamps_travel_duration() -> void:
+	# Defensive: a zero / negative travel duration would divide-by-zero the
+	# tween; configure clamps to a tiny positive minimum.
+	var bolt: ArchiveSentinelCastBolt = ArchiveSentinelCastBolt.new()
+	bolt.configure(Vector2.ZERO, Vector2(100.0, 0.0), 0.0)
+	# Not in tree — just verify configure didn't crash + stored a usable value
+	# by adding it and confirming _ready builds the body without error.
+	add_child_autofree(bolt)
+	await get_tree().process_frame
+	assert_true(is_instance_valid(bolt), "bolt survives _ready with clamped duration")
+
+
+func test_cast_bolt_ready_emits_renderer_observable_visible_trace() -> void:
+	# REGRESSION-86c9y7ygj — pins the bolt's OWN _ready visibility trace contract.
+	# The Playwright spec asserts on `ArchiveSentinelCastBolt._ready | VISIBLE ...
+	# visible=true alpha>0 z>=0 color_rect=true` to prove the attack-visual node
+	# is RENDERABLE (not just spawned) at the moment the cast lands. If a refactor
+	# drops the self-trace, this GUT pin fails before CI green and the harness
+	# guard goes blind. The trace flows through the DebugFlags combat-trace shim;
+	# here we verify the post-_ready render-state the trace REPORTS is correct
+	# (visible / alpha / z / ColorRect body) — the same values the trace emits.
+	var bolt: ArchiveSentinelCastBolt = ArchiveSentinelCastBolt.new()
+	bolt.configure(Vector2(10.0, 10.0), Vector2(80.0, 10.0), 0.16)
+	add_child_autofree(bolt)
+	await get_tree().process_frame
+	assert_true(bolt.visible, "bolt visible==true at _ready (trace reports visible=true)")
+	assert_gt(bolt.modulate.a, 0.0, "bolt modulate.a > 0 at _ready (trace reports alpha>0)")
+	assert_true(bolt.z_index >= 0, "bolt z_index >= 0 at _ready (trace reports z>=0)")
+	var has_color_rect: bool = false
+	for child in bolt.get_children():
+		if child is ColorRect:
+			has_color_rect = true
+	assert_true(
+		has_color_rect, "bolt has a ColorRect body at _ready (trace reports color_rect=true)"
+	)
+
+
+# ---- 12c: Phase-2 slam telegraph spawns a VISIBLE draw_arc indicator -----
+# Companion to the cast-bolt visibility pins: proves the phase-2 slam ALSO has a
+# visible attack-visual node (the draw_arc AOE telegraph) and is NOT a second
+# invisible-attack regression. The slam's visual is the TELEGRAPH (fade-in +
+# strobe over the windup) — the player sees the danger circle BEFORE the damage
+# hitbox fires, so unlike the cast there is no "invisible damage" surface here.
+# This test pins the indicator node presence + renderer-safe draw class + z so a
+# future refactor cannot silently drop the phase-2 telegraph.
+
+
+func test_phase2_slam_telegraph_spawns_visible_draw_arc_indicator() -> void:
+	var b: ArchiveSentinel = _make_sentinel()
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	b.set_player(p)
+	# Drive into phase 2 (700 → 350 boundary), drain the transition window.
+	_hit(b, 350)
+	b._physics_process(ArchiveSentinel.PHASE_TRANSITION_DURATION + 0.01)
+	assert_eq(b.get_phase(), ArchiveSentinel.PHASE_2, "boss is in phase 2")
+	# Player inside slam radius → next tick begins the slam telegraph.
+	b.global_position = Vector2.ZERO
+	p.global_position = Vector2(60.0, 0.0)  # < SLAM_HITBOX_RADIUS (96)
+	b._physics_process(0.016)
+	assert_eq(
+		b.get_state(),
+		ArchiveSentinel.STATE_SLAM_TELEGRAPH,
+		"phase 2 short-range begins the slam telegraph"
+	)
+	# The slam indicator is parented to the construct (construct-centered draw).
+	var indicator: ArchiveSentinelSlamIndicator = null
+	for child in b.get_children():
+		if child is ArchiveSentinelSlamIndicator:
+			indicator = child as ArchiveSentinelSlamIndicator
+	assert_not_null(indicator, "slam telegraph spawned a visible ArchiveSentinelSlamIndicator node")
+	if indicator == null:
+		return
+	assert_true(indicator.visible, "slam indicator node is visible==true")
+	assert_true(indicator.z_index >= 0, "slam indicator z_index >= 0 (not sunk below floor)")
+	# Renderer-safe: the indicator overrides _draw (draw_arc path), NOT Polygon2D.
+	assert_true(
+		indicator.has_method("_draw"),
+		"slam indicator uses _draw/draw_arc (renderer-safe, NOT Polygon2D — PR #137)"
+	)
+	# Its draw radius mirrors the slam hitbox radius (96 px) so the visual matches
+	# the danger zone — drift here would teach the player the wrong dodge distance.
+	assert_almost_eq(
+		ArchiveSentinelSlamIndicator.SLAM_HITBOX_RADIUS_CONST,
+		ArchiveSentinel.SLAM_HITBOX_RADIUS,
+		0.5,
+		"slam indicator draw radius mirrors SLAM_HITBOX_RADIUS"
+	)
+
+
+func test_slam_indicator_color_channels_are_sub_one_html5_safe() -> void:
+	# HDR-clamp safety for the slam telegraph (PR #137 lesson) — every RGB channel
+	# of the draw_arc color must be ≤ 1.0 so WebGL2's sRGB clamp leaves the
+	# ember-orange intact rather than collapsing it toward white.
+	var c: Color = ArchiveSentinelSlamIndicator.SLAM_INDICATOR_COLOR_CONST
+	assert_true(c.r <= 1.0, "slam indicator color r ≤ 1.0 (HDR-clamp safe)")
+	assert_true(c.g <= 1.0, "slam indicator color g ≤ 1.0")
+	assert_true(c.b <= 1.0, "slam indicator color b ≤ 1.0")
+	assert_gt(c.a, 0.0, "slam indicator base alpha > 0 (visible)")
+
+
 # ---- 13: Negative damage clamped + zero-damage doesn't transition -----
 
 
@@ -473,3 +768,446 @@ func test_zero_damage_does_not_trigger_phase_check() -> void:
 	_hit(b, 0)
 	assert_signal_emit_count(b, "phase_changed", 0)
 	assert_eq(b.get_phase(), ArchiveSentinel.PHASE_1)
+
+
+# =====================================================================
+# Phase-blink reposition (W3-T7 Stage 6, ticket 86c9y7ygj) — Uma section 5.5a.
+# The Sentinel does NOT walk/chase; it phase-blinks (instant reposition +
+# VFX) between cast volleys to one of 4 fixed plinth-points. Coverage:
+#   B1. select_blink_target_idx picks FARTHEST-from-player.
+#   B2. select_blink_target_idx NEVER picks the current index (never adjacent).
+#   B3. Cadence hard-floor blocks a second blink until the floor elapses.
+#   B4. Floor differs phase 1 vs phase 2 — phase-2 tightens (constants tracked).
+#   B5. Suppress-at-max-range: no blink when player is beyond suppress range.
+#   B6. No move_and_slide / velocity stays ZERO — reposition is a teleport.
+#   B7. Blink target is one of the 4 fixed plinth-points (arena-bounded).
+#   B8. PLINTH_OFFSETS sub-arena bound + channel-safe VFX color sanity.
+#
+# RETUNE (Sponsor re-soak `d101b83`, 2026-05-31 — "moves around too much, didn't
+# reach phase 2/3"). Floors roughly doubled (P1 2.5→5.0, P2 1.5→3.5) + two new
+# landability levers: every-N-volleys gate + defensive-only range. New coverage:
+#   B9.  Floor VALUE pins — P1 == 5.0, P2 == 3.5 (catches an accidental revert).
+#   B10. Defensive-range gate: blink suppressed when player is outside it.
+#   B11. Defensive-range gate: blink fires when player is inside it.
+#   B12. Every-N-volleys gate (production path): P1 blinks on the 2nd volley,
+#        not the 1st; counter resets after a blink.
+#   B13. Phase-2 every-volley cadence (production path): blinks each volley.
+# =====================================================================
+
+
+func _make_sentinel_at(pos: Vector2) -> ArchiveSentinel:
+	# A blink-ready sentinel rooted at pos with the plinth origin captured.
+	var b: ArchiveSentinel = _make_sentinel()
+	b.global_position = pos
+	b._ensure_plinth_origin()
+	return b
+
+
+# ---- B1: target-select picks the FARTHEST candidate -------------------
+
+
+func test_select_blink_target_idx_picks_farthest_from_player() -> void:
+	var candidates: Array = [
+		Vector2(0, 0),
+		Vector2(100, 0),
+		Vector2(200, 0),
+		Vector2(300, 0),
+	]
+	var idx: int = ArchiveSentinel.select_blink_target_idx(candidates, 1, Vector2(10, 0))
+	assert_eq(idx, 3, "picks the candidate farthest from the player")
+
+
+func test_select_blink_target_idx_player_near_far_end_picks_near_end() -> void:
+	var candidates: Array = [
+		Vector2(0, 0),
+		Vector2(100, 0),
+		Vector2(200, 0),
+		Vector2(300, 0),
+	]
+	var idx: int = ArchiveSentinel.select_blink_target_idx(candidates, 2, Vector2(290, 0))
+	assert_eq(idx, 0, "player near high end gives farthest at index 0")
+
+
+# ---- B2: never re-picks the current index (never adjacent) ------------
+
+
+func test_select_blink_target_idx_never_returns_current_index() -> void:
+	var candidates: Array = [
+		Vector2(0, 0),
+		Vector2(100, 0),
+		Vector2(200, 0),
+		Vector2(300, 0),
+	]
+	var idx: int = ArchiveSentinel.select_blink_target_idx(candidates, 0, Vector2(300, 0))
+	assert_ne(idx, 0, "never re-picks the currently-occupied plinth")
+	assert_eq(idx, 1, "falls to the next-farthest non-current candidate")
+
+
+# ---- B3: cadence hard-floor blocks back-to-back blinks ----------------
+
+
+func test_blink_floor_blocks_second_blink_until_elapsed() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(540, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+
+	var fired_1: bool = b.try_blink_for_test()
+	assert_true(fired_1, "first blink fires (floor was clear)")
+	assert_gt(b.get_blink_floor_left(), 0.0, "floor armed after blink")
+
+	var fired_2: bool = b.try_blink_for_test()
+	assert_false(fired_2, "second blink blocked while floor is armed")
+
+	b._blink_floor_left = 0.0
+	b._blink_in_progress = false
+	var fired_3: bool = b.try_blink_for_test()
+	assert_true(fired_3, "blink eligible again once floor elapses")
+
+
+# ---- B4: phase-2 floor is tighter than phase-1 ------------------------
+
+
+func test_blink_floor_tightens_in_phase_2() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(540, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+
+	assert_eq(b.get_phase(), ArchiveSentinel.PHASE_1)
+	b.try_blink_for_test()
+	var floor_p1: float = b.get_blink_floor_left()
+	assert_almost_eq(floor_p1, ArchiveSentinel.BLINK_FLOOR_PHASE_1, 0.001)
+
+	b.phase = ArchiveSentinel.PHASE_2
+	b._blink_floor_left = 0.0
+	b._blink_in_progress = false
+	b.try_blink_for_test()
+	var floor_p2: float = b.get_blink_floor_left()
+	assert_almost_eq(floor_p2, ArchiveSentinel.BLINK_FLOOR_PHASE_2, 0.001)
+
+	assert_lt(floor_p2, floor_p1, "phase-2 cadence is tighter than phase-1")
+
+
+# ---- B5: suppress-at-max-range ----------------------------------------
+
+
+func test_blink_suppressed_when_player_at_max_range() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	var far: float = ArchiveSentinel.AGGRO_RADIUS * ArchiveSentinel.BLINK_SUPPRESS_RANGE_FRAC + 50.0
+	p.global_position = Vector2(512, 384) + Vector2(far, 0)
+	add_child_autofree(p)
+	b.set_player(p)
+
+	var fired: bool = b.try_blink_for_test()
+	assert_false(fired, "no blink when player is already at max range")
+	assert_eq(b.get_blink_floor_left(), 0.0, "floor not armed when suppressed")
+
+
+func test_blink_not_suppressed_when_player_in_range() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(560, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	var fired: bool = b.try_blink_for_test()
+	assert_true(fired, "blink fires when player is in-range (not suppressed)")
+
+
+# ---- B6: no move_and_slide — velocity stays ZERO, reposition is teleport
+
+
+func test_blink_reposition_is_teleport_velocity_stays_zero() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(560, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+
+	b.try_blink_for_test()
+	assert_eq(b.velocity, Vector2.ZERO, "velocity ZERO right after blink fire")
+
+	for _i in 40:
+		await get_tree().process_frame
+		assert_eq(b.velocity, Vector2.ZERO, "velocity stays ZERO every frame of blink")
+
+	var landed_on_plinth: bool = false
+	for off in ArchiveSentinel.PLINTH_OFFSETS:
+		if b.global_position.distance_to(Vector2(512, 384) + off) < 0.5:
+			landed_on_plinth = true
+	assert_true(landed_on_plinth, "construct landed exactly on a fixed plinth-point")
+
+
+# ---- B7: blink target is one of the 4 fixed plinth-points -------------
+
+
+func test_blink_target_is_a_fixed_plinth_point() -> void:
+	var origin: Vector2 = Vector2(512, 384)
+	var b: ArchiveSentinel = _make_sentinel_at(origin)
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(560, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+
+	var before_idx: int = b.get_current_plinth_idx()
+	b.try_blink_for_test()
+	var after_idx: int = b.get_current_plinth_idx()
+	assert_ne(after_idx, before_idx, "plinth index changed on blink")
+	assert_true(
+		after_idx >= 0 and after_idx < ArchiveSentinel.PLINTH_OFFSETS.size(),
+		"target index in the fixed plinth set"
+	)
+
+
+# ---- B8: plinth offsets arena-bounded + VFX channels HDR-safe ---------
+
+
+func test_plinth_offsets_are_arena_bounded() -> void:
+	var center: Vector2 = Vector2(512, 384)
+	for off in ArchiveSentinel.PLINTH_OFFSETS:
+		var pos: Vector2 = center + off
+		assert_true(pos.x > 80 and pos.x < 944, "plinth x inside arena interior: %s" % pos)
+		assert_true(pos.y > 80 and pos.y < 688, "plinth y inside arena interior: %s" % pos)
+
+
+func test_blink_vfx_color_channels_are_sub_one_html5_safe() -> void:
+	var colors: Array = [
+		ArchiveSentinelBlinkVfx.EMBER_MOTE_COLOR,
+		ArchiveSentinelBlinkVfx.GLYPH_FLECK_COLOR,
+		ArchiveSentinelBlinkVfx.SEAM_COLOR,
+		ArchiveSentinelBlinkVfx.IMPACT_FLARE_COLOR,
+	]
+	for c in colors:
+		assert_true((c as Color).r <= 1.0, "r le 1.0 (HDR-clamp safe): %s" % c)
+		assert_true((c as Color).g <= 1.0, "g le 1.0: %s" % c)
+		assert_true((c as Color).b <= 1.0, "b le 1.0: %s" % c)
+
+
+# ---- B9: RETUNE — floor VALUE pins (catch an accidental revert) -------
+# B4 above asserts P2 < P1 via the constants; these pin the ACTUAL seconds so a
+# silent revert to the old 2.5/1.5 floors (which let the boss strobe around the
+# room) is caught in CI. Cite: Sponsor re-soak `d101b83` 2026-05-31.
+
+
+func test_blink_floor_phase_1_value_is_retuned_to_5s() -> void:
+	assert_almost_eq(
+		ArchiveSentinel.BLINK_FLOOR_PHASE_1, 5.0, 0.001, "phase-1 blink floor retuned to 5.0s"
+	)
+
+
+func test_blink_floor_phase_2_value_is_retuned_to_3point5s() -> void:
+	assert_almost_eq(
+		ArchiveSentinel.BLINK_FLOOR_PHASE_2, 3.5, 0.001, "phase-2 blink floor retuned to 3.5s"
+	)
+
+
+# ---- B10/B11: RETUNE — defensive-only range gate ----------------------
+# The blink now only fires when the player has closed inside BLINK_DEFENSIVE_RANGE
+# (an attacking player gets repositioned-away → the clear window). A distant /
+# ranged player leaves the construct planted (no forever-chase). Cite: Uma §5.5a
+# item 4 + Sponsor re-soak `d101b83`.
+
+
+func test_blink_suppressed_when_player_outside_defensive_range() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	# Inside AGGRO_RADIUS (640) + below max-range suppress (608), but well OUTSIDE
+	# the defensive range (160) — a ranged/kiting player the boss should NOT chase.
+	p.global_position = Vector2(512 + 300, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	var fired: bool = b.try_blink_for_test()
+	assert_false(fired, "no blink when player is outside defensive range (no close-pressure)")
+	assert_eq(b.get_blink_floor_left(), 0.0, "floor not armed when defensive-suppressed")
+
+
+func test_blink_fires_when_player_inside_defensive_range() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	# Inside the defensive range (160) — the player has closed to land hits.
+	p.global_position = Vector2(512 + 100, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	var fired: bool = b.try_blink_for_test()
+	assert_true(
+		fired, "blink fires when player is inside defensive range (deny the close-pressure)"
+	)
+
+
+# ---- B12/B13: RETUNE — every-N-volleys gate (PRODUCTION path) ---------
+# `try_blink_for_test` bypasses the volley gate by design (it isolates floor /
+# suppress / target-select). These drive the FULL production cast volley through
+# `_process_cast_recovery` so the every-N-volleys cadence is exercised end-to-end.
+
+
+func _run_one_cast_volley(b: ArchiveSentinel) -> void:
+	# IDLE_ACTIVE → CAST (decision tick), drain telegraph → CAST_RECOVERY (fire),
+	# drain recovery → recovery-tail (blink-or-idle). Player must already be set
+	# in-range. One full cast → recovery cycle = one "volley".
+	# Clear any leftover cast cooldown from the prior volley so the decision tick
+	# actually begins a new cast (cooldown is armed to CAST_COOLDOWN at each fire).
+	b._cast_cooldown_left = 0.0
+	if b.get_state() == ArchiveSentinel.STATE_IDLE_ACTIVE:
+		b._physics_process(0.016)  # decide → CAST
+	# Drain telegraph so the cast fires and we enter CAST_RECOVERY.
+	b._physics_process(ArchiveSentinel.CAST_TELEGRAPH_DURATION + 0.01)
+	# Drain recovery so the recovery-tail (volley++ / blink gate) runs.
+	b._physics_process(ArchiveSentinel.CAST_RECOVERY_DURATION + 0.01)
+
+
+func test_phase1_blinks_on_second_volley_not_first() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(560, 384)  # 48 px — in cast + defensive range
+	add_child_autofree(p)
+	b.set_player(p)
+	assert_eq(b.get_phase(), ArchiveSentinel.PHASE_1)
+
+	var idx_start: int = b.get_current_plinth_idx()
+	# Volley 1 — counter 0→1, 1 < 2 (phase-1 cadence), so NO blink.
+	_run_one_cast_volley(b)
+	assert_eq(
+		b.get_current_plinth_idx(),
+		idx_start,
+		"phase-1 does NOT blink on the first volley (every-2nd-volley cadence)"
+	)
+	# Volley 2 — counter 1→2, 2 >= 2 + floor clear (never armed) → blink fires.
+	_run_one_cast_volley(b)
+	assert_ne(
+		b.get_current_plinth_idx(), idx_start, "phase-1 blinks on the second completed volley"
+	)
+
+
+func test_phase2_blinks_every_volley() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	# Outside SLAM_HITBOX_RADIUS (96) so phase-2 picks CAST not SLAM, but inside
+	# the defensive range (160) so the blink is not range-suppressed.
+	p.global_position = Vector2(512 + 120, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	# Force phase 2 directly (the cadence under test is volleys-per-blink, not the
+	# transition); clear cooldown so the first cast can fire immediately.
+	b.phase = ArchiveSentinel.PHASE_2
+	b._volleys_since_blink = 0
+	b._blink_floor_left = 0.0
+
+	var idx_start: int = b.get_current_plinth_idx()
+	# Phase-2 cadence = every volley → the very first completed volley blinks.
+	_run_one_cast_volley(b)
+	assert_ne(
+		b.get_current_plinth_idx(),
+		idx_start,
+		"phase-2 blinks on every volley (1-per-volley cadence)"
+	)
+
+
+# =====================================================================
+# Slam-commit gate (Sponsor re-soak #4, 2026-05-31, ticket 86c9y7ygj).
+# Symptom (Sponsor verbatim): "when the boss is making the red blinking circle
+# (aura attack) he should not blink away before its done." The construct must
+# COMMIT to a telegraphed slam (telegraph → hit resolves) before it is eligible
+# to blink. A blink mid-slam teleports the construct AND its construct-parented
+# slam indicator off the telegraphed footprint — the red circle visibly abandons
+# the windup. Gate: `_try_blink_reposition` suppresses while `_is_slam_active()`
+# (STATE_SLAM_TELEGRAPH / STATE_SLAM_RECOVERY / telegraph timer > 0). Coverage:
+#   B14. Blink SUPPRESSED during the slam telegraph window.
+#   B15. Blink SUPPRESSED during the slam recovery window.
+#   B16. Blink RESUMES once the slam resolves back to IDLE_ACTIVE (precise — the
+#        gate is the slam window ONLY; normal between-attacks cadence unaffected).
+#   B17. `try_blink_for_test` (the isolated entry the B-tests use) ALSO honors
+#        the slam gate — the suppression is in `_try_blink_reposition`, not the
+#        production-only volley wrapper.
+# =====================================================================
+
+
+func test_blink_suppressed_during_slam_telegraph() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	# Inside SLAM_HITBOX_RADIUS (96) so phase-2 begins a slam, AND inside the
+	# defensive range so the blink is NOT range-suppressed — isolating the slam
+	# gate as the ONLY reason a blink is denied.
+	p.global_position = Vector2(512 + 60, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	b.phase = ArchiveSentinel.PHASE_2
+	b._slam_cooldown_left = 0.0
+	b._blink_floor_left = 0.0
+
+	# Decision tick begins the slam telegraph (phase 2, in slam radius, cd clear).
+	b._physics_process(0.016)
+	assert_eq(
+		b.get_state(),
+		ArchiveSentinel.STATE_SLAM_TELEGRAPH,
+		"phase-2 short-range begins the slam telegraph"
+	)
+	assert_true(b._is_slam_active(), "slam reads as active during telegraph")
+
+	var idx_start: int = b.get_current_plinth_idx()
+	var fired: bool = b.try_blink_for_test()
+	assert_false(fired, "blink SUPPRESSED while slam is telegraphing — boss commits to the slam")
+	assert_eq(b.get_current_plinth_idx(), idx_start, "construct did NOT reposition mid-telegraph")
+	assert_eq(b.get_blink_floor_left(), 0.0, "floor not armed by a slam-suppressed blink attempt")
+
+
+func test_blink_suppressed_during_slam_recovery() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(512 + 60, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	b.phase = ArchiveSentinel.PHASE_2
+
+	# Drive INTO slam recovery: telegraph begins, drain to fire, land in recovery.
+	b._slam_cooldown_left = 0.0
+	b._blink_floor_left = 0.0
+	b._physics_process(0.016)  # → SLAM_TELEGRAPH
+	b._physics_process(ArchiveSentinel.SLAM_TELEGRAPH_DURATION + 0.01)  # fire → SLAM_RECOVERY
+	assert_eq(b.get_state(), ArchiveSentinel.STATE_SLAM_RECOVERY, "slam fired and entered recovery")
+	assert_true(b._is_slam_active(), "slam reads as active during recovery (still committed)")
+
+	var idx_start: int = b.get_current_plinth_idx()
+	var fired: bool = b.try_blink_for_test()
+	assert_false(fired, "blink SUPPRESSED while slam is in recovery")
+	assert_eq(b.get_current_plinth_idx(), idx_start, "construct did NOT reposition mid-recovery")
+
+
+func test_blink_resumes_after_slam_resolves() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(512 + 60, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	b.phase = ArchiveSentinel.PHASE_2
+	b._slam_cooldown_left = 0.0
+	b._blink_floor_left = 0.0
+
+	# Full slam: telegraph → fire → recovery → resolve back to IDLE_ACTIVE.
+	b._physics_process(0.016)  # → SLAM_TELEGRAPH
+	b._physics_process(ArchiveSentinel.SLAM_TELEGRAPH_DURATION + 0.01)  # → SLAM_RECOVERY
+	b._physics_process(ArchiveSentinel.SLAM_RECOVERY_DURATION + 0.01)  # recovery drains → IDLE
+	assert_eq(
+		b.get_state(), ArchiveSentinel.STATE_IDLE_ACTIVE, "slam fully resolved back to IDLE_ACTIVE"
+	)
+	assert_false(b._is_slam_active(), "slam no longer reads active after it resolves")
+
+	# Blink eligibility RESTORED — the gate was the slam window ONLY. Floor was
+	# never armed during the suppressed window, so a blink now fires normally.
+	var idx_start: int = b.get_current_plinth_idx()
+	var fired: bool = b.try_blink_for_test()
+	assert_true(fired, "blink RESUMES once the slam resolves (gate is slam-window-only)")
+	assert_ne(b.get_current_plinth_idx(), idx_start, "construct repositions normally post-slam")
+
+
+func test_is_slam_active_false_in_idle_and_cast() -> void:
+	# The gate must be precise: NOT active in IDLE_ACTIVE / CAST / CAST_RECOVERY,
+	# so the normal between-attacks blink cadence is untouched.
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	assert_false(b._is_slam_active(), "not slam-active in IDLE_ACTIVE")
+	b._set_state(ArchiveSentinel.STATE_CAST)
+	assert_false(b._is_slam_active(), "not slam-active during a cast telegraph")
+	b._set_state(ArchiveSentinel.STATE_CAST_RECOVERY)
+	assert_false(b._is_slam_active(), "not slam-active during cast recovery (the blink seam)")
