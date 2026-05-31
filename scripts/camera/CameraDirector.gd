@@ -276,6 +276,18 @@ func _ready() -> void:
 	# Defer player resolution one frame so the boot scene (Main) has time
 	# to spawn + register the player in the "player" group.
 	call_deferred("_resolve_player_target")
+	# HTML5 `export_presets.cfg html/canvas_resize_policy=2` (adaptive) makes a
+	# minimize → restore re-run the `canvas_items` viewport stretch, which
+	# clobbers `_camera.zoom` back to its scene-default WITHOUT touching our
+	# GDScript mirror (`_current_normalized_zoom`). The viewport `size_changed`
+	# signal fires on that resize; we re-assert our retained owned state so a
+	# non-default zoom / follow / bounds survives the restore. Pure re-projection
+	# of already-held autoload state — no caller re-fires. See
+	# `.claude/docs/camera-layer.md` § "HTML5 — minimize/restore zoom re-assert".
+	if is_inside_tree():
+		var vp: Viewport = get_viewport()
+		if vp != null and not vp.size_changed.is_connected(_on_window_size_changed):
+			vp.size_changed.connect(_on_window_size_changed)
 	print(
 		(
 			"[CameraDirector] ready normalized_zoom=%.3f baseline=(%.4f,%.4f)"
@@ -342,6 +354,48 @@ func _emit_state_trace() -> void:
 				% [_camera.zoom.x, _camera.global_position.x, _camera.global_position.y]
 			)
 		)
+
+
+# ---- Window-resize re-assert (HTML5 minimize/restore) ----------------
+
+
+## Fired on viewport `size_changed`. On HTML5 with `canvas_resize_policy=2`
+## (adaptive), a minimize → restore re-runs the `canvas_items` stretch and
+## resets `_camera.zoom` to the scene default WITHOUT updating our mirror
+## (`_current_normalized_zoom`). The mirror is still the source of truth, so
+## we re-project it onto the engine `Camera2D` + re-apply follow/bounds state.
+##
+## Deferred by one frame so the engine's stretch recompute settles BEFORE we
+## re-write `_camera.zoom` — otherwise the late stretch pass could clobber our
+## re-assert. This is a pure re-projection of retained autoload state; it does
+## NOT call `request_zoom` (which would no-op against the idempotence guard,
+## since the mirror still reads the correct value).
+func _on_window_size_changed() -> void:
+	call_deferred("_reassert_owned_camera_state")
+
+
+## Re-write the engine `Camera2D` from the retained GDScript mirror state,
+## bypassing the `request_zoom` idempotence guard. Safe to call repeatedly —
+## it writes derived values, emits no signals, and fires no traces beyond the
+## standard per-tick `_process` state trace.
+func _reassert_owned_camera_state() -> void:
+	if _camera == null:
+		return
+	# Re-project the owned normalized zoom onto the engine camera. The stretch
+	# reset clobbered `_camera.zoom`; the mirror is still correct.
+	_camera.zoom = BASELINE_ZOOM * _current_normalized_zoom
+	# Re-assert position-ownership state. Precedence mirrors `_process`:
+	# pinned anchor > continuous-scroll follow > snap-follow (handled in
+	# `_process` on the next tick). Position is fully re-derived by `_process`
+	# each frame, so the only state that needs an explicit poke here is the
+	# pinned anchor (held when no position tween is in flight).
+	if _anchor_override != Vector2.ZERO:
+		if _pos_tween == null or not _pos_tween.is_valid():
+			_camera.global_position = _anchor_override
+	# `_follow_target` / `_follow_deadzone` / `_world_bounds` are read live by
+	# `_process` every tick from these same retained members — the stretch
+	# reset does not touch them, so no re-write is needed; the next `_process`
+	# tick re-applies deadzone-follow + bounds-clamp against the restored zoom.
 
 
 # ---- Public API ------------------------------------------------------

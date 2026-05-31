@@ -128,6 +128,18 @@ Esc and most game-only keys do NOT have this conflict and remain fine in `_unhan
 
 **Latent surfaces in this codebase:** any future loot table walker, mob-def discovery, level-chunk autoloader, or affix-pool scanner that uses `DirAccess` recursion has the same latent bug class. Always pair with a pinned-paths fallback for save-critical resources, and ship an HTML5-build smoke test (headless GUT and desktop will both pass against the bug).
 
+## Canvas resize / minimize-restore — owned-state clobber
+
+**`html/canvas_resize_policy=2` (adaptive) + `window/stretch/mode="canvas_items"` re-run the viewport stretch on every canvas resize — including browser minimize → restore.** The export ships `canvas_resize_policy=2` (`export_presets.cfg`) so the canvas tracks the browser window; combined with the `canvas_items` stretch (`project.godot [display]`), a restore re-runs the stretch pass that maps the 480×270 logical world onto the live canvas size.
+
+**The trap:** the stretch pass writes engine-level transform/zoom state DIRECTLY. Any autoload or system that *owns* a piece of that engine state via a GDScript mirror (the canonical case: `CameraDirector` owns `Camera2D.zoom` via `_current_normalized_zoom`) gets its engine value reset to the scene default on restore, **without** its mirror being touched. The mirror and the engine then disagree — the owned non-default state (a 0.5× arena zoom, a 1.5× cinematic zoom, a pinned camera anchor) silently reverts to default on the next minimize/restore, while the owning system still believes it holds the non-default value.
+
+**The fix pattern (PR `devon/camera-zoom-restore`):** any single-owner-of-engine-state autoload must **subscribe `get_viewport().size_changed` in `_ready`** and, on the signal, **re-project its retained mirror onto the engine state** — `call_deferred` by one frame so the engine's own stretch recompute settles first. For `CameraDirector` this is `_on_window_size_changed()` → `_reassert_owned_camera_state()` writing `_camera.zoom = BASELINE_ZOOM * _current_normalized_zoom` directly (bypassing any idempotence guard that would no-op a re-request, since the mirror still reads the correct value). State that's re-derived live each `_process` tick (follow-target, deadzone, world-bounds) needs no explicit re-write; only state the system writes once-and-holds (zoom, pinned position) must be re-asserted.
+
+**Detection is HTML5-only + interactive.** Headless GUT can *simulate* the clobber (mutate `_camera.zoom` behind the director's back, emit `size_changed`, assert restore) but the real trigger — a browser minimize/restore re-running the adaptive stretch — only manifests in a real browser tab. This is a **visual-verification-gate** surface: confirm the owned state holds across an actual minimize → restore cycle in the release build. Other autoloads that own engine transform state (a future parallax/background-scroll director, any direct `Viewport.canvas_transform` writer) inherit the same latent bug class and need the same `size_changed` re-assert.
+
+**Full Camera2D treatment:** [`camera-layer.md` § "HTML5 — minimize/restore zoom re-assert"](camera-layer.md).
+
 ## Service-worker cache trap
 
 Godot HTML5 exports register a service worker that aggressively caches `index.js` / `index.wasm` / asset bundle. **Switching between artifacts on the same `localhost:8000` URL serves stale assets even after a normal F5 refresh** — including across browser sessions. This bit Sponsor multiple times during the M1 RC P0 wave: the new build SHA showed in BuildInfo from prior sessions in cache, while the trace data printed values from older code (e.g. `tint=(1.40,1.00,0.70)` from pre-PR-#137 even after PR #137's sub-1.0 fix shipped).
