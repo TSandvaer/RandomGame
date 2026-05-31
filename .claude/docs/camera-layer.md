@@ -96,6 +96,24 @@ Per [`html5-export.md`](html5-export.md), the WebGL2 renderer diverges from desk
 
 **Highest residual risk = z-index ordering at zoom > 1.0×** — most relevant to T16's 1.5× ember-rise. T9 ships at default 1.0× which preserves the pre-T9 stretch behavior exactly; T9's Self-Test Report is the 1.0× baseline. T16's Self-Test Report is the 1.5× gate.
 
+## HTML5 — minimize/restore zoom re-assert (`canvas_resize_policy=2`)
+
+**The bug (PR `devon/camera-zoom-restore`).** The HTML5 export ships `html/canvas_resize_policy=2` (adaptive) in `export_presets.cfg` alongside `window/stretch/mode="canvas_items"` in `project.godot`. A browser **minimize → restore** (and any canvas resize) re-runs the `canvas_items` stretch pass, which **clobbers the engine `Camera2D.zoom` back to the scene default** (`BASELINE_ZOOM`, i.e. normalized 1.0× = `2.6667`). Critically, the stretch reset writes the *engine* `_camera.zoom` directly and does **NOT** touch the GDScript mirror `_current_normalized_zoom`. So after a restore, the engine camera is at `1.0×` but the director still believes it's at (e.g.) `0.5×` — any non-default zoom silently reverts.
+
+**Why a naive re-fire doesn't fix it.** `request_zoom(_current_normalized_zoom, 0.0)` is a **no-op** against the idempotence guard (`CameraDirector.request_zoom`): the guard short-circuits when the requested scale equals the mirror AND no zoom-tween is in flight — which is exactly the post-restore state. The mirror is still correct, so the guard refuses to re-write the (now-wrong) engine zoom.
+
+**The fix.** `_ready` subscribes `get_viewport().size_changed` → `_on_window_size_changed()`, which `call_deferred`s `_reassert_owned_camera_state()`:
+
+1. **Re-project zoom directly:** `_camera.zoom = BASELINE_ZOOM * _current_normalized_zoom`, bypassing the idempotence guard entirely. The mirror is the source of truth; this re-derives the engine value from it.
+2. **Re-hold the pinned anchor:** if `_anchor_override != Vector2.ZERO` and no `_pos_tween` is in flight, re-write `_camera.global_position = _anchor_override`.
+3. **Follow / deadzone / bounds need no re-write:** `_follow_target`, `_follow_deadzone`, `_world_bounds` are read **live** by `_process` every tick and are untouched by the stretch reset. The next `_process` tick re-applies deadzone-follow + bounds-clamp against the restored zoom automatically.
+
+**Why deferred one frame:** the re-write fires via `call_deferred` so the engine's own stretch recompute settles BEFORE we re-write `_camera.zoom` — otherwise a late stretch pass in the same frame could clobber our re-assert again.
+
+This is a **pure re-projection of retained autoload state** — no caller re-fires `request_zoom`, no `zoom_requested` / `zoom_changed` signal emission, no `[combat-trace]` request line. The only trace is the standard per-tick `CameraDirector.state` line (which now reports the restored engine zoom).
+
+**Pinned by:** `test_size_changed_reasserts_clobbered_zoom`, `test_size_changed_reassert_holds_non_default_death_zoom`, `test_size_changed_reassert_holds_pinned_anchor`, `test_size_changed_reassert_preserves_follow_and_bounds_state`, `test_viewport_size_changed_is_connected_after_ready` in `tests/test_camera_director.gd`. The last is the regression guard for the `_ready` wiring — if the `size_changed` connection is dropped, the re-assert never fires and the bug returns silently. See also [`html5-export.md` § "Canvas resize / minimize-restore — owned-state clobber"](html5-export.md).
+
 **Visual-verification gate (per `html5-export.md`):** any PR touching Camera2D requires release-build verification. T9 falls within the **escape-clause** workflow when the author can't run Chromium interactively — honest-disclose + Sponsor-soak with explicit probe targets. T16 (Polygon2D + CPUParticles2D + camera zoom > 1.0×) does NOT qualify for the escape clause and requires a local-Godot screenshot before merge.
 
 ## `[combat-trace]` observability — Playwright-visible
