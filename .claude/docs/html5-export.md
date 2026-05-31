@@ -36,6 +36,26 @@ window.addEventListener('DOMContentLoaded', () => {
 
 The `head_include` field embeds the script into the generated `index.html` `<head>` at export time. Suppress at both `document` and `canvas` to cover all hit paths. No GDScript change required.
 
+**Register the `document` listener SYNCHRONOUSLY at `<head>`-parse, NOT inside `DOMContentLoaded` — and use capture phase (the re-soak #5 hardening).** The original PR #235 form (snippet above, the DCL-wrapped version) deferred BOTH `addEventListener` calls to `DOMContentLoaded`. That leaves a **head-parse → DCL window with no suppressor at all**: on a real-browser cold load (large WASM, service-worker miss) the canvas can be present and right-clickable before DCL fires, and a right-click in that window leaks the native menu. This is the "RMB *still* triggers the context menu" re-soak finding — the suppressor was present and worked once DCL had fired, but the cold-load race intermittently leaked. Empirically reproduced: a Playwright spec navigating with `waitUntil:"commit"` and dispatching a `contextmenu` the instant `#canvas` is selectable returns `defaultPrevented:false` on the old build (flaky, ~1-in-5) and `true` deterministically on the hardened build.
+
+**Hardened pattern (current `main`):**
+
+```js
+<script>(function(){
+  var block = function(e){ e.preventDefault(); };
+  document.addEventListener('contextmenu', block, true);   // capture — runs before any other handler, no DCL wait
+  document.addEventListener('contextmenu', block, false);  // bubble  — belt-and-suspenders
+  document.addEventListener('DOMContentLoaded', function(){
+    var canvas = document.getElementById('canvas');
+    if (canvas) { canvas.addEventListener('contextmenu', block, true); }  // canvas-specific, once it exists
+  });
+})();</script>
+```
+
+Why capture-phase at `document`: the `contextmenu` event traverses capture (document → target) then bubble (target → document). A capture-phase `document` listener fires FIRST in the whole dispatch, before any target-level handler and with no DCL dependency — it is the airtight catch-all for canvas, body/letterbox margins, and any future element. The bubble-phase + canvas listeners are redundant safety. **Godot's own engine glue (`godot_js_display_setup_canvas`) also installs a canvas `contextmenu` preventDefault, but only after the WASM Display driver boots** — the head_include covers the entire pre-boot window the engine cannot.
+
+**Regression guard:** `tests/playwright/specs/contextmenu-suppress.spec.ts` — asserts `event.defaultPrevented === true` (the exact signal that gates the native menu) across a real right-click, synthetic dispatch on canvas/body/document, AND the early-load (canvas-exists) path. The early-load test is the one that catches a regression back to the DCL-deferred form. `defaultPrevented` is the headless proxy for "no native menu appears" — Playwright cannot screenshot OS-drawn menu chrome.
+
 **Other likely browser-event leaks to watch for in future soak rounds** (none confirmed in the codebase yet, but Uma flagged the class in PR #235's decision draft):
 
 - `dragstart` / `drop` — browser drag-and-drop semantics
