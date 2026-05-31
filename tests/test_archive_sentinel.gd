@@ -640,7 +640,9 @@ func test_cast_bolt_spawns_at_book_travels_to_captured_target() -> void:
 	# TARGET contract — the bolt travels toward the CAPTURED target (250,50), NOT
 	# the player's post-windup position (250,250). Pins the dodge-snapshot model.
 	assert_almost_eq(bolt._target_pos.x, 250.0, 0.5, "bolt travels toward captured target x")
-	assert_almost_eq(bolt._target_pos.y, 50.0, 0.5, "bolt travels toward captured target y (not 250)")
+	assert_almost_eq(
+		bolt._target_pos.y, 50.0, 0.5, "bolt travels toward captured target y (not 250)"
+	)
 	bolt.queue_free()
 
 
@@ -1030,7 +1032,9 @@ func test_blink_fires_when_player_inside_defensive_range() -> void:
 	add_child_autofree(p)
 	b.set_player(p)
 	var fired: bool = b.try_blink_for_test()
-	assert_true(fired, "blink fires when player is inside defensive range (deny the close-pressure)")
+	assert_true(
+		fired, "blink fires when player is inside defensive range (deny the close-pressure)"
+	)
 
 
 # ---- B12/B13: RETUNE — every-N-volleys gate (PRODUCTION path) ---------
@@ -1095,5 +1099,115 @@ func test_phase2_blinks_every_volley() -> void:
 	# Phase-2 cadence = every volley → the very first completed volley blinks.
 	_run_one_cast_volley(b)
 	assert_ne(
-		b.get_current_plinth_idx(), idx_start, "phase-2 blinks on every volley (1-per-volley cadence)"
+		b.get_current_plinth_idx(),
+		idx_start,
+		"phase-2 blinks on every volley (1-per-volley cadence)"
 	)
+
+
+# =====================================================================
+# Slam-commit gate (Sponsor re-soak #4, 2026-05-31, ticket 86c9y7ygj).
+# Symptom (Sponsor verbatim): "when the boss is making the red blinking circle
+# (aura attack) he should not blink away before its done." The construct must
+# COMMIT to a telegraphed slam (telegraph → hit resolves) before it is eligible
+# to blink. A blink mid-slam teleports the construct AND its construct-parented
+# slam indicator off the telegraphed footprint — the red circle visibly abandons
+# the windup. Gate: `_try_blink_reposition` suppresses while `_is_slam_active()`
+# (STATE_SLAM_TELEGRAPH / STATE_SLAM_RECOVERY / telegraph timer > 0). Coverage:
+#   B14. Blink SUPPRESSED during the slam telegraph window.
+#   B15. Blink SUPPRESSED during the slam recovery window.
+#   B16. Blink RESUMES once the slam resolves back to IDLE_ACTIVE (precise — the
+#        gate is the slam window ONLY; normal between-attacks cadence unaffected).
+#   B17. `try_blink_for_test` (the isolated entry the B-tests use) ALSO honors
+#        the slam gate — the suppression is in `_try_blink_reposition`, not the
+#        production-only volley wrapper.
+# =====================================================================
+
+
+func test_blink_suppressed_during_slam_telegraph() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	# Inside SLAM_HITBOX_RADIUS (96) so phase-2 begins a slam, AND inside the
+	# defensive range so the blink is NOT range-suppressed — isolating the slam
+	# gate as the ONLY reason a blink is denied.
+	p.global_position = Vector2(512 + 60, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	b.phase = ArchiveSentinel.PHASE_2
+	b._slam_cooldown_left = 0.0
+	b._blink_floor_left = 0.0
+
+	# Decision tick begins the slam telegraph (phase 2, in slam radius, cd clear).
+	b._physics_process(0.016)
+	assert_eq(
+		b.get_state(),
+		ArchiveSentinel.STATE_SLAM_TELEGRAPH,
+		"phase-2 short-range begins the slam telegraph"
+	)
+	assert_true(b._is_slam_active(), "slam reads as active during telegraph")
+
+	var idx_start: int = b.get_current_plinth_idx()
+	var fired: bool = b.try_blink_for_test()
+	assert_false(fired, "blink SUPPRESSED while slam is telegraphing — boss commits to the slam")
+	assert_eq(b.get_current_plinth_idx(), idx_start, "construct did NOT reposition mid-telegraph")
+	assert_eq(b.get_blink_floor_left(), 0.0, "floor not armed by a slam-suppressed blink attempt")
+
+
+func test_blink_suppressed_during_slam_recovery() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(512 + 60, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	b.phase = ArchiveSentinel.PHASE_2
+
+	# Drive INTO slam recovery: telegraph begins, drain to fire, land in recovery.
+	b._slam_cooldown_left = 0.0
+	b._blink_floor_left = 0.0
+	b._physics_process(0.016)  # → SLAM_TELEGRAPH
+	b._physics_process(ArchiveSentinel.SLAM_TELEGRAPH_DURATION + 0.01)  # fire → SLAM_RECOVERY
+	assert_eq(b.get_state(), ArchiveSentinel.STATE_SLAM_RECOVERY, "slam fired and entered recovery")
+	assert_true(b._is_slam_active(), "slam reads as active during recovery (still committed)")
+
+	var idx_start: int = b.get_current_plinth_idx()
+	var fired: bool = b.try_blink_for_test()
+	assert_false(fired, "blink SUPPRESSED while slam is in recovery")
+	assert_eq(b.get_current_plinth_idx(), idx_start, "construct did NOT reposition mid-recovery")
+
+
+func test_blink_resumes_after_slam_resolves() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(512 + 60, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	b.phase = ArchiveSentinel.PHASE_2
+	b._slam_cooldown_left = 0.0
+	b._blink_floor_left = 0.0
+
+	# Full slam: telegraph → fire → recovery → resolve back to IDLE_ACTIVE.
+	b._physics_process(0.016)  # → SLAM_TELEGRAPH
+	b._physics_process(ArchiveSentinel.SLAM_TELEGRAPH_DURATION + 0.01)  # → SLAM_RECOVERY
+	b._physics_process(ArchiveSentinel.SLAM_RECOVERY_DURATION + 0.01)  # recovery drains → IDLE
+	assert_eq(
+		b.get_state(), ArchiveSentinel.STATE_IDLE_ACTIVE, "slam fully resolved back to IDLE_ACTIVE"
+	)
+	assert_false(b._is_slam_active(), "slam no longer reads active after it resolves")
+
+	# Blink eligibility RESTORED — the gate was the slam window ONLY. Floor was
+	# never armed during the suppressed window, so a blink now fires normally.
+	var idx_start: int = b.get_current_plinth_idx()
+	var fired: bool = b.try_blink_for_test()
+	assert_true(fired, "blink RESUMES once the slam resolves (gate is slam-window-only)")
+	assert_ne(b.get_current_plinth_idx(), idx_start, "construct repositions normally post-slam")
+
+
+func test_is_slam_active_false_in_idle_and_cast() -> void:
+	# The gate must be precise: NOT active in IDLE_ACTIVE / CAST / CAST_RECOVERY,
+	# so the normal between-attacks blink cadence is untouched.
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	assert_false(b._is_slam_active(), "not slam-active in IDLE_ACTIVE")
+	b._set_state(ArchiveSentinel.STATE_CAST)
+	assert_false(b._is_slam_active(), "not slam-active during a cast telegraph")
+	b._set_state(ArchiveSentinel.STATE_CAST_RECOVERY)
+	assert_false(b._is_slam_active(), "not slam-active during cast recovery (the blink seam)")

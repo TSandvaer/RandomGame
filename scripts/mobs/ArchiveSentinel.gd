@@ -1033,14 +1033,59 @@ func _blink_player_within_defensive_range() -> bool:
 	return dist <= BLINK_DEFENSIVE_RANGE
 
 
+## Slam-commit gate (Sponsor re-soak #4, 2026-05-31): the construct must COMMIT
+## to a telegraphed slam (red strobing aura circle) — telegraph → hit resolves —
+## before it is eligible to blink away. Without this gate a blink fired from the
+## cast-recovery seam (or any future trigger seam) overlapping a live slam
+## teleports the construct AND its construct-parented slam indicator off the
+## telegraphed footprint, so the red circle visibly abandons mid-windup. Suppress
+## a blink whenever a slam is telegraphing OR mid-execution (telegraph + recovery
+## window). Precise: this covers ONLY the slam window — once the slam resolves
+## (back to IDLE_ACTIVE / cast cadence) the construct resumes normal blink
+## eligibility, so the between-attacks blink cadence is unaffected.
+##
+## NOTE — cast telegraph is intentionally NOT gated here. The cast's
+## perceptible windup is the ember cast-bolt that fires AT `_fire_cast` time and
+## travels independently of the construct; the blink seam is the TAIL of
+## cast-recovery (`_process_cast_recovery`), which by construction only runs
+## AFTER `_fire_cast` has already resolved the cast. So a cast never has an
+## in-flight telegraph at the moment the blink is attempted — there is no
+## abandon-mid-windup analog for the cast. (Flagged per the dispatch brief's
+## cast-telegraph check.)
+func _is_slam_active() -> bool:
+	if _state == STATE_SLAM_TELEGRAPH or _state == STATE_SLAM_RECOVERY:
+		return true
+	# Defensive: the timer window can be non-zero a frame before/after the
+	# state flips (e.g. `_fire_slam_hit` re-arms recovery on the same tick the
+	# telegraph drains). Gate on the telegraph timer too so the suppression has
+	# no single-frame gap at the telegraph→hit boundary.
+	return _slam_telegraph_left > 0.0
+
+
 ## Attempt a once-per-volley phase-blink. Returns true if a blink fired (the
 ## caller must NOT also re-enter IDLE_ACTIVE — the blink owns the transition).
 ## Gates: not already mid-blink, floor elapsed, not suppressed-at-max-range, a
 ## valid different target exists.
 func _try_blink_reposition() -> bool:
-	if _is_dead or _blink_in_progress:
+	# Bare preconditions (no per-reason trace): dead / mid-blink / floor not yet
+	# elapsed. The floor is folded in here so the function stays under the
+	# max-returns lint ceiling while the traced suppression reasons below keep
+	# their own diagnostic lines.
+	if _is_dead or _blink_in_progress or _blink_floor_left > 0.0:
 		return false
-	if _blink_floor_left > 0.0:
+	# Slam-commit gate (Sponsor re-soak #4): never blink away while a slam is
+	# telegraphing or mid-execution — the construct commits to the slam first.
+	# Checked BEFORE the range gates so the trace reads "SUPPRESSED slam active"
+	# rather than a misleading range reason. Resumes normal blink eligibility
+	# once the slam resolves.
+	if _is_slam_active():
+		_combat_trace(
+			"ArchiveSentinel._try_blink_reposition",
+			(
+				"SUPPRESSED slam active (state=%s telegraph_left=%.2f) — committing to slam"
+				% [_state, _slam_telegraph_left]
+			)
+		)
 		return false
 	if _blink_suppressed_at_max_range():
 		_combat_trace(
