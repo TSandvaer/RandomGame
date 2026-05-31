@@ -508,9 +508,27 @@ func _await_deferred_add() -> void:
 	await get_tree().process_frame
 
 
-func _find_cast_bolt(parent: Node) -> ArchiveSentinelCastBolt:
+## Snapshot the cast-bolt set currently parented under `parent`. Used to exclude
+## pre-existing / orphaned bolts left by a SIBLING test before firing this test's
+## cast — `bolt.queue_free()` is deferred, so a prior test's bolt can still be in
+## `get_children()` when the next test searches the shared GutTest root. Without
+## the exclusion, `_find_cast_bolt` could return a stale sibling bolt (the
+## test-isolation half of the 86c9y7ygj cast-bolt failure — observed only in the
+## full-file / full-suite run, never in isolation).
+func _snapshot_cast_bolts(parent: Node) -> Array:
+	var out: Array = []
 	for child in parent.get_children():
 		if child is ArchiveSentinelCastBolt:
+			out.append(child)
+	return out
+
+
+## Return THIS test's freshly-spawned bolt: the first ArchiveSentinelCastBolt
+## under `parent` that is NOT in `exclude` (the pre-fire snapshot). Isolation-
+## robust against orphaned sibling bolts on the shared root.
+func _find_new_cast_bolt(parent: Node, exclude: Array) -> ArchiveSentinelCastBolt:
+	for child in parent.get_children():
+		if child is ArchiveSentinelCastBolt and not exclude.has(child):
 			return child as ArchiveSentinelCastBolt
 	return null
 
@@ -525,11 +543,14 @@ func test_cast_fire_spawns_visible_bolt_node() -> void:
 	b.global_position = Vector2.ZERO
 	p.global_position = Vector2(150.0, 0.0)
 	b.set_player(p)
+	# Snapshot any pre-existing (orphaned-sibling) bolts on the shared root BEFORE
+	# firing so we resolve THIS test's fresh bolt, not a stale one.
+	var pre_bolts: Array = _snapshot_cast_bolts(b.get_parent())
 	b._physics_process(0.016)  # enter cast
 	b._physics_process(ArchiveSentinel.CAST_TELEGRAPH_DURATION + 0.01)  # fire
 	await _await_deferred_add()
 	# Bolt is parented to the boss's parent (the room == the GutTest root here).
-	var bolt: ArchiveSentinelCastBolt = _find_cast_bolt(b.get_parent())
+	var bolt: ArchiveSentinelCastBolt = _find_new_cast_bolt(b.get_parent(), pre_bolts)
 	assert_not_null(bolt, "cast fire spawned a visible ArchiveSentinelCastBolt node")
 	if bolt == null:
 		return
@@ -560,25 +581,66 @@ func test_cast_bolt_color_channels_are_sub_one_html5_safe() -> void:
 
 
 func test_cast_bolt_spawns_at_book_travels_to_captured_target() -> void:
-	# The bolt must originate at the construct (book) and head to the CAPTURED
+	# The bolt must ORIGINATE at the construct (book) and head to the CAPTURED
 	# target — so the player sees "the book just shot at where I was standing".
+	#
+	# ROOT-CAUSE NOTE (test-contract refresh, ticket 86c9y7ygj). The two prior
+	# diagnoses were BOTH right and COMPOUND — settled empirically on this HEAD:
+	#
+	#   (1) TRAVEL-TWEEN (fails in ISOLATION). The old assertion read
+	#       `bolt.global_position` after `_await_deferred_add()` (two process-frame
+	#       drains). `ArchiveSentinelCastBolt._ready` immediately starts a travel
+	#       tween (`tween_property(self, "global_position", target,
+	#       CAST_BOLT_TRAVEL_DURATION=0.16)`), so by the second drained frame the
+	#       bolt has already travelled most of the way toward the target —
+	#       empirically `global_position.x ≈ 195–219` in isolation (varies with
+	#       headless frame jitter). NOT the blink (blink never fires here — no
+	#       cast-recovery drain). FIX: assert the IMMUTABLE configured origin
+	#       (`_spawn_pos`) + target (`_target_pos`), not the travelled position.
+	#       (`_spawn_pos` / `_target_pos` reads match the existing in-file
+	#       convention — `_blink_floor_left`, `_volleys_since_blink`,
+	#       `_cast_cooldown_left` are all read directly.)
+	#
+	#   (2) ORPHAN-LEAK (fails ONLY in full-file/full-suite). The sibling
+	#       `test_cast_fire_spawns_visible_bolt_node` (boss@(0,0), player@(150,0))
+	#       runs first; its `bolt.queue_free()` is DEFERRED, so under full-suite
+	#       load its bolt lingers on the shared GutTest root. A first-match
+	#       `_find_cast_bolt` then returned that STALE bolt (spawn=(0,0),
+	#       target=(150,0)) instead of this test's fresh one. FIX: snapshot
+	#       pre-existing bolts before firing + resolve via `_find_new_cast_bolt`
+	#       (exclude the snapshot). Applied to BOTH cast-bolt-finding tests.
 	var b: ArchiveSentinel = _make_sentinel()
 	var p: FakePlayer = FakePlayer.new()
 	add_child_autofree(p)
 	b.global_position = Vector2(50.0, 50.0)
 	p.global_position = Vector2(250.0, 50.0)  # captured at telegraph start
 	b.set_player(p)
+	# Snapshot pre-existing (orphaned-sibling) bolts BEFORE firing — the
+	# test-isolation half of this fix. A sibling test's `bolt.queue_free()` is
+	# deferred, so its bolt can still be on the shared root when this test
+	# searches; excluding the snapshot resolves THIS test's fresh bolt. Observed
+	# only in the full-file / full-suite run (a sibling bolt with spawn=(0,0)
+	# target=(150,0) leaked from test_cast_fire_spawns_visible_bolt_node), never
+	# in isolation — which is why the two prior diagnoses (travel-tween vs
+	# orphan-leak) disagreed: BOTH are real and compound.
+	var pre_bolts: Array = _snapshot_cast_bolts(b.get_parent())
 	b._physics_process(0.016)  # enter cast, captures (250,50)
 	p.global_position = Vector2(250.0, 250.0)  # player moves during windup
 	b._physics_process(ArchiveSentinel.CAST_TELEGRAPH_DURATION + 0.01)  # fire
 	await _await_deferred_add()
-	var bolt: ArchiveSentinelCastBolt = _find_cast_bolt(b.get_parent())
+	var bolt: ArchiveSentinelCastBolt = _find_new_cast_bolt(b.get_parent(), pre_bolts)
 	assert_not_null(bolt, "cast bolt spawned")
 	if bolt == null:
 		return
-	# Bolt spawns at the construct's book position (50,50).
-	assert_almost_eq(bolt.global_position.x, 50.0, 0.5, "bolt spawns at construct x")
-	assert_almost_eq(bolt.global_position.y, 50.0, 0.5, "bolt spawns at construct y")
+	# ORIGIN contract — the bolt was configured to spawn at the construct's book
+	# position (50,50). `_spawn_pos` is immutable; `global_position` has by now
+	# travelled toward the captured target via the bolt's own travel tween.
+	assert_almost_eq(bolt._spawn_pos.x, 50.0, 0.5, "bolt originates at construct x")
+	assert_almost_eq(bolt._spawn_pos.y, 50.0, 0.5, "bolt originates at construct y")
+	# TARGET contract — the bolt travels toward the CAPTURED target (250,50), NOT
+	# the player's post-windup position (250,250). Pins the dodge-snapshot model.
+	assert_almost_eq(bolt._target_pos.x, 250.0, 0.5, "bolt travels toward captured target x")
+	assert_almost_eq(bolt._target_pos.y, 50.0, 0.5, "bolt travels toward captured target y (not 250)")
 	bolt.queue_free()
 
 

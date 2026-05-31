@@ -107,16 +107,19 @@ const CAST_BOLT_VISIBLE_TRACE =
 const SLAM_FIRE_TRACE = /\[combat-trace\] ArchiveSentinel\._fire_slam_hit \|/;
 const SLAM_INDICATOR_TRACE = /\[combat-trace\] ArchiveSentinel\._spawn_slam_indicator \| radius=/;
 
-// Phase-blink reposition traces (W3-T7 Stage 6 — Uma §5.5a). The Sentinel
-// blinks (instant reposition + VFX) at the tail of a completed cast volley,
-// gated by the ~2.5s phase-1 floor + suppress-at-max-range. A `?start_room=9`
-// boot keeps the player inside AGGRO_RADIUS and NOT at max range, so the boss
-// casts → recovers → blinks within the boot window. `_fire_blink` is the
-// reposition decision; `ArchiveSentinelBlinkVfx._ready | VISIBLE` is the
-// renderer-observable VFX-node-mounted signal (same shape as the cast-bolt
-// visibility trace). The regression these guard: a reposition that teleports
-// the body with NO traversal VFX (would read as a generic-teleport bug per
-// Uma §5.5a) — `_fire_blink` present ⟹ the VFX node mounted visible.
+// Phase-blink reposition traces (W3-T7 Stage 6 — Uma §5.5a; RETUNE `d101b83`
+// 2026-05-31). The Sentinel blinks (instant reposition + VFX) at the tail of a
+// completed cast volley, gated post-retune by THREE conditions: the phase floor
+// (5.0s P1 / 3.5s P2), the every-N-volleys cadence (every-2nd P1 / every P2), AND
+// `BLINK_DEFENSIVE_RANGE=160` (blink fires ONLY when the player has closed inside
+// 160 px). A passive `?start_room=9` boot leaves the Player at spawn (240,200),
+// ~328 px from the plinth (512,384) — OUTSIDE the defensive range — so the boss
+// CORRECTLY stays planted and does NOT blink (the intended no-forever-chase
+// behavior; step 4e asserts this suppression). `_fire_blink` is the reposition
+// decision; `ArchiveSentinelBlinkVfx._ready | VISIBLE` is the renderer-observable
+// VFX-node-mounted signal (same shape as the cast-bolt visibility trace). The
+// implication guard remains: IF a blink ever fires, the VFX node must mount
+// visible (a no-VFX teleport would read as a generic-teleport bug per Uma §5.5a).
 const BLINK_FIRE_TRACE =
   /\[combat-trace\] ArchiveSentinel\._fire_blink \| depart_idx=\d+ depart=\([-\d]+,[-\d]+\) -> target_idx=(\d+) arrival=\([-\d]+,[-\d]+\)/;
 const BLINK_VFX_VISIBLE_TRACE =
@@ -127,7 +130,9 @@ test.describe("Stratum2BossRoom production wiring (W3-T7 Stage 6)", () => {
     page,
     context,
   }) => {
-    test.setTimeout(60_000);
+    // 90 s budget: boot (~30 s worst-case) + cast/wake/visibility toPass windows
+    // + the 14 s blink-suppression observation window (step 4e, RETUNE d101b83).
+    test.setTimeout(90_000);
     await context.route("**/*", (route) => route.continue());
 
     const capture = new ConsoleCapture(page);
@@ -260,24 +265,50 @@ test.describe("Stratum2BossRoom production wiring (W3-T7 Stage 6)", () => {
         "(_fire_slam_hit present ⟹ _spawn_slam_indicator present)"
     ).toBe(true);
 
-    // 4e. PHASE-BLINK REPOSITION FIRES + VFX IS VISIBLE (W3-T7 Stage 6).
-    //     The boss casts → recovers → blinks once per volley (gated by the
-    //     ~2.5s phase-1 floor). With the player inside AGGRO_RADIUS and NOT at
-    //     max range, the boot window reaches at least one blink. The blink VFX
-    //     node mounts visible (its own _ready VISIBLE trace, preglow present).
-    //     This proves the reposition is a phase-shift WITH traversal VFX, not a
-    //     generic teleport (Uma §5.5a "must read as phase-shift, not teleport").
-    await expect(async () => {
-      const blinkLine = capture.getLines().find((l) => BLINK_FIRE_TRACE.test(l.text));
-      expect(
-        blinkLine,
-        "ArchiveSentinel._fire_blink fired — the construct phase-blinked to a " +
-          "different plinth at the tail of a cast volley"
-      ).toBeDefined();
-    }).toPass({ timeout: 20_000 });
-
-    // Implication guard: a blink decision MUST mount the visible traversal VFX.
+    // 4e. PHASE-BLINK IS DEFENSIVE-RANGE-SUPPRESSED FOR A PASSIVE FAR PLAYER
+    //     (RETUNE, Sponsor re-soak `d101b83` 2026-05-31 — "moves around too much,
+    //     didn't reach phase 2/3"). PRE-retune the blink fired at the tail of EVERY
+    //     cast volley gated only by a ~2.5s floor + suppress-at-max-range, so a
+    //     passive far-standing player still provoked blinks in this boot window —
+    //     the original assertion required `_fire_blink` within 20s. The retune
+    //     added `BLINK_DEFENSIVE_RANGE=160`: the construct now blinks ONLY when the
+    //     player has CLOSED inside 160 px (an attacking player gets repositioned-
+    //     away → the clear window); a ranged / distant player leaves the construct
+    //     PLANTED (no forever-chase). The `?start_room=9` boot teleports the Player
+    //     to DEFAULT_PLAYER_SPAWN=(240,200); the plinth is (512,384), ~328 px away
+    //     — well OUTSIDE the 160 px defensive range. A passive player standing
+    //     there therefore CORRECTLY does NOT trigger a blink. This is the TRUE
+    //     current intended behavior: the construct stays planted vs a non-pressing
+    //     player. (Floors 5.0/3.5 + every-N-volleys cadence are pinned at the GUT
+    //     layer — B9–B13 in tests/test_archive_sentinel.gd.)
+    //
+    //     We assert SUPPRESSION positively: give the boss a generous window in
+    //     which it demonstrably casts (4b proved ≥1 cast fired) and confirm NO
+    //     `_fire_blink` occurred while the passive player stayed beyond defensive
+    //     range. Driving the Player to within 160 px to provoke a blink would be
+    //     harness-compensation for a passive-player smoke (per
+    //     combat-architecture.md § "Harness coverage gap"); the FIRES-when-close
+    //     path is covered by the GUT production-path drive
+    //     (test_phase1_blinks_on_second_volley_not_first).
+    //
+    //     Wait long enough that, were the old every-volley-no-defensive-gate
+    //     cadence still in effect, a blink WOULD have fired (≥2 volleys ≈ 5.6 s +
+    //     the 5.0 s floor → a pre-retune build blinks well inside 14 s). Then
+    //     assert it did NOT.
+    await page.waitForTimeout(14_000);
     const blinkFired = capture.getLines().some((l) => BLINK_FIRE_TRACE.test(l.text));
+    expect(
+      blinkFired,
+      "phase-blink is SUPPRESSED for a passive player beyond BLINK_DEFENSIVE_RANGE " +
+        "(160 px) — the construct stays planted vs a non-pressing player " +
+        "(RETUNE d101b83). DEFAULT_PLAYER_SPAWN (240,200) is ~328 px from the " +
+        "plinth (512,384), outside defensive range, so no blink should fire."
+    ).toBe(false);
+
+    // Implication guard retained: IF a blink ever fires in this stream (e.g. a
+    // future build moves the player or changes spawn so it closes inside range),
+    // the visible traversal VFX MUST mount — a reposition with no VFX would read
+    // as a generic teleport (Uma §5.5a). Vacuously true while suppressed.
     const blinkVfxVisible = capture.getLines().some((l) => BLINK_VFX_VISIBLE_TRACE.test(l.text));
     expect(
       !blinkFired || blinkVfxVisible,
