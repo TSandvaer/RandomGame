@@ -713,11 +713,21 @@ func test_zero_damage_does_not_trigger_phase_check() -> void:
 #   B1. select_blink_target_idx picks FARTHEST-from-player.
 #   B2. select_blink_target_idx NEVER picks the current index (never adjacent).
 #   B3. Cadence hard-floor blocks a second blink until the floor elapses.
-#   B4. Floor differs phase 1 (2.5s) vs phase 2 (1.5s) — phase-2 tightens.
+#   B4. Floor differs phase 1 vs phase 2 — phase-2 tightens (constants tracked).
 #   B5. Suppress-at-max-range: no blink when player is beyond suppress range.
 #   B6. No move_and_slide / velocity stays ZERO — reposition is a teleport.
 #   B7. Blink target is one of the 4 fixed plinth-points (arena-bounded).
 #   B8. PLINTH_OFFSETS sub-arena bound + channel-safe VFX color sanity.
+#
+# RETUNE (Sponsor re-soak `d101b83`, 2026-05-31 — "moves around too much, didn't
+# reach phase 2/3"). Floors roughly doubled (P1 2.5→5.0, P2 1.5→3.5) + two new
+# landability levers: every-N-volleys gate + defensive-only range. New coverage:
+#   B9.  Floor VALUE pins — P1 == 5.0, P2 == 3.5 (catches an accidental revert).
+#   B10. Defensive-range gate: blink suppressed when player is outside it.
+#   B11. Defensive-range gate: blink fires when player is inside it.
+#   B12. Every-N-volleys gate (production path): P1 blinks on the 2nd volley,
+#        not the 1st; counter resets after a blink.
+#   B13. Phase-2 every-volley cadence (production path): blinks each volley.
 # =====================================================================
 
 
@@ -910,3 +920,118 @@ func test_blink_vfx_color_channels_are_sub_one_html5_safe() -> void:
 		assert_true((c as Color).r <= 1.0, "r le 1.0 (HDR-clamp safe): %s" % c)
 		assert_true((c as Color).g <= 1.0, "g le 1.0: %s" % c)
 		assert_true((c as Color).b <= 1.0, "b le 1.0: %s" % c)
+
+
+# ---- B9: RETUNE — floor VALUE pins (catch an accidental revert) -------
+# B4 above asserts P2 < P1 via the constants; these pin the ACTUAL seconds so a
+# silent revert to the old 2.5/1.5 floors (which let the boss strobe around the
+# room) is caught in CI. Cite: Sponsor re-soak `d101b83` 2026-05-31.
+
+
+func test_blink_floor_phase_1_value_is_retuned_to_5s() -> void:
+	assert_almost_eq(
+		ArchiveSentinel.BLINK_FLOOR_PHASE_1, 5.0, 0.001, "phase-1 blink floor retuned to 5.0s"
+	)
+
+
+func test_blink_floor_phase_2_value_is_retuned_to_3point5s() -> void:
+	assert_almost_eq(
+		ArchiveSentinel.BLINK_FLOOR_PHASE_2, 3.5, 0.001, "phase-2 blink floor retuned to 3.5s"
+	)
+
+
+# ---- B10/B11: RETUNE — defensive-only range gate ----------------------
+# The blink now only fires when the player has closed inside BLINK_DEFENSIVE_RANGE
+# (an attacking player gets repositioned-away → the clear window). A distant /
+# ranged player leaves the construct planted (no forever-chase). Cite: Uma §5.5a
+# item 4 + Sponsor re-soak `d101b83`.
+
+
+func test_blink_suppressed_when_player_outside_defensive_range() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	# Inside AGGRO_RADIUS (640) + below max-range suppress (608), but well OUTSIDE
+	# the defensive range (160) — a ranged/kiting player the boss should NOT chase.
+	p.global_position = Vector2(512 + 300, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	var fired: bool = b.try_blink_for_test()
+	assert_false(fired, "no blink when player is outside defensive range (no close-pressure)")
+	assert_eq(b.get_blink_floor_left(), 0.0, "floor not armed when defensive-suppressed")
+
+
+func test_blink_fires_when_player_inside_defensive_range() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	# Inside the defensive range (160) — the player has closed to land hits.
+	p.global_position = Vector2(512 + 100, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	var fired: bool = b.try_blink_for_test()
+	assert_true(fired, "blink fires when player is inside defensive range (deny the close-pressure)")
+
+
+# ---- B12/B13: RETUNE — every-N-volleys gate (PRODUCTION path) ---------
+# `try_blink_for_test` bypasses the volley gate by design (it isolates floor /
+# suppress / target-select). These drive the FULL production cast volley through
+# `_process_cast_recovery` so the every-N-volleys cadence is exercised end-to-end.
+
+
+func _run_one_cast_volley(b: ArchiveSentinel) -> void:
+	# IDLE_ACTIVE → CAST (decision tick), drain telegraph → CAST_RECOVERY (fire),
+	# drain recovery → recovery-tail (blink-or-idle). Player must already be set
+	# in-range. One full cast → recovery cycle = one "volley".
+	# Clear any leftover cast cooldown from the prior volley so the decision tick
+	# actually begins a new cast (cooldown is armed to CAST_COOLDOWN at each fire).
+	b._cast_cooldown_left = 0.0
+	if b.get_state() == ArchiveSentinel.STATE_IDLE_ACTIVE:
+		b._physics_process(0.016)  # decide → CAST
+	# Drain telegraph so the cast fires and we enter CAST_RECOVERY.
+	b._physics_process(ArchiveSentinel.CAST_TELEGRAPH_DURATION + 0.01)
+	# Drain recovery so the recovery-tail (volley++ / blink gate) runs.
+	b._physics_process(ArchiveSentinel.CAST_RECOVERY_DURATION + 0.01)
+
+
+func test_phase1_blinks_on_second_volley_not_first() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	p.global_position = Vector2(560, 384)  # 48 px — in cast + defensive range
+	add_child_autofree(p)
+	b.set_player(p)
+	assert_eq(b.get_phase(), ArchiveSentinel.PHASE_1)
+
+	var idx_start: int = b.get_current_plinth_idx()
+	# Volley 1 — counter 0→1, 1 < 2 (phase-1 cadence), so NO blink.
+	_run_one_cast_volley(b)
+	assert_eq(
+		b.get_current_plinth_idx(),
+		idx_start,
+		"phase-1 does NOT blink on the first volley (every-2nd-volley cadence)"
+	)
+	# Volley 2 — counter 1→2, 2 >= 2 + floor clear (never armed) → blink fires.
+	_run_one_cast_volley(b)
+	assert_ne(
+		b.get_current_plinth_idx(), idx_start, "phase-1 blinks on the second completed volley"
+	)
+
+
+func test_phase2_blinks_every_volley() -> void:
+	var b: ArchiveSentinel = _make_sentinel_at(Vector2(512, 384))
+	var p: FakePlayer = FakePlayer.new()
+	# Outside SLAM_HITBOX_RADIUS (96) so phase-2 picks CAST not SLAM, but inside
+	# the defensive range (160) so the blink is not range-suppressed.
+	p.global_position = Vector2(512 + 120, 384)
+	add_child_autofree(p)
+	b.set_player(p)
+	# Force phase 2 directly (the cadence under test is volleys-per-blink, not the
+	# transition); clear cooldown so the first cast can fire immediately.
+	b.phase = ArchiveSentinel.PHASE_2
+	b._volleys_since_blink = 0
+	b._blink_floor_left = 0.0
+
+	var idx_start: int = b.get_current_plinth_idx()
+	# Phase-2 cadence = every volley → the very first completed volley blinks.
+	_run_one_cast_volley(b)
+	assert_ne(
+		b.get_current_plinth_idx(), idx_start, "phase-2 blinks on every volley (1-per-volley cadence)"
+	)

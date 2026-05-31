@@ -332,9 +332,42 @@ const PLINTH_OFFSETS: Array[Vector2] = [
 ## Blink hard-floor (real-time between blinks) — phase 1 vs phase 2. Phase 1 is
 ## a slow deliberate positioning puzzle; phase 2 tightens to a pressure tool
 ## ("the book has lost patience"). Uma §5.5a item 4 feel-targets; Drew's balance
-## lever — these are the starting numbers.
-const BLINK_FLOOR_PHASE_1: float = 2.5
-const BLINK_FLOOR_PHASE_2: float = 1.5
+## lever.
+##
+## RETUNE (Sponsor re-soak `d101b83`, 2026-05-31): the original 2.5/1.5 floors
+## let the construct reposition every ~2.8 s cast cycle, so a 1-damage-fist
+## player never accumulated enough hits to push the boss through its HP-gated
+## phase transitions — Sponsor "moves around too much (too fast), didn't get to
+## phase 2/3". Floors roughly doubled (per the brief's "roughly double, or more"
+## lever) AND composed with the every-N-volleys gate + defensive-range gate below
+## so an ATTACKING player gets clear, repeatable windows. P1 2.5 → 5.0,
+## P2 1.5 → 3.5.
+const BLINK_FLOOR_PHASE_1: float = 5.0
+const BLINK_FLOOR_PHASE_2: float = 3.5
+
+## Volleys-per-blink gate (RETUNE 2026-05-31). The construct blinks only every
+## Nth completed cast volley rather than every volley (Uma §5.5a item 4 "blink
+## once per completed cast volley" softened to "every N volleys" — Drew's balance
+## lever per the Appendix S2-state-machine exclusion). Composes with the hard
+## floor: a blink requires BOTH the volley count AND the floor to be satisfied.
+## Phase 1 = every 2nd volley (slow positioning puzzle); phase 2 = every volley
+## (the "lost patience" pressure beat). This is the dominant landability lever —
+## at CAST_COOLDOWN 1.5 + telegraph 0.9 + recovery 0.4 ≈ 2.8 s/volley, every-2nd
+## in P1 means a blink at most every ~5.6 s, giving the player a full clear
+## window to land hits between repositions.
+const BLINK_VOLLEYS_PER_BLINK_PHASE_1: int = 2
+const BLINK_VOLLEYS_PER_BLINK_PHASE_2: int = 1
+
+## Defensive-blink range (RETUNE 2026-05-31, Uma §5.5a item 4 "only blink
+## defensively when the player closes within some range"). The construct only
+## repositions when the player has closed INSIDE this radius (i.e. is positioned
+## to land melee hits). A player kept at distance — or a ranged player — does not
+## trigger a blink, so the construct does not chase forever and an attacker who
+## backs off keeps the construct planted. Combined with suppress-at-max-range
+## below this gives the band: [close → blink defensively] .. [far → suppress] ..
+## [max range → suppress]. Set just above SLAM_HITBOX_RADIUS (96) so "in melee /
+## about-to-be-in-melee" reads as the defensive trigger.
+const BLINK_DEFENSIVE_RANGE: float = 160.0
 
 ## Suppress-at-max-range gate — if the player is already at/near AGGRO_RADIUS
 ## (beyond cast reach and not pressing), there's no gaze-angle to re-close, so
@@ -461,6 +494,14 @@ var _blink_body_tween: Tween = null
 ## True while the construct is mid-blink (dissolved/reforming). Suppresses any
 ## re-entrant blink trigger. Cleared when the reform completes.
 var _blink_in_progress: bool = false
+
+## Completed-cast-volley counter since the last blink (RETUNE 2026-05-31). Each
+## cast volley (cast → fire → recovery-tail) increments this; a blink is gated to
+## fire only on every Nth volley per `_blink_volleys_per_blink()`. Reset to 0
+## when a blink fires. `try_blink_for_test()` bypasses this gate (it tests the
+## floor / suppress / target-select logic in isolation), so the GUT B-tests stay
+## stable; production routes through `_process_cast_recovery` which honors it.
+var _volleys_since_blink: int = 0
 
 
 func _ready() -> void:
@@ -768,11 +809,22 @@ func _process_cast_recovery(_delta: float) -> void:
 	if _cast_recovery_left <= 0.0:
 		# Blink-on-cast-recovery (Uma §5.5a item 4): a completed cast volley =
 		# the full cast → recovery cycle, so the tail of cast-recovery is the
-		# once-per-volley blink seam. Gated by the phase floor + suppress-at-
-		# max-range; if it fires, the blink owns the transition back to combat.
-		if _try_blink_reposition():
+		# blink seam. RETUNE 2026-05-31 — gated by THREE conditions now (was
+		# floor + suppress only): (1) every-Nth-volley count, (2) the phase
+		# floor, (3) defensive-range (player must have closed in) + suppress-at-
+		# max-range. The every-N-volleys gate is the dominant landability lever
+		# — it guarantees the player a full clear window between repositions.
+		# If a blink fires, it owns the transition back to combat.
+		_volleys_since_blink += 1
+		if _volleys_since_blink >= _blink_volleys_per_blink() and _try_blink_reposition():
+			_volleys_since_blink = 0
 			return
 		_set_state(STATE_IDLE_ACTIVE)
+
+
+## Volleys required between blinks for the current phase (RETUNE 2026-05-31).
+func _blink_volleys_per_blink() -> int:
+	return BLINK_VOLLEYS_PER_BLINK_PHASE_2 if phase >= PHASE_2 else BLINK_VOLLEYS_PER_BLINK_PHASE_1
 
 
 func _process_slam_telegraph(_delta: float) -> void:
@@ -968,6 +1020,19 @@ func _blink_suppressed_at_max_range() -> bool:
 	return dist >= AGGRO_RADIUS * BLINK_SUPPRESS_RANGE_FRAC
 
 
+## Defensive-blink gate (RETUNE 2026-05-31, Uma §5.5a item 4 "only blink
+## defensively when the player closes within some range"). The blink only fires
+## when the player has closed INSIDE BLINK_DEFENSIVE_RANGE — i.e. is positioned
+## to land hits. A player kept at a distance leaves the construct planted (it
+## does not chase a ranged / kiting player forever). No player → not defensive
+## (nothing to deny). Returns true when a defensive reposition is warranted.
+func _blink_player_within_defensive_range() -> bool:
+	if _player == null:
+		return false
+	var dist: float = global_position.distance_to(_player.global_position)
+	return dist <= BLINK_DEFENSIVE_RANGE
+
+
 ## Attempt a once-per-volley phase-blink. Returns true if a blink fired (the
 ## caller must NOT also re-enter IDLE_ACTIVE — the blink owns the transition).
 ## Gates: not already mid-blink, floor elapsed, not suppressed-at-max-range, a
@@ -981,6 +1046,17 @@ func _try_blink_reposition() -> bool:
 		_combat_trace(
 			"ArchiveSentinel._try_blink_reposition",
 			"SUPPRESSED player at max range (no gaze-angle to re-close)"
+		)
+		return false
+	# Defensive-only gate (RETUNE 2026-05-31): blink ONLY when the player has
+	# closed inside the defensive range — an attacking player gets repositioned-
+	# away (the clear window), a distant / ranged player leaves the construct
+	# planted (no forever-chase). This is the band between "in melee → blink" and
+	# "far → suppress".
+	if not _blink_player_within_defensive_range():
+		_combat_trace(
+			"ArchiveSentinel._try_blink_reposition",
+			"SUPPRESSED player outside defensive range (no close-pressure to deny)"
 		)
 		return false
 	var candidates: Array = _plinth_candidates()
@@ -1227,6 +1303,9 @@ func _begin_phase_transition(target_phase: int) -> void:
 	# Cooldowns intentionally NOT cleared — phase 2 should respect that
 	# the last cast / slam happened recently. The cast_cooldown remains so
 	# the construct doesn't double-cast at the phase boundary.
+	# RETUNE 2026-05-31: reset the volley counter so phase 2's tighter
+	# every-volley cadence starts clean from the transition, not mid-count.
+	_volleys_since_blink = 0
 	_set_state(STATE_PHASE_TRANSITION)
 	# Phase-transition slow-mo (mirrors S1 Boss T3 — Uma BI-16, BI-17).
 	# Routes through `TimeScaleDirector` per the migration policy.
