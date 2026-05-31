@@ -13,9 +13,10 @@
  * The original PR #235 suppressor deferred BOTH the document- and canvas-level
  * `addEventListener` calls to `DOMContentLoaded`, leaving a head-parse -> DCL
  * window with no suppressor at all (a real-browser cold-load right-click could
- * leak before DCL fired). The hardened form registers the document-level
- * preventDefault SYNCHRONOUSLY at <head>-parse time, on BOTH capture and bubble
- * phases at `document`, plus a canvas-specific capture listener re-added on DCL.
+ * leak before DCL fired). The hardened form (PR #386) registers the
+ * document-level preventDefault SYNCHRONOUSLY at <head>-parse time, on BOTH
+ * capture and bubble phases at `document`, plus a canvas-specific capture
+ * listener re-added on DCL.
  *
  * Coverage (the bug CLASS, not just one instance):
  *   1. A real right-click at the canvas center does NOT leave the contextmenu
@@ -23,20 +24,53 @@
  *   2. A synthetic contextmenu dispatched at the canvas, body (letterbox
  *      margin), and document all end up defaultPrevented — the whole page
  *      surface is covered, not just the canvas.
- *   3. The document-level suppressor is active as soon as the canvas is
- *      present (readyState already complete by the time the canvas exists),
- *      i.e. there is no late-attach gap on a normal load.
+ *   3. The document-level suppressor is active during the PRE-DCL window
+ *      (readyState === "loading"), i.e. there is no late-attach gap — this is
+ *      the test that goes RED if someone reverts to the DCL-deferred form.
  *
  * Probe technique: assert `event.defaultPrevented` after dispatching/firing
  * the contextmenu — that is the exact browser signal that gates whether the
  * native menu shows. This is the headless proxy for "no native menu appears"
  * (Playwright cannot screenshot the OS-drawn context menu chrome).
  *
+ * ─────────────────────────────────────────────────────────────────────────
+ * HARDENING (tess/contextmenu-test-harden) — why the OLD test 5 was a false-green
+ * ─────────────────────────────────────────────────────────────────────────
+ * The OLD test 5 ("suppressor is active as soon as the canvas exists") did:
+ *     await page.goto(baseUrl(), { waitUntil: "commit" });
+ *     await page.waitForSelector("#canvas", { timeout: 10_000 });
+ *     // ...then dispatch a contextmenu and assert defaultPrevented === true
+ * On a fast headless load (the ~10 KB shell + a static <canvas> parse
+ * near-instantly) DOMContentLoaded has ALREADY fired by the time
+ * `waitForSelector("#canvas")` resolves and `page.evaluate` runs the dispatch.
+ * So the DCL-deferred (reverted) form would have ATTACHED its listener by then,
+ * and the test passes WITH OR WITHOUT the head-parse-synchronous hardening.
+ * Empirically: the old test 5 passed 8/8 on a hand-reverted DCL-deferred build
+ * (PR #386 QA note, `team/tess-qa/_pr386-approve.md` finding). It covered the
+ * bug *surface* but had no teeth — reverting the fix would NOT turn it red.
+ *
+ * The fix: probe the contextmenu suppression DURING the pre-DCL window
+ * (`document.readyState === "loading"`), the only window the DCL-deferred form
+ * leaks. We do this build-faithfully by INTERCEPTING the served index.html and
+ * splicing a tiny probe <script> in immediately AFTER the real head_include
+ * suppressor (and before </head>). That probe runs synchronously during head
+ * parse — right after the suppressor would have registered IF it is
+ * synchronous — fires a `contextmenu` at `document` while readyState is still
+ * "loading", and stashes `{readyState, defaultPrevented}` on window. The test
+ * then reads the stash:
+ *   - Hardened build (head-parse-synchronous): probe sees the listener →
+ *     defaultPrevented === true.
+ *   - Reverted build (DCL-deferred OR suppressor removed): listener not yet
+ *     attached at head-parse → defaultPrevented === false → test goes RED.
+ * A control assertion inside the probe (dispatch with the suppressor's own
+ * `block` semantics absent) is not needed: the readyState==="loading" guard
+ * proves we are genuinely pre-DCL, so a `true` result can only come from the
+ * synchronous registration.
+ *
  * References:
  *   - export_presets.cfg `html/head_include` — the injected suppressor script
  *   - .claude/docs/html5-export.md §"Browser-native event leakage (RMB context menu)"
- *   - Sponsor HTML5/WebGL2 re-soak finding: "RMB heavy attack still triggers
- *     the browser's context menu"
+ *   - team/tess-qa/_pr386-approve.md — the non-blocking false-green finding this PR closes
  */
 
 import { test, expect } from "../fixtures/test-base";
@@ -44,6 +78,42 @@ import { test, expect } from "../fixtures/test-base";
 function baseUrl(): string {
   return process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:8000";
 }
+
+/**
+ * The probe <script> spliced into the served index.html immediately before
+ * </head>, i.e. AFTER the real head_include suppressor. It runs synchronously
+ * during head parse while document.readyState === "loading", fires a
+ * cancelable `contextmenu` at `document`, and records whether the suppressor
+ * (which must already be registered, if it is head-parse-synchronous) cancelled
+ * it. Result is stashed on window for the test to read post-load.
+ *
+ * It also runs a NEGATIVE control: it dispatches a plain `click` event (which
+ * the suppressor does NOT touch) and records its defaultPrevented — this must
+ * be false, proving the probe machinery can observe an UN-prevented event and
+ * the `contextmenu` true-result is meaningful (not a harness artifact).
+ */
+const PRE_DCL_PROBE_SCRIPT = `
+<script>
+(function () {
+  try {
+    var atLoading = (document.readyState === 'loading');
+    var ctx = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    document.dispatchEvent(ctx);
+    var ctrl = new MouseEvent('click', { bubbles: true, cancelable: true });
+    document.dispatchEvent(ctrl);
+    window.__preDclProbe = {
+      ran: true,
+      readyStateAtProbe: document.readyState,
+      atLoading: atLoading,
+      contextmenuPrevented: ctx.defaultPrevented,
+      controlClickPrevented: ctrl.defaultPrevented
+    };
+  } catch (e) {
+    window.__preDclProbe = { ran: true, error: String(e) };
+  }
+})();
+</script>
+`;
 
 test.describe("RMB context-menu suppression", () => {
   test("real right-click on canvas does not leave contextmenu un-prevented", async ({
@@ -134,16 +204,36 @@ test.describe("RMB context-menu suppression", () => {
         target.dispatchEvent(ev);
         return ev.defaultPrevented;
       };
+      // NEGATIVE CONTROL: a plain `click` is NOT touched by the suppressor;
+      // it must end up NOT-prevented. This proves the dispatch machinery can
+      // observe an un-prevented event, so the `true` results below are
+      // meaningful (the suppressor is actually doing the work, the harness is
+      // not trivially reporting true for everything).
+      const controlClick = (() => {
+        const ev = new MouseEvent("click", { bubbles: true, cancelable: true });
+        document.dispatchEvent(ev);
+        return ev.defaultPrevented;
+      })();
       const canvas = document.getElementById("canvas");
       return {
         canvas: canvas ? fire(canvas) : null,
         body: fire(document.body),
         document: fire(document),
+        controlClick,
       };
     });
 
-    // All three surfaces must be prevented — the document-level capture/bubble
-    // listener is the airtight catch-all; the canvas listener is belt-and-suspenders.
+    // Negative control: plain click must NOT be prevented.
+    expect(
+      results.controlClick,
+      "control: a plain click must NOT be preventDefault-ed — if it is, the " +
+        "harness cannot distinguish prevented from un-prevented and the " +
+        "contextmenu assertions below are meaningless",
+    ).toBe(false);
+
+    // All three contextmenu surfaces must be prevented — the document-level
+    // capture/bubble listener is the airtight catch-all; the canvas listener is
+    // belt-and-suspenders.
     expect(results.canvas).toBe(true);
     expect(results.body).toBe(true);
     expect(results.document).toBe(true);
@@ -300,26 +390,124 @@ test.describe("RMB context-menu suppression", () => {
     expect(heavyDown.length).toBeGreaterThan(0);
   });
 
-  test("suppressor is active as soon as the canvas exists (no late-attach gap)", async ({
+  test("suppressor is active during the pre-DCL window (no late-attach gap — RED on revert)", async ({
     page,
   }) => {
     test.setTimeout(45_000);
 
-    await page.goto(baseUrl(), { waitUntil: "commit" });
-    await page.waitForSelector("#canvas", { timeout: 10_000 });
+    // ── HARDENED (see file header) ──────────────────────────────────────────
+    // The OLD form of this test dispatched AFTER waitForSelector("#canvas"),
+    // by which point DOMContentLoaded had already fired on a fast headless
+    // load — so it passed even on the DCL-deferred (reverted) suppressor. This
+    // form intercepts the served index.html and splices a probe <script> in
+    // right before </head>, AFTER the real head_include suppressor. The probe
+    // fires a contextmenu at `document` synchronously during head parse, while
+    // document.readyState === "loading" (genuinely pre-DCL), and records
+    // whether it was prevented.
+    //
+    //   • Hardened build (head-parse-synchronous registration): the suppressor's
+    //     document capture listener is ALREADY attached when the probe runs →
+    //     contextmenuPrevented === true.
+    //   • Reverted build (DCL-deferred form, OR suppressor removed entirely):
+    //     no document listener yet at head-parse → contextmenuPrevented ===
+    //     false → this test goes RED. THESE are the teeth.
 
-    // The document-level listener is registered synchronously at <head>-parse,
-    // so the moment the canvas is selectable a contextmenu is already prevented.
-    const early = await page.evaluate(() => {
-      const c = document.getElementById("canvas")!;
-      const ev = new MouseEvent("contextmenu", {
-        bubbles: true,
-        cancelable: true,
+    let splicedHtmlServed = false;
+    await page.route("**/*", async (route) => {
+      const req = route.request();
+      const url = req.url();
+      const isIndex =
+        req.resourceType() === "document" ||
+        url.endsWith("/") ||
+        url.endsWith("/index.html");
+      if (!isIndex) {
+        await route.continue();
+        return;
+      }
+      // Fetch the real served index.html, splice the probe in before </head>,
+      // and fulfil with the modified body. This keeps the REAL head_include
+      // suppressor intact and only ADDS the probe immediately after it.
+      const response = await route.fetch();
+      const original = await response.text();
+      // Safety: only splice if we recognise the document shape.
+      if (!original.includes("</head>")) {
+        await route.fulfill({ response });
+        return;
+      }
+      const modified = original.replace(
+        "</head>",
+        `${PRE_DCL_PROBE_SCRIPT}</head>`,
+      );
+      splicedHtmlServed = true;
+      await route.fulfill({
+        response,
+        body: modified,
+        headers: {
+          ...response.headers(),
+          "content-type": "text/html",
+        },
       });
-      c.dispatchEvent(ev);
-      return { readyState: document.readyState, defaultPrevented: ev.defaultPrevented };
     });
 
-    expect(early.defaultPrevented).toBe(true);
+    await page.goto(baseUrl(), { waitUntil: "domcontentloaded" });
+
+    // The route must have actually intercepted + spliced the document — if it
+    // didn't, the test below would vacuously read `undefined` and we'd be back
+    // to a false-green. Fail loudly if the splice never happened.
+    expect(
+      splicedHtmlServed,
+      "the index.html route interception did not fire — the pre-DCL probe was " +
+        "never spliced in, so this test cannot verify the suppressor; harness bug",
+    ).toBe(true);
+
+    const probe = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __preDclProbe?: {
+              ran?: boolean;
+              readyStateAtProbe?: string;
+              atLoading?: boolean;
+              contextmenuPrevented?: boolean;
+              controlClickPrevented?: boolean;
+              error?: string;
+            };
+          }
+        ).__preDclProbe,
+    );
+
+    // The probe must have run and recorded a result.
+    expect(probe, "pre-DCL probe did not run / left no result").toBeTruthy();
+    expect(probe!.ran).toBe(true);
+    expect(probe!.error, `pre-DCL probe threw: ${probe!.error}`).toBeUndefined();
+
+    // The probe must genuinely have executed during the pre-DCL window — this
+    // is what makes the test a real regression-catcher rather than a re-run of
+    // the post-DCL surface the old test covered.
+    expect(
+      probe!.atLoading,
+      `pre-DCL probe ran at readyState="${probe!.readyStateAtProbe}", not ` +
+        `"loading" — the probe must execute during head parse for this test to ` +
+        `exercise the pre-DCL window the DCL-deferred form leaks`,
+    ).toBe(true);
+
+    // Negative control: a plain click (untouched by the suppressor) must NOT be
+    // prevented — proves the probe can observe an un-prevented event, so the
+    // contextmenu-true result is meaningful.
+    expect(
+      probe!.controlClickPrevented,
+      "control: a plain click was preventDefault-ed during the probe — the " +
+        "probe cannot distinguish prevented from un-prevented",
+    ).toBe(false);
+
+    // THE TEETH: pre-DCL, the contextmenu MUST already be suppressed. Reverting
+    // to the DCL-deferred form (or removing the suppressor) flips this to false.
+    expect(
+      probe!.contextmenuPrevented,
+      "pre-DCL contextmenu was NOT preventDefault-ed (readyState was " +
+        `"loading") — the head_include suppressor is NOT registered ` +
+        "synchronously at head-parse. This is the DCL-deferred-regression / " +
+        "suppressor-removed signal (export_presets.cfg head_include).",
+    ).toBe(true);
   });
 });
