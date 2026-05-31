@@ -11,9 +11,17 @@
  *      the DOM and is visible.
  *   2. Without `?debug` → no button is attached (zero impact on normal play).
  *   3. With `?debug=0` → no button (the gate is strict equality on '1').
- *   4. Clicking the button writes the in-memory console buffer to the
- *      clipboard via `navigator.clipboard.writeText` and the button label
- *      flashes to confirm.
+ *   4. Clicking the button writes a chat-pasteable chunk of the in-memory
+ *      console buffer to the clipboard via `navigator.clipboard.writeText`
+ *      and the button label flashes to confirm.
+ *
+ * NOTE: as of tess/chunked-log-copy the overlay copies in line-boundary
+ * chunks (<= 40000 chars) rather than one blob — the resting label is
+ * `Copy log (chunk X/N)`. The chunked-specific behavior (advance/wrap, the
+ * Tail button, self-labeling headers, the <=cap invariant, the pure helpers
+ * on window.__embergraveCopyLog) is covered in
+ * debug-chunked-copy-log.spec.ts. This spec retains the attach + clipboard
+ * round-trip + ?debug-gate coverage with the updated label assertions.
  *
  * Note: the buffer intercept hooks console.log/warn/error/info BEFORE Godot
  * boots, so the captured text includes the Godot boot lines
@@ -57,21 +65,28 @@ test.describe("Debug copy-log overlay (?debug=1)", () => {
     const btn = page.locator(BUTTON_SELECTOR);
     await expect(btn).toBeAttached({ timeout: 5_000 });
     await expect(btn).toBeVisible();
-    await expect(btn).toHaveText("Copy log");
+    // The overlay now copies in chat-pasteable chunks (tess/chunked-log-copy):
+    // the resting label is `Copy log (chunk X/N)`, not the old single-blob
+    // `Copy log`. Full chunked behavior (advance/wrap, tail, headers, <=cap
+    // invariant) is covered in debug-chunked-copy-log.spec.ts; this baseline
+    // spec retains the DOM-attach + clipboard round-trip + ?debug-gate coverage.
+    await expect(btn).toHaveText(/^Copy log \(chunk \d+\/\d+\)$/);
 
     // Give the build a few seconds to emit at least one console.log before
     // clicking, so the buffer round-trip is exercised end-to-end. Godot
     // boots within ~5-10s in headless.
     await page.waitForTimeout(8_000);
 
-    // Click the Copy log button.
+    // Click the Copy log button (copies the current chunk).
     await btn.click();
 
-    // Button label flashes to "Copied (N lines)" or "Copy failed".
+    // Button label flashes to "Copied chunk i/N (NNN ch)" or "Copy failed".
     // We accept either, but assert it changed away from the resting label.
-    await expect(btn).not.toHaveText("Copy log", { timeout: 3_000 });
+    await expect(btn).not.toHaveText(/^Copy log \(chunk \d+\/\d+\)$/, {
+      timeout: 3_000,
+    });
     const flashedText = await btn.textContent();
-    expect(flashedText).toMatch(/^(Copied \(\d+ lines\)|Copy failed)$/);
+    expect(flashedText).toMatch(/^(Copied chunk \d+\/\d+ \(\d+ ch\)|Copy failed)$/);
 
     // If the API path succeeded, the clipboard should now contain the
     // buffered log content. Read it back and assert non-empty.
@@ -91,9 +106,11 @@ test.describe("Debug copy-log overlay (?debug=1)", () => {
       }
     }
 
-    // Resting label restores after the flash timeout (1500 ms for success,
-    // 2000 ms for failure; allow 4s slack for either).
-    await expect(btn).toHaveText("Copy log", { timeout: 4_000 });
+    // Resting label restores to the chunked form after the flash timeout
+    // (1600 ms for success, 2000 ms for failure; allow 4s slack for either).
+    await expect(btn).toHaveText(/^Copy log \(chunk \d+\/\d+\)$/, {
+      timeout: 4_000,
+    });
   });
 
   test("button is NOT attached when ?debug param is absent", async ({
