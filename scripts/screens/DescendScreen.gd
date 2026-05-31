@@ -3,15 +3,18 @@ extends CanvasLayer
 ## Fullscreen "descend to next stratum" interstitial. Fires after the
 ## player walks into the StratumExit and presses the interact key.
 ##
-## M1 contract:
+## Contract:
 ##   - Fade-in from transparent to fully opaque over `FADE_DURATION` s.
-##   - "Stratum 2 — Coming in M2" placeholder copy. M2 will replace this
-##     scene with the actual stratum-2 first-room load.
-##   - "Return to Stratum 1" button restarts the M1 demo loop. Per
-##     `team/uma-ux/death-restart-flow.md` Beat F's audio/copy convention:
-##     the descend is conceptually similar to a successful "Descend Again"
-##     but with different framing — *the player chose this*, so the fade
-##     and copy are gentler (no "You fell." card).
+##   - Subtitle names the S2 entry zone the player descends into ("Into the
+##     Drowned Undercroft"). Ticket `86ca1m0ph` wired the real S2 transition:
+##     the "Return to Stratum 1" button's `restart_run` now drives
+##     `Main._on_descend_restart_run` → `_begin_stratum_2()` →
+##     `FloorAssembler.assemble_floor(...)` traversal → the authored S2 boss
+##     room, instead of the old Room01-reload placeholder.
+##   - "Return to Stratum 1" button label is the historical name for the
+##     descend-commit action. Per `team/uma-ux/death-restart-flow.md` Beat F's
+##     audio/copy convention: the descend is gentler than death — *the player
+##     chose this*, so the fade and copy are gentler (no "You fell." card).
 ##
 ## Why a CanvasLayer (not a Control root): the screen has to render *over*
 ## the world viewport at output resolution, not the 480×270 internal
@@ -52,9 +55,10 @@ const FADE_DURATION: float = 0.6
 ## quickly. Uma may revise.
 const TITLE_TEXT: String = "STRATUM 2"
 
-## Subtitle copy — the M1 placeholder line. M2 will replace this scene
-## entirely; until then this is the player's "yes the game continues" cue.
-const SUBTITLE_TEXT: String = "Coming in M2"
+## Subtitle copy — names the S2 entry zone the player descends into (ticket
+## `86ca1m0ph` — the descend now reaches real S2 content via the procgen
+## traversal). "Drowned Undercroft" is the S2 descent-entry tonal name.
+const SUBTITLE_TEXT: String = "Into the Drowned Undercroft"
 
 ## Body copy explaining the loop-back option.
 const BODY_TEXT: String = "You have cleared the Outer Cloister.\nThe path deeper waits to be carved."
@@ -191,7 +195,7 @@ func _build_ui() -> void:
 	_title_label.offset_bottom = 180.0
 	_bg_panel.add_child(_title_label)
 
-	# Subtitle — muted "Coming in M2".
+	# Subtitle — muted S2 entry-zone name.
 	_subtitle_label = Label.new()
 	_subtitle_label.name = "SubtitleLabel"
 	_subtitle_label.text = SUBTITLE_TEXT
@@ -312,12 +316,13 @@ func _on_open_map_pressed() -> void:
 	# `diagnostic-traces-before-hypothesized-fixes` memory rule.
 	var df: Node = get_tree().root.get_node_or_null("DebugFlags")
 	if df != null and df.has_method("combat_trace"):
-		var already_open: bool = (
-			_world_map_panel != null and is_instance_valid(_world_map_panel)
-		)
-		df.combat_trace(
-			"DescendScreen._on_open_map_pressed",
-			"already_open=%s" % str(already_open),
+		var already_open: bool = _world_map_panel != null and is_instance_valid(_world_map_panel)
+		(
+			df
+			. combat_trace(
+				"DescendScreen._on_open_map_pressed",
+				"already_open=%s" % str(already_open),
+			)
 		)
 
 	# Re-press while a panel is already open is a no-op (idempotent —
@@ -367,9 +372,12 @@ func _on_open_map_pressed() -> void:
 	# (from `WorldMapPanel._emit_open_trace`) within ~1 frame of the
 	# click — that's the empirical contract for "the click path works."
 	if df != null and df.has_method("combat_trace"):
-		df.combat_trace(
-			"DescendScreen.world_map_mounted",
-			"layer=%d" % _world_map_panel.layer,
+		(
+			df
+			. combat_trace(
+				"DescendScreen.world_map_mounted",
+				"layer=%d" % _world_map_panel.layer,
+			)
 		)
 
 
