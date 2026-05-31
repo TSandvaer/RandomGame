@@ -323,6 +323,128 @@ func test_t16_f3_title_card_dismissed_resets_camera_and_vignette() -> void:
 	)
 
 
+# ---- S2 boss room: resting arena zoom HOLDS through boss death --------
+# REGRESSION (Sponsor re-soak #4, build 4c506b6): boss death over-zoomed the
+# S2 arena. `Main._on_boss_defeated` hardwired `CameraDirector.reset_to_player()`
+# on title-card dismiss, clobbering the S2 arena's standing 0.5 zoom-out back to
+# normalized 1.0 (engine 2.6667 — the "characters too big" over-zoom). Fix:
+# Main prefers the boss room's own `restore_resting_camera()` hook, which for
+# the S2 room re-asserts ARENA_CAMERA_ZOOM (0.5). The bug class this catches:
+# any future change that resets the post-death camera to a game-wide default
+# instead of the per-room resting zoom. `pickup_count > 0`-style weak assertion
+# is avoided — we assert the exact engine zoom value the arena must hold.
+
+
+func test_s2_boss_death_holds_arena_zoom_not_default() -> void:
+	var main: Main = _instantiate_main()
+	main.load_room_index(9)  # S2_BOSS_ROOM_INDEX — Stratum2BossRoom
+	for i in range(6):
+		await get_tree().process_frame
+	var world: Node = main.get_node("World")
+	var boss_room: Stratum2BossRoom = null
+	for child in world.get_children():
+		if child is Stratum2BossRoom:
+			boss_room = child as Stratum2BossRoom
+			break
+	assert_not_null(boss_room, "S2 boss room must load at index 9")
+	var boss: ArchiveSentinel = boss_room.get_boss()
+	assert_not_null(boss, "ArchiveSentinel must spawn in S2 boss room")
+
+	var camera_director: Node = _autoload("CameraDirector")
+	assert_not_null(camera_director)
+	var cam2d: Camera2D = camera_director.get_camera()
+	assert_not_null(cam2d)
+
+	# The arena engaged its standing 0.5 zoom-out on room-load. At
+	# CameraDirector BASELINE_ZOOM 2.6667 × ARENA_CAMERA_ZOOM 0.5 the engine
+	# zoom is ~1.3334. BASELINE_ZOOM literal mirrored here (autoload has no
+	# class_name to reference its const through a type).
+	var baseline_zoom_x: float = 2.6667
+	var expected_engine_zoom: float = Stratum2BossRoom.ARENA_CAMERA_ZOOM * baseline_zoom_x
+	assert_almost_eq(
+		cam2d.zoom.x,
+		expected_engine_zoom,
+		0.01,
+		"S2: arena standing zoom engaged on room-load (0.5 normalized → ~1.3334 engine)"
+	)
+
+	# Drive the boss-defeated → title-card-dismiss chain.
+	boss_room.boss_defeated.emit(boss, boss.global_position)
+	await get_tree().process_frame
+	var card: BossDefeatedTitleCard = null
+	for child in main.get_children():
+		if child is BossDefeatedTitleCard:
+			card = child as BossDefeatedTitleCard
+			break
+	assert_not_null(card, "S2: BossDefeatedTitleCard spawned under Main on boss_defeated")
+
+	card.title_card_dismissed.emit()
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# THE REGRESSION PIN: after dismiss, the arena zoom MUST still be 0.5 —
+	# NOT reset to normalized 1.0 (engine 2.6667). Pre-fix this read 2.6667.
+	assert_almost_eq(
+		cam2d.zoom.x,
+		expected_engine_zoom,
+		0.01,
+		"S2 REGRESSION: arena 0.5 zoom HOLDS through boss death (was reset to 2.6667 pre-fix)"
+	)
+	assert_almost_eq(
+		camera_director.current_zoom(),
+		Stratum2BossRoom.ARENA_CAMERA_ZOOM,
+		0.001,
+		"S2 REGRESSION: normalized mirror stays 0.5 after dismiss (not 1.0)"
+	)
+
+
+func test_s1_boss_death_dismiss_still_returns_to_default_zoom() -> void:
+	# Sibling pin to the S2 test: the fix must NOT regress S1. The S1 boss
+	# room's resting zoom IS the default (1.0); the T16 cinematic moves it to
+	# 1.5×, and dismiss must still return it to 1.0. `restore_resting_camera()`
+	# for S1 calls `reset_to_player()` — byte-equivalent to the legacy path.
+	var main: Main = _instantiate_main()
+	main.load_room_index(8)
+	for i in range(5):
+		await get_tree().process_frame
+	var world: Node = main.get_node("World")
+	var boss_room: Stratum1BossRoom = null
+	for child in world.get_children():
+		if child is Stratum1BossRoom:
+			boss_room = child as Stratum1BossRoom
+			break
+	assert_not_null(boss_room)
+	var boss: Stratum1Boss = boss_room.get_boss()
+	var camera_director: Node = _autoload("CameraDirector")
+
+	# Simulate the F2 cinematic having zoomed to 1.5×.
+	camera_director.request_zoom(1.5, 0.0, boss.global_position)
+
+	boss_room.boss_defeated.emit(boss, boss.global_position)
+	await get_tree().process_frame
+	var card: BossDefeatedTitleCard = null
+	for child in main.get_children():
+		if child is BossDefeatedTitleCard:
+			card = child as BossDefeatedTitleCard
+			break
+	assert_not_null(card)
+
+	var f3_camera_args: Array = []
+	camera_director.zoom_requested.connect(
+		func(t: float, d: float, a: Vector2) -> void:
+			f3_camera_args.append({"target": t, "anchor": a})
+	)
+	card.title_card_dismissed.emit()
+	await get_tree().process_frame
+
+	assert_gte(f3_camera_args.size(), 1, "S1: dismiss still fires a zoom request")
+	var last_cam: Dictionary = f3_camera_args[-1]
+	assert_almost_eq(
+		last_cam["target"], 1.0, 0.001, "S1: dismiss returns zoom to default 1.0 (no regression)"
+	)
+	assert_almost_eq(last_cam["anchor"].x, 0.0, 0.001, "S1: anchor cleared (follow mode)")
+
+
 # ---- F3 idempotence: second title-card-dismissed is safe (defensive) --
 
 

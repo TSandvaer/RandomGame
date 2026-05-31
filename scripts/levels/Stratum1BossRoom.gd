@@ -427,6 +427,30 @@ func is_entry_sequence_completed() -> bool:
 	return _entry_sequence_completed
 
 
+## Re-assert the boss room's RESTING camera state on title-card dismiss.
+## Called by `Main._on_boss_defeated` so the post-cinematic camera returns to
+## THIS room's resting view, NOT a game-wide default that another boss room
+## might disagree with.
+##
+## For the S1 boss room the resting zoom IS the CameraDirector default
+## (normalized 1.0 — viewport-native 480×270). The T16 cinematic moved the
+## zoom to 1.5× (anchored at the boss death position), so "resting" here means
+## "return zoom to 1.0 + follow mode" — `reset_to_player()` — which is exactly
+## the legacy F3 behavior this hook replaces (byte-equivalent for S1; the
+## existing `test_t16_f3_*` assertion on `zoom_requested(1.0)` still holds).
+## The follow/bounds re-engage is belt-and-suspenders (idempotent on same
+## target+deadzone+bounds the CameraDirector autoload already holds).
+##
+## The explicit hook exists so the S2 boss room (standing 0.5 arena zoom) can
+## override what "resting" means without Main hardcoding per-room zoom — see
+## `Stratum2BossRoom.restore_resting_camera` for the over-zoom bug this guards.
+func restore_resting_camera() -> void:
+	var cd: Node = _resolve_camera_director()
+	if cd != null and cd.has_method("reset_to_player"):
+		cd.reset_to_player()
+	_engage_camera_for_boss_room()
+
+
 func is_stratum_exit_unlocked() -> bool:
 	return _stratum_exit_unlocked
 
