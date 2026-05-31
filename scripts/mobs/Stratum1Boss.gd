@@ -589,6 +589,16 @@ func get_phase() -> int:
 	return phase
 
 
+## Ordered phase-boundary fractions (descending) — the HP fractions at which
+## the Warden changes phase, as fractions of max_hp. The S1 boss is a 3-phase
+## boss with boundaries at 66% and 33%, so this returns `[0.66, 0.33]`.
+## Consumers (notably `BossNameplate`) derive segment count = len + 1 and the
+## per-phase fill spans from this list. Read-only introspection — does NOT
+## change any phase logic (ticket 86ca1m0at).
+func get_phase_boundary_fracs() -> Array:
+	return [PHASE_2_HP_FRAC, PHASE_3_HP_FRAC]
+
+
 func is_dead() -> bool:
 	return _is_dead
 

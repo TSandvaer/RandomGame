@@ -408,6 +408,17 @@ func get_phase() -> int:
 	return phase
 
 
+## Ordered phase-boundary fractions (descending) — the HP fractions at which
+## the construct changes phase, as fractions of max_hp. The Sentinel is a
+## 2-phase boss with a single boundary at 50%, so this returns `[0.50]`.
+## Consumers (notably `BossNameplate`) derive segment count = len + 1 and the
+## per-phase fill spans from this list, so the nameplate's phase model tracks
+## the boss's actual phase count instead of hard-coding 3 segments. Read-only
+## introspection — does NOT change any phase logic (ticket 86ca1m0at).
+func get_phase_boundary_fracs() -> Array:
+	return [PHASE_2_HP_FRAC]
+
+
 func is_dead() -> bool:
 	return _is_dead
 
