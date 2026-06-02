@@ -83,7 +83,10 @@ func _expected_z1_mob_total() -> int:
 	if zone == null:
 		return -1
 	var asm: FloorAssembler = FloorAssemblerScript.new()
-	var stratum_seed: int = FloorAssembler.derive_stratum_seed(0, &"s2")
+	# S2_STRATUM_ID is the int 2 (Main.gd) — derive_stratum_seed takes an int
+	# stratum_id, NOT a StringName. Must match Main's seed cascade exactly so
+	# the assembled floor (and thus the spawn positions) are identical.
+	var stratum_seed: int = FloorAssembler.derive_stratum_seed(0, 2)
 	var zone_seed: int = FloorAssembler.derive_zone_seed(stratum_seed, zone.zone_id)
 	var floor: AssembledFloor = asm.assemble_floor(zone, zone_seed)
 	var total: int = 0
@@ -209,7 +212,10 @@ func test_z1_mob_placement_matches_authored_tiles() -> void:
 	# Re-derive the authored world positions independently.
 	var zone: ZoneDef = load("res://resources/level/zones/s2_z1_entry_hall.tres")
 	var asm: FloorAssembler = FloorAssemblerScript.new()
-	var stratum_seed: int = FloorAssembler.derive_stratum_seed(0, &"s2")
+	# S2_STRATUM_ID is the int 2 (Main.gd) — derive_stratum_seed takes an int
+	# stratum_id, NOT a StringName. Must match Main's seed cascade exactly so
+	# the assembled floor (and thus the spawn positions) are identical.
+	var stratum_seed: int = FloorAssembler.derive_stratum_seed(0, 2)
 	var zone_seed: int = FloorAssembler.derive_zone_seed(stratum_seed, zone.zone_id)
 	var floor: AssembledFloor = asm.assemble_floor(zone, zone_seed)
 	var expected_positions: Array[Vector2] = []
