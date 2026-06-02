@@ -114,19 +114,20 @@ func test_render_spawns_mobs_from_assembled_floor() -> void:
 	)
 
 
-## REGRESSION GUARD (OOS boundary) — this PR makes mobs EXIST but must NOT add
-## the chunk-clear gate (sibling ticket 86ca3amyb). The advance must stay
-## unconditional (`call_deferred("_advance_s2_zone")`); it must NOT be gated on
-## `_s2_mobs_remaining == 0` in THIS PR. If a future PR adds the gate here, this
-## guard should be updated alongside that ticket — until then it pins the OOS.
-func test_render_does_not_gate_advance_on_mob_count() -> void:
+## REGRESSION GUARD (ticket 86ca3amyb landed the gate). The advance hook MUST
+## now gate on `_s2_mobs_remaining` — a populated zone holds; an empty zone
+## advances. If a future refactor drops the gate and reverts to an unconditional
+## `call_deferred("_advance_s2_zone")`, this fails. (This flips the #392 OOS pin
+## that previously asserted the gate was ABSENT — that PR's scope ended at "mobs
+## exist + trackable"; this ticket adds the gate.)
+func test_render_gates_advance_on_mob_count() -> void:
 	var src: String = _read_source(MAIN_SOURCE_PATH)
 	var advance_body: String = _func_body(src, "func _on_s2_zone_advance_ready")
 	assert_ne(advance_body, "", "expected _on_s2_zone_advance_ready")
-	assert_eq(
+	assert_gt(
 		advance_body.find("_s2_mobs_remaining"),
-		-1,
-		"OOS: advance hook must NOT gate on mob count in this PR (gate = ticket 86ca3amyb)"
+		0,
+		"GATE: advance hook must gate on _s2_mobs_remaining (ticket 86ca3amyb)"
 	)
 
 

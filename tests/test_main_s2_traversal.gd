@@ -16,13 +16,14 @@ extends GutTest
 ##   4. **Structural wiring** — the traversal calls the FloorAssembler API +
 ##      the S2 audio entry trigger + the camera-scroll API.
 ##
-## **Content note (verified this PR).** The S2 chunk `.tres` HAVE authored
-## `scene_path` (chunk geometry renders) + declarative `mob_spawns`, but no
-## runtime consumes `mob_spawns` (no mobs spawn yet) and no `chunk_cleared`
-## signal exists — so the zone-progression seam auto-advances z1 → z2 → z3 →
-## boss room. The traversal WIRING is what this ticket owns; mid-floor mob
-## spawning + a clear-gate are separate content surfaces. These tests assert
-## the wiring + terminal reachability, NOT mid-floor mob content.
+## **Content note (updated for ticket 86ca3amyb — chunk-clear gate).** The S2
+## chunk `.tres` HAVE authored `scene_path` + declarative `mob_spawns`. As of
+## #392 mobs spawn; as of THIS ticket the zone-advance is GATED on those mobs
+## being cleared (`_s2_mobs_remaining == 0`). So a freshly-descended floor HOLDS
+## at z1 with live mobs — it does NOT auto-advance to the boss room. The
+## reach-boss-room test below therefore DEFEATS the spawned mobs to drive the
+## traversal, rather than relying on a free auto-advance. The traversal WIRING +
+## terminal reachability are what these tests assert.
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const MAIN_SOURCE_PATH: String = "res://scenes/Main.gd"
@@ -132,11 +133,25 @@ func test_descend_subtitle_off_coming_in_m2() -> void:
 # ---- Behavioural bare-instance Main tests -----------------------------
 
 
-## Drive the production descend path on a bare-instance Main and assert it
-## reaches the authored S2 boss room (NOT S1 Room01). Because no chunk-clear
-## trigger exists yet, the zone-progression seam auto-advances across
-## z1/z2/z3 to the boss room within a few deferred frames — drain enough.
-func test_descend_reaches_s2_boss_room() -> void:
+## Lethal-damage every currently-live S2 mob (drives the standard _die →
+## mob_died chain). Returns the count killed this call. The gate connects
+## mob_died CONNECT_DEFERRED, so the caller must drain a frame for the
+## `_s2_mobs_remaining` decrement to land.
+func _kill_live_s2_mobs(main: Node) -> int:
+	var mobs: Array = main.get_s2_mobs()
+	var killed: int = 0
+	for mob: Node in mobs:
+		if is_instance_valid(mob) and mob.has_method("take_damage"):
+			mob.take_damage(99999, Vector2.ZERO, null)
+			killed += 1
+	return killed
+
+
+## Drive the production descend path on a bare-instance Main and assert that —
+## with the chunk-clear gate (86ca3amyb) — the floor HOLDS at z1 with live mobs
+## and reaches the authored S2 boss room ONLY after the player clears each zone.
+## This is the room-by-room pacing the headline #391 traversal set up.
+func test_descend_reaches_s2_boss_room_after_clearing_each_zone() -> void:
 	var main: Node = MAIN_SCENE.instantiate()
 	add_child_autofree(main)
 	await get_tree().process_frame
@@ -153,18 +168,71 @@ func test_descend_reaches_s2_boss_room() -> void:
 	assert_true(screen.has_method("press_return_for_test"), "screen exposes press_return_for_test")
 	screen.press_return_for_test()
 
-	# Drain deferred frames so the z1 -> z2 -> z3 -> boss-room walk completes
-	# (each zone defers one advance). 8 frames is generous margin for 3 zone
-	# hops + the boss-room load.
-	for _i: int in range(8):
+	# z1 is now LIVE with mobs — the gate must HOLD. Drain several frames and
+	# assert we have NOT advanced to the boss room (the gate is doing its job).
+	for _i: int in range(4):
 		await get_tree().process_frame
+	assert_gt(main.s2_mobs_remaining(), 0, "z1 entry hall spawns mobs (gate has something to hold on)")
+	assert_ne(
+		main.get_current_room_index(),
+		main.S2_BOSS_ROOM_INDEX,
+		"GATE: must NOT reach boss room while z1 mobs are alive (no premature advance)"
+	)
+
+	# Clear each zone in turn. Each kill-all + frame-drain advances one zone;
+	# the next zone loads with its own mobs (until z3 clears → boss-room load).
+	# Bound the loop generously (3 authored zones + margin) to avoid an infinite
+	# loop if a regression breaks the advance.
+	var hops: int = 0
+	while main.get_current_room_index() != main.S2_BOSS_ROOM_INDEX and hops < 12:
+		_kill_live_s2_mobs(main)
+		# Drain enough frames for the deferred decrement, the deferred advance,
+		# and the next zone's synchronous render + spawn.
+		for _j: int in range(4):
+			await get_tree().process_frame
+		hops += 1
 
 	assert_eq(
 		main.get_current_room_index(),
 		main.S2_BOSS_ROOM_INDEX,
-		"descend must reach the authored S2 boss room (index 9), NOT reload Room01"
+		"clearing every zone must reach the authored S2 boss room (index 9)"
 	)
 	assert_ne(main.get_current_room_index(), 0, "descend must NOT end on S1 Room01")
+	main.queue_free()
+
+
+## Premature-advance / no-skipped-zone guard. After descend, defeating NONE of
+## the z1 mobs must keep the floor at z1 indefinitely (the gate never opens). A
+## regression to unconditional auto-advance would whisk past z1 → boss room with
+## mobs still alive — this asserts the floor stays put with mobs remaining.
+func test_descend_does_not_advance_while_mobs_alive() -> void:
+	var main: Node = MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	main.force_descend_for_test()
+	await get_tree().process_frame
+	var screen: Node = main.get_descend_screen()
+	if screen == null:
+		main.queue_free()
+		return
+	screen.press_return_for_test()
+
+	var z1_mobs: int = main.s2_mobs_remaining()
+	assert_gt(z1_mobs, 0, "z1 must spawn mobs for the gate to hold")
+	# Drain many frames WITHOUT killing anything — the gate must hold the floor.
+	for _i: int in range(10):
+		await get_tree().process_frame
+	assert_eq(
+		main.s2_mobs_remaining(),
+		z1_mobs,
+		"no mob died → counter unchanged (no spurious decrement)"
+	)
+	assert_ne(
+		main.get_current_room_index(),
+		main.S2_BOSS_ROOM_INDEX,
+		"GATE: floor must NOT advance to boss room while mobs are alive"
+	)
 	main.queue_free()
 
 
