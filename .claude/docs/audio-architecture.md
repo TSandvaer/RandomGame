@@ -131,16 +131,18 @@ expose `loop` at the GDScript level).
 ### S1→S2 entry trigger
 
 `Main._on_descend_restart_run()` — fires when the player clicks "Return
-to Stratum 1" on the DescendScreen. This is semantically the S1→S2
-stratum step even though the M1 placeholder reloads Room 01 rather than
-a real Stratum 2 scene. Firing S2 audio here means the audio identity
-for Cinder Vaults is audible from the moment the player chooses to
-descend.
+to Stratum 1" on the DescendScreen. This is the S1→S2 stratum step.
 
-When an actual S2 scene transition lands (post-M2 W3), this trigger
-moves to the scene-load callback alongside `_load_room_at_index(0)`.
-The wiring is one line — search for `audio_director.play_stratum2_entry()`
-in `scenes/Main.gd`.
+As of ticket `86ca1m0ph` (S2 traversal, Option A) the real S2 floor
+transition is wired: `_on_descend_restart_run` calls `_begin_stratum_2()`,
+which fires `AudioDirector.play_stratum2_entry()` (BGM + Ambient) at the
+START of the genuine S2 transition, then drives the
+`FloorAssembler.assemble_floor(...)` traversal. The DescendScreen "Return
+to Stratum 1" button click is the user gesture that unlocks the HTML5
+AudioContext (see § HTML5 audio-playback gate), so the S2 BGM/Ambient is
+audible from the moment the player descends. The cue is no longer fired
+against a Room01-reload placeholder — it fires on the real descent into
+Stratum 2.
 
 ### Boss-room crossfade (deferred)
 

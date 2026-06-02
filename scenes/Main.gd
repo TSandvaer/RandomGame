@@ -53,16 +53,14 @@ const SAVE_SLOT: int = 0
 ## SAME production room-load mechanism every other room uses — and via the
 ## `DebugFlags.start_room=9` URL hook for soak / Playwright.
 ##
-## **Why a terminal index, NOT a full S2 room-sequence.** Main.gd has no S2
-## zone progression: the descend flow (`_on_descend_restart_run`) reloads
-## Room01 with S2 audio as a placeholder (DescendScreen subtitle: "Coming in
-## M2"); the real S2 scene transition is deferred "post-M2 W3" per three
-## in-code comments. Authoring an S2 room-by-room sequence is a separate
-## ticket-class (descend → S2 Room01 → … → S2 boss). Stage 6's scope is
-## "make the boss room REACHABLE" — appending it at a terminal index + the
-## start_room hook satisfies that without fabricating an S2 progression that
-## doesn't exist. When the real S2 sequence lands, this terminal entry stays
-## valid as the S2 sequence's final room.
+## **Terminal index = the S2 traversal terminal (ticket `86ca1m0ph`).** The
+## descend flow (`_on_descend_restart_run`) now drives a real S2 floor
+## transition via `FloorAssembler.assemble_floor(...)` (Option A): it traverses
+## the S2 zones (`S2_ZONE_IDS`: z1 → z2 → z3) then loads THIS index 9 entry as
+## the authored z4 (`s2_z4_inner_sanctum`) boss-room terminal. The S2 boss room
+## is reached by the production descend path (and still via `?start_room=9` for
+## soak / Playwright). See `_on_descend_restart_run` → `_begin_stratum_2` →
+## `_load_s2_zone` → `_enter_s2_boss_room`.
 const ROOM_SCENE_PATHS: Array[String] = [
 	"res://scenes/levels/Stratum1Room01.tscn",
 	"res://scenes/levels/Stratum1Room02.tscn",
@@ -87,6 +85,52 @@ const BOSS_ROOM_INDEX: int = 8
 ## `_load_room_at_index(9)` (start_room hook / future S2 sequence). Wired in
 ## `_wire_room_signals` through the shared boss-room branch.
 const S2_BOSS_ROOM_INDEX: int = 9
+
+## S2 traversal (ticket `86ca1m0ph`, Option A — procgen-driven). The descend
+## flow assembles each S2 zone via `FloorAssembler.assemble_floor(...)` in
+## graph order (entry → boss-adjacent), then hands off to the authored
+## Stratum2BossRoom (`ROOM_SCENE_PATHS[S2_BOSS_ROOM_INDEX]`) as the terminal.
+##
+## The zone_ids are the AUTHORITATIVE `ZoneDef.zone_id` values (NOT the .tres
+## filenames). The non-boss zones z1→z2→z3 form a linked list via each exit
+## anchor's `target_zone_id`; z4 (`s2_z4_inner_sanctum`) IS the authored boss
+## room (see `ROOM_INDEX_TO_ZONE_ID[9]`), so it is loaded as the boss scene
+## rather than assembled procedurally.
+##
+## **Content note (verified 2026-05-31, this PR).** The s2_roomNN chunk
+## `.tres` resources HAVE authored `scene_path` (e.g. `s2_room01_chunk.tscn`),
+## `ports`, and declarative `mob_spawns` — so z1/z2/z3 assemble to non-empty
+## bounding boxes AND render their authored chunk geometry. TWO gaps remain,
+## both OUT OF SCOPE for this traversal-wiring ticket (see PR body
+## § "Cross-lane content gaps"):
+##   1. **No runtime consumes `LevelChunkDef.mob_spawns`** — the assembler
+##      records chunk placements but does not spawn mobs, and the chunk
+##      `.tscn` roots are static geometry (no mob-spawn script). So S2 mid-
+##      floor zones render geometry but spawn no mobs yet. Mob-spawn wiring
+##      for assembled chunks is a separate surface.
+##   2. **No chunk-clear signal exists** — there is no `LevelChunk.gd` /
+##      `chunk_cleared` / `room_cleared` on chunk scenes (grep-confirmed). So
+##      the zone-progression seam (`_on_s2_zone_advance_ready`) auto-advances
+##      z1 → z2 → z3 → boss room rather than gating on a clear. When chunk
+##      mob-spawn + clear-trigger content lands, only that advance condition
+##      swaps from auto to clear-gated — every other seam here is unchanged.
+const S2_ZONE_IDS: Array[StringName] = [
+	&"s2_z1_entry_hall",
+	&"s2_z2_reading_chamber",
+	&"s2_z3_archive_vault",
+]
+
+## res:// path template for resolving an S2 ZoneDef from its zone_id. The
+## filename slug matches the zone_id 1:1 for the S2 set.
+const S2_ZONE_DEF_PATH_FMT: String = "res://resources/level/zones/%s.tres"
+
+## Stratum index passed to FloorAssembler.derive_stratum_seed for S2 zones.
+const S2_STRATUM_ID: int = 2
+
+## Fallback world-bounds for an S2 assembled floor whose bounding box is
+## degenerate (zero-size). Mirrors the S1_ROOM_BOUNDS viewport-native shape;
+## the live floor normally drives bounds from `assembled.bounding_box_px`.
+const S2_ROOM_BOUNDS: Rect2 = Rect2(0, 0, 480, 270)
 
 ## Room IDs for StratumProgression bookkeeping (matches the chunk_def.id
 ## fields in the .tres files). One-to-one with ROOM_SCENE_PATHS.
@@ -210,6 +254,19 @@ var _boss_room: Stratum1BossRoom = null
 ## `_on_stratum_exit_unlocked`. Both rooms expose `get_stratum_exit()`.
 var _boss_room_node: Node = null
 var _loot_spawner: MobLootSpawner = null
+
+## S2 procgen-traversal state (ticket `86ca1m0ph`, Option A). `_s2_zone_index`
+## < 0 means "not currently in an S2 procgen floor". `_s2_world_seed` is the
+## per-character seed (stable per save) the zone seeds derive from.
+## `_s2_floor_container` holds the instantiated assembled-floor chunks (a
+## Node2D under `_world`); it is freed on zone advance + on the boss-room
+## handoff. `_s2_chunks_remaining` tracks live chunk instances for the
+## forward-compatible chunk-clear progression (0 today since chunks are
+## data-only shells — see S2_ZONE_IDS doc).
+var _s2_zone_index: int = -1
+var _s2_world_seed: int = 0
+var _s2_floor_container: Node2D = null
+var _s2_chunks_remaining: int = 0
 
 ## Room01 onboarding gate (ticket 86c9qbb3k). When the Room01 PracticeDummy
 ## dies it drops an iron_sword Pickup; the room advance to Room02 must WAIT
@@ -1445,47 +1502,278 @@ func _on_descend_triggered() -> void:
 
 
 func _on_descend_restart_run() -> void:
-	# Tear down descend screen + reload Room01 keeping ALL state (descend
-	# rule, not death rule). Player keeps level + equipped + inventory; only
-	# room progression resets (the run starts over but with ALL gear).
+	# Descend from the S1 boss into Stratum 2 (ticket `86ca1m0ph`, Option A —
+	# procgen-driven traversal). Replaces the M1 Room01-reload placeholder with
+	# a real S2 floor transition driven by `FloorAssembler.assemble_floor(...)`.
+	# Per the descend rule (DECISIONS.md 2026-05-02): the player keeps EVERYTHING
+	# (level + equipped + inventory) — only room-clear progression bookkeeping
+	# resets.
 	if _descend_screen != null and is_instance_valid(_descend_screen):
 		_descend_screen.queue_free()
 		_descend_screen = null
 	var sp: Node = _stratum_progression()
 	if sp != null:
 		sp.preserve_for_descend()
-		# preserve_for_descend is a no-op in M1; we still want the rooms
-		# to be re-clearable so we reset progression. The descend rule says
-		# "everything carries forward EXCEPT room-clear bookkeeping."
+		# preserve_for_descend is a no-op in M1; we still reset room-clear
+		# bookkeeping so the rooms are re-clearable. "Everything carries forward
+		# EXCEPT room-clear bookkeeping."
 		sp.reset()
 	if _player != null:
 		_player.revive_full_hp()
-	# W3-T9 (`86c9uf6hh`) — S1→S2 audio transition. The DescendScreen is
-	# the canonical "you descended" gate; semantically this IS the stratum
-	# step even though the M1 placeholder reloads Room 01 rather than a
-	# real Stratum 2 scene (per `scripts/screens/DescendScreen.gd` Beat F).
-	# Firing S2 BGM + Ambient here means the audio identity for Cinder
-	# Vaults is audible from the moment the player chooses to descend —
-	# proves the audio plumbing works end-to-end for Sponsor's next soak.
-	# When the actual S2 scene transition lands (post-M2 W3), this trigger
-	# moves to the scene-load callback alongside `_load_room_at_index(0)`.
-	# The user-gesture click on the "Return to Stratum 1" button unlocks
-	# the HTML5 AudioContext (see AudioDirector.gd § HTML5 audio-playback
-	# gate), so this is the safe first-cue spot regardless of browser.
+	_begin_stratum_2()
+	_persist_to_save()
+
+
+## Entry point into Stratum 2 (ticket `86ca1m0ph`). Fires the S1→S2 audio
+## entry trigger (BGM + Ambient) then assembles + loads the first S2 zone.
+##
+## **HTML5 audio gate:** this runs from the DescendScreen "Return to Stratum 1"
+## button click — a user gesture — so the AudioContext is unlocked here
+## (AudioDirector.gd § HTML5 audio-playback gate). The BGM/Ambient is audible
+## from the moment the player descends.
+func _begin_stratum_2() -> void:
+	# S1→S2 audio entry trigger. `play_stratum2_entry()` fires BGM + Ambient in
+	# one call (the canonical entry-point per AudioDirector docs). This is the
+	# real S1→S2 entry trigger the prior deferral comment promised — it now
+	# fires at the START of the genuine S2 transition, not on a Room01 reload.
 	var audio_director: Node = _audio_director()
-	# M3-T2-W2-T10 ordering note: `_load_room_at_index(0)` now triggers
-	# `play_stratum1_ambient()` because room 0 is a non-boss S1 room.
-	# Since the descend semantically reaches Stratum 2 (the M1 placeholder
-	# reload is the wiring shortcut, not the design), the S2 entry trigger
-	# must fire AFTER the room-load so the S2 ambient overwrites the S1
-	# ambient state that _load_room_at_index set. Once a real S2 scene
-	# transition lands (post-M2 W3) this re-ordering becomes unnecessary —
-	# the post-descend scene is a stratum-2 room which `_load_room_at_index`
-	# would correctly NOT trigger S1 ambient for.
-	_load_room_at_index(0)
 	if audio_director != null and audio_director.has_method("play_stratum2_entry"):
 		audio_director.play_stratum2_entry()
+	_s2_world_seed = _resolve_s2_world_seed()
+	_load_s2_zone(0)
+
+
+## Resolve the per-character world seed the S2 zone seeds derive from.
+##
+## **As of this PR there is NO `world_seed` surface in the codebase** — the
+## per-character seed (`Character.world_seed` round-tripping through Save.gd,
+## per procgen-pipeline.md § "Save-schema binding") is unimplemented; a grep
+## for `world_seed` across `scripts/`+`scenes/` returns zero matches at HEAD.
+## Until that lands (Commitment 5 — randomized maps per character), this
+## returns a fixed deterministic seed so S2 layouts are stable across runs.
+## Forward-compat: when `Save.get_world_seed()` (or equivalent) ships, swap the
+## constant return for that read — every other seam here already keys off
+## `_s2_world_seed`, so it is a single-line change.
+func _resolve_s2_world_seed() -> int:
+	var save: Node = _save()
+	if save != null and save.has_method("get_world_seed"):
+		return int(save.get_world_seed())
+	return 0
+
+
+## Assemble S2 zone `zone_idx` (index into `S2_ZONE_IDS`) via FloorAssembler
+## and render it into the world. When `zone_idx` is past the last authored S2
+## zone, hand off to the authored boss room (the z4 terminal).
+func _load_s2_zone(zone_idx: int) -> void:
+	if zone_idx < 0 or zone_idx >= S2_ZONE_IDS.size():
+		_enter_s2_boss_room()
+		return
+	var zone_id: StringName = S2_ZONE_IDS[zone_idx]
+	var zone_path: String = S2_ZONE_DEF_PATH_FMT % String(zone_id)
+	var zone_def: ZoneDef = load(zone_path) as ZoneDef
+	if zone_def == null:
+		WarningBus.warn("[Main] S2 zone def failed to load: %s" % zone_path, &"level")
+		_enter_s2_boss_room()
+		return
+	_s2_zone_index = zone_idx
+	var stratum_seed: int = FloorAssembler.derive_stratum_seed(_s2_world_seed, S2_STRATUM_ID)
+	var zone_seed: int = FloorAssembler.derive_zone_seed(stratum_seed, zone_def.zone_id)
+	var assembler: FloorAssembler = FloorAssembler.new()
+	var assembled: AssembledFloor = assembler.assemble_floor(zone_def, zone_seed)
+	_record_discovered_zone(zone_def.zone_id)
+	_render_assembled_floor(assembled)
+	_combat_trace_main(
+		"Main.load_s2_zone",
+		(
+			"zone_id=%s seed=%d chunks=%d bounds=%s"
+			% [
+				String(zone_def.zone_id),
+				zone_seed,
+				assembled.chunk_count(),
+				str(assembled.bounding_box_px),
+			]
+		)
+	)
 	_persist_to_save()
+
+
+## Instantiate every placed chunk into a fresh container under `_world`,
+## re-parent the player to the floor origin, and engage the continuous-scroll
+## camera against the assembled floor bounds. Then arm zone progression.
+##
+## S2 chunks render their authored geometry (`scene_path` is populated); they
+## spawn no mobs yet (no runtime consumes `mob_spawns`) and expose no clear
+## signal, so the zone-progression seam auto-advances. See S2_ZONE_IDS doc.
+func _render_assembled_floor(assembled: AssembledFloor) -> void:
+	_teardown_active_room_for_s2()
+	_teardown_s2_floor()
+	_s2_floor_container = Node2D.new()
+	_s2_floor_container.name = "S2FloorContainer"
+	if _world != null:
+		_world.add_child(_s2_floor_container)
+	else:
+		add_child(_s2_floor_container)
+	var live_chunks: Array[Node] = _instantiate_chunks(assembled)
+	_s2_chunks_remaining = live_chunks.size()
+	_reparent_player_into(_s2_floor_container, _s2_floor_spawn(assembled))
+	_engage_camera_for_assembled_floor(assembled)
+	# Forward-compatible zone-progression seam. Today the chunks are data-only
+	# shells (no clear trigger), so there is nothing to clear and the zone
+	# auto-advances on the next frame. When chunk content + a chunk-clear
+	# signal land, wire each chunk's clear signal here and gate the advance on
+	# `_s2_chunks_remaining == 0` instead of auto-advancing.
+	_on_s2_zone_advance_ready()
+
+
+## Returns the live chunk nodes instantiated from the assembled floor. Skips
+## chunks whose `scene_path` is empty (defensive — S2 chunks have geometry, but
+## a future zone could reference a geometry-less chunk) and chunks whose scene
+## fails to load (warned via WarningBus).
+func _instantiate_chunks(assembled: AssembledFloor) -> Array[Node]:
+	var live: Array[Node] = []
+	for placed: PlacedChunk in assembled.placed_chunks:
+		var chunk_def: LevelChunkDef = _resolve_chunk_def(placed.chunk_id)
+		if chunk_def == null or chunk_def.scene_path.is_empty():
+			continue
+		var packed: PackedScene = load(chunk_def.scene_path) as PackedScene
+		if packed == null:
+			WarningBus.warn(
+				"[Main] S2 chunk scene failed to load: %s" % chunk_def.scene_path, &"level"
+			)
+			continue
+		var inst: Node = packed.instantiate()
+		if inst is Node2D:
+			(inst as Node2D).position = placed.position_px
+		_s2_floor_container.add_child(inst)
+		live.append(inst)
+	return live
+
+
+## Resolve a `LevelChunkDef` by id from the canonical chunk root. Returns null
+## (warned) on a miss.
+func _resolve_chunk_def(chunk_id: StringName) -> LevelChunkDef:
+	var path: String = "res://resources/level_chunks/%s.tres" % String(chunk_id)
+	var res: Resource = load(path)
+	if res is LevelChunkDef:
+		return res as LevelChunkDef
+	return null
+
+
+## Player spawn for an assembled S2 floor — left edge of the floor, vertically
+## centred in the bounds. Falls back to DEFAULT_PLAYER_SPAWN for a degenerate
+## (zero-size) bounding box.
+func _s2_floor_spawn(assembled: AssembledFloor) -> Vector2:
+	var bounds: Rect2 = assembled.bounding_box_px
+	if bounds.size == Vector2.ZERO:
+		return DEFAULT_PLAYER_SPAWN
+	return Vector2(bounds.position.x + 24.0, bounds.position.y + bounds.size.y * 0.5)
+
+
+## Engage continuous-scroll follow + world-bounds clamp against the assembled
+## floor (camera-scroll.md § "Forward-compat — AssembledFloor.bounding_box_px
+## swap"). This is the production consumer the W2-T1 camera wiring anticipated.
+func _engage_camera_for_assembled_floor(assembled: AssembledFloor) -> void:
+	if _player == null:
+		return
+	var cd: Node = _camera_director()
+	if cd == null:
+		return
+	if cd.has_method("follow_target"):
+		cd.follow_target(_player, CAMERA_FOLLOW_DEADZONE)
+	if cd.has_method("set_world_bounds"):
+		var bounds: Rect2 = assembled.bounding_box_px
+		if bounds.size == Vector2.ZERO:
+			bounds = S2_ROOM_BOUNDS
+		cd.set_world_bounds(bounds)
+
+
+## Zone-progression advance hook. Forward-compatible seam: today (data-only
+## chunks, no clear trigger) it advances to the next zone deferred so the
+## current frame settles first. When chunk-clear content lands, gate this on
+## `_s2_chunks_remaining == 0`.
+func _on_s2_zone_advance_ready() -> void:
+	call_deferred("_advance_s2_zone")
+
+
+func _advance_s2_zone() -> void:
+	if _s2_zone_index < 0:
+		# Already left the S2 procgen floor (e.g. boss-room handoff fired).
+		return
+	_load_s2_zone(_s2_zone_index + 1)
+
+
+## Terminal of the S2 floor: hand off to the authored Stratum2BossRoom scene
+## (`ROOM_SCENE_PATHS[S2_BOSS_ROOM_INDEX]`) — the z4 (`s2_z4_inner_sanctum`)
+## terminal with real authored content (ArchiveSentinel boss + arena + exit).
+func _enter_s2_boss_room() -> void:
+	_teardown_s2_floor()
+	_s2_zone_index = -1
+	_load_room_at_index(S2_BOSS_ROOM_INDEX)
+
+
+func _teardown_s2_floor() -> void:
+	if _s2_floor_container == null:
+		return
+	if is_instance_valid(_s2_floor_container):
+		_s2_floor_container.queue_free()
+	_s2_floor_container = null
+	_s2_chunks_remaining = 0
+
+
+## Re-parent the player under `parent` at `spawn` (world pos). Mirrors the
+## re-parent block in `_load_room_at_index`. The player is preserved across the
+## S1→S2 transition (descend rule keeps the character intact).
+func _reparent_player_into(parent: Node, spawn: Vector2) -> void:
+	if _player == null or parent == null:
+		return
+	if _player.get_parent() != parent:
+		if _player.get_parent() != null:
+			_player.get_parent().remove_child(_player)
+		parent.add_child(_player)
+	_player.global_position = spawn
+
+
+## Record a discovered S2 zone on the Player so the world-map discovery surface
+## + save round-trip see it (`discovered_zones` for S2 populates on real
+## traversal — composes against the W2-T5 save work). Mirrors the S1 discovery
+## path in `_mark_zone_discovered_for_room_index`; `Player.mark_zone_discovered`
+## is idempotent (returns false if the zone was already discovered). Emits the
+## same `Main.discover_zone` trace line for parity.
+func _record_discovered_zone(zone_id: StringName) -> void:
+	if zone_id == &"":
+		return
+	if _player == null or not _player.has_method("mark_zone_discovered"):
+		return
+	var was_new: bool = bool(_player.call("mark_zone_discovered", zone_id))
+	_combat_trace_main("Main.discover_zone", "zone_id=%s new=%s" % [str(zone_id), str(was_new)])
+
+
+## Tear down the active authored room before rendering an assembled S2 floor.
+## Mirrors the room-teardown block in `_load_room_at_index` — unparent the
+## player BEFORE freeing the room so the player isn't taken down with it.
+func _teardown_active_room_for_s2() -> void:
+	if _current_room == null:
+		return
+	if _player != null and _player.get_parent() == _current_room:
+		_current_room.remove_child(_player)
+		if _world != null:
+			_world.add_child(_player)
+	_current_room.queue_free()
+	_current_room = null
+	_boss_room = null
+	_boss_room_node = null
+
+
+## HTML5-only `[combat-trace]` shim for the S2 traversal path. Mirrors the
+## AudioDirector / DescendScreen trace pattern so the Playwright spec + Sponsor
+## DevTools can confirm the descend→S2 transition fired (and read the assembled
+## floor's chunk count + bounds).
+func _combat_trace_main(tag: String, msg: String = "") -> void:
+	if not is_inside_tree():
+		return
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags")
+	if df != null and df.has_method("combat_trace"):
+		df.combat_trace(tag, msg)
 
 
 func _on_player_died(_death_position: Vector2) -> void:
