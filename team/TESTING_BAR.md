@@ -105,6 +105,68 @@ func test_grunt_hit_flash_applied_to_visible_sprite_not_parent_body():
 
 ---
 
+## Pre-soak gates — catch findings BEFORE Sponsor soaks (Sponsor directive 2026-06-02)
+
+**Sponsor directive (2026-06-02):** *"can you do more to catch things before I soak, so i dont have to soak and re-soak so much?"*
+
+**Root cause of the re-soak churn** (from project history): (a) agents declare fix-complete on green CI without real-browser verification — headless GUT/Playwright ≠ real-browser perception (PR #291 bit twice this way); (b) Sponsor-soak handoffs carry speculated rather than code-verified instructions, and a wrong URL-param or wrong step burns a whole soak round (PR #328, PR #391). These gates put more catch-points BEFORE the Sponsor sees a build.
+
+These three gates are ADDITIVE to the existing visual-verification gate, author-self-soak gate, and sponsor-soak-routing rule above — they do not replace them. They are the Sponsor-selected subset (2026-06-02); an author-self-soak HARD-gate was explicitly NOT selected and is NOT part of this bar.
+
+### Pre-soak Gate 1 — Tess independent release-build verification (visual-class PRs)
+
+**Rule.** For any PR in the HTML5-visual-gated class (`Tween` / `CanvasItem.modulate` / `Polygon2D` / `CPUParticles2D` / `Area2D`-state mutations / `ColorRect` with HDR colors / new `gl_compatibility`-rendered primitive / z-index ordering / TileMap-scroll), Tess performs an **INDEPENDENT verification pass on the real release-build artifact** before posting APPROVE — she does NOT approve on the author's CI-green + author's Self-Test screenshots alone. Tess's verdict is grounded in evidence she generated against the artifact, not in trust of the author's claims.
+
+**What "independent verification" means concretely:**
+
+1. Tess fetches the release-build artifact for the PR HEAD SHA (the same artifact a Sponsor soak would use), confirms `[BuildInfo]` SHA matches PR HEAD, and exercises the gated visual surface herself.
+2. The QA review comment states the artifact run-id + SHA Tess verified against, and what she observed on the gated surface (not just "author's screenshots look right").
+
+**Escape-clause-aware (per `.claude/docs/html5-export.md` § "Visual-verification escape clause").** If Tess's environment cannot drive an interactive browser (CLI / container / headless-only), she does NOT silently skip:
+
+- She runs the **Playwright spec(s) covering the surface against the release-build artifact** (trace + config + spawn-position + universal-warning-gate coverage), AND spot-checks via Playwright screenshot captures where feasible.
+- She **honest-discloses in the QA comment which surface she verified by which means**: "verified mechanically via Playwright spec X against artifact `<run-id>`; interactive-perception verification of <surface> deferred to Sponsor per the escape clause — probe targets: <list>." This is the per-surface enumeration shape, not a blanket "ran Playwright."
+- Per `team/TESTING_BAR.md` § "Auto-memory: `html5-visual-gated-author-self-soak`": Playwright headless proves "spawned with the right config," NOT "a human will see it." Tess MUST NOT upgrade a headless-screenshot pass into a "Sponsor will see it" APPROVE — that perception slice routes to Sponsor with named probe targets.
+
+**Why this is a NET catch-point, not duplicate work.** The author-self-soak gate (above) is the author proving due-diligence. Gate 1 is a SECOND independent party reproducing against the artifact before it reaches the Sponsor — the failure mode it closes is "author's self-soak missed it / author's screenshot was at a sub-perceptual timing window / author claimed renderer-safe-primitive exemption." PR #291's two Tess-APPROVE-then-Sponsor-overturn iterations are the cautionary tale: Tess approved on the author's GUT+CI evidence twice; an independent artifact pass (interactive OR honest-disclosed Playwright-on-artifact + Sponsor-routed perception slice) would have caught the divergence one round earlier.
+
+**Cross-reference — this composes with the orchestrator merge-gate** (`team/GIT_PROTOCOL.md` § "Orchestrator merge-gate verification"): that gate verifies the Self-Test Report's HTML5 section is present at merge time. Gate 1 sits earlier — at Tess's APPROVE, before the merge tool-round — and requires Tess's own artifact-grounded evidence in the QA comment.
+
+### Pre-soak Gate 2 — verified-only Sponsor-soak instructions
+
+**Rule.** Every Sponsor-soak handoff MUST give exact, **code-VERIFIED** steps + correct URL params. Never speculation, never pattern-completion ("CameraDirector.follow_target binds the marker so WASD must scroll"), never instructions inferred from API knowledge without confirming against the actual scene/script. A wrong step or wrong param burns an entire soak round.
+
+This promotes orchestrator memory `soak-instruction-no-speculation` to a **hard handoff rule** binding on every soak-handoff author (the agent who self-soaks + drafts the handoff, and the orchestrator who relays it).
+
+**What "code-verified" means for each instruction line:**
+
+- **"Press / move / refresh to see X"** — the action must be confirmed against the actual input-handler / scene wiring (grep the binding, read the scene), OR omitted. Do not infer a control from engine-API knowledge.
+- **URL params** — only params the build actually reads, with the exact value semantics confirmed against `scripts/debug/DebugFlags.gd` call-sites.
+- **Expected observation** — what the Sponsor should see must trace to a real code path, not a hoped-for behavior.
+
+**DebugFlags param discipline (per `.claude/docs/html5-export.md` § "DebugFlags URL params"):**
+
+| Soak goal | Correct URL param | NEVER |
+|---|---|---|
+| S2 traversal (z1→z2→z3→boss) | `?force_descend=1` **ALONE** | combine with `start_room=9` |
+| S2 boss-arena (skip traversal) | `?start_room=9` **ALONE** (pair `?boss_hp_mult=0.2` for phase-2 reach, subject to the per-boss parity gap) | combine with `force_descend=1` |
+
+**The mutual-exclusivity gotcha:** `?start_room=9` + `?force_descend=1` together load the boss room underneath AND layer the DescendScreen overlay on top — the boss aggros and kills an idle player through the overlay. This produced a wasted soak cycle on PR #391. The params are individually documented in `DebugFlags.gd` but the interaction is NOT guarded in code; it is a caller-discipline rule that EVERY soak handoff must honor.
+
+**Per-boss `boss_hp_mult` parity caveat.** `?boss_hp_mult=N` is NOT inherited by every boss class (`ArchiveSentinel` does not read it as of PR #380). If the soak targets a boss whose `boss_hp_mult` wiring is unconfirmed, the handoff MUST either confirm the wiring or route phase-2 reach to a `diag/*` `hp_base`-nerf artifact — never assume the param works.
+
+**Required artifact link shape.** Every soak handoff carries the fully-resolved direct artifact download URL inline (`https://github.com/<owner>/<repo>/actions/runs/<run_id>/artifacts/<artifact_id>`) — no run-page-only references, no `<run-id>` placeholders (hard rule per orchestrator memory `sponsor-soak-artifact-links`). For spike PRs with a `diag/*` proof-scene branch, the link MUST be the diag-build artifact, not the production release-build (per `spike-soak-uses-diag-artifact-not-production`).
+
+**Enforcement.** The "Sponsor-soak steps (code-verified)" section is now a required block in the Self-Test Report for any PR whose handoff includes a Sponsor-soak ask (see `team/GIT_PROTOCOL.md` § "Self-Test Report"). A handoff carrying any unverified/speculated step is bounced back to the author for verification before it reaches the Sponsor.
+
+### Pre-soak Gate 3 — visual-snapshot baselines (automated layer)
+
+**Rule (forward-looking).** Tier-3 framebuffer-level visual-regression coverage via Playwright screenshot snapshots (`toMatchSnapshot` / `toHaveScreenshot` with a pixel-diff tolerance) on key UX surfaces, so a "the equipped-glyph went tofu again" class regression is caught at CI gate time rather than at Sponsor-soak time.
+
+This is the automated complement to Gates 1+2 (which are human/process gates). It is **scoped, not yet built** — implementation is tracked by ClickUp `86c9ufaga` ("qa(spec): visual-fidelity Tier-2 — Playwright screenshot snapshot baseline"), a later Devon/Tess task. Until that ticket lands, Tier 1 (target ≠ rest) + Tier 2 (visible-draw-target landing) per § "Visual primitives" remain the binding floor; Gate 3 is the M3 Tier-3 promotion.
+
+---
+
 ## Load-bearing memory rules ported here for sub-agent visibility
 
 These rules originate as auto-memory entries in the orchestrator's user-scope (`~/.claude/projects/c--Trunk-PRIVATE-RandomGame/memory/`). Sub-agents do NOT auto-read auto-memory; they only see rule content when the orchestrator puts it in a dispatch brief. The M3 retrospective (2026-05-22, PR #315) found that "rule codified ≠ rule applied" was a recurring root cause (pattern P3) — sub-agents were unaware of rules that lived only in auto-memory. The fix is here: port the load-bearing rules into a doc sub-agents read at dispatch time. The auto-memory entries continue to exist as the orchestrator's reference; this is the sub-agent-facing mirror.

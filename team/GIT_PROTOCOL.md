@@ -147,6 +147,15 @@ Any PR that touches a **player-visible surface** (scene tree, UI, visual feedbac
 ### Cross-lane integration check
 List every other role's feature that shares state with this PR (e.g. Inventory + Pickup + Room gate + Loot for any combat PR). Describe what you probed and what you observed. If you cannot probe cross-lane state (no browser, headless only), name it explicitly as a Sponsor-soak probe target so the orchestrator can route it to Tess's journey-probe (see `team/TESTING_BAR.md` § "Milestone-gate journey probe").
 
+### Sponsor-soak steps (code-verified) — REQUIRED whenever this PR's handoff includes a Sponsor-soak ask
+Every instruction line below MUST be code-verified or omitted — never speculated, never pattern-completed from engine-API knowledge (hard rule per `team/TESTING_BAR.md` § "Pre-soak Gate 2" + orchestrator memory `soak-instruction-no-speculation`). For each line, the action/param/expected-observation traces to a real input-handler, scene-wiring, or `DebugFlags.gd` call-site you confirmed.
+- **Artifact:** <fully-resolved direct download URL — `https://github.com/<owner>/<repo>/actions/runs/<run_id>/artifacts/<artifact_id>`; for spike PRs use the `diag/*` proof-scene artifact, NOT the production release-build>
+- **Cache-clear:** fresh extract + incognito + verify `[BuildInfo]` SHA matches `<PR HEAD sha>` (per html5-export.md service-worker cache trap)
+- **URL params:** <only params the build reads; confirm against `scripts/debug/DebugFlags.gd`. DebugFlags discipline: `?force_descend=1` ALONE for S2 traversal; `?start_room=9` ALONE for boss-arena — NEVER combine the two (they collide: boss loads underneath + DescendScreen overlays on top → idle player killed through overlay, burned PR #391 soak cycle). `?boss_hp_mult=N` not honored by every boss class — confirm wiring or route phase-2 to a diag nerf.>
+- **Steps:** <exact verified actions: "press X" / "walk W→E" / "open inventory and look at the EQUIPPED badge" — each confirmed against the actual binding/scene>
+- **Expected observation per step + concrete success criteria:** <what the Sponsor should see, traced to a real code path>
+If this PR has no Sponsor-soak ask, write: "N/A — no Sponsor-soak handoff for this PR."
+
 ### Open concerns / known gaps
 <anything you noticed but is out of this PR's scope>
 ```
