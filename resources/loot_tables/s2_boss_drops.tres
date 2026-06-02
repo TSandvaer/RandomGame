@@ -1,0 +1,62 @@
+[gd_resource type="Resource" script_class="LootTableDef" load_steps=5 format=3]
+
+; s2_boss_drops.tres — Archive Sentinel (Stratum-2 boss) loot table.
+; Ticket 86ca1m0e6 (deferred from PR #376 W3-T7 Stage 6, Follow-up #3).
+;
+; S2-FLAVORED vs the S1 boss_drops.tres it replaces on archive_sentinel.tres:
+;   - S1 boss_drops: iron_sword T3 (tier_modifier=2) + leather_vest T2
+;     (tier_modifier=1) — the S1 floor reward beat.
+;   - S2 (this table): iron_sword T3 (tier_modifier=2) + leather_vest T3
+;     (tier_modifier=2). The vest is bumped one tier (T2→T3) to express S2
+;     progression — strictly higher-tier than the S1 boss pool, reflecting
+;     the meatier late-S2 climax (mirrors the boss's own +HP/+xp envelope:
+;     archive_sentinel hp_base 700 vs S1 600, xp 350 vs 250).
+;
+; Structure MIRRORS S1 boss_drops (per ticket scope "mirror the structure of
+; the existing S1 boss_drops.tres"):
+;   - Same two base items (iron_sword + leather_vest). No S2-specific items
+;     exist yet (out of scope — broader S2 item authoring is a separate
+;     surface); the S2 flavor is expressed via tier weighting, not new items.
+;   - roll_count = -1 (independent-roll), weight = 1.0 each → both items are
+;     GUARANTEED to drop (the boss is the floor's reward beat — no empty
+;     boss kill). This is the same guaranteed-two-drops shape as S1.
+;
+; Affix safety (ticket flag — "use only registered affix IDs"): this table
+; references ITEMS, not affixes. Affixes are pulled at roll-time from each
+; ItemDef.affix_pool (iron_sword + leather_vest both pool swift/vital/keen —
+; all registered AffixDefs in resources/affixes/). No affix IDs are named
+; here, so the unknown-affix-id save-bug class (Devon's concurrent fix) is
+; avoided by construction. Both items are already in
+; ContentRegistry.STARTER_ITEM_PATHS, so live S2-boss drops resolve on F5
+; reload in HTML5 packed builds.
+;
+; Cross-references:
+;   resources/loot_tables/boss_drops.tres (S1 precedent — structure mirror)
+;   resources/mobs/archive_sentinel.tres (consumer — re-pointed to this table)
+;   team/priya-pl/affix-balance-pin.md §3 "Recommended boss drop table"
+;     (the S2-boss weighting guidance; §5 stratum tier-spread)
+;   .claude/docs/combat-architecture.md § "Single MobLootSpawner per mob death"
+;     (the pipeline this pool feeds via ArchiveSentinel.boss_died)
+
+[ext_resource type="Script" path="res://scripts/content/LootTableDef.gd" id="1_table"]
+[ext_resource type="Script" path="res://scripts/content/LootEntry.gd" id="2_entry"]
+[ext_resource type="Resource" path="res://resources/items/weapons/iron_sword.tres" id="3_sword"]
+[ext_resource type="Resource" path="res://resources/items/armors/leather_vest.tres" id="4_vest"]
+
+[sub_resource type="Resource" id="Resource_s2_boss_entry_sword_t3"]
+script = ExtResource("2_entry")
+item_def = ExtResource("3_sword")
+weight = 1.0
+tier_modifier = 2
+
+[sub_resource type="Resource" id="Resource_s2_boss_entry_vest_t3"]
+script = ExtResource("2_entry")
+item_def = ExtResource("4_vest")
+weight = 1.0
+tier_modifier = 2
+
+[resource]
+script = ExtResource("1_table")
+id = &"s2_boss_drops"
+entries = [SubResource("Resource_s2_boss_entry_sword_t3"), SubResource("Resource_s2_boss_entry_vest_t3")]
+roll_count = -1
