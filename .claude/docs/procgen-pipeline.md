@@ -74,6 +74,34 @@ Convenience accessors: `is_empty()`, `is_well_mated()`, `chunk_count()`, `anchor
 
 **`bounding_box_px → CameraDirector` integration** is the downstream consumer introduced in PR #314 (camera-scroll spike, `set_world_bounds`). The procgen spike scene wires this in `_ready` as a smoke integration test. Full camera-scroll API in `.claude/docs/camera-scroll.md`.
 
+## S2 production consumer — `Main.gd` traversal driver (PR #391, merge `9a6b479`)
+
+`FloorAssembler.assemble_floor` got its **first production consumer in the live play loop** as of PR #391 (2026-06-02). All prior consumers were spike scenes or tests. The call chain in `scenes/Main.gd`:
+
+```
+DescendScreen.restart_run signal
+  → _on_descend_restart_run()
+    → _begin_stratum_2()              # fires AudioDirector.play_stratum2_entry() here
+      → _load_s2_zone(0)              # iterates zone_id in S2_ZONE_IDS (z1→z2→z3)
+          FloorAssembler.assemble_floor(zone_def, zone_seed)
+          _render_assembled_floor()
+      → past last authored zone → _enter_s2_boss_room()   # terminal index 9 = s2_z4_inner_sanctum (ArchiveSentinel)
+```
+
+**Seed call site.** `_load_s2_zone` derives seeds via the standard cascade:
+```gdscript
+stratum_seed = FloorAssembler.derive_stratum_seed(_resolve_s2_world_seed(), S2_STRATUM_ID)  # S2_STRATUM_ID = 2
+zone_seed    = FloorAssembler.derive_zone_seed(stratum_seed, zone_id)
+```
+`_resolve_s2_world_seed()` returns a **fixed deterministic `0`** today — no `world_seed` save surface exists yet (Commitment 5, randomized-maps-per-character, unimplemented). It is a one-line swap to `Save.get_world_seed()` when that ships; no assembler change needed. Until then every character gets structurally identical S2 layouts.
+
+**Two OOS gaps are deliberate skeleton, NOT bugs.** Agents dispatched against "wire chunk-clear" or "populate mob spawns" should read `_render_assembled_floor` and `_advance_s2_zone` as the two extension points:
+
+1. **`AssembledFloor.mob_spawns` has no runtime consumer.** `assemble_floor` populates it correctly, but `_render_assembled_floor` does not yet instantiate mobs from it — S2 zones render geometry shells and spawn zero enemies. Future wiring site: inside `_render_assembled_floor`.
+2. **No chunk-clear gate — zones auto-advance on the next frame.** `_render_assembled_floor` arms `_on_s2_zone_advance_ready()` → `call_deferred("_advance_s2_zone")`. With no `_s2_chunks_remaining == 0` guard yet, descending whisks through z1→z2→z3 in ~3 frames straight to the boss. `_s2_chunks_remaining` is the designed future guard variable.
+
+Net effect: S2 is a **reachable skeleton** — traversal flow is live and the boss room is reachable, but room-by-room progression and mob population are stubs. (Soak entry points + the `start_room`/`force_descend` param gotcha: `.claude/docs/html5-export.md`.)
+
 ## Debug-string ASCII-only discipline
 
 Mating-error strings emitted by `_sweep_port_mating` use ASCII `<->` (three characters), NOT U+2194 `↔`. The `ProcgenSpikeScene` HUD surfaces these strings in a `Label` node, where U+2194 renders as a notdef tofu box in the Godot 4.3 HTML5 default font. Devon caught + fixed during M3 Tier 3 W1 self-soak (commit `e900222`). The full rule lives in `.claude/docs/html5-export.md` § "Default-font glyph coverage" — this doc only flags the convention for future agents extending the mating-error format.

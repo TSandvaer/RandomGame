@@ -393,6 +393,30 @@ If a future refactor renames the constant value (`&"mob"`, `&"hero"`, etc.), the
 
 **Apply when:** any spec whose core assertion is "behavior follows A, not B" — anim-source decoupling, signal-source decoupling, physics-parameter decoupling. The adversarial probe is the structural answer to the silent-symmetry failure class.
 
+## Pre-DCL false-green — post-`waitForSelector` probes have no teeth for DOMContentLoaded-deferral regressions (ticket `86ca2561j`, pending PR #390)
+
+**The trap.** A Playwright regression guard that dispatches its probe event AFTER `await page.waitForSelector("#canvas")` (or any other post-interactive sentinel) + `page.evaluate(...)` is a **false-green** for any regression class where the fix must be active *before* `DOMContentLoaded`. On a fast headless load, DCL has already fired by the time `waitForSelector` resolves — so a regression that defers the fix to DCL (e.g. a contextmenu suppressor that attaches its `preventDefault` listener on `DOMContentLoaded` instead of synchronously at head-parse) **still passes**. The spec exercises the right surface but is vacuously true against the exact regression it was written to catch. Sibling of the adversarial-off-cardinal trap above and the passive-damage-window trap below: all three are "looks covered, no teeth."
+
+**Empirical case (ticket `86ca2561j`, pending PR #390 merge).** The pre-hardened `contextmenu-suppress.spec.ts` test 5 dispatched its `contextmenu` after `waitForSelector("#canvas")`. A revert to the old DCL-deferred suppressor form still passed it (the listener was already attached by then). Flagged non-blocking during PR #386 QA (`team/tess-qa/_pr386-approve.md`: old test passed 8/8 on a hand-reverted DCL-deferred build).
+
+**Why the class is broad — not contextmenu-specific.** Any spec asserting "this fix is active from the very first interaction, including before/during bootstrap" hits this trap. Surfaces: event-suppression handlers (contextmenu, keydown, beforeunload) that must apply from first render; console-override patches that must precede any DCL handler; input-capture layers that must register before any gesture. Whenever the fix's root cause was "listener registered too late," the guard must probe the pre-DCL window.
+
+**Fix — fire the probe during `document.readyState === "loading"`.** Two validated mechanisms:
+
+1. **`page.route` HTML splice (preferred — deterministic).** Intercept the served `index.html`, splice a probe `<script>` immediately before `</head>` (after the real `head_include` suppressor). The spliced script fires the event synchronously during head-parse, while `readyState === "loading"`, and records `defaultPrevented` + the readyState to a `window.__*` global the test reads back.
+2. **`addInitScript` + a slow-loading asset** to widen the `loading` window. Simpler but timing-fragile (the asset-delay must straddle the probe dispatch); prefer Mechanism 1.
+
+**Three mandatory anti-vacuousness guards** (all required — each closes a silent-pass hole):
+1. **Assert the spliced HTML was actually served** (e.g. `expect(body).toContain("</head>")` in the route handler, or verify a marker post-load). A `replace` no-op or route-pattern mismatch otherwise yields a vacuous pass.
+2. **Assert `document.readyState === "loading"` at probe time** (captured inside the spliced script, asserted from the test). If it's `"interactive"`/`"complete"`, the probe fired too late and has no discriminating power.
+3. **Include a plain-`click` negative control** — confirms the suppressor selectively catches `contextmenu`, not all events (rules out "something swallows everything").
+
+**Empirical discriminator (pending PR #390 merge):** HARDENED build (suppressor at head-parse) = 5 passed / 0 failed; REVERTED build (DCL-deferred) = 1 failed (exactly the pre-DCL probe test) / 4 passed. Clean red-on-revert / green-on-main — the spec has teeth.
+
+**What this does NOT cover.** If the fix is DCL-or-later *by design* ("attach listener after canvas ready"), a post-`waitForSelector` guard is correct. The pre-DCL trap fires only when the invariant is specifically "active before DCL" — verify the fix's intended timing before choosing the probe window.
+
+**Cite shape.** Ticket `86ca2561j` (Tess contextmenu-suppress harden). Spec `tests/playwright/specs/contextmenu-suppress.spec.ts` "pre-DCL window" test (pending PR #390 merge — per unmerged-defer rule, the line ref firms up on merge). Suppressor feature context: `.claude/docs/html5-export.md` § "Browser-native event leakage".
+
 ## Passive-damage Playwright probe windows (PR #281)
 
 **Minimum window: 15 s** at default game speed for Room 01 mob density. An 8 s window is insufficient — Grunts at distance 27–28 tiles take 10–12 s to close to melee range and land their first hit. The probe closes before any damage events occur and the negative assertion is vacuously true.

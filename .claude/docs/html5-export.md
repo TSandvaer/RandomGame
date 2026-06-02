@@ -56,6 +56,10 @@ Why capture-phase at `document`: the `contextmenu` event traverses capture (docu
 
 **Regression guard:** `tests/playwright/specs/contextmenu-suppress.spec.ts` — asserts `event.defaultPrevented === true` (the exact signal that gates the native menu) across a real right-click, synthetic dispatch on canvas/body/document, AND the early-load (canvas-exists) path. The early-load test is the one that catches a regression back to the DCL-deferred form. `defaultPrevented` is the headless proxy for "no native menu appears" — Playwright cannot screenshot OS-drawn menu chrome.
 
+**`window`-capture layer + Shift+RMB (PR #386 follow-up).** A Sponsor re-soak (#5, Brave) reported plain RMB suppressed but **Shift+RMB still leaked** the native menu. Empirical finding against the real Brave binary via CDP: there is NO modifier gate in the suppressor, and Shift+RMB DOES fire `contextmenu` with `shiftKey:true` — both plain and shift right-click reach the suppressor and end `defaultPrevented:true` in Brave AND vanilla Chromium. MDN documents the Shift+RightClick force-show escape hatch as **Firefox-only** (menu shown without firing a suppressible event); Chromium/Brave do not expose it on the automatable path. Hardening: also register on **`window` capture** (`window.addEventListener('contextmenu', block, true)`) — the earliest point in the capture descent, before `document` — so no mid-chain `stopPropagation` can intercept a shift-modified event before our `preventDefault`. **Honest caveat:** the interactive-Brave Shift+RMB leak was NOT reproducible via Playwright CDP input (automation already prevents it pre-fix at the event level), so window-capture is the defensible code-side close but **Sponsor re-soak in real Brave is the gate of record**; if it persists the residual cause is a Brave hardware-gesture escape hatch un-suppressible from JS, and the fallback is a control-rebind discussion (move heavy-attack off Shift+RMB), not a JS hack.
+
+**Heavy-attack passthrough.** `preventDefault()` on `contextmenu` does NOT affect the `mousedown`/`pointerdown` (button 2) events Godot reads for the heavy-attack — they are separate events. Against the real Godot WASM build the engine's own glue calls `preventDefault()` on the canvas `mousedown` it consumes, so `defaultPrevented` is TRUE on the real build by Godot's own choice — that is correct and does NOT mean the input was suppressed. The regression test asserts button-2 mousedown **delivery to the canvas**, not its `defaultPrevented` state.
+
 **Other likely browser-event leaks to watch for in future soak rounds** (none confirmed in the codebase yet, but Uma flagged the class in PR #235's decision draft):
 
 - `dragstart` / `drop` — browser drag-and-drop semantics
@@ -218,6 +222,8 @@ Per memory rule `html5-visual-verification-gate.md`: any PR touching Tween / mod
 
 Platform-agnostic fixes (e.g. PR #140's mob hit-flash Sprite color tween, where the tween targets `Sprite.color` which is an engine-level draw property identical across all renderers) are exempt from this gate when the change is mechanically deterministic — but the burden is on the author to demonstrate why the visual gate doesn't apply, not to assert exemption by primitive-class.
 
+**What this gate does NOT catch — the bare-Hitbox-no-visual class.** The visual-verification gate is for nodes that exist and may render incorrectly in WebGL2. It does NOT catch an attack that spawns a damage `Hitbox` with no visual child at all (player takes damage with zero telegraph). That's a distinct combat-authoring bug class — see [`combat-architecture.md`](combat-architecture.md) § "Invisible-attack bug class — bare damage-Hitbox with no visual child" (PR #380). Only interactive soak catches the raw symptom; the structural defense is the attack-visual `_ready()` trace-bridge documented there.
+
 ### Visual-verification escape clause — honest-disclose + Sponsor-soak routing
 
 When **both the PR author and the reviewing agent** cannot launch a browser interactively in their environments (VM / container / headless agent context), the gate has an established escape-clause workflow rather than a blanket block:
@@ -273,6 +279,29 @@ When validation needs a tedious-to-trigger gameplay scenario (e.g. mob death at 
 **Variant — `diag/<topic>-soak` for spike PR Sponsor visual gates (PR #328 procgen, 2026-05-23).** When a spike PR ships a proof scene (e.g. `scenes/spike/ProcgenSpikeScene.tscn`) and the production PR keeps `main_scene = Main.tscn` (so production behavior is unchanged), the spike feature is INERT in production builds — main_scene drives normal gameplay, the proof scene only loads when explicitly activated. The diag-build variant for this case is `diag/<topic>-soak`: a single-commit branch that swaps `application/run/main_scene` in `project.godot` to the proof scene, so the artifact boots directly into the spike for Sponsor visual verification. **Sponsor soak link MUST be the diag-build artifact, NEVER the production PR's release-build artifact** — the production artifact ships the spike code but does not activate it. Empirical case: PR #328 procgen spike → `diag/procgen-spike-soak` at SHA `e900222`. Memory rule: `spike-soak-uses-diag-artifact-not-production.md`. The production artifact still has a valid signal — proves the spike code merges cleanly without breaking normal play — but is NOT the visual-gate artifact.
 
 Memory rule: `diagnostic-build-pattern.md`.
+
+### New-boss soak acceleration — `boss_hp_mult` parity gap
+
+The `?boss_hp_mult=N` URL soak param is honored by `Stratum1Boss` but is **NOT inherited by new boss classes** — `ArchiveSentinel` (S2 boss, merged PR #374) reads `hp_base` from its `.tres` without consulting the param. Consequence: a phase-2 soak for a new boss that relies on the param silently does nothing, forcing a `diag/*` `hp_base`-nerf branch to reach phase-2 mechanics (Drew hit this on PR #380 — had to diag-build to reach ArchiveSentinel's phase-2 slam telegraph).
+
+**Rule for every new boss class:** wire `?boss_hp_mult=N` in the boss's `_ready` at authoring time (mirror `Stratum1Boss`), not as a post-ship follow-up. Until parity lands for a given boss, any Self-Test Report / Sponsor-soak handoff for that boss MUST note `boss_hp_mult` is unwired + route phase-2 verification to a `diag/*` nerf artifact. `boss_hp_mult` parity for ArchiveSentinel is a standing follow-up from PR #380.
+
+### DebugFlags URL params — S2 traversal vs boss-only, and the mutual-exclusivity gotcha
+
+`scripts/debug/DebugFlags.gd` exposes three HTML5 URL query params for S2 soak iteration (call sites confirmed at PR #391, merge `9a6b479`):
+
+| Param | Type | Effect |
+|---|---|---|
+| `?boss_hp_mult=N` | float, clamped `[0.05, 5.0]` | Scales boss HP. Values below 0.05 emit a benign `USER WARNING` clamp message — expected, not a test failure. (Caveat: not honored by every boss class — see parity-gap note above.) |
+| `?start_room=N` | int `0–9` | Drops directly into room index N. `9 = S2_BOSS_ROOM_INDEX` — loads the ArchiveSentinel arena directly, **bypassing S2 traversal**. |
+| `?force_descend=1` | flag | Opens the DescendScreen at boot; descending from it **enters the S2 traversal** via `Main._begin_stratum_2()`. |
+
+**GOTCHA — never combine `start_room=9` with `force_descend=1`.** `start_room=9` loads the boss room directly in the background AND `force_descend=1` layers the DescendScreen overlay on top. The player observes neither a clean traversal nor a clean boss test — the boss loaded underneath aggros and kills an idle player through the overlay. This produced a wasted soak cycle on PR #391 Sponsor verification. The params are individually documented in `DebugFlags.gd` but the interaction is not guarded in code — it is a caller-discipline rule.
+
+**Rule for soak handoffs:**
+- **S2-traversal soak** (z1→z2→z3→boss): `?force_descend=1` **alone**.
+- **Boss-arena soak** (skip traversal): `?start_room=9` **alone** (pair with `?boss_hp_mult=0.2` for phase-2 reach, subject to the parity gap above).
+- Never combine both in one soak URL.
 
 ## Sponsor soak ritual
 

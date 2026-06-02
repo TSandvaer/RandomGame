@@ -51,6 +51,24 @@ This rule does not collapse to "skip Sponsor soak" — it sharpens it. Sponsor s
 - Tier-completion sign-offs (W1 done, W2 done, milestone-RC) — Sponsor reviews the integrated whole.
 - Anything where Sponsor's domain expertise (tonal direction, design taste, aesthetic) is the deciding voice.
 
+## Design-vs-bug triage — investigate before dispatching a fix
+
+A soak finding where a mob or boss "behaves wrong" may be **authored-correct-to-spec, not a code defect**. Dispatching a fix from the symptom wastes an agent cycle on code that is working as designed — and produces a PR that correctly implements the wrong objective. The orchestrator-never-codes rule means the orchestrator must NOT grep the source to settle this; the correct mechanism is an **investigation-only dispatch** (no code change, no PR) that returns a typed verdict.
+
+**Triage protocol — verify authored intent at three independent levels:**
+
+1. **Code-comment level.** An explicit "by design" comment or a zero-value constant with a matching comment (e.g. `move_speed_base: float = 0.0  # STATIONARY — never moves`; `velocity = Vector2.ZERO` every tick with a "rooted-to-plinth" comment; *absence* of a `move_and_slide()` call where a mobile sibling has one).
+2. **Class-doc level.** The class header / `## Design` block describing the intent (e.g. `ArchiveSentinel.gd:28` "the Sentinel never CHASES").
+3. **Design-brief level.** A binding design doc (`team/uma-ux/`, a `DECISIONS.md` entry, a bound ticket) naming the mechanic as deliberate and distinct from a prior-stratum precedent.
+
+If **all three confirm intent** → the finding is a **balance/design verdict**, not a bug. Surface to Sponsor with options ("X is stationary by spec; options: A keep / B reposition-between-casts / C mobile-chase"); the director picks, the orchestrator implements the chosen revision. If the code does **not** match the spec at any level → genuine **code defect** → dispatch a fix normally.
+
+The discriminating question: *"Is the gap between code and spec (a bug), or between spec and Sponsor's expectation (a design call)?"* Only the first warrants an immediate fix dispatch. This is the design-domain analog of the `diagnostic-traces-before-hypothesized-fixes` memory entry (the code-bug analog).
+
+**Design-lock sequencing — design-owner brief FIRST (Pattern A).** When the chosen revision touches a design lock *owned by another persona* (Uma owns visual/tonal identity locks; Devon owns inventory/harness locks), sequence the dispatches: (1) the design-owner amends their lock + writes the revised brief, (2) that brief merges/confirms, (3) THEN the implementer is dispatched against the current spec. Do NOT dispatch the implementer in parallel against the unrevised lock — the code will be grounded in the old spec and diverge from whatever the design-owner produces.
+
+**Worked example (S2 ArchiveSentinel soak, 2026-05-30; boss class merged in PR #374).** Sponsor soaked build `38e0ecb` (`?start_room=9&boss_hp_mult=0.2`) and reported the boss "stands still all the time — easy to kill." Investigation-only dispatch (Drew) confirmed authored-stationary at all three levels: `ArchiveSentinel.gd:329` (`move_speed_base = 0.0  # STATIONARY`), `:620-625` (`velocity = Vector2.ZERO`, "rooted-to-plinth", no `move_and_slide()` anywhere — vs `Stratum1Boss.gd:824/839/847/864` which has `_process_chase` + `move_and_slide()`), class doc `:28` ("never CHASES"), and `team/uma-ux/palette-stratum-2.md:356` ("stationary phase-shift boss, NOT a mobile melee boss"). The boss WAS aggroing + casting (player took damage) — only movement was absent, by spec. Verdict = design verdict, not bug. Sponsor chose "reposition between casts (phase-blink)"; sequencing applied — Uma amended her lock + briefed the blink (PR #381), THEN Drew implemented against it.
+
 ## Cite-of-record
 
 PR #314 (M3 Tier 3 W1 continuous-scroll camera spike, commit `e695bd9`) shipped with `tests/playwright/specs/camera-scroll-spike.spec.ts` covering follow-target tracking, deadzone behaviour, and world-bounds clamping. Sponsor soaked the full PR (~5-10 minutes) when the spec would have covered ~80% of that surface in ~2 minutes of Tess time. The retrospective surfacing: 1-2 minutes of Sponsor subjective-feel soak (deadzone size, scroll smoothness, transition naturalness) would have been the right scope.
