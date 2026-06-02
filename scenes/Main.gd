@@ -263,10 +263,16 @@ var _loot_spawner: MobLootSpawner = null
 ## handoff. `_s2_chunks_remaining` tracks live chunk instances for the
 ## forward-compatible chunk-clear progression (0 today since chunks are
 ## data-only shells — see S2_ZONE_IDS doc).
+## `_s2_mobs_remaining` tracks live mobs spawned from the placed chunks'
+## `mob_spawns` (ticket `86ca3amgt`). The chunk-clear zone-advance GATE is a
+## SEPARATE ticket (`86ca3amyb`); this PR only makes the mobs EXIST + be
+## trackable. Auto-advance behaviour is UNCHANGED here.
 var _s2_zone_index: int = -1
 var _s2_world_seed: int = 0
 var _s2_floor_container: Node2D = null
 var _s2_chunks_remaining: int = 0
+var _s2_mobs_remaining: int = 0
+var _s2_mobs: Array[Node] = []
 
 ## Room01 onboarding gate (ticket 86c9qbb3k). When the Room01 PracticeDummy
 ## dies it drops an iron_sword Pickup; the room advance to Room02 must WAIT
@@ -550,6 +556,20 @@ func apply_death_rule() -> void:
 ## + presses E).
 func force_descend_for_test() -> void:
 	_on_descend_triggered()
+
+
+## Test/gate accessor — the live mobs spawned from the current S2 assembled
+## floor's chunk `mob_spawns` (ticket `86ca3amgt`). Empty when not in an S2
+## procgen floor. The sibling chunk-clear gate ticket (`86ca3amyb`) consumes
+## this + `s2_mobs_remaining()` to hold zone advance until cleared.
+func get_s2_mobs() -> Array[Node]:
+	return _s2_mobs
+
+
+## Count of live S2 mobs spawned from the current assembled floor. 0 when not
+## in an S2 procgen floor.
+func s2_mobs_remaining() -> int:
+	return _s2_mobs_remaining
 
 
 ## Snapshot all autoload state into a payload + persist via Save autoload.
@@ -1585,11 +1605,12 @@ func _load_s2_zone(zone_idx: int) -> void:
 	_combat_trace_main(
 		"Main.load_s2_zone",
 		(
-			"zone_id=%s seed=%d chunks=%d bounds=%s"
+			"zone_id=%s seed=%d chunks=%d mobs=%d bounds=%s"
 			% [
 				String(zone_def.zone_id),
 				zone_seed,
 				assembled.chunk_count(),
+				_s2_mobs_remaining,
 				str(assembled.bounding_box_px),
 			]
 		)
@@ -1601,9 +1622,18 @@ func _load_s2_zone(zone_idx: int) -> void:
 ## re-parent the player to the floor origin, and engage the continuous-scroll
 ## camera against the assembled floor bounds. Then arm zone progression.
 ##
-## S2 chunks render their authored geometry (`scene_path` is populated); they
-## spawn no mobs yet (no runtime consumes `mob_spawns`) and expose no clear
-## signal, so the zone-progression seam auto-advances. See S2_ZONE_IDS doc.
+## S2 chunks render their authored geometry (`scene_path` is populated) AND
+## spawn the mobs declared in each placed chunk's `mob_spawns` (ticket
+## `86ca3amgt`). Spawned mobs are CharacterBody2D nodes parented under the
+## floor container — they hook into the standard combat/death pipeline (their
+## own melee Hitbox / Projectile uses the encapsulated `_init` deferred-
+## monitoring pattern, so the spawn is physics-flush-safe regardless of this
+## call's context; see combat-architecture.md § Hitbox encapsulated-monitoring).
+## This call path is NOT inside a physics flush (it is reached from the
+## DescendScreen `restart_run` button click → `_begin_stratum_2`, or from the
+## `call_deferred`-driven `_advance_s2_zone`), so the synchronous child-add of
+## CharacterBody2D mobs is safe — same justification as `Stratum1BossRoom`'s
+## synchronous `_spawn_boss`.
 func _render_assembled_floor(assembled: AssembledFloor) -> void:
 	_teardown_active_room_for_s2()
 	_teardown_s2_floor()
@@ -1615,13 +1645,15 @@ func _render_assembled_floor(assembled: AssembledFloor) -> void:
 		add_child(_s2_floor_container)
 	var live_chunks: Array[Node] = _instantiate_chunks(assembled)
 	_s2_chunks_remaining = live_chunks.size()
+	_s2_mobs = _spawn_assembled_floor_mobs(assembled)
+	_s2_mobs_remaining = _s2_mobs.size()
 	_reparent_player_into(_s2_floor_container, _s2_floor_spawn(assembled))
 	_engage_camera_for_assembled_floor(assembled)
-	# Forward-compatible zone-progression seam. Today the chunks are data-only
-	# shells (no clear trigger), so there is nothing to clear and the zone
-	# auto-advances on the next frame. When chunk content + a chunk-clear
-	# signal land, wire each chunk's clear signal here and gate the advance on
-	# `_s2_chunks_remaining == 0` instead of auto-advancing.
+	# Forward-compatible zone-progression seam. Today the chunks expose no
+	# clear trigger, so the zone auto-advances on the next frame. Mobs now
+	# EXIST + are tracked in `_s2_mobs_remaining`, but the chunk-clear GATE
+	# that would hold the advance until `_s2_mobs_remaining == 0` is the
+	# SEPARATE sibling ticket (`86ca3amyb`) — do NOT gate the advance here.
 	_on_s2_zone_advance_ready()
 
 
@@ -1647,6 +1679,77 @@ func _instantiate_chunks(assembled: AssembledFloor) -> Array[Node]:
 		_s2_floor_container.add_child(inst)
 		live.append(inst)
 	return live
+
+
+## Spawn the mobs declared in every placed chunk's `mob_spawns` (ticket
+## `86ca3amgt`). For each placed chunk we resolve its `LevelChunkDef`, then for
+## each `MobSpawnPoint` resolve `mob_id` via the `MobRegistry` autoload and
+## instantiate the registered scene at the spawn's authored tile position,
+## converted to world pixels and offset by the chunk's placement
+## (`placed.position_px + position_tiles × chunk_def.tile_size_px`).
+##
+## mob_id resolution goes through MobRegistry; an UNKNOWN mob_id is handled
+## explicitly — WarningBus.warn + skip (no silent crash) so the universal
+## warning gate catches a content regression. Returns the live mob nodes for
+## the caller to track (`_s2_mobs_remaining`) — the chunk-clear zone-advance
+## gate (sibling ticket `86ca3amyb`) consumes that count later.
+func _spawn_assembled_floor_mobs(assembled: AssembledFloor) -> Array[Node]:
+	var live: Array[Node] = []
+	var registry: Node = _mob_registry()
+	if registry == null:
+		WarningBus.warn("[Main] S2 mob spawn: MobRegistry autoload unavailable", &"level")
+		return live
+	for placed: PlacedChunk in assembled.placed_chunks:
+		var chunk_def: LevelChunkDef = _resolve_chunk_def(placed.chunk_id)
+		if chunk_def == null:
+			continue
+		for spawn: MobSpawnPoint in chunk_def.mob_spawns:
+			var mob: Node = _spawn_one_chunk_mob(registry, chunk_def, placed, spawn)
+			if mob != null:
+				live.append(mob)
+	return live
+
+
+## Resolve + instantiate a single `MobSpawnPoint`. Returns the live mob node, or
+## null (warned + skipped) on an unknown / unloadable mob_id. Mirrors
+## `MobRegistry.spawn`'s scene-instantiate + mob_def-apply shape but parents
+## under the S2 floor container and positions from the chunk-relative tile
+## offset.
+func _spawn_one_chunk_mob(
+	registry: Node, chunk_def: LevelChunkDef, placed: PlacedChunk, spawn: MobSpawnPoint
+) -> Node:
+	if not registry.has_mob(spawn.mob_id):
+		WarningBus.warn(
+			(
+				"[Main] S2 mob spawn: unknown mob_id '%s' in chunk '%s' -- skipped"
+				% [String(spawn.mob_id), String(chunk_def.id)]
+			),
+			&"level"
+		)
+		return null
+	var scene: PackedScene = registry.get_mob_scene(spawn.mob_id)
+	if scene == null:
+		# get_mob_scene already routes its own load-failure warning through
+		# WarningBus (MobRegistry._emit_warning); just skip here.
+		return null
+	var node: Node = scene.instantiate()
+	var def: MobDef = registry.get_mob_def(spawn.mob_id)
+	# Apply the MobDef so the kill → mob_died → XP/loot pipelines see a
+	# non-null payload (otherwise both pipelines silently no-op). Matches the
+	# MultiMobRoom / MobRegistry.spawn contract exactly.
+	if def != null and "mob_def" in node:
+		node.mob_def = def
+	if node is Node2D:
+		var local_px := Vector2(spawn.position_tiles * chunk_def.tile_size_px)
+		(node as Node2D).position = placed.position_px + local_px
+	_s2_floor_container.add_child(node)
+	return node
+
+
+## Resolve the MobRegistry autoload (null if unavailable — degenerate test/boot
+## context). Mirrors `MultiMobRoom._get_mob_registry`.
+func _mob_registry() -> Node:
+	return get_tree().root.get_node_or_null("MobRegistry")
 
 
 ## Resolve a `LevelChunkDef` by id from the canonical chunk root. Returns null
@@ -1718,6 +1821,8 @@ func _teardown_s2_floor() -> void:
 		_s2_floor_container.queue_free()
 	_s2_floor_container = null
 	_s2_chunks_remaining = 0
+	_s2_mobs_remaining = 0
+	_s2_mobs = []
 
 
 ## Re-parent the player under `parent` at `spawn` (world pos). Mirrors the
