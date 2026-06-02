@@ -264,9 +264,12 @@ var _loot_spawner: MobLootSpawner = null
 ## forward-compatible chunk-clear progression (0 today since chunks are
 ## data-only shells — see S2_ZONE_IDS doc).
 ## `_s2_mobs_remaining` tracks live mobs spawned from the placed chunks'
-## `mob_spawns` (ticket `86ca3amgt`). The chunk-clear zone-advance GATE is a
-## SEPARATE ticket (`86ca3amyb`); this PR only makes the mobs EXIST + be
-## trackable. Auto-advance behaviour is UNCHANGED here.
+## `mob_spawns` (ticket `86ca3amgt`). The chunk-clear zone-advance GATE
+## (ticket `86ca3amyb`) consumes this counter: each spawned mob's `mob_died`
+## is wired (CONNECT_DEFERRED) to `_on_s2_mob_died`, which decrements the count;
+## the zone advances only when it reaches 0 (`_on_s2_zone_advance_ready` arms the
+## advance for an empty zone, `_on_s2_mob_died` arms it when the last mob clears).
+## An empty / geometry-only zone (0 spawns) advances immediately — no soft-lock.
 var _s2_zone_index: int = -1
 var _s2_world_seed: int = 0
 var _s2_floor_container: Node2D = null
@@ -1649,11 +1652,13 @@ func _render_assembled_floor(assembled: AssembledFloor) -> void:
 	_s2_mobs_remaining = _s2_mobs.size()
 	_reparent_player_into(_s2_floor_container, _s2_floor_spawn(assembled))
 	_engage_camera_for_assembled_floor(assembled)
-	# Forward-compatible zone-progression seam. Today the chunks expose no
-	# clear trigger, so the zone auto-advances on the next frame. Mobs now
-	# EXIST + are tracked in `_s2_mobs_remaining`, but the chunk-clear GATE
-	# that would hold the advance until `_s2_mobs_remaining == 0` is the
-	# SEPARATE sibling ticket (`86ca3amyb`) — do NOT gate the advance here.
+	# Chunk-clear zone-progression gate (ticket `86ca3amyb`). Mobs spawned above
+	# are each wired (CONNECT_DEFERRED) to `_on_s2_mob_died`, which decrements
+	# `_s2_mobs_remaining` and fires the advance when it reaches 0. The advance
+	# is GATED here: `_on_s2_zone_advance_ready` only arms the deferred advance
+	# when no mobs remain (a geometry-only / zero-spawn zone advances immediately,
+	# preserving traversal for empty zones). A populated zone holds until the
+	# player defeats every spawned mob — the intended room-by-room pacing.
 	_on_s2_zone_advance_ready()
 
 
@@ -1743,6 +1748,18 @@ func _spawn_one_chunk_mob(
 		var local_px := Vector2(spawn.position_tiles * chunk_def.tile_size_px)
 		(node as Node2D).position = placed.position_px + local_px
 	_s2_floor_container.add_child(node)
+	# Wire the chunk-clear gate (ticket `86ca3amyb`). Every S2 spawn mob exposes
+	# `mob_died(mob, pos, def)` (Grunt / Charger / Shooter / SunkenScholar / etc.).
+	# We connect with CONNECT_DEFERRED so the `_s2_mobs_remaining` decrement is
+	# queued to end-of-frame rather than running inside the synchronous
+	# `_die → mob_died.emit` chain (which is rooted in a Hitbox.body_entered
+	# physics-flush callback). This mirrors RoomGate.register_mob exactly
+	# (ticket 86c9qcf9z — see combat-architecture.md § "RoomGate uses
+	# CONNECT_DEFERRED"). A synchronous connect would race the decrement against
+	# other physics-flush mutations and could lose a decrement, leaving the gate
+	# stuck > 0 and soft-locking the zone.
+	if node.has_signal("mob_died"):
+		node.mob_died.connect(_on_s2_mob_died, CONNECT_DEFERRED)
 	return node
 
 
@@ -1790,12 +1807,45 @@ func _engage_camera_for_assembled_floor(assembled: AssembledFloor) -> void:
 		cd.set_world_bounds(bounds)
 
 
-## Zone-progression advance hook. Forward-compatible seam: today (data-only
-## chunks, no clear trigger) it advances to the next zone deferred so the
-## current frame settles first. When chunk-clear content lands, gate this on
-## `_s2_chunks_remaining == 0`.
+## Zone-progression advance hook (ticket `86ca3amyb` — chunk-clear gate).
+##
+## **Gate semantics:** the zone advances ONLY when every mob spawned into the
+## current assembled floor has been defeated (`_s2_mobs_remaining == 0`).
+##   - **Populated zone (mobs > 0):** this is a NO-OP — the advance is NOT armed
+##     here. Each mob's `mob_died` is wired to `_on_s2_mob_died`, which arms the
+##     deferred advance when the LAST mob clears. This is the room-by-room pacing
+##     the headline #391 traversal set up.
+##   - **Empty zone (mobs == 0):** a geometry-only / zero-spawn zone has nothing
+##     to clear, so the gate is already satisfied — advance immediately (deferred
+##     so the current frame settles first). Without this branch an empty zone
+##     would soft-lock (the gate would never open).
+##
+## Deferred (not synchronous) so the render frame settles before the next zone's
+## teardown + assemble runs.
 func _on_s2_zone_advance_ready() -> void:
-	call_deferred("_advance_s2_zone")
+	if _s2_mobs_remaining <= 0:
+		call_deferred("_advance_s2_zone")
+
+
+## A mob spawned into the current S2 floor died. Connected CONNECT_DEFERRED from
+## `_spawn_one_chunk_mob` so this runs at end-of-frame, OUTSIDE the physics-flush
+## window the `_die → mob_died.emit` chain runs in (see RoomGate precedent +
+## combat-architecture.md § CONNECT_DEFERRED). Decrements the live-mob counter;
+## when it reaches 0 the zone is cleared → arm the deferred zone advance.
+##
+## The signal payload (`mob`, `pos`, `def`) is unused — we count clears, not
+## identities. Idempotence guard: `_s2_zone_index < 0` means we already left the
+## S2 floor (boss-room handoff fired); a late deferred decrement must NOT
+## re-trigger an advance. The `max(0, ...)` floor guards against any double-fire.
+func _on_s2_mob_died(_mob: Variant = null, _pos: Variant = null, _def: Variant = null) -> void:
+	if _s2_zone_index < 0:
+		return
+	_s2_mobs_remaining = maxi(0, _s2_mobs_remaining - 1)
+	_combat_trace_main(
+		"Main.s2_mob_died", "remaining=%d zone_idx=%d" % [_s2_mobs_remaining, _s2_zone_index]
+	)
+	if _s2_mobs_remaining == 0:
+		call_deferred("_advance_s2_zone")
 
 
 func _advance_s2_zone() -> void:
