@@ -31,9 +31,10 @@
 ;     cause drift).
 ;   - ai_behavior_tag = &"archive_sentinel" — distinct from S1 boss
 ;     (&"stratum1_boss") so future AI dispatcher logic keys per-boss.
-;   - loot_table = boss_drops.tres — reuses the S1 boss loot table for
-;     Stage 5. Stage 6 (or a follow-up balance pass) can author a
-;     dedicated s2_boss_drops.tres with stratum-2-flavored item pool.
+;   - loot_table = s2_boss_drops.tres — S2-flavored boss pool (ticket
+;     86ca1m0e6). Mirrors S1 boss_drops structure (guaranteed iron_sword
+;     + leather_vest) but bumps the vest T2→T3 for S2 progression. Was
+;     boss_drops.tres (S1) through Stage 5/6 as a placeholder.
 ;   - xp_reward = 350 — scaled up from S1 boss (250). Same +40%
 ;     leverage as hp_base — keeps reward-to-effort ratio approximately
 ;     constant.
@@ -44,7 +45,7 @@
 ;   resources/mobs/stratum1_boss.tres (S1 precedent)
 
 [ext_resource type="Script" path="res://scripts/content/MobDef.gd" id="1_mob"]
-[ext_resource type="Resource" path="res://resources/loot_tables/boss_drops.tres" id="2_loot"]
+[ext_resource type="Resource" path="res://resources/loot_tables/s2_boss_drops.tres" id="2_loot"]
 
 [resource]
 script = ExtResource("1_mob")
