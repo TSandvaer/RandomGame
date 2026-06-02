@@ -79,6 +79,29 @@ This is the **load-bearing fix** for the M1 RC P0 wave 2 (PR #143). Five spawn s
 
 **Double-defer addendum (PR #240, ticket `86c9unkr2`, M2 W3 Sponsor 2026-05-16 soak of `92b6206`).** PR #232's single `call_deferred("activate")` was empirically **insufficient under HTML5** — Sponsor's trace stream showed `StratumExit.activate` running, the synchronous trace `monitoring flipped ON` printed, then `body_entered` never fired against the area for 60+ seconds. Sibling `Pickup._activate_and_check_initial_overlap` failed the same way. The diagnostic trap was that the "monitoring flipped ON" string was a hardcoded label, not a readback — there was no signal whether the C++ setter actually succeeded. Hypothesis (verifiable on next soak via the readback trace below): the boss-death frame's end-of-frame deferred queue drains 1× StratumExit `activate`, 2× Pickup `add_child`, 2× Pickup `_ready`-deferred `_activate`, particle adds, and signal cascades — under HTML5's `gl_compatibility` physics timing, monitoring mutations from inside that crowded deferred drain still race against in-flight `flush_queries()`. **Fix shape (a) "double-defer":** `await get_tree().physics_frame` BEFORE the `monitoring = true` write. `await physics_frame` yields until the next physics tick boundary, by definition AFTER any in-flight flush has completed. Applied to both `StratumExit.activate` (split into sync `activate` + async `_arm_interaction_area_after_flush`) and `Pickup._activate_and_check_initial_overlap` (await at top). **Readback trace as diagnostic surface:** every monitoring write is now paired with `mon_actual=%s` (reads `monitoring` BACK after the setter). If the silent ERR_FAIL_COND ever fires again, `mon_actual=false` will surface in the trace stream and the failure mode is empirically distinguishable from "code never reached." Pre-fix the labels were hardcoded "true" regardless of actual state. **Test-discipline consequence:** `activate()` flips `_is_active` + visual state synchronously (test compat), but the `_interaction_area.monitoring` flip is now async — GUT tests that assert post-`activate()` monitoring must `await get_tree().physics_frame; await get_tree().process_frame`. Pinned by `test_activate_monitoring_flips_after_physics_frame_not_synchronously` (StratumExit + Pickup test files).
 
+## Invisible-attack bug class — bare damage-Hitbox with no visual child
+
+**Distinct from WebGL2 render divergence.** When a boss/mob attack spawns a damage `Hitbox` (Area2D) with NO visual child, the player takes damage with zero on-screen telegraph or projectile — HP simply drops. This is NOT a `gl_compatibility` HDR-clamp / Polygon2D rendering issue (the node would render fine — there is just nothing to render), so the HTML5 visual-verification gate (`.claude/docs/html5-export.md`) does NOT catch it: that gate is for nodes that exist and may render incorrectly, not for a visual that was never authored.
+
+**Why headless + Playwright miss it.** GUT confirms the hitbox fires + damage lands; the Playwright boss-room spec asserts boss-spawn + continuous-scroll + no `USER WARNING:` — none verify "a visible node also exists as a sibling of the hitbox at damage-time." Only an interactive Sponsor soak catches the raw symptom ("HP just drops, nothing visible").
+
+**Worked example (PR #380, pending merge; ticket `86c9y7ygj`).** ArchiveSentinel's phase-1 cast spawned a bare `Hitbox` with no visual child. GUT + CI + Playwright were all green; Sponsor's soak caught it. Fix added a cosmetic `ArchiveSentinelCastBolt` (Node2D + ColorRect, no Area2D/damage — dodge + captured-target semantics byte-identical).
+
+**Assertable bridge — self-emit a renderer-observable visibility trace from the visual node's own `_ready()`:**
+
+```gdscript
+func _ready() -> void:
+    print("[combat-trace] %s._ready | visible=%s alpha=%.2f z=%d" % [name, str(visible), modulate.a, z_index])
+```
+
+A Playwright/GUT spec then enforces the implication **attack-fired ⟹ attack-visual node spawned AND visible** (`visible==true`, `modulate.a>0`, on-screen z) at the damage moment. This is the attack-visual analog of the `mon_actual=` monitoring readback (§ Hitbox + Projectile rule) — it converts a human-perception question into a mechanically-assertable trace check. **Scope: it proves existence + non-hidden state, NOT human perceptibility** — the Sponsor interactive soak remains the gate of record per `html5-export.md` § "Playwright headless ≠ real-browser perception."
+
+**Authoring checklist for every new boss/mob attack move:**
+1. Every code path that spawns a damage `Hitbox` MUST add a visual child / sibling (Sprite, ColorRect, `_draw()`+`draw_arc()` Node2D, CPUParticles2D) alive for at least the hitbox's active window.
+2. That visual node's `_ready()` emits the `[combat-trace]` visibility line above (live readbacks, not hardcoded labels — same trap as the double-defer monitoring-label addendum above).
+3. The boss-room Playwright spec asserts the trace fires when an attack lands — not just that the boss spawned.
+4. Author-self-soak the interactive HTML5 build + confirm the attack has a visible telegraph before claiming fix-complete; GUT-green is insufficient evidence for this class.
+
 ## Mob spawn registry (MobRegistry autoload)
 
 [`scripts/content/MobRegistry.gd`](scripts/content/MobRegistry.gd) — autoload registered in `project.godot` as `MobRegistry="*res://scripts/content/MobRegistry.gd"` (ticket `#86c9ue1up`, W3-T5). Maps `mob_id: StringName → MobDef + PackedScene` and exposes stratum-scaling.

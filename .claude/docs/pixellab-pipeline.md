@@ -752,17 +752,21 @@ calls atomically** if there aren't enough slots free for ALL its directions. Val
 
 | Tier | Concurrent job slots |
 |---|---|
-| Tier 1 ($12/mo, 2000 gens) | **8** |
-| Tier 2 (5000 gens) | 10 |
+| Tier 1 / Pixel Apprentice ($12/mo, 2000 gens) | **8** |
+| Tier 2 / Pixel Artisan ($24/mo, 5000 gens) | **10** ← ACTIVE since 2026-05-29 |
 | Tier 3 | 20 |
+
+**Active account: Tier 2 / Pixel Artisan as of 2026-05-29** (was Tier 1 through 2026-05-29 — see memory `[[pixellab-mcp-installed]]`). 5000 gens/mo, ≤400×400px images.
 
 **Atomicity:** an 8-direction `animate_character` call needs 8 free slots. If only 7 are free,
 the call **rejects entirely** with "Insufficient job slots for complete animation" — no partial
 queueing. Same applies to `create_character` (8 directions per char).
 
-**Consequence on Tier 1:** at most **one 8-direction animation can be queued at a time.** You
-cannot batch-dispatch a multi-animation plan with parallel `animate_character` calls. They
-must be serialized.
+**Consequence (still holds on Tier 2):** at most **one 8-direction animation can be queued at a time** —
+10 slots cannot fit two 8-dir jobs (8+8=16 > 10), so the serial-by-animation rule is unchanged by the
+Tier 2 upgrade. What Tier 2 buys: up to 10-way parallelism for **single-direction** dispatch (strategy 2),
+priority-queue turnaround, and 400px boss-scale headroom. You still cannot batch-dispatch a multi-animation
+plan with parallel full `animate_character` calls.
 
 **Strategies:**
 
