@@ -395,6 +395,160 @@ func test_load_all_still_resolves_affixes() -> void:
 	)
 
 
+# =======================================================================
+# AC7 — REGRESSION-86ca3anaz: affixes direct-loaded via STARTER_AFFIX_PATHS
+# =======================================================================
+# Sponsor soak (HTML5 build `06946cd`) surfaced three USER WARNINGs:
+#   ItemInstance.from_save_dict: unknown affix id 'vital' on item 'iron_sword'
+#   ItemInstance.from_save_dict: unknown affix id 'swift' on item 'iron_sword'
+#   ItemInstance.from_save_dict: unknown affix id 'vital' on item 'leather_vest'
+# Root cause: the affix scan was the SOLE recursive-DirAccess prong (no
+# direct-load fallback), while items had three prongs. The recursive scan over
+# the flat `res://resources/affixes` dir is unreliable in HTML5 packed .pck
+# builds (same `current_is_dir()` / `list_dir_begin()` quirk as iron_sword /
+# leather_vest). On desktop + headless GUT the recursive scan works, so the
+# affixes registered and `test_load_all_still_resolves_affixes` (AC6 above)
+# passed — a SILENT KILLER green in CI but broken in HTML5. When the registry
+# came up affix-empty in HTML5, from_save_dict warned + SILENTLY DROPPED the
+# affix (data-integrity loss: a saved item loses its affixes on reload).
+#
+# These tests pin the STARTER_AFFIX_PATHS direct-load prong: a drift-detector
+# (catches removal of the path) + a full round-trip that asserts the affix
+# SURVIVES with zero USER WARNING (the NoWarningGuard in after_each is the
+# zero-warning assertion). The round-trip test MUST fail on the pre-fix code
+# (no STARTER_AFFIX_PATHS) because affix preservation depends on the prong.
+
+
+func test_starter_affix_paths_includes_vital_swift_keen_drift_detector() -> void:
+	# Drift detector mirror of the STARTER_ITEM_PATHS tests: if someone removes
+	# an affix from STARTER_AFFIX_PATHS thinking DirAccess covers it, this fails
+	# and surfaces the regression. Any affix that can land in a save (rolled on
+	# a live loot-table item) MUST be in STARTER_AFFIX_PATHS.
+	for affix_path: String in [
+		"res://resources/affixes/vital.tres",
+		"res://resources/affixes/swift.tres",
+		"res://resources/affixes/keen.tres",
+	]:
+		assert_true(
+			ContentRegistry.STARTER_AFFIX_PATHS.has(affix_path),
+			(
+				"REGRESSION-86ca3anaz: STARTER_AFFIX_PATHS must include %s — "
+				+ "load-bearing for HTML5 save-restore of saves with rolled affixes. "
+				+ "Do NOT remove without verifying DirAccess enumerates resources/affixes/ in HTML5."
+			) % affix_path
+		)
+
+
+func test_restore_from_save_iron_sword_with_vital_swift_affixes_round_trips() -> void:
+	# Reproduces the Sponsor soak symptom shape: a saved iron_sword carrying
+	# BOTH vital + swift rolled affixes. On restore the affix_resolver must
+	# return non-null for both, the affixes must SURVIVE the round-trip, and
+	# the NoWarningGuard (after_each) must catch zero USER WARNINGs. Pre-fix
+	# (no STARTER_AFFIX_PATHS prong) this fails: in HTML5 the affix registry is
+	# empty so both affixes drop with a warning. In GUT the recursive scan
+	# masked it — so the load-bearing assertion is "affixes PRESERVED", which
+	# the direct-load prong guarantees on every platform.
+	var save_data: Dictionary = {
+		"equipped":
+		{
+			"weapon":
+			{
+				"id": "iron_sword",
+				"tier": 0,
+				"rolled_affixes":
+				[
+					{"affix_id": "vital", "value": 12.0},
+					{"affix_id": "swift", "value": 0.06},
+				],
+				"stack_count": 1,
+			},
+		},
+		"stash": [],
+	}
+	var registry: ContentRegistry = ContentRegistry.new().load_all()
+	(
+		_inv()
+		. restore_from_save(
+			save_data,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
+	)
+	var equipped: ItemInstance = _inv().get_equipped(&"weapon") as ItemInstance
+	assert_not_null(equipped, "iron_sword restores")
+	assert_eq(
+		equipped.rolled_affixes.size(),
+		2,
+		(
+			"REGRESSION-86ca3anaz: BOTH vital + swift affixes must survive the round-trip — "
+			+ "if < 2, an affix was silently dropped (from_save_dict warned + skipped)"
+		)
+	)
+	var ids: Array = []
+	for a: AffixRoll in equipped.rolled_affixes:
+		ids.append(a.def.id)
+	assert_true(ids.has(&"vital"), "vital affix preserved on restored iron_sword")
+	assert_true(ids.has(&"swift"), "swift affix preserved on restored iron_sword")
+
+
+func test_restore_from_save_leather_vest_with_vital_affix_round_trips() -> void:
+	# The third Sponsor-soak warning was vital-on-leather_vest. Same shape as
+	# the iron_sword test but on the armor item — confirms the affix prong
+	# applies regardless of which live item carried the rolled affix.
+	var save_data: Dictionary = {
+		"equipped": {},
+		"stash":
+		[
+			{
+				"id": "leather_vest",
+				"tier": 1,
+				"rolled_affixes": [{"affix_id": "vital", "value": 18.0}],
+				"stack_count": 1,
+			},
+		],
+	}
+	var registry: ContentRegistry = ContentRegistry.new().load_all()
+	(
+		_inv()
+		. restore_from_save(
+			save_data,
+			registry.item_resolver_callable(),
+			registry.affix_resolver_callable(),
+		)
+	)
+	var items: Array = _inv().get_items()
+	assert_eq(items.size(), 1, "leather_vest restores")
+	var inst: ItemInstance = items[0] as ItemInstance
+	assert_eq(
+		inst.rolled_affixes.size(),
+		1,
+		(
+			"REGRESSION-86ca3anaz: vital affix must survive the round-trip on leather_vest — "
+			+ "if 0, the affix was silently dropped"
+		)
+	)
+	assert_eq(
+		inst.rolled_affixes[0].def.id, &"vital", "vital affix preserved on restored leather_vest"
+	)
+
+
+func test_load_all_resolves_all_affixes_via_starter_paths() -> void:
+	# Direct registry assertion: every STARTER_AFFIX_PATHS affix resolves after
+	# load_all(). This is the affix counterpart of
+	# test_load_all_resolves_iron_sword_via_starter_paths — pins the prong
+	# itself, independent of the round-trip integration tests above.
+	var reg: ContentRegistry = ContentRegistry.new()
+	reg.load_all()
+	for affix_id: StringName in [&"vital", &"swift", &"keen"]:
+		assert_not_null(
+			reg.resolve_affix(affix_id),
+			(
+				"REGRESSION-86ca3anaz: affix '%s' MUST resolve via ContentRegistry after load_all() — "
+				+ "if null, save-restore silently drops the affix on HTML5 load"
+			) % affix_id
+		)
+
+
 func test_load_all_iron_sword_with_affix_round_trips_through_restore() -> void:
 	# Combined: iron_sword equipped WITH a swift affix roll. Both the item
 	# resolver AND the affix resolver must succeed for from_save_dict to

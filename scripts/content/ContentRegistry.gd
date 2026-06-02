@@ -45,12 +45,16 @@ extends RefCounted
 ##
 ## **Fix:** alongside the recursive scan, we explicitly enumerate a list of
 ## known content subdirectories (`KNOWN_ITEM_SUBDIRS`) AND directly `load()`
-## a list of starter content paths (`STARTER_ITEM_PATHS`). Direct `load()` of
-## a packed res:// path always works in HTML5 — only DirAccess enumeration
-## is unreliable. This guarantees the M1 starter inventory (iron_sword)
-## resolves on every platform regardless of DirAccess behavior. Future
-## starter / save-critical content should be appended to
-## `STARTER_ITEM_PATHS` so a missing-from-DirAccess regression cannot ship.
+## a list of starter content paths (`STARTER_ITEM_PATHS` for items,
+## `STARTER_AFFIX_PATHS` for affixes). Direct `load()` of a packed res:// path
+## always works in HTML5 — only DirAccess enumeration is unreliable. This
+## guarantees the M1 starter inventory (iron_sword) AND every rolled affix
+## (`vital`/`swift`/`keen`) resolves on every platform regardless of DirAccess
+## behavior. Future starter / save-critical content should be appended to
+## `STARTER_ITEM_PATHS` / `STARTER_AFFIX_PATHS` so a missing-from-DirAccess
+## regression cannot ship. (Affixes got the direct-load prong in ticket
+## `86ca3anaz` — pre-fix they relied on the recursive scan alone, so a save
+## with a rolled affix silently dropped it on HTML5 load.)
 ##
 ## After `load_all()` completes, `is_resolved() == true` and the
 ## `items_resolved` signal has been emitted. Async-style awaiters (future
@@ -100,6 +104,35 @@ const STARTER_ITEM_PATHS: Array[String] = [
 	"res://resources/items/armors/leather_vest.tres",
 ]
 
+## Critical affix paths preloaded directly via `load()` regardless of
+## DirAccess behavior — the affix analog of `STARTER_ITEM_PATHS`.
+##
+## **Why this exists (ticket `86ca3anaz` — Sponsor soak of build `06946cd`):**
+## the affix scan was the SOLE recursive-DirAccess prong (no direct-load
+## fallback), while items had three prongs. In Godot 4.3 HTML5 /
+## `gl_compatibility` packed `.pck` exports, `DirAccess.list_dir_begin()`
+## over `res://resources/affixes` does NOT reliably enumerate the flat
+## `.tres` files — the same `current_is_dir()` / `list_dir_begin()`
+## packed-resource quirk that bit `iron_sword` (`86c9qah1f`) and
+## `leather_vest` (`86c9uemdg`). On desktop + headless GUT the recursive
+## scan works, so the affixes registered and the existing
+## `test_load_all_still_resolves_affixes` passed — a silent killer that was
+## green in CI but broken in HTML5. The result: a save with a rolled
+## `vital`/`swift` affix on `iron_sword` or `leather_vest` produced
+## `USER WARNING: ItemInstance.from_save_dict: unknown affix id 'vital'
+## on item 'iron_sword'` on load, SILENTLY DROPPING the affix (data loss).
+##
+## **Inclusion rule:** any affix appearing in an `ItemDef`'s affix pool (i.e.
+## an affix that can land in a save via a rolled drop) MUST be listed here.
+## `vital`/`swift`/`keen` are all ext_resource'd by `iron_sword.tres` +
+## `leather_vest.tres`, both live loot-table drops. Future affix additions
+## need to extend this list — mirror the `STARTER_ITEM_PATHS` discipline.
+const STARTER_AFFIX_PATHS: Array[String] = [
+	"res://resources/affixes/vital.tres",
+	"res://resources/affixes/swift.tres",
+	"res://resources/affixes/keen.tres",
+]
+
 var _items: Dictionary = {}  # StringName -> ItemDef
 var _affixes: Dictionary = {}  # StringName -> AffixDef
 var _resolved: bool = false
@@ -118,7 +151,7 @@ signal items_resolved
 ## Scan both content directories and populate the registry. Idempotent —
 ## calling twice replaces the maps. Returns self for chaining.
 ##
-## **Three-pronged scanning strategy** (HTML5-robust):
+## **Four-pronged scanning strategy** (HTML5-robust):
 ##   1. Recursive scan of `ITEMS_ROOT` / `AFFIXES_ROOT` (works on desktop,
 ##      partial in HTML5 due to DirAccess subdirectory recursion quirk).
 ##   2. Explicit subdirectory scan of `KNOWN_ITEM_SUBDIRS` (catches the
@@ -126,12 +159,14 @@ signal items_resolved
 ##   3. Direct `load()` of `STARTER_ITEM_PATHS` (load-bearing fallback —
 ##      always works because direct res:// `load()` reads from the packed
 ##      pck via the resource cache, not DirAccess).
+##   4. Direct `load()` of `STARTER_AFFIX_PATHS` (the affix analog of step 3
+##      — closes the HTML5 silent-affix-drop bug, ticket `86ca3anaz`).
 ##
-## Steps 2 + 3 may register items already registered by step 1 — the
-## `_on_item_resource_found` path silently skips same-instance duplicates
-## (instance equality means the resource cache returned the same ItemDef
-## twice, which is normal for a packed res:// path). Only an
-## id-collision-from-different-instance warrants a push_warning.
+## Steps 2 + 3 + 4 may register content already registered by step 1 — the
+## `_on_item_resource_found` / `_on_affix_resource_found` paths silently skip
+## same-instance duplicates (instance equality means the resource cache
+## returned the same def twice, which is normal for a packed res:// path).
+## Only an id-collision-from-different-instance warrants a push_warning.
 func load_all() -> ContentRegistry:
 	_items.clear()
 	_affixes.clear()
@@ -151,6 +186,18 @@ func load_all() -> ContentRegistry:
 			_on_item_resource_found(res, path)
 		else:
 			push_warning("[ContentRegistry] starter item path %s failed to load" % path)
+	# Step 4: direct-load starter affix paths (always-works fallback — the
+	# affix analog of step 3). Closes the HTML5 silent-affix-drop bug
+	# (ticket 86ca3anaz): the recursive AFFIXES_ROOT scan above is best-effort
+	# in packed .pck builds, so a save with a rolled affix would lose it on
+	# load. `_on_affix_resource_found` dedupes via instance-equality, so this
+	# re-registration of affixes the recursive scan already caught is silent.
+	for path: String in STARTER_AFFIX_PATHS:
+		var res: Resource = load(path)
+		if res != null:
+			_on_affix_resource_found(res, path)
+		else:
+			push_warning("[ContentRegistry] starter affix path %s failed to load" % path)
 	_resolved = true
 	items_resolved.emit()
 	return self
