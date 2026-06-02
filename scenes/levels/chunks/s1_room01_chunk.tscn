@@ -1,4 +1,11 @@
-[gd_scene load_steps=3 format=3 uid="uid://b0embergrave_s1room01_chunk"]
+[gd_scene load_steps=12 format=3 uid="uid://b0embergrave_s1room01_chunk"]
+
+[ext_resource type="Script" path="res://scripts/levels/S1CloisterChunk.gd" id="1_chunk"]
+[ext_resource type="TileSet" path="res://resources/tilesets/s1_cloister.tres" id="2_tileset"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/brazier_lit.png" id="3_brazier_lit"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/moss_patch.png" id="4_moss"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/parchment_01.png" id="5_parchment"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/rubble_01.png" id="6_rubble"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_h"]
 size = Vector2(480, 32)
@@ -7,13 +14,11 @@ size = Vector2(480, 32)
 size = Vector2(32, 256)
 
 [node name="S1Room01Chunk" type="Node2D"]
+script = ExtResource("1_chunk")
 
-[node name="Floor" type="ColorRect" parent="."]
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 480.0
-offset_bottom = 256.0
-color = Color(0.36, 0.31, 0.24, 1)
+[node name="FloorTiles" type="TileMapLayer" parent="."]
+texture_filter = 1
+tile_set = ExtResource("2_tileset")
 
 [node name="WallNorth" type="StaticBody2D" parent="."]
 position = Vector2(240, 16)
@@ -21,25 +26,11 @@ position = Vector2(240, 16)
 [node name="CollisionShape2D" type="CollisionShape2D" parent="WallNorth"]
 shape = SubResource("RectangleShape2D_wall_h")
 
-[node name="Sprite" type="ColorRect" parent="WallNorth"]
-offset_left = -240.0
-offset_top = -16.0
-offset_right = 240.0
-offset_bottom = 16.0
-color = Color(0.18, 0.14, 0.11, 1)
-
 [node name="WallSouth" type="StaticBody2D" parent="."]
 position = Vector2(240, 240)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="WallSouth"]
 shape = SubResource("RectangleShape2D_wall_h")
-
-[node name="Sprite" type="ColorRect" parent="WallSouth"]
-offset_left = -240.0
-offset_top = -16.0
-offset_right = 240.0
-offset_bottom = 16.0
-color = Color(0.18, 0.14, 0.11, 1)
 
 [node name="WallWest" type="StaticBody2D" parent="."]
 position = Vector2(16, 128)
@@ -47,22 +38,62 @@ position = Vector2(16, 128)
 [node name="CollisionShape2D" type="CollisionShape2D" parent="WallWest"]
 shape = SubResource("RectangleShape2D_wall_v")
 
-[node name="Sprite" type="ColorRect" parent="WallWest"]
-offset_left = -16.0
-offset_top = -128.0
-offset_right = 16.0
-offset_bottom = 128.0
-color = Color(0.18, 0.14, 0.11, 1)
-
 [node name="WallEast" type="StaticBody2D" parent="."]
 position = Vector2(464, 128)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="WallEast"]
 shape = SubResource("RectangleShape2D_wall_v")
 
-[node name="Sprite" type="ColorRect" parent="WallEast"]
-offset_left = -16.0
-offset_top = -128.0
-offset_right = 16.0
-offset_bottom = 128.0
-color = Color(0.18, 0.14, 0.11, 1)
+[node name="FloorWallSeam" type="Node2D" parent="."]
+z_index = 1
+
+[node name="SeamTop" type="ColorRect" parent="FloorWallSeam"]
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 448.0
+offset_bottom = 34.0
+color = Color(0.102, 0.071, 0.063, 0.85)
+
+[node name="SeamBottom" type="ColorRect" parent="FloorWallSeam"]
+offset_left = 32.0
+offset_top = 222.0
+offset_right = 448.0
+offset_bottom = 224.0
+color = Color(0.102, 0.071, 0.063, 0.85)
+
+[node name="SeamLeft" type="ColorRect" parent="FloorWallSeam"]
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 34.0
+offset_bottom = 224.0
+color = Color(0.102, 0.071, 0.063, 0.85)
+
+[node name="SeamRight" type="ColorRect" parent="FloorWallSeam"]
+offset_left = 446.0
+offset_top = 32.0
+offset_right = 448.0
+offset_bottom = 224.0
+color = Color(0.102, 0.071, 0.063, 0.85)
+
+[node name="Props" type="Node2D" parent="."]
+z_index = 1
+
+[node name="BrazierLitWest" type="Sprite2D" parent="Props"]
+position = Vector2(120, 28)
+texture = ExtResource("3_brazier_lit")
+
+[node name="BrazierLitEast" type="Sprite2D" parent="Props"]
+position = Vector2(360, 28)
+texture = ExtResource("3_brazier_lit")
+
+[node name="MossPatch" type="Sprite2D" parent="Props"]
+position = Vector2(72, 200)
+texture = ExtResource("4_moss")
+
+[node name="Parchment" type="Sprite2D" parent="Props"]
+position = Vector2(416, 200)
+texture = ExtResource("5_parchment")
+
+[node name="Rubble" type="Sprite2D" parent="Props"]
+position = Vector2(408, 64)
+texture = ExtResource("6_rubble")
