@@ -14,9 +14,16 @@ trigger_size = Vector2(48, 16)
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_gate_trigger")
 
+; Doorway-threshold visual. Authored at the DEFAULT trigger_size (48x16);
+; RoomGate._sync_visual_to_trigger resizes it at runtime to the room's actual
+; trigger_size (production rooms override to 48x80) so it reads as the full
+; doorway opening, not a small floating bar. Color is the dark stone-brown of
+; the chunk floor/wall seam (Color(0.102,0.071,0.063,*)) so the threshold reads
+; as doorway masonry rather than a stray red artifact — red-bar fix, ticket
+; 86ca3kpzz Stage-1 soak (Sponsor 2026-06-03).
 [node name="Sprite" type="ColorRect" parent="."]
 offset_left = -24.0
 offset_top = -8.0
 offset_right = 24.0
 offset_bottom = 8.0
-color = Color(0.42, 0.18, 0.12, 0.6)
+color = Color(0.102, 0.071, 0.063, 0.6)

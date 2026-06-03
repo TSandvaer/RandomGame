@@ -323,6 +323,14 @@ var _boot_banner_label: Label = null
 ## DebugFlags.cam_zoom_changed in _build_hud. Diagnostic tooling — the LOCKED
 ## default-zoom change is a separate follow-up once the Sponsor reports his value.
 var _cam_zoom_label: Label = null
+## Character-scale soak readout (ticket 86ca3kpzz Stage-1 soak iteration).
+## Top-center HUD Label (one row below the cam-zoom readout) showing the live
+## NORMALIZED player/non-boss-mob scale while the Sponsor dials in the sprite
+## size on the widened S1 build via `?char_scale` + the `[` / `]` / `\` keys.
+## Hidden until an override / key-step occurs, so production play never shows it.
+## Subscribes to DebugFlags.char_scale_changed in _build_hud. The LOCKED size is
+## a follow-up once the Sponsor reports his value.
+var _char_scale_label: Label = null
 ## Save-confirmation toast (Ticket 2 — `86c9q7p38`). Bottom-right widget that
 ## fades in/out on every successful `Save.save_completed`. Connects on its
 ## own `_ready` — Main only needs to add it to the HUD CanvasLayer.
@@ -423,6 +431,18 @@ func _ready() -> void:
 			print("[Main] DebugFlags.cam_zoom=%.3f — applying boot zoom override" % df.cam_zoom)
 			cam_director.request_zoom(df.cam_zoom, 0.0)
 			_show_cam_zoom_readout(df.cam_zoom)
+	# DebugFlags.char_scale URL-param soak utility (ticket 86ca3kpzz Stage-1
+	# soak iteration). When `?char_scale=N` is set, apply N to the live player +
+	# non-boss mobs AFTER the room loads. Per-room re-apply happens inside
+	# `_load_room_at_index` (so a room loaded later — start_room jump, room
+	# advance — gets its freshly-spawned mobs scaled too). Sibling of cam_zoom;
+	# default sentinel -1.0 = no override. Boss sizes are NEVER touched.
+	if df != null and df.has_method("has_char_scale_override") and df.has_char_scale_override():
+		print(
+			"[Main] DebugFlags.char_scale=%.3f — applying boot char-scale override" % df.char_scale
+		)
+		_apply_char_scale(df.char_scale)
+		_show_char_scale_readout(df.char_scale)
 
 
 func _notification(what: int) -> void:
@@ -742,6 +762,13 @@ func _load_room_at_index(index: int) -> void:
 			ad.play_stratum1_ambient()
 	# Update HUD room counter.
 	_refresh_room_label()
+	# DebugFlags.char_scale soak re-apply (ticket 86ca3kpzz Stage-1). If the
+	# Sponsor has a char-scale dial active (URL param OR a live `[`/`]` key step),
+	# re-apply it to the freshly-spawned room's non-boss mobs + the player. No-op
+	# when no override is set. Re-applying per room is required because each room
+	# spawns NEW mob instances at default scale; the player survives the room
+	# swap so re-applying its (idempotent) scale is harmless.
+	_reapply_char_scale_if_active()
 	room_changed.emit(room, index)
 
 
@@ -1129,6 +1156,30 @@ func _build_hud() -> void:
 	if df_hud != null and df_hud.has_signal("cam_zoom_changed"):
 		if not df_hud.cam_zoom_changed.is_connected(_on_cam_zoom_changed):
 			df_hud.cam_zoom_changed.connect(_on_cam_zoom_changed)
+
+	# Top-center character-scale soak readout (ticket 86ca3kpzz Stage-1 soak).
+	# Sibling of the cam-zoom readout, one row lower so both can show at once.
+	# Hidden by default; shows the live NORMALIZED char-scale only while the
+	# Sponsor dials in via `?char_scale` + the `[` / `]` / `\` keys. ASCII-only
+	# (default-font tofu rule). Subscribes to DebugFlags.char_scale_changed so a
+	# key step updates the value live AND re-applies the scale to characters.
+	_char_scale_label = Label.new()
+	_char_scale_label.name = "CharScaleReadout"
+	_char_scale_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_char_scale_label.offset_left = -160.0
+	_char_scale_label.offset_top = 32.0
+	_char_scale_label.offset_right = 160.0
+	_char_scale_label.offset_bottom = 56.0
+	_char_scale_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_char_scale_label.add_theme_color_override("font_color", Color(0.6, 0.95, 1.0, 0.95))
+	_char_scale_label.add_theme_font_size_override("font_size", 16)
+	_char_scale_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_char_scale_label.text = ""
+	_char_scale_label.visible = false
+	_hud.add_child(_char_scale_label)
+	if df_hud != null and df_hud.has_signal("char_scale_changed"):
+		if not df_hud.char_scale_changed.is_connected(_on_char_scale_changed):
+			df_hud.char_scale_changed.connect(_on_char_scale_changed)
 
 	# Bottom-center boot banner — the only on-screen control reference in M1
 	# (no in-game tutorial). Lists every input action from `project.godot`
@@ -2077,6 +2128,69 @@ func _show_cam_zoom_readout(normalized: float) -> void:
 		return
 	_cam_zoom_label.text = "CAM ZOOM %.2fx  (-/+ adjust, 0 reset)" % normalized
 	_cam_zoom_label.visible = true
+
+
+## Signal handler for DebugFlags.char_scale_changed (a `[`/`]`/`\` key step
+## during soak). Re-applies the new scale to the live characters AND updates the
+## on-screen readout so the value the Sponsor reads matches what is rendered.
+func _on_char_scale_changed(normalized: float) -> void:
+	_apply_char_scale(normalized)
+	_show_char_scale_readout(normalized)
+
+
+## Reveal + update the character-scale soak readout. ASCII-only text per the
+## default-font tofu rule. Visible only while the Sponsor is dialing in scale;
+## stays hidden in normal production play (no override + no key-step ever fires).
+func _show_char_scale_readout(normalized: float) -> void:
+	if _char_scale_label == null:
+		return
+	_char_scale_label.text = "CHAR SCALE %.2fx  ([ ] adjust, \\ reset)" % normalized
+	_char_scale_label.visible = true
+
+
+## Re-apply the active char-scale (if any) to the current room. Called on every
+## room load so a freshly-spawned room's NEW non-boss mob instances inherit the
+## Sponsor's current dial value. No-op when no override is active.
+func _reapply_char_scale_if_active() -> void:
+	var df: Node = get_tree().root.get_node_or_null("DebugFlags")
+	if df == null or not df.has_method("has_char_scale_override"):
+		return
+	if not df.has_char_scale_override():
+		return
+	_apply_char_scale(df.effective_char_scale())
+
+
+## Apply a NORMALIZED scale to the PLAYER + every NON-BOSS mob in the current
+## room. Scaling the ROOT CharacterBody2D scales its Sprite AND CollisionShape2D
+## / Hitbox children together (no big-hitbox-on-small-sprite mismatch). **Bosses
+## are EXCLUDED** via `_char_scale_is_boss` (Sponsor's explicit choice). Soak
+## instrument only — default play never calls this (sentinel -1.0 reads as
+## no-override upstream).
+func _apply_char_scale(normalized: float) -> void:
+	var s: Vector2 = Vector2(normalized, normalized)
+	if _player != null and is_instance_valid(_player):
+		_player.scale = s
+	if _current_room == null:
+		return
+	if not _current_room.has_method("get_spawned_mobs"):
+		return
+	for m: Node in _current_room.get_spawned_mobs():
+		if m == null or not is_instance_valid(m):
+			continue
+		if not (m is Node2D):
+			continue
+		if _char_scale_is_boss(m):
+			continue
+		(m as Node2D).scale = s
+
+
+## Boss discriminator for char-scale exclusion. A node is a boss iff it has the
+## `boss_died` signal — the SAME discriminator `_wire_mob` uses to route boss vs
+## regular-mob death wiring. Robust to new boss classes (every boss emits
+## `boss_died`; no regular mob does), so a future S3+ boss is auto-excluded with
+## zero edits here.
+func _char_scale_is_boss(mob: Node) -> bool:
+	return mob != null and mob.has_signal("boss_died")
 
 
 func _refresh_hp_widget() -> void:

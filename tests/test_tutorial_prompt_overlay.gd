@@ -153,6 +153,30 @@ func test_anchor_enum_applies() -> void:
 	)
 
 
+# Red-bar sibling fix — expand-nudge of the BOTTOM "WASD to move" prompt
+# (ticket 86ca3kpzz Stage-1 soak). Under `aspect=expand` the center-spawned
+# player renders lower on the now-taller viewport; at the old 200 px the BOTTOM
+# prompt sat on the player sprite. The nudge raised ANCHOR_BOTTOM_OFFSET_Y to
+# 248 to lift the prompt clear. Pin the value (and the BOTTOM layout that
+# consumes it) so a regression back to a player-overlapping offset fails here.
+func test_bottom_anchor_nudged_clear_of_player_under_expand() -> void:
+	var overlay: TutorialPromptOverlay = OverlayScript.new()
+	add_child_autofree(overlay)
+	assert_eq(
+		overlay.ANCHOR_BOTTOM_OFFSET_Y,
+		248.0,
+		"BOTTOM prompt sits 248 px from the bottom edge (expand-nudge clear of player)"
+	)
+	overlay.show_prompt("WASD to move.", 1.0, TutorialPromptOverlay.AnchorPos.BOTTOM)
+	# BOTTOM uses PRESET_CENTER_BOTTOM with offset_bottom = -ANCHOR_BOTTOM_OFFSET_Y.
+	assert_almost_eq(
+		overlay.offset_bottom,
+		-248.0,
+		0.001,
+		"BOTTOM layout consumes the nudged offset (offset_bottom = -248)"
+	)
+
+
 # HTML5 safety — zero Polygon2D in the entire overlay tree, all painted
 # colors strictly sub-1.0 per channel (HDR-clamp invariant per
 # `.claude/docs/html5-export.md`). Mirrors the SaveToast test pattern.
