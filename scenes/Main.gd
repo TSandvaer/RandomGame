@@ -2193,8 +2193,21 @@ func _camera_director() -> Node:
 ## soft-resolve shape — the rest of the room-load flow MUST continue.
 ##
 ## See `.claude/docs/camera-scroll.md` § "Production wiring" for the
-## end-to-end contract; `S1_ROOM_BOUNDS` + `CAMERA_FOLLOW_DEADZONE`
-## constants define the values used.
+## end-to-end contract; `CAMERA_FOLLOW_DEADZONE` defines the deadzone.
+##
+## **Bounds-from-chunk (ticket 86ca3kpzz — S1A scroll retrofit).** The bounds
+## are no longer the fixed `S1_ROOM_BOUNDS` constant; they are read from the
+## live room's `get_bounds_px()` (the chunk's `size_tiles × tile_size_px`
+## rect, surfaced by `MultiMobRoom` / `Stratum1Room01` via `LevelAssembler`).
+## For the M1 single-screen rooms `get_bounds_px()` is `Rect2(0,0,480,256)` —
+## `<= viewport_world` on both axes, so `_clamp_to_world_bounds` takes the
+## centre branch (zero visual change, exactly as the old constant). For the
+## widened proof chunk (Room02 → `Rect2(0,0,960,256)`) the X axis exceeds the
+## viewport, so the clamp takes the SCROLL branch and the camera follows the
+## player across the wider floor (camera-scroll.md § "Bounds-clamp math").
+## `S1_ROOM_BOUNDS` is the fallback for a degenerate (zero-size) bounds — the
+## same defensive shape as `_engage_camera_for_assembled_floor`'s
+## `S2_ROOM_BOUNDS` fallback.
 func _engage_camera_for_room() -> void:
 	if _player == null:
 		return
@@ -2204,7 +2217,21 @@ func _engage_camera_for_room() -> void:
 	if cd.has_method("follow_target"):
 		cd.follow_target(_player, CAMERA_FOLLOW_DEADZONE)
 	if cd.has_method("set_world_bounds"):
-		cd.set_world_bounds(S1_ROOM_BOUNDS)
+		cd.set_world_bounds(_room_world_bounds())
+
+
+## Resolve the world-bounds rect for the current room from its live geometry.
+## Reads `_current_room.get_bounds_px()` (chunk size from the assembler) and
+## falls back to `S1_ROOM_BOUNDS` for a degenerate / missing value so the
+## camera always has a sane clamp. Centralised so the bounds source is a
+## single seam (mirrors the W2-T3 forward-compat note — a future procgen swap
+## changes only this helper).
+func _room_world_bounds() -> Rect2:
+	if _current_room != null and _current_room.has_method("get_bounds_px"):
+		var bounds: Rect2 = _current_room.get_bounds_px()
+		if bounds.size.x > 0.0 and bounds.size.y > 0.0:
+			return bounds
+	return S1_ROOM_BOUNDS
 
 
 ## M3 Tier 3 W2-T5 — discovery write hook (ticket `86c9y10fv`). Looks up
