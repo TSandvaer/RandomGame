@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://b0embergrave_s1room02_wide_chunk"]
+[gd_scene load_steps=17 format=3 uid="uid://b0embergrave_s1room02_wide_chunk"]
 
 ; S1 bigger-rooms retrofit Stage 1A (ticket 86ca3kpzz). Hand-widened proof
 ; chunk: 30x8 tiles = 960x256 px (vs the 15x8 / 480x256 single-screen chunks).
@@ -9,6 +9,17 @@
 ; floor PNG absorbed from PR #403. Wall collision perimeter + seams + props
 ; redistributed across the wider span. ONE proof chunk only (OOS: widening all
 ; 8 rooms / procgen — see ticket).
+;
+; Decoration-density pass (ticket 86ca3yuwv, Uma brief
+; team/uma-ux/s1-decoration-density.md). "A hall built for a crowd that no
+; longer comes" — decorated rails (N + S wall bands) + corner pockets, with a
+; swept-clear central aisle (y 112-176) for traversal + combat. Reuse-only
+; first pass: activates the 3 approved-but-unused props (brazier_cold,
+; banner_worn, pillar_arch) + adds existing moss/parchment/rubble. 9 -> 23
+; props. KEEP-CLEAR honored exactly (chunk-def-traced): lane y 112-176, both
+; ports, RoomGate(48,144), 4 grunt-spawn tiles (336,112)/(496,176)/(688,112)/
+; (816,176) at ~48px radius. DECORATION Sprite2D nodes ONLY — no collision /
+; wall-perimeter / spawn / gate / fountain changes.
 
 [ext_resource type="Script" path="res://scripts/levels/S1CloisterChunk.gd" id="1_chunk"]
 [ext_resource type="TileSet" path="res://resources/tilesets/s1_cloister.tres" id="2_tileset"]
@@ -16,6 +27,9 @@
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/moss_patch.png" id="4_moss"]
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/parchment_01.png" id="5_parchment"]
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/rubble_01.png" id="6_rubble"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/brazier_cold.png" id="7_brazier_cold"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/banner_worn.png" id="8_banner"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/pillar_arch.png" id="9_pillar"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_h"]
 size = Vector2(960, 32)
@@ -125,3 +139,75 @@ texture = ExtResource("6_rubble")
 [node name="RubbleEast" type="Sprite2D" parent="Props"]
 position = Vector2(872, 196)
 texture = ExtResource("6_rubble")
+
+; --- Decoration-density pass (86ca3yuwv) — new reuse-only props below ---
+; Warmth gradient: lit N wall (braziers above) -> clear aisle -> dimmer S wall
+; (cold brazier + heavier moss/rubble). Pillars flank the aisle (make it a
+; HALL). Banners line the N wall between braziers. Corners settle rubble /
+; parchment / moss. Every coord checked vs keep-clear: lane y 112-176, spawn
+; tiles +/-48px, both ports, RoomGate swept area.
+
+; North wall band — 2 hanging banners, staggered between the lit braziers
+; (braziers at x=160/400/640/840; banners between, NOT aligned — anti-tiling).
+[node name="BannerWornWest" type="Sprite2D" parent="Props"]
+position = Vector2(280, 24)
+texture = ExtResource("8_banner")
+
+[node name="BannerWornEast" type="Sprite2D" parent="Props"]
+position = Vector2(740, 24)
+texture = ExtResource("8_banner")
+
+; South wall band — the "this one went out" cold brazier (offset from the N
+; rhythm; x=600 clears the (496,176) + (688,112) spawn radii).
+[node name="BrazierColdSouth" type="Sprite2D" parent="Props"]
+position = Vector2(600, 216)
+texture = ExtResource("7_brazier_cold")
+
+; Pillars flank the aisle — architectural weight, makes it a HALL. Two N of the
+; lane (bottom edge at y=112 = lane top), two S of the lane (top edge at y=176
+; = lane bottom). Wall-adjacent, clear of ports + spawns.
+[node name="PillarArchWestN" type="Sprite2D" parent="Props"]
+position = Vector2(96, 80)
+texture = ExtResource("9_pillar")
+
+[node name="PillarArchEastN" type="Sprite2D" parent="Props"]
+position = Vector2(864, 80)
+texture = ExtResource("9_pillar")
+
+[node name="PillarArchWestS" type="Sprite2D" parent="Props"]
+position = Vector2(96, 208)
+texture = ExtResource("9_pillar")
+
+[node name="PillarArchEastS" type="Sprite2D" parent="Props"]
+position = Vector2(864, 208)
+texture = ExtResource("9_pillar")
+
+; Corners settle — rubble / parchment / moss in the "nobody swept here" pockets.
+[node name="RubbleNW" type="Sprite2D" parent="Props"]
+position = Vector2(72, 72)
+texture = ExtResource("6_rubble")
+
+[node name="RubbleSWCorner" type="Sprite2D" parent="Props"]
+position = Vector2(80, 200)
+texture = ExtResource("6_rubble")
+
+[node name="RubbleSECorner" type="Sprite2D" parent="Props"]
+position = Vector2(888, 210)
+texture = ExtResource("6_rubble")
+
+[node name="ParchmentNW" type="Sprite2D" parent="Props"]
+position = Vector2(160, 68)
+texture = ExtResource("5_parchment")
+
+[node name="ParchmentSouth" type="Sprite2D" parent="Props"]
+position = Vector2(744, 212)
+texture = ExtResource("5_parchment")
+
+; South-band + corner moss creep (heavier south = the decay wall).
+[node name="MossSouthMid" type="Sprite2D" parent="Props"]
+position = Vector2(420, 214)
+texture = ExtResource("4_moss")
+
+[node name="MossNECorner" type="Sprite2D" parent="Props"]
+position = Vector2(888, 64)
+texture = ExtResource("4_moss")
