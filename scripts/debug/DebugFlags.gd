@@ -148,6 +148,44 @@ const CAM_ZOOM_MAX: float = 4.0  # mirror CameraDirector.MAX_NORMALIZED_ZOOM
 const CAM_ZOOM_STEP: float = 0.05  # per-keypress increment
 const CAM_ZOOM_RESET: float = 1.0  # the default normalized zoom (== CameraDirector default)
 
+## Character-scale soak control — Sponsor dials in the player/mob sprite size on
+## the widened S1 build himself, then we lock the value in a follow-up (ticket
+## 86ca3kpzz Stage-1 soak iteration). Sibling of `?cam_zoom`: that dial controls
+## the CAMERA perspective; this one controls how BIG the characters render
+## inside that perspective. On the 2x-wider scrolling room the default-size
+## sprites can read too large; the Sponsor finds the right NORMALIZED scale
+## empirically and reports it.
+##
+## `?char_scale=N` URL query param. N is the NORMALIZED scale applied to the
+## PLAYER + every NON-BOSS mob's ROOT node (1.0 == ship size; <1.0 = smaller
+## sprite+collision; >1.0 = larger). Scaling the ROOT means the sprite AND the
+## CollisionShape2D / Hitbox shrink together (no big-hitbox-on-small-sprite
+## mismatch). **BOSSES are EXCLUDED** — `Stratum1Boss` / `ArchiveSentinel` stay
+## full size (Sponsor's explicit choice). The boss discriminator is the
+## `boss_died` signal (every boss has it; no regular mob does) — see
+## `Main._char_scale_is_boss`. Clamped to [CHAR_SCALE_MIN, CHAR_SCALE_MAX].
+## Default -1.0 = "no override" (negative sentinel, same shape as cam_zoom).
+##
+## LIVE keys (HTML5 only, soak-gated on OS.has_feature("web"), same posture as
+## cam_zoom — the soak runs the RELEASE artifact): `[` steps DOWN by
+## CHAR_SCALE_STEP; `]` steps UP; `\` resets to 1.0. Keys chosen to NOT collide
+## with cam_zoom's `-`/`+`/`0`. Each step re-applies to live characters + emits
+## `char_scale_changed` so Main's on-screen readout reflects the live value.
+##
+## Usage:
+##   http://localhost:8080/?start_room=1&char_scale=0.8  → widened Room02, 0.8x chars
+##   then press [ / ] in-session to fine-tune; read "CHAR SCALE x.xx"
+##   http://localhost:8080/?start_room=1                 → no override; [ ] still adjust live
+##
+## Desktop / headless GUT: -1.0 (no override) + keys inert (web-feature gate).
+## Test injection via set_char_scale_for_test / step_char_scale_for_test below.
+const CHAR_SCALE_QUERY_PARAM: String = "char_scale"
+const CHAR_SCALE_DEFAULT: float = -1.0  # negative sentinel = no override
+const CHAR_SCALE_MIN: float = 0.3
+const CHAR_SCALE_MAX: float = 2.0
+const CHAR_SCALE_STEP: float = 0.05  # per-keypress increment
+const CHAR_SCALE_RESET: float = 1.0  # ship size (no scaling)
+
 # Public state — read by gameplay code, written only via toggle/parse functions.
 var fast_xp_enabled: bool = false
 var test_mode_enabled: bool = false
@@ -155,6 +193,7 @@ var boss_hp_mult: float = BOSS_HP_MULT_DEFAULT
 var start_room: int = START_ROOM_DEFAULT
 var force_descend: bool = false
 var cam_zoom: float = CAM_ZOOM_DEFAULT
+var char_scale: float = CHAR_SCALE_DEFAULT
 
 # Emitted when fast_xp_enabled flips, so HUD/debug overlays can reflect it.
 signal fast_xp_toggled(enabled: bool)
@@ -163,6 +202,12 @@ signal fast_xp_toggled(enabled: bool)
 ## or a +/- key step). Payload is the new NORMALIZED zoom. Main's HUD readout
 ## subscribes so the Sponsor can read the exact value he settles on.
 signal cam_zoom_changed(normalized: float)
+
+## Emitted whenever the live soak char-scale value changes (URL-param boot apply,
+## or a `[` / `]` / `\` key step). Payload is the new NORMALIZED scale. Main
+## subscribes to (a) re-apply the scale to the live player + non-boss mobs and
+## (b) update its HUD readout so the Sponsor can read the value he settles on.
+signal char_scale_changed(normalized: float)
 
 
 func _ready() -> void:
@@ -174,12 +219,13 @@ func _ready() -> void:
 	_resolve_start_room()
 	_resolve_force_descend()
 	_resolve_cam_zoom()
+	_resolve_char_scale()
 	# Single boot-time line for Tess's grep.
 	print(
 		(
 			(
 				"[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s"
-				+ " web=%s boss_hp_mult=%.3f start_room=%d force_descend=%s cam_zoom=%.3f"
+				+ " web=%s boss_hp_mult=%.3f start_room=%d force_descend=%s cam_zoom=%.3f char_scale=%.3f"
 			)
 			% [
 				OS.is_debug_build(),
@@ -190,6 +236,7 @@ func _ready() -> void:
 				start_room,
 				force_descend,
 				cam_zoom,
+				char_scale,
 			]
 		)
 	)
@@ -270,6 +317,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		KEY_0, KEY_KP_0:
 			_set_cam_zoom(CAM_ZOOM_RESET)
+			get_viewport().set_input_as_handled()
+		# Char-scale dial — keys chosen to NOT collide with cam_zoom's -/+/0.
+		# `[` smaller, `]` bigger, `\` reset to ship size.
+		KEY_BRACKETLEFT:
+			_step_char_scale(-CHAR_SCALE_STEP)
+			get_viewport().set_input_as_handled()
+		KEY_BRACKETRIGHT:
+			_step_char_scale(CHAR_SCALE_STEP)
+			get_viewport().set_input_as_handled()
+		KEY_BACKSLASH:
+			_set_char_scale(CHAR_SCALE_RESET)
 			get_viewport().set_input_as_handled()
 
 
@@ -484,9 +542,12 @@ func _resolve_force_descend() -> void:
 	if not Engine.has_singleton("JavaScriptBridge"):
 		return
 	var bridge: Object = Engine.get_singleton("JavaScriptBridge")
-	var raw_value: Variant = bridge.eval(
-		"new URLSearchParams(window.location.search).get('%s')" % FORCE_DESCEND_QUERY_PARAM,
-		true,
+	var raw_value: Variant = (
+		bridge
+		. eval(
+			"new URLSearchParams(window.location.search).get('%s')" % FORCE_DESCEND_QUERY_PARAM,
+			true,
+		)
 	)
 	if raw_value == null:
 		return
@@ -614,3 +675,96 @@ func step_cam_zoom_for_test(delta: float) -> void:
 ## director (pair with CameraDirector.reset_to_player in the test's teardown).
 func reset_cam_zoom_for_test() -> void:
 	cam_zoom = CAM_ZOOM_DEFAULT
+
+
+## Read the `char_scale` URL query param via JavaScriptBridge on HTML5; no-op on
+## desktop / headless GUT. Defaults to -1.0 (no override) when absent / malformed.
+## Clamps a valid float to [CHAR_SCALE_MIN, CHAR_SCALE_MAX] so an extreme value
+## can't shrink characters to invisibility or balloon them off-screen. Same
+## HTML5-only-via-bridge shape as cam_zoom — desktop / headless GUT always reads
+## the default.
+##
+## NOTE: this only PARSES the param into `char_scale`. The actual apply to the
+## live player + non-boss mobs happens in `Main` (boot apply after the room
+## loads + re-apply on every room load so freshly-spawned mobs inherit the
+## scale) — mirrors how cam_zoom is applied from Main, not from DebugFlags.
+func _resolve_char_scale() -> void:
+	char_scale = CHAR_SCALE_DEFAULT
+	if not OS.has_feature("web"):
+		return
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return
+	var bridge: Object = Engine.get_singleton("JavaScriptBridge")
+	var raw_value: Variant = bridge.eval(
+		"new URLSearchParams(window.location.search).get('%s')" % CHAR_SCALE_QUERY_PARAM, true
+	)
+	if raw_value == null:
+		return
+	var raw_str: String = str(raw_value).strip_edges()
+	if raw_str.is_empty() or raw_str == "null":
+		return
+	if not raw_str.is_valid_float():
+		push_warning("[DebugFlags] char_scale URL param invalid float: %s" % raw_str)
+		return
+	var parsed: float = raw_str.to_float()
+	var clamped: float = clampf(parsed, CHAR_SCALE_MIN, CHAR_SCALE_MAX)
+	char_scale = clamped
+	if not is_equal_approx(parsed, clamped):
+		push_warning(
+			(
+				("[DebugFlags] char_scale clamped from %.3f to %.3f " + "(range [%.2f..%.2f])")
+				% [parsed, clamped, CHAR_SCALE_MIN, CHAR_SCALE_MAX]
+			)
+		)
+
+
+## True iff a char_scale URL override was successfully parsed (>= MIN means a
+## real value landed; the -1.0 default sentinel reads false). Main uses this to
+## decide whether to apply the boot-time override.
+func has_char_scale_override() -> bool:
+	return char_scale >= CHAR_SCALE_MIN
+
+
+## The NORMALIZED scale to apply to characters right now: the live override if one
+## is set, else 1.0 (ship size). Main reads this on every room load so mobs
+## spawned in a freshly-loaded room pick up the Sponsor's current dial value even
+## when the override was set via a `[`/`]` key step rather than the URL param.
+func effective_char_scale() -> float:
+	if char_scale >= CHAR_SCALE_MIN:
+		return char_scale
+	return CHAR_SCALE_RESET
+
+
+## Set the live soak char-scale to an absolute NORMALIZED value, clamp it, and
+## emit `char_scale_changed` (Main re-applies to live characters + updates the
+## readout). Internal — the key handler + reset path call this.
+func _set_char_scale(normalized: float) -> void:
+	var clamped: float = clampf(normalized, CHAR_SCALE_MIN, CHAR_SCALE_MAX)
+	char_scale = clamped
+	char_scale_changed.emit(clamped)
+
+
+## Step the live soak char-scale by `delta` from the CURRENT value (so the first
+## keypress with no prior override walks from the 1.0 ship size rather than from
+## the -1.0 sentinel). Internal — the `[` / `]` key handler calls this.
+func _step_char_scale(delta: float) -> void:
+	var base: float = effective_char_scale()
+	_set_char_scale(base + delta)
+
+
+## Test-only: set the live char-scale to an absolute normalized value without the
+## JS bridge / key events. Drives the full clamp + emit path so GUT can assert
+## the signal fires with the clamped value.
+func set_char_scale_for_test(normalized: float) -> void:
+	_set_char_scale(normalized)
+
+
+## Test-only: step the live char-scale (exercises the `[` / `]` key path's clamp +
+## current-value-base behavior without an InputEventKey).
+func step_char_scale_for_test(delta: float) -> void:
+	_step_char_scale(delta)
+
+
+## Test-only: reset char_scale state to the no-override default.
+func reset_char_scale_for_test() -> void:
+	char_scale = CHAR_SCALE_DEFAULT

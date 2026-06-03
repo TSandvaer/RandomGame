@@ -295,7 +295,16 @@ func test_each_stratum1_room_scene_has_walls_at_runtime() -> void:
 			4,
 			"%s must surface >=4 boundary StaticBody2D walls at runtime; got %d" % [p, walls.size()]
 		)
+		# Derive bounds from the live chunk geometry rather than hard-coding
+		# 480×256. The S1A widened proof chunk (Room02 → 960×256, ticket
+		# 86ca3kpzz) has a wider perimeter; reading `get_bounds_px()` makes
+		# this a width-agnostic wall-coverage guard (catches a wall that
+		# fails to track a future room-width change, at ANY width).
 		var bounds: Rect2 = Rect2(0, 0, 480, 256)
+		if inst.has_method("get_bounds_px"):
+			var b: Rect2 = inst.get_bounds_px()
+			if b.size.x > 0.0 and b.size.y > 0.0:
+				bounds = b
 		for edge: StringName in [&"north", &"south", &"east", &"west"]:
 			var axis_len: float = (
 				bounds.size.x if (edge == &"north" or edge == &"south") else bounds.size.y

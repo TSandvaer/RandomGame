@@ -452,3 +452,67 @@ func test_unlock_with_no_overlap_emits_gate_unlocked_only() -> void:
 			+ "player to walk back into the trigger to fire gate_traversed."
 		)
 	)
+
+
+# ---- Red-bar fix: doorway visual syncs to trigger geometry -----------------
+# Ticket 86ca3kpzz Stage-1 soak (Sponsor 2026-06-03). The scene's `Sprite`
+# ColorRect is authored at the DEFAULT trigger_size (48×16); every production
+# room overrides trigger_size to 48×80. Pre-fix the visual stayed 48×16 — a
+# small dark-RED bar floating against the left wall (the Sponsor's "red bar, no
+# character" finding on the widened Room02). The fix (a) resizes the ColorRect
+# to the room's actual trigger_size so it reads as the full doorway opening, and
+# (b) recolors it to the dark stone-brown of the chunk floor/wall seam so it
+# reads as doorway masonry, not a red artifact.
+
+# gdlint:disable=duplicated-load
+const ROOM_GATE_SCENE: PackedScene = preload("res://scenes/levels/RoomGate.tscn")
+# gdlint:enable=duplicated-load
+
+# The production seam / doorway color (matches the chunk FloorWallSeam ColorRects
+# Color(0.102, 0.071, 0.063, *)). RGB pinned; alpha is the gate's own 0.6.
+const DOORWAY_RGB := Vector3(0.102, 0.071, 0.063)
+
+
+func _make_scene_gate(size: Vector2) -> RoomGate:
+	var g: RoomGate = ROOM_GATE_SCENE.instantiate()
+	g.trigger_size = size
+	add_child_autofree(g)
+	return g
+
+
+func test_gate_visual_resizes_to_trigger_size_production_doorway() -> void:
+	# Production Room02..08 use trigger_size = (48, 80). The doorway visual must
+	# span that full geometry (offsets = -half..+half), NOT the authored 48×16.
+	var g: RoomGate = _make_scene_gate(Vector2(48, 80))
+	await get_tree().process_frame
+	var sprite: ColorRect = g.get_node_or_null("Sprite") as ColorRect
+	assert_not_null(sprite, "RoomGate scene has a Sprite ColorRect")
+	assert_almost_eq(sprite.offset_left, -24.0, 0.001, "visual left = -trigger_w/2")
+	assert_almost_eq(sprite.offset_right, 24.0, 0.001, "visual right = +trigger_w/2")
+	assert_almost_eq(sprite.offset_top, -40.0, 0.001, "visual top = -trigger_h/2 (80/2=40)")
+	assert_almost_eq(sprite.offset_bottom, 40.0, 0.001, "visual bottom = +trigger_h/2")
+
+
+func test_gate_visual_is_doorway_brown_not_red() -> void:
+	# The red-bar perception fix: the doorway threshold reads as stone-brown
+	# masonry (matching the chunk seam), NOT the old alarming dark-red
+	# Color(0.42, 0.18, 0.12). Pin the RGB so a regression back to red fails here.
+	var g: RoomGate = _make_scene_gate(Vector2(48, 80))
+	await get_tree().process_frame
+	var sprite: ColorRect = g.get_node_or_null("Sprite") as ColorRect
+	assert_not_null(sprite, "RoomGate scene has a Sprite ColorRect")
+	assert_almost_eq(sprite.color.r, DOORWAY_RGB.x, 0.001, "doorway red channel == seam brown")
+	assert_almost_eq(sprite.color.g, DOORWAY_RGB.y, 0.001, "doorway green channel == seam brown")
+	assert_almost_eq(sprite.color.b, DOORWAY_RGB.z, 0.001, "doorway blue channel == seam brown")
+	# And it is NOT the pre-fix red (r=0.42) — the regression marker.
+	assert_lt(sprite.color.r, 0.2, "doorway is NOT the pre-fix dark-red (r was 0.42)")
+
+
+func test_gate_visual_sync_safe_on_bare_instance() -> void:
+	# Bare `RoomGate.new()` (no scene, no Sprite child — the unit-test path used
+	# throughout this file) must not error when _sync_visual_to_trigger runs.
+	var g: RoomGate = RoomGateScript.new()
+	add_child_autofree(g)
+	await get_tree().process_frame
+	assert_null(g.get_node_or_null("Sprite"), "bare gate has no Sprite child — sync is a no-op")
+	assert_eq(g.get_state(), RoomGate.STATE_OPEN, "bare gate still boots cleanly to OPEN")

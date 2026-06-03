@@ -138,9 +138,15 @@ func test_main_engage_camera_helper_calls_follow_target_and_set_world_bounds() -
 		fn_body.find("CAMERA_FOLLOW_DEADZONE") > -1,
 		"_engage_camera_for_room passes Main.CAMERA_FOLLOW_DEADZONE deadzone"
 	)
+	# Ticket 86ca3kpzz (S1A): bounds are now read from the live room geometry
+	# via `_room_world_bounds()` (which reads `get_bounds_px()` + falls back to
+	# S1_ROOM_BOUNDS) — NOT the fixed constant. The scroll machinery engages
+	# only when bounds are wider than the viewport, which the widened proof
+	# chunk produces. A refactor that hard-codes the constant again (dropping
+	# the chunk-driven source) would regress the scroll-on-wide-room behaviour.
 	assert_true(
-		fn_body.find("S1_ROOM_BOUNDS") > -1,
-		"_engage_camera_for_room passes Main.S1_ROOM_BOUNDS rect"
+		fn_body.find("_room_world_bounds()") > -1,
+		"_engage_camera_for_room drives bounds from the chunk via _room_world_bounds()"
 	)
 
 
@@ -216,11 +222,69 @@ func test_main_boot_engages_camera_against_player_with_authored_constants() -> v
 		Vector2(40, 24),
 		"deadzone matches Main.CAMERA_FOLLOW_DEADZONE = Vector2(40, 24)"
 	)
-	# World bounds matches authored Rect2(0, 0, 480, 270).
+	# World bounds is now driven from the boot room's chunk geometry
+	# (ticket 86ca3kpzz). Room01 (the boot room) is a 15×8 / 480×256 chunk,
+	# so `get_bounds_px()` returns Rect2(0, 0, 480, 256) — the chunk-derived
+	# value, NOT the old fixed Rect2(0, 0, 480, 270) constant. 256 (8×32) is
+	# the chunk's true pixel height; the prior 270 was the viewport-target
+	# height the old constant baked in. On both axes 480/256 <= the 480×270
+	# viewport_world, so the camera still centres (zero visual change at boot).
 	assert_eq(
 		_director.get_world_bounds(),
-		Rect2(0, 0, 480, 270),
-		"world bounds matches Main.S1_ROOM_BOUNDS = Rect2(0, 0, 480, 270)"
+		Rect2(0, 0, 480, 256),
+		"world bounds is chunk-derived from boot room Room01 (15×8 = 480×256)"
+	)
+
+
+# ---- Pin 3b: widened proof room engages the SCROLL branch -------------
+
+
+func test_loading_widened_room02_drives_scrolling_bounds() -> void:
+	# **The S1A regression gate (ticket 86ca3kpzz).** Loading the widened
+	# proof chunk (Room02 → 30×8 = 960×256) must set world bounds wider than
+	# the viewport on X, so `_clamp_to_world_bounds` takes the SCROLL branch
+	# (not the centre branch) — the behaviour that makes the camera follow the
+	# player across the bigger room. If a future refactor reverts
+	# `_engage_camera_for_room` to the fixed S1_ROOM_BOUNDS constant, the
+	# bounds would read 480-wide and the camera would centre — the bug this
+	# whole ticket fixes. This pin catches that regression.
+	if _director == null:
+		return
+	var main: Node = MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+	# Load the widened Room02 (ROOM_SCENE_PATHS index 1) through the real
+	# production room-load path.
+	main.call("_load_room_at_index", 1)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	# Bounds reflect the widened chunk geometry: 30×8 tiles × 32 px = 960×256.
+	var bounds: Rect2 = _director.get_world_bounds()
+	assert_eq(
+		bounds,
+		Rect2(0, 0, 960, 256),
+		"widened Room02 drives world bounds = chunk size 960×256 (scroll-width)"
+	)
+	# Prove the clamp actually SCROLLS on X: the camera position for a player
+	# at the far-right of the room must differ from the bounds-centre. At
+	# BASELINE_ZOOM the viewport_world is 480 wide; 960 > 480 so the X axis
+	# takes the clamp (scroll) branch. The clamp helper is pure + test-callable.
+	var centre_x: float = bounds.position.x + bounds.size.x * 0.5  # 480
+	var far_right_cam: Vector2 = _director._clamp_to_world_bounds(Vector2(900, 128), bounds)
+	assert_ne(
+		far_right_cam.x,
+		centre_x,
+		"camera scrolls on X for a far-right player (clamp took the scroll branch, not centre)"
+	)
+	# And clamps at the right edge: at BASELINE_ZOOM half_vp.x = 240, so the
+	# right-edge camera x is bounds.end.x - 240 = 960 - 240 = 720.
+	assert_almost_eq(
+		far_right_cam.x,
+		720.0,
+		0.5,
+		"camera clamps to the right edge (bounds.end.x - half_viewport)"
 	)
 
 

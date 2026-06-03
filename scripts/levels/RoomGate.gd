@@ -126,6 +126,7 @@ func _ready() -> void:
 	if collision_mask == 0:
 		collision_mask = LAYER_PLAYER
 	_ensure_collision_shape()
+	_sync_visual_to_trigger()
 	body_entered.connect(_on_body_entered)
 	# Bug 1 fix (ticket 86c9q7xgx): guard against Area2D-derived nodes
 	# (Hitbox, Projectile, other trigger zones) accidentally activating the
@@ -159,6 +160,30 @@ func _ensure_collision_shape() -> void:
 	# a circle/capsule), leave it alone — that's an explicit author choice.
 	if existing.shape is RectangleShape2D:
 		(existing.shape as RectangleShape2D).size = trigger_size
+
+
+## Sync the doorway visual (`Sprite` ColorRect) to the gate's actual
+## `trigger_size`. **Red-bar fix (ticket 86ca3kpzz Stage-1 soak, Sponsor
+## 2026-06-03).** The scene's `Sprite` ColorRect is authored at a fixed
+## 48x16 (the default trigger_size) but every production room overrides
+## `trigger_size` to 48x80 — leaving the visual a small 48x16 dark-red
+## horizontal bar floating against the left wall while the trigger zone it
+## represents is 5x taller. On the original 480-wide single-screen rooms the
+## tiny bar sat at the screen edge and read as incidental; on the Stage-1
+## widened + scrolling Room02 (with the warm flat floor) it pops as a stray
+## red artifact the Sponsor mistook for a misplaced mob. Resizing the
+## ColorRect to span the full trigger geometry makes it read as the doorway
+## opening it actually is, centered on the gate (offsets = -half..+half), at
+## every room size. No color change — purely a geometry sync.
+func _sync_visual_to_trigger() -> void:
+	var sprite: ColorRect = get_node_or_null("Sprite") as ColorRect
+	if sprite == null:
+		return
+	var half: Vector2 = trigger_size * 0.5
+	sprite.offset_left = -half.x
+	sprite.offset_top = -half.y
+	sprite.offset_right = half.x
+	sprite.offset_bottom = half.y
 
 
 # ---- Public API -----------------------------------------------------

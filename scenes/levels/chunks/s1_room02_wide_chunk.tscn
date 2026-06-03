@@ -1,0 +1,127 @@
+[gd_scene load_steps=14 format=3 uid="uid://b0embergrave_s1room02_wide_chunk"]
+
+; S1 bigger-rooms retrofit Stage 1A (ticket 86ca3kpzz). Hand-widened proof
+; chunk: 30x8 tiles = 960x256 px (vs the 15x8 / 480x256 single-screen chunks).
+; Drives the camera-scroll machinery: with world bounds wider than the
+; viewport, CameraDirector.set_world_bounds takes the SCROLL branch (not the
+; centre branch) so the camera follows the player across the wider floor.
+; Reuses the S1CloisterChunk painter (grid_w=30 override) + the warm flat
+; floor PNG absorbed from PR #403. Wall collision perimeter + seams + props
+; redistributed across the wider span. ONE proof chunk only (OOS: widening all
+; 8 rooms / procgen — see ticket).
+
+[ext_resource type="Script" path="res://scripts/levels/S1CloisterChunk.gd" id="1_chunk"]
+[ext_resource type="TileSet" path="res://resources/tilesets/s1_cloister.tres" id="2_tileset"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/brazier_lit.png" id="3_brazier_lit"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/moss_patch.png" id="4_moss"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/parchment_01.png" id="5_parchment"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/rubble_01.png" id="6_rubble"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_h"]
+size = Vector2(960, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_v"]
+size = Vector2(32, 256)
+
+[node name="S1Room02WideChunk" type="Node2D"]
+script = ExtResource("1_chunk")
+grid_w = 30
+grid_h = 8
+
+[node name="FloorTiles" type="TileMapLayer" parent="."]
+texture_filter = 1
+tile_set = ExtResource("2_tileset")
+
+[node name="WallNorth" type="StaticBody2D" parent="."]
+position = Vector2(480, 16)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallNorth"]
+shape = SubResource("RectangleShape2D_wall_h")
+
+[node name="WallSouth" type="StaticBody2D" parent="."]
+position = Vector2(480, 240)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallSouth"]
+shape = SubResource("RectangleShape2D_wall_h")
+
+[node name="WallWest" type="StaticBody2D" parent="."]
+position = Vector2(16, 128)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallWest"]
+shape = SubResource("RectangleShape2D_wall_v")
+
+[node name="WallEast" type="StaticBody2D" parent="."]
+position = Vector2(944, 128)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WallEast"]
+shape = SubResource("RectangleShape2D_wall_v")
+
+[node name="FloorWallSeam" type="Node2D" parent="."]
+z_index = 1
+
+[node name="SeamTop" type="ColorRect" parent="FloorWallSeam"]
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 928.0
+offset_bottom = 34.0
+color = Color(0.102, 0.071, 0.063, 0.85)
+
+[node name="SeamBottom" type="ColorRect" parent="FloorWallSeam"]
+offset_left = 32.0
+offset_top = 222.0
+offset_right = 928.0
+offset_bottom = 224.0
+color = Color(0.102, 0.071, 0.063, 0.85)
+
+[node name="SeamLeft" type="ColorRect" parent="FloorWallSeam"]
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 34.0
+offset_bottom = 224.0
+color = Color(0.102, 0.071, 0.063, 0.85)
+
+[node name="SeamRight" type="ColorRect" parent="FloorWallSeam"]
+offset_left = 926.0
+offset_top = 32.0
+offset_right = 928.0
+offset_bottom = 224.0
+color = Color(0.102, 0.071, 0.063, 0.85)
+
+[node name="Props" type="Node2D" parent="."]
+z_index = 1
+
+[node name="BrazierLitWest" type="Sprite2D" parent="Props"]
+position = Vector2(160, 28)
+texture = ExtResource("3_brazier_lit")
+
+[node name="BrazierLitMidWest" type="Sprite2D" parent="Props"]
+position = Vector2(400, 28)
+texture = ExtResource("3_brazier_lit")
+
+[node name="BrazierLitMidEast" type="Sprite2D" parent="Props"]
+position = Vector2(640, 28)
+texture = ExtResource("3_brazier_lit")
+
+[node name="BrazierLitEast" type="Sprite2D" parent="Props"]
+position = Vector2(840, 28)
+texture = ExtResource("3_brazier_lit")
+
+[node name="MossPatch" type="Sprite2D" parent="Props"]
+position = Vector2(120, 200)
+texture = ExtResource("4_moss")
+
+[node name="MossPatchEast" type="Sprite2D" parent="Props"]
+position = Vector2(720, 204)
+texture = ExtResource("4_moss")
+
+[node name="Parchment" type="Sprite2D" parent="Props"]
+position = Vector2(560, 200)
+texture = ExtResource("5_parchment")
+
+[node name="Rubble" type="Sprite2D" parent="Props"]
+position = Vector2(488, 64)
+texture = ExtResource("6_rubble")
+
+[node name="RubbleEast" type="Sprite2D" parent="Props"]
+position = Vector2(872, 196)
+texture = ExtResource("6_rubble")

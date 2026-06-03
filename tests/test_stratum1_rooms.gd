@@ -25,7 +25,10 @@ const ROOM_SCENES: Dictionary = {
 }
 
 const CHUNK_TRES: Dictionary = {
-	&"s1_room02": "res://resources/level_chunks/s1_room02.tres",
+	# S1A widened proof chunk (ticket 86ca3kpzz): Stratum1Room02.tscn now loads
+	# the wide def (30×8). Point CHUNK_TRES at the same def the scene loads so
+	# these chunk-level assertions reflect what Room02 actually ships.
+	&"s1_room02": "res://resources/level_chunks/s1_room02_wide.tres",
 	&"s1_room03": "res://resources/level_chunks/s1_room03.tres",
 	&"s1_room04": "res://resources/level_chunks/s1_room04.tres",
 	&"s1_room05": "res://resources/level_chunks/s1_room05.tres",
@@ -35,8 +38,10 @@ const CHUNK_TRES: Dictionary = {
 }
 
 # Authoritative expected mob counts — keep in sync with the .tres files.
+# Room02 is the S1A widened proof chunk (ticket 86ca3kpzz): 30×8 / 960×256,
+# rebalanced 2→4 grunts so the 2×-wider floor doesn't read empty.
 const EXPECTED_MOB_COUNTS: Dictionary = {
-	&"s1_room02": 2,
+	&"s1_room02": 4,
 	&"s1_room03": 2,
 	&"s1_room04": 1,
 	&"s1_room05": 3,
@@ -133,10 +138,13 @@ func test_each_room_spawn_count_matches_chunk_def() -> void:
 		)
 
 
-func test_room02_spawns_two_grunts() -> void:
+func test_room02_spawns_four_grunts() -> void:
+	# S1A widened proof chunk (ticket 86ca3kpzz): the 960-wide Room02 carries
+	# 4 grunts (was 2 on the 480-wide chunk) — light balance pass for the
+	# bigger floor. Still grunts-only (mob-mix variety starts in Room03).
 	var room: MultiMobRoom = _load_room(ROOM_SCENES[&"s1_room02"])
 	var mobs: Array[Node] = room.get_spawned_mobs()
-	assert_eq(mobs.size(), 2)
+	assert_eq(mobs.size(), 4)
 	for m: Node in mobs:
 		assert_true(m is Grunt, "room02 spawns Grunts only")
 
@@ -203,12 +211,12 @@ func test_room02_gate_registers_both_grunts_after_deferred_pass() -> void:
 	assert_not_null(gate, "Room02 spawns a RoomGate (room_gate_position is non-zero)")
 
 	var mobs: Array[Node] = room.get_spawned_mobs()
-	assert_eq(mobs.size(), 2, "Room02 spawned its 2 grunts")
+	assert_eq(mobs.size(), 4, "Room02 spawned its 4 grunts (S1A widened roster)")
 	assert_eq(
 		gate.mobs_alive(),
-		2,
+		4,
 		(
-			"RoomGate registered BOTH grunts — mobs_alive must equal the spawned "
+			"RoomGate registered ALL grunts — mobs_alive must equal the spawned "
 			+ "mob count after the deferred _assemble_room_fixtures pass (ticket 86c9tqvxx)"
 		)
 	)
@@ -273,7 +281,7 @@ func test_room_reentered_after_free_reregisters_cleanly() -> void:
 	# missed registration. Simulate by loading Room02, freeing it, then
 	# loading a brand-new Room02 instance.
 	var first: MultiMobRoom = await _load_room_with_fixtures(ROOM_SCENES[&"s1_room02"])
-	assert_eq(first.get_room_gate().mobs_alive(), 2, "first Room02 instance registered 2 grunts")
+	assert_eq(first.get_room_gate().mobs_alive(), 4, "first Room02 instance registered 4 grunts")
 	first.queue_free()
 	await get_tree().process_frame
 
@@ -283,8 +291,8 @@ func test_room_reentered_after_free_reregisters_cleanly() -> void:
 	assert_not_null(gate2, "re-entered Room02 spawns its own fresh RoomGate")
 	assert_eq(
 		gate2.mobs_alive(),
-		2,
-		"re-entered Room02 instance registered its own 2 grunts cleanly (no stale state)"
+		4,
+		"re-entered Room02 instance registered its own 4 grunts cleanly (no stale state)"
 	)
 
 
@@ -321,7 +329,14 @@ func test_each_chunk_uses_uma_canvas_constraints() -> void:
 		var c: LevelChunkDef = load(CHUNK_TRES[room_id]) as LevelChunkDef
 		assert_eq(c.tile_size_px, 32, "%s 32 px tile lock" % String(room_id))
 		var size_px: Vector2i = c.size_px()
-		assert_lte(size_px.x, 480, "%s width fits 480" % String(room_id))
+		# Room02 is the S1A widened proof chunk (ticket 86ca3kpzz) — 960 wide,
+		# DELIBERATELY exceeding the single-screen 480 so the camera scrolls.
+		# Every other S1 room keeps the single-screen 480 width. Height stays
+		# single-screen for all rooms (vertical scroll is OOS for S1A).
+		if room_id == &"s1_room02":
+			assert_eq(size_px.x, 960, "Room02 (S1A proof chunk) is the widened 960-px room")
+		else:
+			assert_lte(size_px.x, 480, "%s width fits the single-screen 480" % String(room_id))
 		assert_lte(size_px.y, 270, "%s height fits 270" % String(room_id))
 
 
@@ -342,8 +357,9 @@ func test_mobs_positioned_inside_bounds() -> void:
 
 func test_total_mob_count_in_reasonable_bounds() -> void:
 	# Per dispatch: 14-30 mobs total across rooms 2-8. Authored count is
-	# 19 which fits comfortably. This test pins the upper+lower bands so
-	# a future content edit doesn't accidentally spike or zero the curve.
+	# 21 (Room02 grew 2→4 in the S1A widen, ticket 86ca3kpzz) which fits
+	# comfortably. This test pins the upper+lower bands so a future content
+	# edit doesn't accidentally spike or zero the curve.
 	var total: int = 0
 	for room_id: StringName in CHUNK_TRES.keys():
 		var c: LevelChunkDef = load(CHUNK_TRES[room_id]) as LevelChunkDef
@@ -354,7 +370,8 @@ func test_total_mob_count_in_reasonable_bounds() -> void:
 
 func test_difficulty_curve_roughly_increases() -> void:
 	# Per dispatch difficulty guidance, mob-count by room is roughly:
-	#   r02=2, r03=2, r04=1 (intro shooter), r05=3, r06=3, r07=4, r08=4.
+	#   r02=4 (S1A widened), r03=2, r04=1 (intro shooter), r05=3, r06=3,
+	#   r07=4, r08=4.
 	# The tail (rooms 5-8) must be >= the head (rooms 2-4). This is a soft
 	# lint, not an exact-equals — content authors are free to tweak so long
 	# as the second half doesn't end up *easier* than the first.

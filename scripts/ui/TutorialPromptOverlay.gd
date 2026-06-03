@@ -79,7 +79,17 @@ const ANCHOR_TOP_OFFSET_Y: float = 64.0
 
 ## Vertical padding from the bottom edge for BOTTOM anchor. Sits above the
 ## BootBanner (which spans `offset_top = -150`), but below the [+1 STAT] pip.
-const ANCHOR_BOTTOM_OFFSET_Y: float = 200.0
+##
+## **Expand nudge (ticket 86ca3kpzz Stage-1 soak, Sponsor 2026-06-03).** Raised
+## 200 → 248. Under the Stage-1 `window/stretch/aspect=expand` change, the
+## center-spawned player (world y=200 of 270 — the LOWER half of the room)
+## renders lower on the now-taller viewport than it did under the old
+## `aspect=keep` letterbox. At 200 px the "WASD to move" first-input prompt sat
+## directly on the player sprite. 248 px lifts the prompt clear of the player
+## band while keeping Uma's "centered low" Beat-4 placement (still in the lower
+## third). HUD is on a camera-immune CanvasLayer so this is a pure screen-space
+## nudge — independent of camera zoom / scroll.
+const ANCHOR_BOTTOM_OFFSET_Y: float = 248.0
 
 # ---- Visual constants (sub-1.0 channels per HTML5 HDR-clamp rule) ----
 
