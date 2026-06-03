@@ -69,6 +69,7 @@ import {
   clickAimedAtSpawn,
   clickAtWorldPos,
   latestPlayerPos,
+  DEFAULT_PLAYER_SPAWN,
 } from "../fixtures/mouse-facing";
 
 const BOOT_TIMEOUT_MS = 30_000;
@@ -200,18 +201,67 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
     // This is the SAME pattern `chaseAndClearMultiChaserRoom` uses for
     // Rooms 05-08 (PR #198), narrowly applied to AC2's 2-grunt case.
 
-    function latestGruntWorldPos(
-      capture: ConsoleCapture
+    // **Nearest-grunt aim (ticket 86ca3kpzz — widened Room02).** Pre-Stage-1
+    // Room02 was 480 px wide with 2 grunts spawning ~16-80 px from the player
+    // spawn (240,200) — so "aim at the most-recently-emitting grunt" landed a
+    // swing on an in-range chaser every iteration. Stage-1 widened Room02 to
+    // 960 px with 4 grunts spread tiles 10→25 (x=320→800). `latestGruntWorldPos`
+    // (most-recent emitter) now thrashes between near + far grunts, wasting
+    // swings aiming at a grunt 500+ px out of reach while the in-range chaser
+    // goes un-swung — the AC2 ≤60 s budget blew past on the wide floor (CI run
+    // 26864564617: aim locked on grunt=(816,176) while player stood at (240,200)).
+    // Fix: scan the LATEST `Grunt.pos` per distinct grunt-position cluster and
+    // pick the one NEAREST the player; the kill loop then walks toward it when
+    // out of swing reach + swings — a faithful "fight the closest threat" model
+    // that stays valid in the old narrow rooms (nearest == only grunt nearby).
+    const GRUNT_POS_SCAN = 24; // recent Grunt.pos lines to consider for nearest
+    function nearestGruntWorldPos(
+      capture: ConsoleCapture,
+      player: { x: number; y: number } | null
     ): { x: number; y: number } | null {
       const lines = capture.getLines();
-      for (let i = lines.length - 1; i >= 0; i--) {
+      const recent: { x: number; y: number }[] = [];
+      for (let i = lines.length - 1; i >= 0 && recent.length < GRUNT_POS_SCAN; i--) {
         const t = lines[i].text;
         if (!/\[combat-trace\] Grunt\.pos \|/.test(t)) continue;
         const m = t.match(/pos=\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/);
         if (!m) continue;
-        return { x: parseInt(m[1], 10), y: parseInt(m[2], 10) };
+        recent.push({ x: parseInt(m[1], 10), y: parseInt(m[2], 10) });
       }
-      return null;
+      if (recent.length === 0) return null;
+      const ref = player ?? DEFAULT_PLAYER_SPAWN;
+      let best = recent[0];
+      let bestD = (best.x - ref.x) ** 2 + (best.y - ref.y) ** 2;
+      for (const g of recent) {
+        const d = (g.x - ref.x) ** 2 + (g.y - ref.y) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = g;
+        }
+      }
+      return best;
+    }
+
+    // Swing reach (world px). Player must be within this of the grunt for the
+    // wedge to land; beyond it the loop walks the player toward the grunt.
+    // Conservative under the actual SWING_REACH so we always close in.
+    const SWING_REACH_PX = 90;
+
+    // Walk the player toward a world target for a short pulse via WASD. Used to
+    // close distance to an out-of-reach grunt in the widened Room02 before
+    // swinging. Pulses are short so the loop re-reads the live grunt position
+    // (chasers move) between approach steps.
+    async function stepToward(target: { x: number; y: number }): Promise<void> {
+      const p = latestPlayerPos(capture) ?? DEFAULT_PLAYER_SPAWN;
+      const dx = target.x - p.x;
+      const dy = target.y - p.y;
+      const horiz = dx > 12 ? "d" : dx < -12 ? "a" : null;
+      const vert = dy > 12 ? "s" : dy < -12 ? "w" : null;
+      const keys = [horiz, vert].filter((k): k is string => k !== null);
+      if (keys.length === 0) return;
+      for (const k of keys) await page.keyboard.down(k);
+      await page.waitForTimeout(180);
+      for (const k of keys) await page.keyboard.up(k);
     }
 
     // Small wait so Room 02 grunts spawn + emit at least one `Grunt.pos`
@@ -245,21 +295,29 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
       // — clicking at the grunt's world position aims the swing wedge
       // exactly toward the grunt regardless of player drift. The
       // `clickAtWorldPos` helper applies the live camera transform.
-      const gruntPos = latestGruntWorldPos(capture);
+      const playerPos = latestPlayerPos(capture);
+      const gruntPos = nearestGruntWorldPos(capture, playerPos);
       if (gruntPos != null) {
         if (
           lastLoggedGruntPos == null ||
           lastLoggedGruntPos.x !== gruntPos.x ||
           lastLoggedGruntPos.y !== gruntPos.y
         ) {
-          const playerPos = latestPlayerPos(capture);
           console.log(
-            `[ac2-first-kill] aim_at_grunt: grunt=(${gruntPos.x},${gruntPos.y}) ` +
+            `[ac2-first-kill] aim_at_nearest_grunt: grunt=(${gruntPos.x},${gruntPos.y}) ` +
               `player=${
                 playerPos ? `(${playerPos.x},${playerPos.y})` : "<no pos trace>"
               }`
           );
           lastLoggedGruntPos = gruntPos;
+        }
+        // If the nearest grunt is beyond swing reach (widened Room02), close
+        // distance first; chasers also move toward us, so a short step + re-read
+        // converges quickly. Within reach, swing immediately.
+        const ref = playerPos ?? DEFAULT_PLAYER_SPAWN;
+        const dist = Math.hypot(gruntPos.x - ref.x, gruntPos.y - ref.y);
+        if (dist > SWING_REACH_PX) {
+          await stepToward(gruntPos);
         }
         await clickAtWorldPos(canvas, capture, gruntPos.x, gruntPos.y);
       } else {
@@ -446,7 +504,7 @@ test.describe("AC2 — cold launch first Room02 kill in ≤60 s with weapon-scal
       // when the first grunt has died but the second is still alive, the
       // `Grunt.pos` trace targets the survivor. Falls back to spawn-NE if
       // both grunts have died and no `Grunt.pos` trace fires.
-      const gp = latestGruntWorldPos(capture);
+      const gp = nearestGruntWorldPos(capture, latestPlayerPos(capture));
       if (gp != null) {
         await clickAtWorldPos(canvas, capture, gp.x, gp.y);
       } else {

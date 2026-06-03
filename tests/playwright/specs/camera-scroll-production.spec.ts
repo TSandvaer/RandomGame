@@ -348,12 +348,22 @@ test.describe("CameraDirector production wiring (M3-T3-W2-T1)", () => {
     );
 
     // 1. The widened Room02 engages 960×256 bounds (scroll-width). The boot
-    //    sequence fires Room01's 480×256 trace first, then start_room=1
-    //    re-loads into Room02 → the 960×256 trace. We assert the 960 trace
-    //    is present (the chunk-derived wide bounds reached the camera).
-    const wideBoundsTrace = capture
-      .getLines()
-      .find((l) => WIDE_BOUNDS_TRACE.test(l.text));
+    //    sequence fires Room01's 480×256 trace first (during `_ready`, BEFORE
+    //    the "[Main] M1 play-loop ready" line the boot-race above waits on),
+    //    then `_resolve_start_room` → `_load_room_at_index(1)` re-loads into
+    //    Room02 → the 960×256 trace — which fires AFTER the boot-ready line.
+    //    A synchronous `getLines().find(...)` here raced that emission: the
+    //    boot-race resolved on the ready line and the buffer was scanned
+    //    before the post-boot 960 trace had been delivered to Playwright's
+    //    console buffer (CI run 26864564617 — failed at this assertion in
+    //    3.1 s, never reaching the scroll-walk). The engine path is correct
+    //    (proven via the bare-Main GUT repro: `_load_room_at_index(1)` →
+    //    `_room_world_bounds()` returns Rect2(0,0,960,256)); the fix is to
+    //    WAIT for the trace to flush rather than scan synchronously.
+    const wideBoundsTrace = await capture.waitForLine(
+      WIDE_BOUNDS_TRACE,
+      BOOT_TIMEOUT_MS
+    );
     expect(
       wideBoundsTrace,
       "widened Room02 engages CameraDirector.set_world_bounds size=(960,256) " +
