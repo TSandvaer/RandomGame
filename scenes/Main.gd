@@ -431,18 +431,25 @@ func _ready() -> void:
 			print("[Main] DebugFlags.cam_zoom=%.3f — applying boot zoom override" % df.cam_zoom)
 			cam_director.request_zoom(df.cam_zoom, 0.0)
 			_show_cam_zoom_readout(df.cam_zoom)
-	# DebugFlags.char_scale URL-param soak utility (ticket 86ca3kpzz Stage-1
-	# soak iteration). When `?char_scale=N` is set, apply N to the live player +
-	# non-boss mobs AFTER the room loads. Per-room re-apply happens inside
-	# `_load_room_at_index` (so a room loaded later — start_room jump, room
-	# advance — gets its freshly-spawned mobs scaled too). Sibling of cam_zoom;
-	# default sentinel -1.0 = no override. Boss sizes are NEVER touched.
-	if df != null and df.has_method("has_char_scale_override") and df.has_char_scale_override():
-		print(
-			"[Main] DebugFlags.char_scale=%.3f — applying boot char-scale override" % df.char_scale
-		)
-		_apply_char_scale(df.char_scale)
-		_show_char_scale_readout(df.char_scale)
+	# DebugFlags.char_scale — SHIPPED production default 0.6 (ticket 86ca3rgxq;
+	# locks the soak dial from ticket 86ca3kpzz). In normal play (no `?char_scale`
+	# param) `effective_char_scale()` returns the 0.6 production default, so the
+	# player + non-boss mobs render at 0.6× — applied here on boot AND re-applied
+	# per room in `_load_room_at_index` (so later-loaded rooms scale their freshly-
+	# spawned mobs too). A `?char_scale=N` param OVERRIDES the 0.6 default; the
+	# `[`/`]`/`\` dial still re-tunes live; `?char_scale=1.0` / `\` reset returns to
+	# full size. Boss sizes are NEVER touched (see `_char_scale_is_boss`). The
+	# on-screen readout shows only when a non-default OVERRIDE is active (the dial
+	# UI is a soak affordance — normal 0.6 play has no readout clutter).
+	if df != null and df.has_method("effective_char_scale"):
+		var eff_scale: float = df.effective_char_scale()
+		if df.has_method("has_char_scale_override") and df.has_char_scale_override():
+			print("[Main] DebugFlags.char_scale=%.3f — boot override" % df.char_scale)
+			_apply_char_scale(eff_scale)
+			_show_char_scale_readout(eff_scale)
+		else:
+			print("[Main] char_scale production default %.3f applied on boot" % eff_scale)
+			_apply_char_scale(eff_scale)
 
 
 func _notification(what: int) -> void:
@@ -2148,14 +2155,15 @@ func _show_char_scale_readout(normalized: float) -> void:
 	_char_scale_label.visible = true
 
 
-## Re-apply the active char-scale (if any) to the current room. Called on every
-## room load so a freshly-spawned room's NEW non-boss mob instances inherit the
-## Sponsor's current dial value. No-op when no override is active.
+## Re-apply the effective char-scale to the current room. Called on every room
+## load so a freshly-spawned room's NEW non-boss mob instances inherit the current
+## value. In normal play (no param, no dial step) `effective_char_scale()` is the
+## SHIPPED 0.6 production default (ticket 86ca3rgxq), so EVERY S1 room's player +
+## non-boss mobs render at 0.6× — not just the boot room. A param / dial override
+## supersedes; `?char_scale=1.0` returns to full size. Bosses are always excluded.
 func _reapply_char_scale_if_active() -> void:
 	var df: Node = get_tree().root.get_node_or_null("DebugFlags")
-	if df == null or not df.has_method("has_char_scale_override"):
-		return
-	if not df.has_char_scale_override():
+	if df == null or not df.has_method("effective_char_scale"):
 		return
 	_apply_char_scale(df.effective_char_scale())
 
@@ -2163,9 +2171,10 @@ func _reapply_char_scale_if_active() -> void:
 ## Apply a NORMALIZED scale to the PLAYER + every NON-BOSS mob in the current
 ## room. Scaling the ROOT CharacterBody2D scales its Sprite AND CollisionShape2D
 ## / Hitbox children together (no big-hitbox-on-small-sprite mismatch). **Bosses
-## are EXCLUDED** via `_char_scale_is_boss` (Sponsor's explicit choice). Soak
-## instrument only — default play never calls this (sentinel -1.0 reads as
-## no-override upstream).
+## are EXCLUDED** via `_char_scale_is_boss` (Sponsor's explicit choice). As of
+## ticket 86ca3rgxq this IS called in normal play — with the SHIPPED 0.6
+## production default, every boot + room load applies 0.6 to player + non-boss
+## mobs. A `?char_scale=N` param / `[`/`]`/`\` dial overrides the value passed in.
 func _apply_char_scale(normalized: float) -> void:
 	var s: Vector2 = Vector2(normalized, normalized)
 	if _player != null and is_instance_valid(_player):

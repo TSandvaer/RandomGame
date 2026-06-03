@@ -156,15 +156,28 @@ const CAM_ZOOM_RESET: float = 1.0  # the default normalized zoom (== CameraDirec
 ## sprites can read too large; the Sponsor finds the right NORMALIZED scale
 ## empirically and reports it.
 ##
-## `?char_scale=N` URL query param. N is the NORMALIZED scale applied to the
-## PLAYER + every NON-BOSS mob's ROOT node (1.0 == ship size; <1.0 = smaller
-## sprite+collision; >1.0 = larger). Scaling the ROOT means the sprite AND the
-## CollisionShape2D / Hitbox shrink together (no big-hitbox-on-small-sprite
-## mismatch). **BOSSES are EXCLUDED** — `Stratum1Boss` / `ArchiveSentinel` stay
-## full size (Sponsor's explicit choice). The boss discriminator is the
-## `boss_died` signal (every boss has it; no regular mob does) — see
-## `Main._char_scale_is_boss`. Clamped to [CHAR_SCALE_MIN, CHAR_SCALE_MAX].
-## Default -1.0 = "no override" (negative sentinel, same shape as cam_zoom).
+## SHIPPED production default 0.6 (ticket 86ca3rgxq). In normal play with NO
+## `?char_scale` param, the PLAYER + every NON-BOSS mob renders at 0.6× — Sponsor
+## dialed this on the Stage-1 soak as the right size in the widened S1 rooms.
+##
+## `?char_scale=N` URL query param OVERRIDES the 0.6 default. N is the NORMALIZED
+## scale applied to the PLAYER + every NON-BOSS mob's ROOT node (1.0 == full /
+## ship size; <1.0 = smaller sprite+collision; >1.0 = larger). Scaling the ROOT
+## means the sprite AND the CollisionShape2D / Hitbox shrink together (no
+## big-hitbox-on-small-sprite mismatch). **BOSSES are EXCLUDED** — `Stratum1Boss`
+## / `ArchiveSentinel` stay full size regardless of the default or any override
+## (Sponsor's explicit choice). The boss discriminator is the `boss_died` signal
+## (every boss has it; no regular mob does) — see `Main._char_scale_is_boss`.
+## Clamped to [CHAR_SCALE_MIN, CHAR_SCALE_MAX].
+##
+## RESOLUTION (default vs param vs explicit-disable):
+##   - param ABSENT → `effective_char_scale()` returns 0.6 (the shipped default).
+##   - param PRESENT (`?char_scale=N`) → returns N (clamped). Override wins.
+##   - explicit-disable → `?char_scale=1.0` (or the `\` dial reset key) returns to
+##     full size. There is no separate "disable" flag — 1.0 IS the disable value.
+## The `char_scale` var still defaults to the -1.0 sentinel ("no PARAM override");
+## the 0.6 default lives in `effective_char_scale()` so the param/dial layering
+## is unchanged and only the no-override fallthrough value moved 1.0 → 0.6.
 ##
 ## LIVE keys (HTML5 only, soak-gated on OS.has_feature("web"), same posture as
 ## cam_zoom — the soak runs the RELEASE artifact): `[` steps DOWN by
@@ -180,11 +193,19 @@ const CAM_ZOOM_RESET: float = 1.0  # the default normalized zoom (== CameraDirec
 ## Desktop / headless GUT: -1.0 (no override) + keys inert (web-feature gate).
 ## Test injection via set_char_scale_for_test / step_char_scale_for_test below.
 const CHAR_SCALE_QUERY_PARAM: String = "char_scale"
-const CHAR_SCALE_DEFAULT: float = -1.0  # negative sentinel = no override
+const CHAR_SCALE_DEFAULT: float = -1.0  # negative sentinel = no param override
 const CHAR_SCALE_MIN: float = 0.3
 const CHAR_SCALE_MAX: float = 2.0
 const CHAR_SCALE_STEP: float = 0.05  # per-keypress increment
-const CHAR_SCALE_RESET: float = 1.0  # ship size (no scaling)
+const CHAR_SCALE_RESET: float = 1.0  # full / ship size (the `\` dial reset + explicit-disable value)
+## SHIPPED production default (ticket 86ca3rgxq). Sponsor dialed 0.6 on the
+## Stage-1 soak (build 6a59f9e, run 26872372173) as the right size for player +
+## non-boss mobs in the widened S1 rooms. With NO `?char_scale` param this is the
+## scale Main applies in normal play. A param (`?char_scale=N`) OVERRIDES it; the
+## `[`/`]`/`\` dial still works for live re-tuning; `?char_scale=1.0` (or the `\`
+## reset key) returns to full size. The boss exclusion is unaffected — bosses are
+## always 1.0× regardless of this default (see `Main._char_scale_is_boss`).
+const CHAR_SCALE_PRODUCTION_DEFAULT: float = 0.6
 
 # Public state — read by gameplay code, written only via toggle/parse functions.
 var fast_xp_enabled: bool = false
@@ -726,13 +747,16 @@ func has_char_scale_override() -> bool:
 
 
 ## The NORMALIZED scale to apply to characters right now: the live override if one
-## is set, else 1.0 (ship size). Main reads this on every room load so mobs
-## spawned in a freshly-loaded room pick up the Sponsor's current dial value even
-## when the override was set via a `[`/`]` key step rather than the URL param.
+## is set (URL param OR a `[`/`]`/`\` dial step), else the SHIPPED production
+## default (0.6 — ticket 86ca3rgxq). Main reads this on boot AND on every room
+## load so freshly-spawned mobs pick up the current value — in normal play (no
+## param, no dial step) that value is 0.6, so the player + non-boss mobs render at
+## 0.6× by default. A param or dial step overrides; `?char_scale=1.0` / `\` reset
+## returns to full size. (Was 1.0 ship size before the lock; the dial is intact.)
 func effective_char_scale() -> float:
 	if char_scale >= CHAR_SCALE_MIN:
 		return char_scale
-	return CHAR_SCALE_RESET
+	return CHAR_SCALE_PRODUCTION_DEFAULT
 
 
 ## Set the live soak char-scale to an absolute NORMALIZED value, clamp it, and

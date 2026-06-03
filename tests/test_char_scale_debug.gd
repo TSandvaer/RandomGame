@@ -1,34 +1,40 @@
 # gdlint:disable=max-public-methods
 # GUT test class — one test per scenario IS the design.
 extends GutTest
-## Paired tests for the tunable character-scale soak control (ticket 86ca3kpzz
-## Stage-1 soak iteration).
+## Paired tests for the character-scale control — now LOCKED at the SHIPPED 0.6
+## production default (ticket 86ca3rgxq; locks the soak dial from 86ca3kpzz).
 ##
 ## Sibling of the `?cam_zoom` dial (ticket 86ca3kjyg): cam_zoom dials the CAMERA
 ## perspective; char_scale dials how BIG the player + non-boss mobs render inside
-## that perspective. On the 2x-wider scrolling S1 room the default sprite size
-## can read too large; the Sponsor finds the right NORMALIZED scale empirically
-## and reports it. This PR delivers the control; LOCKING the size is a follow-up.
+## that perspective. The Sponsor dialed 0.6 on the Stage-1 soak as the right size
+## in the widened S1 rooms; this lock makes 0.6 the production default while
+## keeping the `?char_scale` param + `[`/`]`/`\` dial fully working for re-tuning.
+##
+## RESOLUTION (default vs param vs explicit-disable) — pinned by tests below:
+##   - param ABSENT → effective_char_scale() == 0.6 (shipped default; tests 1/3/8a)
+##   - param/dial PRESENT → effective_char_scale() == the override (tests 2/3/8b)
+##   - explicit-disable → 1.0 / `\` reset returns to full size (tests 5/8c)
 ##
 ## What these cover (the bug CLASS, not just an instance):
-##   1. DebugFlags.char_scale defaults to the no-override sentinel (-1.0) on
-##      desktop / headless (no JS bridge) — production play is untouched, so a
-##      default boot is a NO-OP (player + mobs render at ship scale 1.0).
+##   1. DebugFlags.char_scale var defaults to the no-PARAM sentinel (-1.0) on
+##      desktop / headless (no JS bridge) — the param layer is unchanged; the 0.6
+##      default lives in effective_char_scale().
 ##   2. set_char_scale_for_test clamps to [CHAR_SCALE_MIN, CHAR_SCALE_MAX].
 ##   3. char_scale_changed signal fires with the clamped value (Main subscribes
-##      to re-apply + update the HUD readout).
+##      to re-apply + update the HUD readout). effective default is 0.6 (not 1.0).
 ##   4. The `[`/`]` step path steps from the CURRENT value + clamps at edges.
-##   5. Reset path returns to 1.0×.
+##   5. Reset path returns to 1.0× (the explicit-disable / full-size value).
 ##   6. NO USER WARNING across the in-range path (NoWarningGuard); the clamp-
 ##      warning path is exercised with an explicit expect_warning.
 ##   7. `_unhandled_input` char-scale keys are web-gated — inert on desktop /
 ##      headless GUT (soak keys must never fire outside the HTML5 artifact).
-##   8. **Main apply — the integration seam.** Booting Main with an active
-##      char_scale override scales the PLAYER + every NON-BOSS mob's root, so
-##      sprite + collision shrink together. Default 1.0 is a no-op.
+##   8. **Main apply — the integration seam.** (a) NO-param default scales the
+##      PLAYER + every NON-BOSS mob's root to 0.6 (the lock); (b) a param/dial
+##      override supersedes the 0.6 default; (c) explicit 1.0 disables (full size).
 ##   9. **Boss exclusion** — `_char_scale_is_boss` returns true for a node with a
 ##      `boss_died` signal (the codebase boss discriminator) and false for a
-##      regular mob, so `_apply_char_scale` never touches a boss.
+##      regular mob, so `_apply_char_scale` never touches a boss — bosses stay
+##      1.0× under the 0.6 default too.
 ##
 ## Why GUT can't test the URL-param parse directly: `_resolve_char_scale` reads
 ## `OS.has_feature("web")` + JavaScriptBridge, both false/absent in headless GUT.
@@ -87,14 +93,46 @@ func test_has_char_scale_override_false_at_default() -> void:
 	)
 
 
-func test_effective_char_scale_is_ship_size_at_default() -> void:
-	# The no-op contract: with no override, the effective scale Main applies is
-	# 1.0 (ship size) — so a default boot never changes character size.
+func test_effective_char_scale_is_production_default_at_no_override() -> void:
+	# THE LOCK (ticket 86ca3rgxq): with no param override, the effective scale Main
+	# applies is the SHIPPED 0.6 production default — NOT 1.0 ship size. This is the
+	# load-bearing change; a default boot now renders player + non-boss mobs at 0.6.
 	assert_almost_eq(
 		_flags.effective_char_scale(),
-		_flags.CHAR_SCALE_RESET,
+		_flags.CHAR_SCALE_PRODUCTION_DEFAULT,
 		0.0001,
-		"effective scale is 1.0 (ship size) when no override is set"
+		"effective scale is the 0.6 production default when no override is set"
+	)
+	assert_almost_eq(
+		_flags.CHAR_SCALE_PRODUCTION_DEFAULT,
+		0.6,
+		0.0001,
+		"the locked production default is 0.6 (Sponsor's dialed value)",
+	)
+
+
+func test_param_override_supersedes_production_default() -> void:
+	# The dial is INTACT: a param/dial override returns the override value, NOT the
+	# 0.6 default — so `?char_scale=N` still wins and the soak control keeps working.
+	_flags.set_char_scale_for_test(0.9)
+	assert_true(_flags.has_char_scale_override(), "override active after a param/dial value")
+	assert_almost_eq(
+		_flags.effective_char_scale(),
+		0.9,
+		0.0001,
+		"override value supersedes the 0.6 production default (dial intact)",
+	)
+
+
+func test_explicit_one_disables_scaling_full_size() -> void:
+	# Explicit-disable resolution: `?char_scale=1.0` (or the `\` reset key) returns
+	# to full size. 1.0 IS the disable value — there is no separate disable flag.
+	_flags.set_char_scale_for_test(_flags.CHAR_SCALE_RESET)
+	assert_almost_eq(
+		_flags.effective_char_scale(),
+		1.0,
+		0.0001,
+		"explicit 1.0 disables scaling — characters render full size",
 	)
 
 
@@ -135,15 +173,17 @@ func test_char_scale_changed_emits_clamped_value() -> void:
 # --- 4. Step path -------------------------------------------------------------
 
 
-func test_step_char_scale_walks_from_ship_size_on_first_step() -> void:
-	# First step with no prior override walks from 1.0 (ship size), NOT from the
-	# -1.0 sentinel — so pressing `]` once goes to 1.05, not a clamped -0.95→0.3.
+func test_step_char_scale_walks_from_production_default_on_first_step() -> void:
+	# Post-lock (ticket 86ca3rgxq): the first step with no prior override walks from
+	# the effective baseline, which is now the 0.6 production default — NOT the -1.0
+	# sentinel and NOT 1.0 ship size. So pressing `]` once goes 0.6 → 0.65. The dial
+	# now starts where production renders, which is the intended re-tune ergonomics.
 	_flags.step_char_scale_for_test(_flags.CHAR_SCALE_STEP)
 	assert_almost_eq(
 		_flags.char_scale,
-		_flags.CHAR_SCALE_RESET + _flags.CHAR_SCALE_STEP,
+		_flags.CHAR_SCALE_PRODUCTION_DEFAULT + _flags.CHAR_SCALE_STEP,
 		0.0001,
-		"first up-step from ship size 1.0"
+		"first up-step walks from the 0.6 production default (0.6 → 0.65)",
 	)
 
 
@@ -247,6 +287,73 @@ func test_main_apply_char_scale_scales_player_and_nonboss_mobs() -> void:
 		)
 
 
+func test_main_room_load_applies_production_default_with_no_param() -> void:
+	# THE LOCK end-to-end (ticket 86ca3rgxq): with NO `?char_scale` param active
+	# (the default headless/desktop state — no JS bridge), loading a room must scale
+	# the player + every non-boss mob to the 0.6 production default via the actual
+	# `_load_room_at_index` → `_reapply_char_scale_if_active` → `effective_char_scale`
+	# path — NOT a direct `_apply_char_scale(0.6)` call. This catches a regression
+	# where the boot/room-load path stops applying the default (the silent-killer
+	# class: a weak "scale != 1.0" assertion would pass; we assert the actual 0.6).
+	assert_false(_flags.has_char_scale_override(), "no param override active (default state)")
+	assert_almost_eq(
+		_flags.effective_char_scale(), 0.6, 0.0001, "effective default is 0.6 going in"
+	)
+	var main: Node = MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+	main.call("_load_room_at_index", 1)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var player: Node = main.get("_player")
+	assert_not_null(player, "Main has a player after boot")
+	assert_almost_eq(
+		(player as Node2D).scale.x,
+		0.6,
+		0.0001,
+		"player scaled to the 0.6 production default by the room-load path (no param)",
+	)
+	var room: Node = main.get("_current_room")
+	var mobs: Array = room.call("get_spawned_mobs")
+	assert_gt(mobs.size(), 0, "Room02 spawned at least one mob")
+	for m in mobs:
+		assert_almost_eq(
+			(m as Node2D).scale.x,
+			0.6,
+			0.0001,
+			"non-boss mob %s scaled to the 0.6 production default (no param)" % str(m.name),
+		)
+
+
+func test_main_room_load_param_override_supersedes_default() -> void:
+	# The dial is INTACT end-to-end: with a param/dial override active, the room-load
+	# path applies the OVERRIDE (0.8), not the 0.6 default — proving `?char_scale=N`
+	# still wins after the lock.
+	_flags.set_char_scale_for_test(0.8)
+	var main: Node = MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+	main.call("_load_room_at_index", 1)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var player: Node = main.get("_player")
+	assert_almost_eq(
+		(player as Node2D).scale.x,
+		0.8,
+		0.0001,
+		"override (0.8) supersedes the 0.6 default on room load (dial intact)",
+	)
+	var room: Node = main.get("_current_room")
+	for m in room.call("get_spawned_mobs"):
+		assert_almost_eq(
+			(m as Node2D).scale.x, 0.8, 0.0001, "non-boss mob honors the 0.8 override, not 0.6"
+		)
+
+
 func test_main_apply_char_scale_default_one_is_a_noop() -> void:
 	# The production-safety contract: applying 1.0 leaves characters at ship
 	# scale (1,1) — a default boot never changes anything.
@@ -291,6 +398,34 @@ func test_char_scale_is_boss_discriminates_on_boss_died_signal() -> void:
 	assert_false(main.call("_char_scale_is_boss", grunt), "regular grunt is scaled (not excluded)")
 
 
+func test_apply_char_scale_leaves_boss_full_size_among_mobs() -> void:
+	# End-to-end exclusion at the apply seam: even when a boss is present alongside
+	# regular mobs, `_apply_char_scale(0.6)` (the production default) scales the
+	# regular mob to 0.6 but leaves the boss at full size 1.0. This is the
+	# Sponsor's "bosses stay full size" lock under the 0.6 default. (Production boss
+	# rooms double-exclude — they expose get_boss(), not get_spawned_mobs() — but
+	# this pins the in-loop `_char_scale_is_boss` continue branch directly.)
+	var main: Node = MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await get_tree().process_frame
+	var boss: Node = preload("res://scenes/mobs/Stratum1Boss.tscn").instantiate()
+	var grunt: Node = preload("res://scenes/mobs/Grunt.tscn").instantiate()
+	var stub_room: Node = StubRoom.new()
+	stub_room.mobs = [boss, grunt]
+	main.set("_current_room", stub_room)
+	add_child_autofree(stub_room)
+	stub_room.add_child(boss)
+	stub_room.add_child(grunt)
+	await get_tree().process_frame
+	main.call("_apply_char_scale", 0.6)
+	assert_almost_eq(
+		(boss as Node2D).scale.x, 1.0, 0.0001, "boss stays full size 1.0 under the 0.6 default"
+	)
+	assert_almost_eq(
+		(grunt as Node2D).scale.x, 0.6, 0.0001, "regular grunt scaled to the 0.6 default"
+	)
+
+
 func test_main_source_apply_char_scale_excludes_boss() -> void:
 	# Structural pin: `_apply_char_scale` body calls `_char_scale_is_boss` and
 	# `continue`s on a true result — guards against a future refactor that drops
@@ -307,3 +442,17 @@ func test_main_source_apply_char_scale_excludes_boss() -> void:
 		"_apply_char_scale consults _char_scale_is_boss for boss exclusion"
 	)
 	assert_true(fn_body.find("get_spawned_mobs") > -1, "_apply_char_scale iterates spawned mobs")
+
+
+# --- Test helpers -------------------------------------------------------------
+
+
+## Minimal stand-in for a room that exposes `get_spawned_mobs()` — lets the
+## boss-exclusion test feed a boss + a regular mob through `_apply_char_scale`'s
+## iteration without instantiating the full boss-room fixture graph.
+class StubRoom:
+	extends Node2D
+	var mobs: Array = []
+
+	func get_spawned_mobs() -> Array:
+		return mobs
