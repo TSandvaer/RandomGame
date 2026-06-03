@@ -316,6 +316,13 @@ var _room_label: Label = null
 var _build_label: Label = null
 var _stat_pip_label: Label = null
 var _boot_banner_label: Label = null
+## Camera-zoom soak readout (ticket 86ca3kjyg). Top-center HUD Label showing the
+## live NORMALIZED zoom while the Sponsor dials in the S1 perspective with the
+## `?cam_zoom` param + live +/- keys (DebugFlags). Hidden until a zoom override /
+## key-step occurs, so production play never shows it. Subscribes to
+## DebugFlags.cam_zoom_changed in _build_hud. Diagnostic tooling — the LOCKED
+## default-zoom change is a separate follow-up once the Sponsor reports his value.
+var _cam_zoom_label: Label = null
 ## Save-confirmation toast (Ticket 2 — `86c9q7p38`). Bottom-right widget that
 ## fades in/out on every successful `Save.save_completed`. Connects on its
 ## own `_ready` — Main only needs to add it to the HUD CanvasLayer.
@@ -403,6 +410,19 @@ func _ready() -> void:
 	if df != null and bool(df.get("force_descend")):
 		print("[Main] DebugFlags.force_descend=true — auto-opening DescendScreen")
 		force_descend_for_test()
+	# DebugFlags.cam_zoom URL-param soak utility (ticket 86ca3kjyg, 2026-06-02).
+	# When `?cam_zoom=N` is set on the HTML5 URL, apply N (normalized scale) to
+	# the CameraDirector at boot AFTER the room loads (so the director + player
+	# are wired). Sponsor dials in the S1 perspective; we lock the value in a
+	# follow-up. The live +/- keys (in DebugFlags._unhandled_input) adjust it
+	# in-session; the on-screen readout (built in _build_hud) shows the live
+	# value. Same HTML5-only shape as start_room / force_descend.
+	if df != null and df.has_method("has_cam_zoom_override") and df.has_cam_zoom_override():
+		var cam_director: Node = get_tree().root.get_node_or_null("CameraDirector")
+		if cam_director != null and cam_director.has_method("request_zoom"):
+			print("[Main] DebugFlags.cam_zoom=%.3f — applying boot zoom override" % df.cam_zoom)
+			cam_director.request_zoom(df.cam_zoom, 0.0)
+			_show_cam_zoom_readout(df.cam_zoom)
 
 
 func _notification(what: int) -> void:
@@ -1085,6 +1105,30 @@ func _build_hud() -> void:
 	_stat_pip_label.text = ""
 	_stat_pip_label.visible = false
 	_hud.add_child(_stat_pip_label)
+
+	# Top-center camera-zoom soak readout (ticket 86ca3kjyg). Hidden by default;
+	# shows the live NORMALIZED zoom only while the Sponsor is dialing in S1 via
+	# `?cam_zoom` + live +/- keys. ASCII-only text (default-font tofu rule,
+	# html5-export.md § default-font glyph coverage). Subscribes to
+	# DebugFlags.cam_zoom_changed so a +/- keypress updates the value live.
+	_cam_zoom_label = Label.new()
+	_cam_zoom_label.name = "CamZoomReadout"
+	_cam_zoom_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_cam_zoom_label.offset_left = -120.0
+	_cam_zoom_label.offset_top = 8.0
+	_cam_zoom_label.offset_right = 120.0
+	_cam_zoom_label.offset_bottom = 32.0
+	_cam_zoom_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_cam_zoom_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4, 0.95))
+	_cam_zoom_label.add_theme_font_size_override("font_size", 16)
+	_cam_zoom_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cam_zoom_label.text = ""
+	_cam_zoom_label.visible = false
+	_hud.add_child(_cam_zoom_label)
+	var df_hud: Node = get_tree().root.get_node_or_null("DebugFlags")
+	if df_hud != null and df_hud.has_signal("cam_zoom_changed"):
+		if not df_hud.cam_zoom_changed.is_connected(_on_cam_zoom_changed):
+			df_hud.cam_zoom_changed.connect(_on_cam_zoom_changed)
 
 	# Bottom-center boot banner — the only on-screen control reference in M1
 	# (no in-game tutorial). Lists every input action from `project.godot`
@@ -2017,6 +2061,22 @@ func _refresh_hud_full() -> void:
 	_refresh_level_widget()
 	_refresh_room_label()
 	_refresh_stat_pip()
+
+
+## Signal handler for DebugFlags.cam_zoom_changed (a +/- key step during soak).
+## Reflects the live normalized zoom in the top-center readout.
+func _on_cam_zoom_changed(normalized: float) -> void:
+	_show_cam_zoom_readout(normalized)
+
+
+## Reveal + update the camera-zoom soak readout. ASCII-only text per the
+## default-font tofu rule. Visible only while the Sponsor is dialing in zoom;
+## stays hidden in normal production play (no override + no key-step ever fires).
+func _show_cam_zoom_readout(normalized: float) -> void:
+	if _cam_zoom_label == null:
+		return
+	_cam_zoom_label.text = "CAM ZOOM %.2fx  (-/+ adjust, 0 reset)" % normalized
+	_cam_zoom_label.visible = true
 
 
 func _refresh_hp_widget() -> void:
