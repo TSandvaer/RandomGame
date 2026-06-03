@@ -111,15 +111,58 @@ const START_ROOM_MAX: int = 9  # S2_BOSS_ROOM_INDEX in Main.gd (Stage 6)
 ## a direct route that bypasses the click handler entirely).
 const FORCE_DESCEND_QUERY_PARAM: String = "force_descend"
 
+## Camera-zoom soak control — Sponsor dials in the S1 perspective himself, then
+## we lock the value in a follow-up (ticket 86ca3kjyg, 2026-06-02). Sponsor's
+## recurring S1 soak verdict: "the zoom perspective is still much too zoomed".
+## A tunable build ends the nudge-and-resoak loop — Sponsor finds the exact
+## NORMALIZED zoom value empirically and reports it.
+##
+## `?cam_zoom=N` URL query param applied to `CameraDirector.request_zoom(N, 0.0)`
+## at boot (HTML5 only). N is the NORMALIZED scale (1.0 == default pre-T9
+## rendering; <1.0 zooms OUT / shows more room — what Sponsor wants; >1.0 zooms
+## IN). Clamped to CameraDirector's own [MIN, MAX] normalized range [0.5, 4.0],
+## mirrored here as CAM_ZOOM_MIN / CAM_ZOOM_MAX so the readout + key-step can
+## clamp before reaching the director (avoids the director's own WarningBus
+## clamp-warning on every key tap). Default -1.0 = "no override" (negative is
+## the sentinel, same shape as start_room's -1).
+##
+## LIVE +/- keys (HTML5 only, soak-gated on OS.has_feature("web")): the soak
+## runs against the production-shape RELEASE artifact (same posture as
+## boss_hp_mult — debug-gating would make the utility unusable for its actual
+## consumer). `=`/`+` steps zoom IN by CAM_ZOOM_STEP; `-`/`_` steps OUT; `0`
+## resets to default 1.0×. Each press re-requests the director zoom + emits
+## `cam_zoom_changed` so Main's on-screen readout reflects the live value the
+## Sponsor reads off and reports back.
+##
+## Usage:
+##   http://localhost:8080/?cam_zoom=0.7  → boot at 0.7× (wider view, smaller sprites)
+##   then press -/+ in-session to fine-tune; read the on-screen "CAM ZOOM x.xx"
+##   http://localhost:8080/               → no override; +/- still adjust live
+##
+## Desktop / headless GUT: -1.0 (no override) + keys inert (web-feature gate).
+## Test injection via set_cam_zoom_for_test / step_cam_zoom_for_test below.
+const CAM_ZOOM_QUERY_PARAM: String = "cam_zoom"
+const CAM_ZOOM_DEFAULT: float = -1.0  # negative sentinel = no override
+const CAM_ZOOM_MIN: float = 0.5  # mirror CameraDirector.MIN_NORMALIZED_ZOOM
+const CAM_ZOOM_MAX: float = 4.0  # mirror CameraDirector.MAX_NORMALIZED_ZOOM
+const CAM_ZOOM_STEP: float = 0.05  # per-keypress increment
+const CAM_ZOOM_RESET: float = 1.0  # the default normalized zoom (== CameraDirector default)
+
 # Public state — read by gameplay code, written only via toggle/parse functions.
 var fast_xp_enabled: bool = false
 var test_mode_enabled: bool = false
 var boss_hp_mult: float = BOSS_HP_MULT_DEFAULT
 var start_room: int = START_ROOM_DEFAULT
 var force_descend: bool = false
+var cam_zoom: float = CAM_ZOOM_DEFAULT
 
 # Emitted when fast_xp_enabled flips, so HUD/debug overlays can reflect it.
 signal fast_xp_toggled(enabled: bool)
+
+## Emitted whenever the live soak cam-zoom value changes (URL-param boot apply,
+## or a +/- key step). Payload is the new NORMALIZED zoom. Main's HUD readout
+## subscribes so the Sponsor can read the exact value he settles on.
+signal cam_zoom_changed(normalized: float)
 
 
 func _ready() -> void:
@@ -130,12 +173,13 @@ func _ready() -> void:
 	_resolve_boss_hp_mult()
 	_resolve_start_room()
 	_resolve_force_descend()
+	_resolve_cam_zoom()
 	# Single boot-time line for Tess's grep.
 	print(
 		(
 			(
 				"[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s"
-				+ " web=%s boss_hp_mult=%.3f start_room=%d force_descend=%s"
+				+ " web=%s boss_hp_mult=%.3f start_room=%d force_descend=%s cam_zoom=%.3f"
 			)
 			% [
 				OS.is_debug_build(),
@@ -145,6 +189,7 @@ func _ready() -> void:
 				boss_hp_mult,
 				start_room,
 				force_descend,
+				cam_zoom,
 			]
 		)
 	)
@@ -195,6 +240,37 @@ func _input(event: InputEvent) -> void:
 		_toggle_fast_xp()
 		# Mark handled so it doesn't fire any other action.
 		get_viewport().set_input_as_handled()
+
+
+## Live cam-zoom soak keys. Gated on `OS.has_feature("web")` (NOT
+## `OS.is_debug_build()`) because the Sponsor soaks the production-shape HTML5
+## RELEASE artifact — same posture as the `?cam_zoom` URL param. Desktop /
+## headless GUT never enter this handler (the feature gate is false), so the
+## keys are fully inert outside the web soak build. Uses `_unhandled_input` so
+## a focused UI Control (inventory, dialogue) still consumes its own keys first.
+##
+## Keys (no modifier — the soak player has a free hand): `=`/`+` zoom IN by
+## CAM_ZOOM_STEP; `-`/`_` zoom OUT; `0` reset to default 1.0×. Each step clamps
+## to [CAM_ZOOM_MIN, CAM_ZOOM_MAX] BEFORE reaching the director so a key tap at
+## the range edge doesn't spam the director's own WarningBus clamp warning.
+func _unhandled_input(event: InputEvent) -> void:
+	if not OS.has_feature("web"):
+		return
+	if not (event is InputEventKey):
+		return
+	var key_event: InputEventKey = event
+	if not key_event.pressed or key_event.echo:
+		return
+	match key_event.keycode:
+		KEY_EQUAL, KEY_PLUS, KEY_KP_ADD:
+			_step_cam_zoom(CAM_ZOOM_STEP)
+			get_viewport().set_input_as_handled()
+		KEY_MINUS, KEY_KP_SUBTRACT:
+			_step_cam_zoom(-CAM_ZOOM_STEP)
+			get_viewport().set_input_as_handled()
+		KEY_0, KEY_KP_0:
+			_set_cam_zoom(CAM_ZOOM_RESET)
+			get_viewport().set_input_as_handled()
 
 
 ## Returns the XP multiplier currently in effect. Always 1 in release
@@ -430,3 +506,111 @@ func set_force_descend_for_test(enabled: bool) -> void:
 ## Test-only: reset to production default.
 func reset_force_descend_for_test() -> void:
 	force_descend = false
+
+
+## Read the `cam_zoom` URL query param via JavaScriptBridge on HTML5; no-op on
+## desktop / headless GUT. Defaults to -1.0 (no override) when absent / malformed.
+## Clamps a valid float to [CAM_ZOOM_MIN, CAM_ZOOM_MAX] so an out-of-range value
+## can never reach `CameraDirector.request_zoom` with a scale that trips the
+## director's own WarningBus clamp on boot. Same HTML5-only-via-bridge shape as
+## boss_hp_mult / start_room — desktop / headless GUT always reads the default.
+##
+## NOTE: this only PARSES the param into `cam_zoom`. The actual apply to the
+## CameraDirector happens in `Main._ready` AFTER the room loads (so the director
+## + player are wired) — mirrors how start_room / force_descend are applied from
+## Main, not from DebugFlags. The director isn't necessarily up at autoload-_ready
+## ordering time, so applying here would be fragile.
+func _resolve_cam_zoom() -> void:
+	cam_zoom = CAM_ZOOM_DEFAULT
+	if not OS.has_feature("web"):
+		return
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return
+	var bridge: Object = Engine.get_singleton("JavaScriptBridge")
+	var raw_value: Variant = bridge.eval(
+		"new URLSearchParams(window.location.search).get('%s')" % CAM_ZOOM_QUERY_PARAM, true
+	)
+	if raw_value == null:
+		return
+	var raw_str: String = str(raw_value).strip_edges()
+	if raw_str.is_empty() or raw_str == "null":
+		return
+	if not raw_str.is_valid_float():
+		push_warning("[DebugFlags] cam_zoom URL param invalid float: %s" % raw_str)
+		return
+	var parsed: float = raw_str.to_float()
+	var clamped: float = clampf(parsed, CAM_ZOOM_MIN, CAM_ZOOM_MAX)
+	cam_zoom = clamped
+	if not is_equal_approx(parsed, clamped):
+		push_warning(
+			(
+				("[DebugFlags] cam_zoom clamped from %.3f to %.3f " + "(range [%.2f..%.2f])")
+				% [parsed, clamped, CAM_ZOOM_MIN, CAM_ZOOM_MAX]
+			)
+		)
+
+
+## True iff a cam_zoom URL override was successfully parsed (>= MIN means a real
+## value landed; the -1.0 default sentinel reads false). Main uses this to decide
+## whether to apply the boot-time override.
+func has_cam_zoom_override() -> bool:
+	return cam_zoom >= CAM_ZOOM_MIN
+
+
+## Set the live soak cam-zoom to an absolute NORMALIZED value, clamp it, push it
+## to the CameraDirector (instant), and emit `cam_zoom_changed`. Internal — the
+## key handler + reset path call this. Clamps BEFORE the director so a clamp at
+## the range edge doesn't emit the director's own WarningBus warning per keypress.
+func _set_cam_zoom(normalized: float) -> void:
+	var clamped: float = clampf(normalized, CAM_ZOOM_MIN, CAM_ZOOM_MAX)
+	cam_zoom = clamped
+	_apply_cam_zoom_to_director(clamped)
+	cam_zoom_changed.emit(clamped)
+
+
+## Step the live soak cam-zoom by `delta` from the CURRENT director zoom (so the
+## first keypress with no prior override walks from the live 1.0× default rather
+## than from the -1.0 sentinel). Internal — the +/- key handler calls this.
+func _step_cam_zoom(delta: float) -> void:
+	var base: float = CAM_ZOOM_RESET
+	var director: Node = _get_camera_director()
+	if director != null and director.has_method("current_zoom"):
+		base = float(director.current_zoom())
+	elif cam_zoom >= CAM_ZOOM_MIN:
+		base = cam_zoom
+	_set_cam_zoom(base + delta)
+
+
+## Push a normalized zoom to the CameraDirector instantly. No-op if the director
+## isn't in the tree (headless GUT stripped contexts). Routed through the
+## director's public API — never writes Camera2D.zoom directly (per camera-layer.md
+## migration policy "future writers MUST route through CameraDirector").
+func _apply_cam_zoom_to_director(normalized: float) -> void:
+	var director: Node = _get_camera_director()
+	if director != null and director.has_method("request_zoom"):
+		director.request_zoom(normalized, 0.0)
+
+
+func _get_camera_director() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_tree().root.get_node_or_null("CameraDirector")
+
+
+## Test-only: set the live cam-zoom to an absolute normalized value without the
+## JS bridge / key events. Drives the full apply + emit path so GUT can assert
+## the director receives the clamped value + the signal fires.
+func set_cam_zoom_for_test(normalized: float) -> void:
+	_set_cam_zoom(normalized)
+
+
+## Test-only: step the live cam-zoom (exercises the +/- key path's clamp +
+## current-zoom-base behavior without an InputEventKey).
+func step_cam_zoom_for_test(delta: float) -> void:
+	_step_cam_zoom(delta)
+
+
+## Test-only: reset cam_zoom state to the no-override default. Does NOT touch the
+## director (pair with CameraDirector.reset_to_player in the test's teardown).
+func reset_cam_zoom_for_test() -> void:
+	cam_zoom = CAM_ZOOM_DEFAULT
