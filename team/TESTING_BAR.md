@@ -165,6 +165,27 @@ This promotes orchestrator memory `soak-instruction-no-speculation` to a **hard 
 
 This is the automated complement to Gates 1+2 (which are human/process gates). It is **scoped, not yet built** — implementation is tracked by ClickUp `86c9ufaga` ("qa(spec): visual-fidelity Tier-2 — Playwright screenshot snapshot baseline"), a later Devon/Tess task. Until that ticket lands, Tier 1 (target ≠ rest) + Tier 2 (visible-draw-target landing) per § "Visual primitives" remain the binding floor; Gate 3 is the M3 Tier-3 promotion.
 
+### Pre-soak Gate 4 — first-of-class art aesthetic review (Uma) (Sponsor directive 2026-06-03)
+
+**Rule.** Any **NEW first-of-class visual asset** — a tileset, a sprite, a prop set, a VFX, a boss visual, or a first application of a palette to a new surface — requires an **Uma aesthetic review of the asset rendered IN CONTEXT** before it reaches Sponsor soak or merge. "In context" means tiled / placed in a real scene at the **actual game camera zoom**, and judged against the relevant Uma direction brief (e.g. `team/uma-ux/env-art-s1-direction.md`). Uma — not QA, not the impl author, not the orchestrator — posts the aesthetic sign-off (or REQUEST CHANGES) on that in-context render.
+
+**This gate is distinct from the other catch-points; it does not duplicate them:**
+
+- **Not QA (Gate 1 / Tess).** Tess verifies *mechanical render-correctness* — tiles paint, no `USER WARNING`, collision perimeter intact, `[BuildInfo]` SHA matches. Aesthetics are explicitly **not QA's job**; "the tiles paint correctly" and "the tiles look good tiled across a room" are different verdicts.
+- **Not the snapshot baseline (Gate 3 / `86c9ufaga`).** Visual-snapshot baselines catch **regressions** of brand-new art against an approved reference — they cannot judge "this brand-new art looks bad" on **first introduction**, because there is no approved baseline yet. Gate 4 is the first-introduction aesthetic judgment that *establishes* what a future baseline would lock.
+- **Not the author's self-soak.** The author's HTML5 self-soak proves the surface renders; it is not an aesthetic sign-off by the direction-owner.
+
+**Binding rule — judge art in context, never as isolated swatches.** Approval of an asset shown as **isolated or scaled-up swatches** (a 4×-scaled contact sheet, a single tile blown up, a sprite on a neutral background) does **NOT** constitute aesthetic sign-off. The **binding view is the in-context render at the actual game camera zoom** — tiled across a real room, placed alongside the other props, at the size and density the player will actually see. An asset that reads fine as an isolated swatch can read as a defect once tiled (the canonical failure: a tileset that looks textured at 4× but reads as **"a grid of bordered boxes"** tiled across a room at game zoom — exactly the anti-pattern Uma warned against in her own `env-art-s1-direction.md` §6.3).
+
+**Who produces the in-context render Uma signs off on:**
+
+- For **impl-wired assets** (a tileset/prop placed into a chunk `.tscn` by Drew/Devon): the impl author's **HTML5 self-soak screenshot** at game zoom — the same artifact the author-self-soak gate already requires — IS the in-context render. Uma reviews that screenshot against the brief.
+- For **orchestrator-generated assets not yet impl-wired** (a PixelLab-generated tileset/prop before a Drew ticket exists): the **orchestrator places the asset in a throwaway test scene at game zoom** (or a `diag/*` build) and captures the in-context render. Uma signs off on THAT, not on the PixelLab contact-sheet output.
+
+Either way, the artifact of record is the **in-context render at game zoom**, and Uma's sign-off comment names which render she reviewed.
+
+**Why this is a NET catch-point.** The Sponsor S1 perception-soak (2026-06-03, build `aa8a30b`) caught the floor tileset reading as a grid of bordered boxes — the §6.3 anti-pattern — *after* it had cleared every prior gate: Tess's QA verified mechanical render-correctness (not aesthetics, correctly not her job); Uma, who authored the direction, never reviewed the GENERATED RESULT against her own brief; and the tiles were approved as isolated 4×-scaled swatches in a contact sheet, so the grid only became visible tiled across a room at game zoom. Gate 4 closes that exact gap: the direction-owner reviews the generated result, in context, at game zoom, before the Sponsor sees it.
+
 ---
 
 ## Load-bearing memory rules ported here for sub-agent visibility
@@ -191,6 +212,8 @@ These rules originate as auto-memory entries in the orchestrator's user-scope (`
 **Routing — when Playwright + Tess is sufficient (PR #314 retro, 2026-05-22).** **If the PR ships with a Playwright spec covering the mechanical surface (geometry / API contracts / edge cases / BuildInfo SHA / universal-warning gate / `[combat-trace]` API-invocation confirmations), Tess + spec own correctness; Sponsor soak is the 1-2 minute subjective-feel slice only** (deadzone feel at framerate, transition naturalness, scroll cadence, tonal coherence — things headless `gl_compatibility` cannot answer). Run the routing check before asking Sponsor to soak a visual-class PR — if a spec already exists hitting the mechanical surface, Tess runs it + posts verdict first, then Sponsor's ask is right-sized to the human-perception slice. **Cite-of-record:** `.claude/docs/sponsor-soak-routing.md` (codified post-PR-#314 spike) + orchestrator memory `sponsor-soak-routing-rule.md`. **Composes with — does not replace** `html5-visual-gated-author-self-soak` (author-side burden of proof, still required) and the first-of-class / tier-completion / shader-aesthetic surfaces where Sponsor soak IS the binding gate (see `sponsor-soak-routing.md` § "When Sponsor soak IS the gate"). The routing rule sharpens the Sponsor ask; it does not collapse to "skip the soak".
 
 This is the canonical poster-child for `product-vs-component-completeness` (below). Reference both rules together when working visual-layer surfaces.
+
+**Cross-ref — first-of-class art also needs an Uma aesthetic review (Pre-soak Gate 4).** This gate proves the visual *renders correctly* in WebGL2; it does NOT judge whether brand-new first-of-class art *looks good* tiled/placed at game zoom. For any NEW tileset / sprite / prop set / VFX / boss visual / first palette application, also clear **Pre-soak Gate 4** (above): an Uma aesthetic review of the asset rendered IN CONTEXT at game zoom against her direction brief, never as isolated swatches. (Driver: the 2026-06-03 S1 build-`aa8a30b` floor tileset read as a "grid of bordered boxes" tiled across a room after clearing every render-correctness gate.)
 
 ---
 
