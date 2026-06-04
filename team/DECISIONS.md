@@ -480,3 +480,9 @@ Format:
 - Detail: this PR (`docs/stoker-palette-swap-decision`) records the decision in this entry; the actual Stoker bake + SpriteFrames authoring lands at M3W-5 per Priya's scope brief.
 
 
+
+## 2026-06-04 — S1 character art-direction: bestiary doctrine + visible-equipment locked (Sponsor-approved)
+
+**Bestiary doctrine LOCKED** (`team/uma-ux/character-monster-direction.md`): "the monsters ARE the place's dead" — each stratum's mobs are the corrupted former inhabitants; every creature carries an ember tell (`#D24A3C` aggro-eye / `#FF6A2A` rest-ember); the player (humble bald blue-eyed cloister monk) is the sole ember-FREE humanoid, the living contrast. S1 recast: grunt=cloister-penitent, charger=ossuary-thing, shooter=brazier-warden, boss=the Warden; hub NPCs stay ember-free. Player is doctrine-EXEMPT (never retinted). Sponsor approved the direction 2026-06-04.
+
+**Visible-equipment system LOCKED** (`team/uma-ux/visible-equipment-system.md`): 3-layer rig — armor-tier body-swaps (4: rags/light/medium/heavy via `create_character_state`) + per-weapon overlay sprites pinned to a hand-anchor + the body carrying motion. Weapon classes M3: FIST + ONE_HAND_MELEE. States for armor tiers, overlays for weapon variety (NOT states-per-weapon). Build AFTER the S1 mob roster.
