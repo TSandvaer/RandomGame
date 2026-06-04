@@ -127,3 +127,20 @@ Tags noted: `mobs`, `charger`, `ci-flake`, `html5`, `progression` are NOT existi
       `team/uma-ux/player-journey.md` Beat 4 hand-off).
 - created_at: 2026-05-06T (Drew run-002 Stage 2b)
 - attempts: 0 (deferred filing — orchestrator to flush)
+
+## ENTRY 2026-06-04-001
+- op: update_task (status move TO DO → IN PROGRESS, then → READY FOR QA TEST)
+- list_id: 901523123922
+- payload:
+    name: "feat(player): install new monk sprite rig (8-dir, 6 anims)"
+    target_status: "ready for qa test"
+    pr: "https://github.com/TSandvaer/RandomGame/pull/409"
+- NOTE: **No ClickUp ticket ID was provided in the dispatch brief** for the
+    monk-rig-install task, and no matching ticket was found in
+    clickup-synced.md / clickup-pending.md. Drew did NOT fabricate an ID
+    (per never-fabricate rule). **Orchestrator/Priya: locate or create the
+    monk-rig ticket on the board and flip it to `ready for qa test`** paired
+    with PR #409. The work is complete + PR open; ClickUp is the only gate
+    not actioned (could not action without a real ticket ID).
+- created_at: 2026-06-04 (Drew monk-rig-install)
+- attempts: 0
