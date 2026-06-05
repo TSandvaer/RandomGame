@@ -1,277 +1,309 @@
-[gd_resource type="SpriteFrames" load_steps=273 format=3 uid="uid://b0embergrave_player_sprite_frames"]
+[gd_resource type="SpriteFrames" load_steps=305 format=3 uid="uid://b0embergrave_player_sprite_frames"]
 
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south/frame_000.png" id="f_0000"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south/frame_001.png" id="f_0001"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south/frame_002.png" id="f_0002"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south/frame_003.png" id="f_0003"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south/frame_004.png" id="f_0004"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south/frame_005.png" id="f_0005"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-east/frame_000.png" id="f_0006"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-east/frame_001.png" id="f_0007"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-east/frame_002.png" id="f_0008"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-east/frame_003.png" id="f_0009"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-east/frame_004.png" id="f_0010"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-east/frame_005.png" id="f_0011"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/east/frame_000.png" id="f_0012"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/east/frame_001.png" id="f_0013"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/east/frame_002.png" id="f_0014"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/east/frame_003.png" id="f_0015"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/east/frame_004.png" id="f_0016"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/east/frame_005.png" id="f_0017"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-east/frame_000.png" id="f_0018"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-east/frame_001.png" id="f_0019"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-east/frame_002.png" id="f_0020"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-east/frame_003.png" id="f_0021"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-east/frame_004.png" id="f_0022"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-east/frame_005.png" id="f_0023"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north/frame_000.png" id="f_0024"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north/frame_001.png" id="f_0025"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north/frame_002.png" id="f_0026"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north/frame_003.png" id="f_0027"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north/frame_004.png" id="f_0028"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north/frame_005.png" id="f_0029"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-west/frame_000.png" id="f_0030"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-west/frame_001.png" id="f_0031"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-west/frame_002.png" id="f_0032"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-west/frame_003.png" id="f_0033"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-west/frame_004.png" id="f_0034"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/north-west/frame_005.png" id="f_0035"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/west/frame_000.png" id="f_0036"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/west/frame_001.png" id="f_0037"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/west/frame_002.png" id="f_0038"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/west/frame_003.png" id="f_0039"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/west/frame_004.png" id="f_0040"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/west/frame_005.png" id="f_0041"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-west/frame_000.png" id="f_0042"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-west/frame_001.png" id="f_0043"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-west/frame_002.png" id="f_0044"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-west/frame_003.png" id="f_0045"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-west/frame_004.png" id="f_0046"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/walk/south-west/frame_005.png" id="f_0047"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/south/frame_000.png" id="f_0048"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/south/frame_001.png" id="f_0049"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/south/frame_002.png" id="f_0050"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/south-east/frame_000.png" id="f_0051"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/south-east/frame_001.png" id="f_0052"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/south-east/frame_002.png" id="f_0053"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/east/frame_000.png" id="f_0054"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/east/frame_001.png" id="f_0055"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/east/frame_002.png" id="f_0056"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/north-east/frame_000.png" id="f_0057"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/north-east/frame_001.png" id="f_0058"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/north-east/frame_002.png" id="f_0059"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/north/frame_000.png" id="f_0060"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/north/frame_001.png" id="f_0061"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/north/frame_002.png" id="f_0062"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/north-west/frame_000.png" id="f_0063"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/north-west/frame_001.png" id="f_0064"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/north-west/frame_002.png" id="f_0065"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/west/frame_000.png" id="f_0066"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/west/frame_001.png" id="f_0067"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/west/frame_002.png" id="f_0068"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/south-west/frame_000.png" id="f_0069"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/south-west/frame_001.png" id="f_0070"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_light/south-west/frame_002.png" id="f_0071"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south/frame_000.png" id="f_0072"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south/frame_001.png" id="f_0073"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south/frame_002.png" id="f_0074"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south/frame_003.png" id="f_0075"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south/frame_004.png" id="f_0076"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south/frame_005.png" id="f_0077"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-east/frame_000.png" id="f_0078"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-east/frame_001.png" id="f_0079"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-east/frame_002.png" id="f_0080"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-east/frame_003.png" id="f_0081"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-east/frame_004.png" id="f_0082"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-east/frame_005.png" id="f_0083"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/east/frame_000.png" id="f_0084"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/east/frame_001.png" id="f_0085"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/east/frame_002.png" id="f_0086"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/east/frame_003.png" id="f_0087"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/east/frame_004.png" id="f_0088"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/east/frame_005.png" id="f_0089"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-east/frame_000.png" id="f_0090"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-east/frame_001.png" id="f_0091"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-east/frame_002.png" id="f_0092"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-east/frame_003.png" id="f_0093"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-east/frame_004.png" id="f_0094"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-east/frame_005.png" id="f_0095"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north/frame_000.png" id="f_0096"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north/frame_001.png" id="f_0097"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north/frame_002.png" id="f_0098"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north/frame_003.png" id="f_0099"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north/frame_004.png" id="f_0100"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north/frame_005.png" id="f_0101"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-west/frame_000.png" id="f_0102"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-west/frame_001.png" id="f_0103"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-west/frame_002.png" id="f_0104"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-west/frame_003.png" id="f_0105"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-west/frame_004.png" id="f_0106"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/north-west/frame_005.png" id="f_0107"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/west/frame_000.png" id="f_0108"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/west/frame_001.png" id="f_0109"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/west/frame_002.png" id="f_0110"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/west/frame_003.png" id="f_0111"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/west/frame_004.png" id="f_0112"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/west/frame_005.png" id="f_0113"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-west/frame_000.png" id="f_0114"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-west/frame_001.png" id="f_0115"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-west/frame_002.png" id="f_0116"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-west/frame_003.png" id="f_0117"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-west/frame_004.png" id="f_0118"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/attack_heavy/south-west/frame_005.png" id="f_0119"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south/frame_000.png" id="f_0120"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south/frame_001.png" id="f_0121"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south/frame_002.png" id="f_0122"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south/frame_003.png" id="f_0123"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south/frame_004.png" id="f_0124"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south/frame_005.png" id="f_0125"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-east/frame_000.png" id="f_0126"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-east/frame_001.png" id="f_0127"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-east/frame_002.png" id="f_0128"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-east/frame_003.png" id="f_0129"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-east/frame_004.png" id="f_0130"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-east/frame_005.png" id="f_0131"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/east/frame_000.png" id="f_0132"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/east/frame_001.png" id="f_0133"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/east/frame_002.png" id="f_0134"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/east/frame_003.png" id="f_0135"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/east/frame_004.png" id="f_0136"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/east/frame_005.png" id="f_0137"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-east/frame_000.png" id="f_0138"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-east/frame_001.png" id="f_0139"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-east/frame_002.png" id="f_0140"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-east/frame_003.png" id="f_0141"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-east/frame_004.png" id="f_0142"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-east/frame_005.png" id="f_0143"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north/frame_000.png" id="f_0144"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north/frame_001.png" id="f_0145"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north/frame_002.png" id="f_0146"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north/frame_003.png" id="f_0147"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north/frame_004.png" id="f_0148"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north/frame_005.png" id="f_0149"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-west/frame_000.png" id="f_0150"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-west/frame_001.png" id="f_0151"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-west/frame_002.png" id="f_0152"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-west/frame_003.png" id="f_0153"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-west/frame_004.png" id="f_0154"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/north-west/frame_005.png" id="f_0155"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/west/frame_000.png" id="f_0156"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/west/frame_001.png" id="f_0157"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/west/frame_002.png" id="f_0158"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/west/frame_003.png" id="f_0159"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/west/frame_004.png" id="f_0160"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/west/frame_005.png" id="f_0161"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-west/frame_000.png" id="f_0162"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-west/frame_001.png" id="f_0163"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-west/frame_002.png" id="f_0164"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-west/frame_003.png" id="f_0165"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-west/frame_004.png" id="f_0166"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/dodge/south-west/frame_005.png" id="f_0167"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south/frame_000.png" id="f_0168"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south/frame_001.png" id="f_0169"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south/frame_002.png" id="f_0170"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south/frame_003.png" id="f_0171"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south/frame_004.png" id="f_0172"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south/frame_005.png" id="f_0173"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-east/frame_000.png" id="f_0174"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-east/frame_001.png" id="f_0175"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-east/frame_002.png" id="f_0176"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-east/frame_003.png" id="f_0177"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-east/frame_004.png" id="f_0178"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-east/frame_005.png" id="f_0179"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/east/frame_000.png" id="f_0180"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/east/frame_001.png" id="f_0181"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/east/frame_002.png" id="f_0182"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/east/frame_003.png" id="f_0183"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/east/frame_004.png" id="f_0184"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/east/frame_005.png" id="f_0185"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-east/frame_000.png" id="f_0186"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-east/frame_001.png" id="f_0187"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-east/frame_002.png" id="f_0188"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-east/frame_003.png" id="f_0189"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-east/frame_004.png" id="f_0190"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-east/frame_005.png" id="f_0191"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north/frame_000.png" id="f_0192"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north/frame_001.png" id="f_0193"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north/frame_002.png" id="f_0194"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north/frame_003.png" id="f_0195"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north/frame_004.png" id="f_0196"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north/frame_005.png" id="f_0197"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-west/frame_000.png" id="f_0198"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-west/frame_001.png" id="f_0199"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-west/frame_002.png" id="f_0200"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-west/frame_003.png" id="f_0201"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-west/frame_004.png" id="f_0202"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/north-west/frame_005.png" id="f_0203"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/west/frame_000.png" id="f_0204"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/west/frame_001.png" id="f_0205"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/west/frame_002.png" id="f_0206"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/west/frame_003.png" id="f_0207"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/west/frame_004.png" id="f_0208"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/west/frame_005.png" id="f_0209"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-west/frame_000.png" id="f_0210"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-west/frame_001.png" id="f_0211"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-west/frame_002.png" id="f_0212"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-west/frame_003.png" id="f_0213"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-west/frame_004.png" id="f_0214"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/hit/south-west/frame_005.png" id="f_0215"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south/frame_000.png" id="f_0216"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south/frame_001.png" id="f_0217"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south/frame_002.png" id="f_0218"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south/frame_003.png" id="f_0219"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south/frame_004.png" id="f_0220"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south/frame_005.png" id="f_0221"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south/frame_006.png" id="f_0222"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-east/frame_000.png" id="f_0223"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-east/frame_001.png" id="f_0224"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-east/frame_002.png" id="f_0225"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-east/frame_003.png" id="f_0226"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-east/frame_004.png" id="f_0227"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-east/frame_005.png" id="f_0228"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-east/frame_006.png" id="f_0229"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/east/frame_000.png" id="f_0230"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/east/frame_001.png" id="f_0231"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/east/frame_002.png" id="f_0232"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/east/frame_003.png" id="f_0233"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/east/frame_004.png" id="f_0234"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/east/frame_005.png" id="f_0235"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/east/frame_006.png" id="f_0236"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-east/frame_000.png" id="f_0237"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-east/frame_001.png" id="f_0238"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-east/frame_002.png" id="f_0239"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-east/frame_003.png" id="f_0240"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-east/frame_004.png" id="f_0241"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-east/frame_005.png" id="f_0242"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-east/frame_006.png" id="f_0243"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north/frame_000.png" id="f_0244"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north/frame_001.png" id="f_0245"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north/frame_002.png" id="f_0246"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north/frame_003.png" id="f_0247"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north/frame_004.png" id="f_0248"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north/frame_005.png" id="f_0249"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north/frame_006.png" id="f_0250"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-west/frame_000.png" id="f_0251"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-west/frame_001.png" id="f_0252"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-west/frame_002.png" id="f_0253"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-west/frame_003.png" id="f_0254"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-west/frame_004.png" id="f_0255"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-west/frame_005.png" id="f_0256"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/north-west/frame_006.png" id="f_0257"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/west/frame_000.png" id="f_0258"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/west/frame_001.png" id="f_0259"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/west/frame_002.png" id="f_0260"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/west/frame_003.png" id="f_0261"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/west/frame_004.png" id="f_0262"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/west/frame_005.png" id="f_0263"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/west/frame_006.png" id="f_0264"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-west/frame_000.png" id="f_0265"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-west/frame_001.png" id="f_0266"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-west/frame_002.png" id="f_0267"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-west/frame_003.png" id="f_0268"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-west/frame_004.png" id="f_0269"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-west/frame_005.png" id="f_0270"]
-[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_re-queue/animations/die/south-west/frame_006.png" id="f_0271"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south/frame_000.png" id="f_0000"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south/frame_001.png" id="f_0001"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south/frame_002.png" id="f_0002"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south/frame_003.png" id="f_0003"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south/frame_004.png" id="f_0004"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south/frame_005.png" id="f_0005"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-east/frame_000.png" id="f_0006"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-east/frame_001.png" id="f_0007"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-east/frame_002.png" id="f_0008"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-east/frame_003.png" id="f_0009"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-east/frame_004.png" id="f_0010"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-east/frame_005.png" id="f_0011"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/east/frame_000.png" id="f_0012"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/east/frame_001.png" id="f_0013"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/east/frame_002.png" id="f_0014"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/east/frame_003.png" id="f_0015"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/east/frame_004.png" id="f_0016"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/east/frame_005.png" id="f_0017"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-east/frame_000.png" id="f_0018"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-east/frame_001.png" id="f_0019"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-east/frame_002.png" id="f_0020"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-east/frame_003.png" id="f_0021"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-east/frame_004.png" id="f_0022"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-east/frame_005.png" id="f_0023"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north/frame_000.png" id="f_0024"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north/frame_001.png" id="f_0025"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north/frame_002.png" id="f_0026"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north/frame_003.png" id="f_0027"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north/frame_004.png" id="f_0028"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north/frame_005.png" id="f_0029"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-west/frame_000.png" id="f_0030"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-west/frame_001.png" id="f_0031"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-west/frame_002.png" id="f_0032"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-west/frame_003.png" id="f_0033"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-west/frame_004.png" id="f_0034"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/north-west/frame_005.png" id="f_0035"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/west/frame_000.png" id="f_0036"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/west/frame_001.png" id="f_0037"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/west/frame_002.png" id="f_0038"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/west/frame_003.png" id="f_0039"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/west/frame_004.png" id="f_0040"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/west/frame_005.png" id="f_0041"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-west/frame_000.png" id="f_0042"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-west/frame_001.png" id="f_0043"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-west/frame_002.png" id="f_0044"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-west/frame_003.png" id="f_0045"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-west/frame_004.png" id="f_0046"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/walk/south-west/frame_005.png" id="f_0047"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south/frame_000.png" id="f_0048"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south/frame_001.png" id="f_0049"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south/frame_002.png" id="f_0050"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south/frame_003.png" id="f_0051"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south-east/frame_000.png" id="f_0052"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south-east/frame_001.png" id="f_0053"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south-east/frame_002.png" id="f_0054"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south-east/frame_003.png" id="f_0055"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/east/frame_000.png" id="f_0056"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/east/frame_001.png" id="f_0057"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/east/frame_002.png" id="f_0058"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/east/frame_003.png" id="f_0059"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north-east/frame_000.png" id="f_0060"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north-east/frame_001.png" id="f_0061"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north-east/frame_002.png" id="f_0062"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north-east/frame_003.png" id="f_0063"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north/frame_000.png" id="f_0064"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north/frame_001.png" id="f_0065"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north/frame_002.png" id="f_0066"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north/frame_003.png" id="f_0067"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north-west/frame_000.png" id="f_0068"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north-west/frame_001.png" id="f_0069"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north-west/frame_002.png" id="f_0070"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/north-west/frame_003.png" id="f_0071"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/west/frame_000.png" id="f_0072"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/west/frame_001.png" id="f_0073"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/west/frame_002.png" id="f_0074"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/west/frame_003.png" id="f_0075"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south-west/frame_000.png" id="f_0076"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south-west/frame_001.png" id="f_0077"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south-west/frame_002.png" id="f_0078"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/idle/south-west/frame_003.png" id="f_0079"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/south/frame_000.png" id="f_0080"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/south/frame_001.png" id="f_0081"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/south/frame_002.png" id="f_0082"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/south-east/frame_000.png" id="f_0083"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/south-east/frame_001.png" id="f_0084"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/south-east/frame_002.png" id="f_0085"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/east/frame_000.png" id="f_0086"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/east/frame_001.png" id="f_0087"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/east/frame_002.png" id="f_0088"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/north-east/frame_000.png" id="f_0089"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/north-east/frame_001.png" id="f_0090"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/north-east/frame_002.png" id="f_0091"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/north/frame_000.png" id="f_0092"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/north/frame_001.png" id="f_0093"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/north/frame_002.png" id="f_0094"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/north-west/frame_000.png" id="f_0095"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/north-west/frame_001.png" id="f_0096"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/north-west/frame_002.png" id="f_0097"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/west/frame_000.png" id="f_0098"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/west/frame_001.png" id="f_0099"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/west/frame_002.png" id="f_0100"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/south-west/frame_000.png" id="f_0101"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/south-west/frame_001.png" id="f_0102"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_light/south-west/frame_002.png" id="f_0103"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south/frame_000.png" id="f_0104"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south/frame_001.png" id="f_0105"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south/frame_002.png" id="f_0106"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south/frame_003.png" id="f_0107"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south/frame_004.png" id="f_0108"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south/frame_005.png" id="f_0109"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-east/frame_000.png" id="f_0110"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-east/frame_001.png" id="f_0111"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-east/frame_002.png" id="f_0112"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-east/frame_003.png" id="f_0113"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-east/frame_004.png" id="f_0114"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-east/frame_005.png" id="f_0115"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/east/frame_000.png" id="f_0116"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/east/frame_001.png" id="f_0117"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/east/frame_002.png" id="f_0118"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/east/frame_003.png" id="f_0119"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/east/frame_004.png" id="f_0120"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/east/frame_005.png" id="f_0121"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-east/frame_000.png" id="f_0122"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-east/frame_001.png" id="f_0123"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-east/frame_002.png" id="f_0124"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-east/frame_003.png" id="f_0125"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-east/frame_004.png" id="f_0126"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-east/frame_005.png" id="f_0127"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north/frame_000.png" id="f_0128"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north/frame_001.png" id="f_0129"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north/frame_002.png" id="f_0130"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north/frame_003.png" id="f_0131"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north/frame_004.png" id="f_0132"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north/frame_005.png" id="f_0133"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-west/frame_000.png" id="f_0134"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-west/frame_001.png" id="f_0135"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-west/frame_002.png" id="f_0136"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-west/frame_003.png" id="f_0137"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-west/frame_004.png" id="f_0138"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/north-west/frame_005.png" id="f_0139"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/west/frame_000.png" id="f_0140"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/west/frame_001.png" id="f_0141"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/west/frame_002.png" id="f_0142"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/west/frame_003.png" id="f_0143"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/west/frame_004.png" id="f_0144"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/west/frame_005.png" id="f_0145"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-west/frame_000.png" id="f_0146"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-west/frame_001.png" id="f_0147"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-west/frame_002.png" id="f_0148"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-west/frame_003.png" id="f_0149"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-west/frame_004.png" id="f_0150"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/attack_heavy/south-west/frame_005.png" id="f_0151"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south/frame_000.png" id="f_0152"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south/frame_001.png" id="f_0153"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south/frame_002.png" id="f_0154"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south/frame_003.png" id="f_0155"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south/frame_004.png" id="f_0156"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south/frame_005.png" id="f_0157"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-east/frame_000.png" id="f_0158"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-east/frame_001.png" id="f_0159"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-east/frame_002.png" id="f_0160"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-east/frame_003.png" id="f_0161"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-east/frame_004.png" id="f_0162"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-east/frame_005.png" id="f_0163"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/east/frame_000.png" id="f_0164"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/east/frame_001.png" id="f_0165"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/east/frame_002.png" id="f_0166"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/east/frame_003.png" id="f_0167"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/east/frame_004.png" id="f_0168"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/east/frame_005.png" id="f_0169"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-east/frame_000.png" id="f_0170"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-east/frame_001.png" id="f_0171"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-east/frame_002.png" id="f_0172"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-east/frame_003.png" id="f_0173"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-east/frame_004.png" id="f_0174"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-east/frame_005.png" id="f_0175"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north/frame_000.png" id="f_0176"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north/frame_001.png" id="f_0177"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north/frame_002.png" id="f_0178"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north/frame_003.png" id="f_0179"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north/frame_004.png" id="f_0180"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north/frame_005.png" id="f_0181"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-west/frame_000.png" id="f_0182"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-west/frame_001.png" id="f_0183"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-west/frame_002.png" id="f_0184"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-west/frame_003.png" id="f_0185"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-west/frame_004.png" id="f_0186"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/north-west/frame_005.png" id="f_0187"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/west/frame_000.png" id="f_0188"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/west/frame_001.png" id="f_0189"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/west/frame_002.png" id="f_0190"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/west/frame_003.png" id="f_0191"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/west/frame_004.png" id="f_0192"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/west/frame_005.png" id="f_0193"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-west/frame_000.png" id="f_0194"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-west/frame_001.png" id="f_0195"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-west/frame_002.png" id="f_0196"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-west/frame_003.png" id="f_0197"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-west/frame_004.png" id="f_0198"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/dodge/south-west/frame_005.png" id="f_0199"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south/frame_000.png" id="f_0200"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south/frame_001.png" id="f_0201"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south/frame_002.png" id="f_0202"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south/frame_003.png" id="f_0203"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south/frame_004.png" id="f_0204"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south/frame_005.png" id="f_0205"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-east/frame_000.png" id="f_0206"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-east/frame_001.png" id="f_0207"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-east/frame_002.png" id="f_0208"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-east/frame_003.png" id="f_0209"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-east/frame_004.png" id="f_0210"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-east/frame_005.png" id="f_0211"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/east/frame_000.png" id="f_0212"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/east/frame_001.png" id="f_0213"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/east/frame_002.png" id="f_0214"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/east/frame_003.png" id="f_0215"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/east/frame_004.png" id="f_0216"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/east/frame_005.png" id="f_0217"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-east/frame_000.png" id="f_0218"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-east/frame_001.png" id="f_0219"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-east/frame_002.png" id="f_0220"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-east/frame_003.png" id="f_0221"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-east/frame_004.png" id="f_0222"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-east/frame_005.png" id="f_0223"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north/frame_000.png" id="f_0224"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north/frame_001.png" id="f_0225"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north/frame_002.png" id="f_0226"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north/frame_003.png" id="f_0227"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north/frame_004.png" id="f_0228"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north/frame_005.png" id="f_0229"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-west/frame_000.png" id="f_0230"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-west/frame_001.png" id="f_0231"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-west/frame_002.png" id="f_0232"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-west/frame_003.png" id="f_0233"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-west/frame_004.png" id="f_0234"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/north-west/frame_005.png" id="f_0235"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/west/frame_000.png" id="f_0236"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/west/frame_001.png" id="f_0237"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/west/frame_002.png" id="f_0238"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/west/frame_003.png" id="f_0239"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/west/frame_004.png" id="f_0240"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/west/frame_005.png" id="f_0241"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-west/frame_000.png" id="f_0242"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-west/frame_001.png" id="f_0243"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-west/frame_002.png" id="f_0244"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-west/frame_003.png" id="f_0245"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-west/frame_004.png" id="f_0246"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/hit/south-west/frame_005.png" id="f_0247"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south/frame_000.png" id="f_0248"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south/frame_001.png" id="f_0249"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south/frame_002.png" id="f_0250"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south/frame_003.png" id="f_0251"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south/frame_004.png" id="f_0252"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south/frame_005.png" id="f_0253"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south/frame_006.png" id="f_0254"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-east/frame_000.png" id="f_0255"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-east/frame_001.png" id="f_0256"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-east/frame_002.png" id="f_0257"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-east/frame_003.png" id="f_0258"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-east/frame_004.png" id="f_0259"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-east/frame_005.png" id="f_0260"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-east/frame_006.png" id="f_0261"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/east/frame_000.png" id="f_0262"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/east/frame_001.png" id="f_0263"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/east/frame_002.png" id="f_0264"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/east/frame_003.png" id="f_0265"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/east/frame_004.png" id="f_0266"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/east/frame_005.png" id="f_0267"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/east/frame_006.png" id="f_0268"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-east/frame_000.png" id="f_0269"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-east/frame_001.png" id="f_0270"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-east/frame_002.png" id="f_0271"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-east/frame_003.png" id="f_0272"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-east/frame_004.png" id="f_0273"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-east/frame_005.png" id="f_0274"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-east/frame_006.png" id="f_0275"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north/frame_000.png" id="f_0276"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north/frame_001.png" id="f_0277"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north/frame_002.png" id="f_0278"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north/frame_003.png" id="f_0279"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north/frame_004.png" id="f_0280"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north/frame_005.png" id="f_0281"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north/frame_006.png" id="f_0282"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-west/frame_000.png" id="f_0283"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-west/frame_001.png" id="f_0284"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-west/frame_002.png" id="f_0285"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-west/frame_003.png" id="f_0286"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-west/frame_004.png" id="f_0287"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-west/frame_005.png" id="f_0288"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/north-west/frame_006.png" id="f_0289"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/west/frame_000.png" id="f_0290"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/west/frame_001.png" id="f_0291"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/west/frame_002.png" id="f_0292"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/west/frame_003.png" id="f_0293"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/west/frame_004.png" id="f_0294"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/west/frame_005.png" id="f_0295"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/west/frame_006.png" id="f_0296"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-west/frame_000.png" id="f_0297"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-west/frame_001.png" id="f_0298"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-west/frame_002.png" id="f_0299"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-west/frame_003.png" id="f_0300"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-west/frame_004.png" id="f_0301"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-west/frame_005.png" id="f_0302"]
+[ext_resource type="Texture2D" path="res://assets/sprites/player/_pixellab_anims/Player_Monk_v3_strict/animations/die/south-west/frame_006.png" id="f_0303"]
 
 [resource]
 animations = [
@@ -279,19 +311,24 @@ animations = [
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_0000")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0001")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0002")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0003")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0004")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0005")
 }],
@@ -303,19 +340,24 @@ animations = [
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_0006")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0007")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0008")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0009")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0010")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0011")
 }],
@@ -327,19 +369,24 @@ animations = [
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_0012")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0013")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0014")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0015")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0016")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0017")
 }],
@@ -351,19 +398,24 @@ animations = [
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_0018")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0019")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0020")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0021")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0022")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0023")
 }],
@@ -375,19 +427,24 @@ animations = [
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_0024")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0025")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0026")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0027")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0028")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0029")
 }],
@@ -399,19 +456,24 @@ animations = [
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_0030")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0031")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0032")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0033")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0034")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0035")
 }],
@@ -423,19 +485,24 @@ animations = [
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_0036")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0037")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0038")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0039")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0040")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0041")
 }],
@@ -447,19 +514,24 @@ animations = [
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_0042")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0043")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0044")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0045")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0046")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0047")
 }],
@@ -471,12 +543,182 @@ animations = [
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_0048")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0049")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_0050")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0051")
+}],
+"loop": true,
+"name": &"idle_s",
+"speed": 8.0
+},
+{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_0052")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0053")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0054")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0055")
+}],
+"loop": true,
+"name": &"idle_se",
+"speed": 8.0
+},
+{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_0056")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0057")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0058")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0059")
+}],
+"loop": true,
+"name": &"idle_e",
+"speed": 8.0
+},
+{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_0060")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0061")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0062")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0063")
+}],
+"loop": true,
+"name": &"idle_ne",
+"speed": 8.0
+},
+{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_0064")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0065")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0066")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0067")
+}],
+"loop": true,
+"name": &"idle_n",
+"speed": 8.0
+},
+{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_0068")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0069")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0070")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0071")
+}],
+"loop": true,
+"name": &"idle_nw",
+"speed": 8.0
+},
+{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_0072")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0073")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0074")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0075")
+}],
+"loop": true,
+"name": &"idle_w",
+"speed": 8.0
+},
+{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_0076")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0077")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0078")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0079")
+}],
+"loop": true,
+"name": &"idle_sw",
+"speed": 8.0
+},
+{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_0080")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0081")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_0082")
 }],
 "loop": false,
 "name": &"attack_light_s",
@@ -485,13 +727,15 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0051")
-}, {
+"texture": ExtResource("f_0083")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0052")
-}, {
+"texture": ExtResource("f_0084")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0053")
+"texture": ExtResource("f_0085")
 }],
 "loop": false,
 "name": &"attack_light_se",
@@ -500,13 +744,15 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0054")
-}, {
+"texture": ExtResource("f_0086")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0055")
-}, {
+"texture": ExtResource("f_0087")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0056")
+"texture": ExtResource("f_0088")
 }],
 "loop": false,
 "name": &"attack_light_e",
@@ -515,13 +761,15 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0057")
-}, {
+"texture": ExtResource("f_0089")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0058")
-}, {
+"texture": ExtResource("f_0090")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0059")
+"texture": ExtResource("f_0091")
 }],
 "loop": false,
 "name": &"attack_light_ne",
@@ -530,13 +778,15 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0060")
-}, {
+"texture": ExtResource("f_0092")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0061")
-}, {
+"texture": ExtResource("f_0093")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0062")
+"texture": ExtResource("f_0094")
 }],
 "loop": false,
 "name": &"attack_light_n",
@@ -545,13 +795,15 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0063")
-}, {
+"texture": ExtResource("f_0095")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0064")
-}, {
+"texture": ExtResource("f_0096")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0065")
+"texture": ExtResource("f_0097")
 }],
 "loop": false,
 "name": &"attack_light_nw",
@@ -560,13 +812,15 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0066")
-}, {
+"texture": ExtResource("f_0098")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0067")
-}, {
+"texture": ExtResource("f_0099")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0068")
+"texture": ExtResource("f_0100")
 }],
 "loop": false,
 "name": &"attack_light_w",
@@ -575,13 +829,15 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0069")
-}, {
+"texture": ExtResource("f_0101")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0070")
-}, {
+"texture": ExtResource("f_0102")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0071")
+"texture": ExtResource("f_0103")
 }],
 "loop": false,
 "name": &"attack_light_sw",
@@ -590,22 +846,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0072")
-}, {
+"texture": ExtResource("f_0104")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0073")
-}, {
+"texture": ExtResource("f_0105")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0074")
-}, {
+"texture": ExtResource("f_0106")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0075")
-}, {
+"texture": ExtResource("f_0107")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0076")
-}, {
+"texture": ExtResource("f_0108")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0077")
+"texture": ExtResource("f_0109")
 }],
 "loop": false,
 "name": &"attack_heavy_s",
@@ -614,22 +875,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0078")
-}, {
+"texture": ExtResource("f_0110")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0079")
-}, {
+"texture": ExtResource("f_0111")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0080")
-}, {
+"texture": ExtResource("f_0112")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0081")
-}, {
+"texture": ExtResource("f_0113")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0082")
-}, {
+"texture": ExtResource("f_0114")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0083")
+"texture": ExtResource("f_0115")
 }],
 "loop": false,
 "name": &"attack_heavy_se",
@@ -638,22 +904,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0084")
-}, {
+"texture": ExtResource("f_0116")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0085")
-}, {
+"texture": ExtResource("f_0117")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0086")
-}, {
+"texture": ExtResource("f_0118")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0087")
-}, {
+"texture": ExtResource("f_0119")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0088")
-}, {
+"texture": ExtResource("f_0120")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0089")
+"texture": ExtResource("f_0121")
 }],
 "loop": false,
 "name": &"attack_heavy_e",
@@ -662,22 +933,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0090")
-}, {
+"texture": ExtResource("f_0122")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0091")
-}, {
+"texture": ExtResource("f_0123")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0092")
-}, {
+"texture": ExtResource("f_0124")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0093")
-}, {
+"texture": ExtResource("f_0125")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0094")
-}, {
+"texture": ExtResource("f_0126")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0095")
+"texture": ExtResource("f_0127")
 }],
 "loop": false,
 "name": &"attack_heavy_ne",
@@ -686,22 +962,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0096")
-}, {
+"texture": ExtResource("f_0128")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0097")
-}, {
+"texture": ExtResource("f_0129")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0098")
-}, {
+"texture": ExtResource("f_0130")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0099")
-}, {
+"texture": ExtResource("f_0131")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0100")
-}, {
+"texture": ExtResource("f_0132")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0101")
+"texture": ExtResource("f_0133")
 }],
 "loop": false,
 "name": &"attack_heavy_n",
@@ -710,22 +991,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0102")
-}, {
+"texture": ExtResource("f_0134")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0103")
-}, {
+"texture": ExtResource("f_0135")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0104")
-}, {
+"texture": ExtResource("f_0136")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0105")
-}, {
+"texture": ExtResource("f_0137")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0106")
-}, {
+"texture": ExtResource("f_0138")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0107")
+"texture": ExtResource("f_0139")
 }],
 "loop": false,
 "name": &"attack_heavy_nw",
@@ -734,22 +1020,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0108")
-}, {
+"texture": ExtResource("f_0140")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0109")
-}, {
+"texture": ExtResource("f_0141")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0110")
-}, {
+"texture": ExtResource("f_0142")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0111")
-}, {
+"texture": ExtResource("f_0143")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0112")
-}, {
+"texture": ExtResource("f_0144")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0113")
+"texture": ExtResource("f_0145")
 }],
 "loop": false,
 "name": &"attack_heavy_w",
@@ -758,22 +1049,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0114")
-}, {
+"texture": ExtResource("f_0146")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0115")
-}, {
+"texture": ExtResource("f_0147")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0116")
-}, {
+"texture": ExtResource("f_0148")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0117")
-}, {
+"texture": ExtResource("f_0149")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0118")
-}, {
+"texture": ExtResource("f_0150")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0119")
+"texture": ExtResource("f_0151")
 }],
 "loop": false,
 "name": &"attack_heavy_sw",
@@ -782,22 +1078,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0120")
-}, {
+"texture": ExtResource("f_0152")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0121")
-}, {
+"texture": ExtResource("f_0153")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0122")
-}, {
+"texture": ExtResource("f_0154")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0123")
-}, {
+"texture": ExtResource("f_0155")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0124")
-}, {
+"texture": ExtResource("f_0156")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0125")
+"texture": ExtResource("f_0157")
 }],
 "loop": false,
 "name": &"dodge_s",
@@ -806,22 +1107,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0126")
-}, {
+"texture": ExtResource("f_0158")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0127")
-}, {
+"texture": ExtResource("f_0159")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0128")
-}, {
+"texture": ExtResource("f_0160")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0129")
-}, {
+"texture": ExtResource("f_0161")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0130")
-}, {
+"texture": ExtResource("f_0162")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0131")
+"texture": ExtResource("f_0163")
 }],
 "loop": false,
 "name": &"dodge_se",
@@ -830,22 +1136,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0132")
-}, {
+"texture": ExtResource("f_0164")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0133")
-}, {
+"texture": ExtResource("f_0165")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0134")
-}, {
+"texture": ExtResource("f_0166")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0135")
-}, {
+"texture": ExtResource("f_0167")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0136")
-}, {
+"texture": ExtResource("f_0168")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0137")
+"texture": ExtResource("f_0169")
 }],
 "loop": false,
 "name": &"dodge_e",
@@ -854,22 +1165,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0138")
-}, {
+"texture": ExtResource("f_0170")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0139")
-}, {
+"texture": ExtResource("f_0171")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0140")
-}, {
+"texture": ExtResource("f_0172")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0141")
-}, {
+"texture": ExtResource("f_0173")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0142")
-}, {
+"texture": ExtResource("f_0174")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0143")
+"texture": ExtResource("f_0175")
 }],
 "loop": false,
 "name": &"dodge_ne",
@@ -878,22 +1194,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0144")
-}, {
+"texture": ExtResource("f_0176")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0145")
-}, {
+"texture": ExtResource("f_0177")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0146")
-}, {
+"texture": ExtResource("f_0178")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0147")
-}, {
+"texture": ExtResource("f_0179")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0148")
-}, {
+"texture": ExtResource("f_0180")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0149")
+"texture": ExtResource("f_0181")
 }],
 "loop": false,
 "name": &"dodge_n",
@@ -902,22 +1223,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0150")
-}, {
+"texture": ExtResource("f_0182")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0151")
-}, {
+"texture": ExtResource("f_0183")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0152")
-}, {
+"texture": ExtResource("f_0184")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0153")
-}, {
+"texture": ExtResource("f_0185")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0154")
-}, {
+"texture": ExtResource("f_0186")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0155")
+"texture": ExtResource("f_0187")
 }],
 "loop": false,
 "name": &"dodge_nw",
@@ -926,22 +1252,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0156")
-}, {
+"texture": ExtResource("f_0188")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0157")
-}, {
+"texture": ExtResource("f_0189")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0158")
-}, {
+"texture": ExtResource("f_0190")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0159")
-}, {
+"texture": ExtResource("f_0191")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0160")
-}, {
+"texture": ExtResource("f_0192")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0161")
+"texture": ExtResource("f_0193")
 }],
 "loop": false,
 "name": &"dodge_w",
@@ -950,22 +1281,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0162")
-}, {
+"texture": ExtResource("f_0194")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0163")
-}, {
+"texture": ExtResource("f_0195")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0164")
-}, {
+"texture": ExtResource("f_0196")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0165")
-}, {
+"texture": ExtResource("f_0197")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0166")
-}, {
+"texture": ExtResource("f_0198")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0167")
+"texture": ExtResource("f_0199")
 }],
 "loop": false,
 "name": &"dodge_sw",
@@ -974,22 +1310,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0168")
-}, {
+"texture": ExtResource("f_0200")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0169")
-}, {
+"texture": ExtResource("f_0201")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0170")
-}, {
+"texture": ExtResource("f_0202")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0171")
-}, {
+"texture": ExtResource("f_0203")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0172")
-}, {
+"texture": ExtResource("f_0204")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0173")
+"texture": ExtResource("f_0205")
 }],
 "loop": false,
 "name": &"hit_s",
@@ -998,22 +1339,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0174")
-}, {
+"texture": ExtResource("f_0206")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0175")
-}, {
+"texture": ExtResource("f_0207")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0176")
-}, {
+"texture": ExtResource("f_0208")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0177")
-}, {
+"texture": ExtResource("f_0209")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0178")
-}, {
+"texture": ExtResource("f_0210")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0179")
+"texture": ExtResource("f_0211")
 }],
 "loop": false,
 "name": &"hit_se",
@@ -1022,22 +1368,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0180")
-}, {
+"texture": ExtResource("f_0212")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0181")
-}, {
+"texture": ExtResource("f_0213")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0182")
-}, {
+"texture": ExtResource("f_0214")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0183")
-}, {
+"texture": ExtResource("f_0215")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0184")
-}, {
+"texture": ExtResource("f_0216")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0185")
+"texture": ExtResource("f_0217")
 }],
 "loop": false,
 "name": &"hit_e",
@@ -1046,22 +1397,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0186")
-}, {
+"texture": ExtResource("f_0218")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0187")
-}, {
+"texture": ExtResource("f_0219")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0188")
-}, {
+"texture": ExtResource("f_0220")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0189")
-}, {
+"texture": ExtResource("f_0221")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0190")
-}, {
+"texture": ExtResource("f_0222")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0191")
+"texture": ExtResource("f_0223")
 }],
 "loop": false,
 "name": &"hit_ne",
@@ -1070,22 +1426,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0192")
-}, {
+"texture": ExtResource("f_0224")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0193")
-}, {
+"texture": ExtResource("f_0225")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0194")
-}, {
+"texture": ExtResource("f_0226")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0195")
-}, {
+"texture": ExtResource("f_0227")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0196")
-}, {
+"texture": ExtResource("f_0228")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0197")
+"texture": ExtResource("f_0229")
 }],
 "loop": false,
 "name": &"hit_n",
@@ -1094,22 +1455,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0198")
-}, {
+"texture": ExtResource("f_0230")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0199")
-}, {
+"texture": ExtResource("f_0231")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0200")
-}, {
+"texture": ExtResource("f_0232")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0201")
-}, {
+"texture": ExtResource("f_0233")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0202")
-}, {
+"texture": ExtResource("f_0234")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0203")
+"texture": ExtResource("f_0235")
 }],
 "loop": false,
 "name": &"hit_nw",
@@ -1118,22 +1484,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0204")
-}, {
+"texture": ExtResource("f_0236")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0205")
-}, {
+"texture": ExtResource("f_0237")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0206")
-}, {
+"texture": ExtResource("f_0238")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0207")
-}, {
+"texture": ExtResource("f_0239")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0208")
-}, {
+"texture": ExtResource("f_0240")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0209")
+"texture": ExtResource("f_0241")
 }],
 "loop": false,
 "name": &"hit_w",
@@ -1142,22 +1513,27 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0210")
-}, {
+"texture": ExtResource("f_0242")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0211")
-}, {
+"texture": ExtResource("f_0243")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0212")
-}, {
+"texture": ExtResource("f_0244")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0213")
-}, {
+"texture": ExtResource("f_0245")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0214")
-}, {
+"texture": ExtResource("f_0246")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0215")
+"texture": ExtResource("f_0247")
 }],
 "loop": false,
 "name": &"hit_sw",
@@ -1166,25 +1542,31 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0216")
-}, {
+"texture": ExtResource("f_0248")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0217")
-}, {
+"texture": ExtResource("f_0249")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0218")
-}, {
+"texture": ExtResource("f_0250")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0219")
-}, {
+"texture": ExtResource("f_0251")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0220")
-}, {
+"texture": ExtResource("f_0252")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0221")
-}, {
+"texture": ExtResource("f_0253")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0222")
+"texture": ExtResource("f_0254")
 }],
 "loop": false,
 "name": &"die_s",
@@ -1193,25 +1575,31 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0223")
-}, {
+"texture": ExtResource("f_0255")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0224")
-}, {
+"texture": ExtResource("f_0256")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0225")
-}, {
+"texture": ExtResource("f_0257")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0226")
-}, {
+"texture": ExtResource("f_0258")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0227")
-}, {
+"texture": ExtResource("f_0259")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0228")
-}, {
+"texture": ExtResource("f_0260")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0229")
+"texture": ExtResource("f_0261")
 }],
 "loop": false,
 "name": &"die_se",
@@ -1220,25 +1608,31 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0230")
-}, {
+"texture": ExtResource("f_0262")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0231")
-}, {
+"texture": ExtResource("f_0263")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0232")
-}, {
+"texture": ExtResource("f_0264")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0233")
-}, {
+"texture": ExtResource("f_0265")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0234")
-}, {
+"texture": ExtResource("f_0266")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0235")
-}, {
+"texture": ExtResource("f_0267")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0236")
+"texture": ExtResource("f_0268")
 }],
 "loop": false,
 "name": &"die_e",
@@ -1247,25 +1641,31 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0237")
-}, {
+"texture": ExtResource("f_0269")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0238")
-}, {
+"texture": ExtResource("f_0270")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0239")
-}, {
+"texture": ExtResource("f_0271")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0240")
-}, {
+"texture": ExtResource("f_0272")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0241")
-}, {
+"texture": ExtResource("f_0273")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0242")
-}, {
+"texture": ExtResource("f_0274")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0243")
+"texture": ExtResource("f_0275")
 }],
 "loop": false,
 "name": &"die_ne",
@@ -1274,25 +1674,31 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0244")
-}, {
+"texture": ExtResource("f_0276")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0245")
-}, {
+"texture": ExtResource("f_0277")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0246")
-}, {
+"texture": ExtResource("f_0278")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0247")
-}, {
+"texture": ExtResource("f_0279")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0248")
-}, {
+"texture": ExtResource("f_0280")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0249")
-}, {
+"texture": ExtResource("f_0281")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0250")
+"texture": ExtResource("f_0282")
 }],
 "loop": false,
 "name": &"die_n",
@@ -1301,25 +1707,31 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0251")
-}, {
+"texture": ExtResource("f_0283")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0252")
-}, {
+"texture": ExtResource("f_0284")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0253")
-}, {
+"texture": ExtResource("f_0285")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0254")
-}, {
+"texture": ExtResource("f_0286")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0255")
-}, {
+"texture": ExtResource("f_0287")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0256")
-}, {
+"texture": ExtResource("f_0288")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0257")
+"texture": ExtResource("f_0289")
 }],
 "loop": false,
 "name": &"die_nw",
@@ -1328,25 +1740,31 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0258")
-}, {
+"texture": ExtResource("f_0290")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0259")
-}, {
+"texture": ExtResource("f_0291")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0260")
-}, {
+"texture": ExtResource("f_0292")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0261")
-}, {
+"texture": ExtResource("f_0293")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0262")
-}, {
+"texture": ExtResource("f_0294")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0263")
-}, {
+"texture": ExtResource("f_0295")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0264")
+"texture": ExtResource("f_0296")
 }],
 "loop": false,
 "name": &"die_w",
@@ -1355,25 +1773,31 @@ animations = [
 {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_0265")
-}, {
+"texture": ExtResource("f_0297")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0266")
-}, {
+"texture": ExtResource("f_0298")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0267")
-}, {
+"texture": ExtResource("f_0299")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0268")
-}, {
+"texture": ExtResource("f_0300")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0269")
-}, {
+"texture": ExtResource("f_0301")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0270")
-}, {
+"texture": ExtResource("f_0302")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_0271")
+"texture": ExtResource("f_0303")
 }],
 "loop": false,
 "name": &"die_sw",

@@ -1,0 +1,432 @@
+{
+  "group_id": "4b542afc-f7d0-43b8-89e5-50ee28f869c4",
+  "states": [
+    {
+      "character": {
+        "id": "32f647b7-d63a-4342-8a51-1ece6535912f",
+        "name": "Player Monk v3 strict",
+        "prompt": "a dirt-poor humble cloister monk wearing ONLY a plain simple undyed homespun wool robe, completely bald clean-shaven smooth head, pale white skin, gentle blue eyes, absolutely no armor, no pauldrons, no shoulder plates, no metal, no gloves, no glowing, no ember, no fire, no beard, no stubble, nothing but threadbare patched cloth and a knotted rope belt, barefoot, frail gentle and penniless, solemn, dark-fantasy pixel art, dark muted stone palette",
+        "size": {
+          "width": 92,
+          "height": 92
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-06-04T10:35:44.500229+00:00"
+      },
+      "folder": "Player_Monk_v3_strict",
+      "frames": {
+        "rotations": {
+          "south": "Player_Monk_v3_strict/rotations/south.png",
+          "south-east": "Player_Monk_v3_strict/rotations/south-east.png",
+          "east": "Player_Monk_v3_strict/rotations/east.png",
+          "north-east": "Player_Monk_v3_strict/rotations/north-east.png",
+          "north": "Player_Monk_v3_strict/rotations/north.png",
+          "north-west": "Player_Monk_v3_strict/rotations/north-west.png",
+          "west": "Player_Monk_v3_strict/rotations/west.png",
+          "south-west": "Player_Monk_v3_strict/rotations/south-west.png"
+        },
+        "animations": {
+          "animating-9db04594": {
+            "north-east": [
+              "Player_Monk_v3_strict/animations/animating-9db04594/north-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/north-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/north-east/frame_002.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/north-east/frame_003.png"
+            ],
+            "south-east": [
+              "Player_Monk_v3_strict/animations/animating-9db04594/south-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/south-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/south-east/frame_002.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/south-east/frame_003.png"
+            ],
+            "west": [
+              "Player_Monk_v3_strict/animations/animating-9db04594/west/frame_000.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/west/frame_001.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/west/frame_002.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/west/frame_003.png"
+            ],
+            "south": [
+              "Player_Monk_v3_strict/animations/animating-9db04594/south/frame_000.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/south/frame_001.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/south/frame_002.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/south/frame_003.png"
+            ],
+            "north": [
+              "Player_Monk_v3_strict/animations/animating-9db04594/north/frame_000.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/north/frame_001.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/north/frame_002.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/north/frame_003.png"
+            ],
+            "south-west": [
+              "Player_Monk_v3_strict/animations/animating-9db04594/south-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/south-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/south-west/frame_002.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/south-west/frame_003.png"
+            ],
+            "north-west": [
+              "Player_Monk_v3_strict/animations/animating-9db04594/north-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/north-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/north-west/frame_002.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/north-west/frame_003.png"
+            ],
+            "east": [
+              "Player_Monk_v3_strict/animations/animating-9db04594/east/frame_000.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/east/frame_001.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/east/frame_002.png",
+              "Player_Monk_v3_strict/animations/animating-9db04594/east/frame_003.png"
+            ]
+          },
+          "walking-aa63b7be": {
+            "south": [
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south/frame_000.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south/frame_001.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south/frame_002.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south/frame_003.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south/frame_004.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south/frame_005.png"
+            ],
+            "south-west": [
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-west/frame_002.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-west/frame_003.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-west/frame_004.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-west/frame_005.png"
+            ],
+            "east": [
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/east/frame_000.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/east/frame_001.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/east/frame_002.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/east/frame_003.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/east/frame_004.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/east/frame_005.png"
+            ],
+            "north-west": [
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-west/frame_002.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-west/frame_003.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-west/frame_004.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-west/frame_005.png"
+            ],
+            "west": [
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/west/frame_000.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/west/frame_001.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/west/frame_002.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/west/frame_003.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/west/frame_004.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/west/frame_005.png"
+            ],
+            "north": [
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north/frame_000.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north/frame_001.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north/frame_002.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north/frame_003.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north/frame_004.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north/frame_005.png"
+            ],
+            "north-east": [
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-east/frame_002.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-east/frame_003.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-east/frame_004.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/north-east/frame_005.png"
+            ],
+            "south-east": [
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-east/frame_002.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-east/frame_003.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-east/frame_004.png",
+              "Player_Monk_v3_strict/animations/walking-aa63b7be/south-east/frame_005.png"
+            ]
+          },
+          "jab_attack-eb842ad8": {
+            "south-west": [
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/south-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/south-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/south-west/frame_002.png"
+            ],
+            "west": [
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/west/frame_000.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/west/frame_001.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/west/frame_002.png"
+            ],
+            "north-east": [
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/north-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/north-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/north-east/frame_002.png"
+            ],
+            "north-west": [
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/north-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/north-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/north-west/frame_002.png"
+            ],
+            "north": [
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/north/frame_000.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/north/frame_001.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/north/frame_002.png"
+            ],
+            "south": [
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/south/frame_000.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/south/frame_001.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/south/frame_002.png"
+            ],
+            "south-east": [
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/south-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/south-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/south-east/frame_002.png"
+            ],
+            "east": [
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/east/frame_000.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/east/frame_001.png",
+              "Player_Monk_v3_strict/animations/jab_attack-eb842ad8/east/frame_002.png"
+            ]
+          },
+          "cross_punch_attack-d2676276": {
+            "south": [
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south/frame_000.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south/frame_001.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south/frame_002.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south/frame_003.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south/frame_004.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south/frame_005.png"
+            ],
+            "west": [
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/west/frame_000.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/west/frame_001.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/west/frame_002.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/west/frame_003.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/west/frame_004.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/west/frame_005.png"
+            ],
+            "south-west": [
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-west/frame_002.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-west/frame_003.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-west/frame_004.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-west/frame_005.png"
+            ],
+            "north-west": [
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-west/frame_002.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-west/frame_003.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-west/frame_004.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-west/frame_005.png"
+            ],
+            "north": [
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north/frame_000.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north/frame_001.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north/frame_002.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north/frame_003.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north/frame_004.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north/frame_005.png"
+            ],
+            "north-east": [
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-east/frame_002.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-east/frame_003.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-east/frame_004.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/north-east/frame_005.png"
+            ],
+            "south-east": [
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-east/frame_002.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-east/frame_003.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-east/frame_004.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/south-east/frame_005.png"
+            ],
+            "east": [
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/east/frame_000.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/east/frame_001.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/east/frame_002.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/east/frame_003.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/east/frame_004.png",
+              "Player_Monk_v3_strict/animations/cross_punch_attack-d2676276/east/frame_005.png"
+            ]
+          },
+          "taking_a_punch-56764fe0": {
+            "south": [
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south/frame_000.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south/frame_001.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south/frame_002.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south/frame_003.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south/frame_004.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south/frame_005.png"
+            ],
+            "south-west": [
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-west/frame_002.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-west/frame_003.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-west/frame_004.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-west/frame_005.png"
+            ],
+            "north-west": [
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north-west/frame_002.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north-west/frame_003.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north-west/frame_004.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north-west/frame_005.png"
+            ],
+            "west": [
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/west/frame_000.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/west/frame_001.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/west/frame_002.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/west/frame_003.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/west/frame_004.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/west/frame_005.png"
+            ],
+            "north": [
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north/frame_000.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north/frame_001.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north/frame_002.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north/frame_003.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north/frame_004.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/north/frame_005.png"
+            ],
+            "east": [
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/east/frame_000.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/east/frame_001.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/east/frame_002.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/east/frame_003.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/east/frame_004.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/east/frame_005.png"
+            ],
+            "south-east": [
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-east/frame_002.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-east/frame_003.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-east/frame_004.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-56764fe0/south-east/frame_005.png"
+            ]
+          },
+          "falling_backward-8dbdf2db": {
+            "north-east": [
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-east/frame_002.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-east/frame_003.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-east/frame_004.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-east/frame_005.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-east/frame_006.png"
+            ],
+            "north-west": [
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-west/frame_002.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-west/frame_003.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-west/frame_004.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-west/frame_005.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north-west/frame_006.png"
+            ],
+            "south-west": [
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-west/frame_000.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-west/frame_001.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-west/frame_002.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-west/frame_003.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-west/frame_004.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-west/frame_005.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-west/frame_006.png"
+            ],
+            "south": [
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south/frame_000.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south/frame_001.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south/frame_002.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south/frame_003.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south/frame_004.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south/frame_005.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south/frame_006.png"
+            ],
+            "west": [
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/west/frame_000.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/west/frame_001.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/west/frame_002.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/west/frame_003.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/west/frame_004.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/west/frame_005.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/west/frame_006.png"
+            ],
+            "east": [
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/east/frame_000.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/east/frame_001.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/east/frame_002.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/east/frame_003.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/east/frame_004.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/east/frame_005.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/east/frame_006.png"
+            ],
+            "south-east": [
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-east/frame_002.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-east/frame_003.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-east/frame_004.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-east/frame_005.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/south-east/frame_006.png"
+            ],
+            "north": [
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north/frame_000.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north/frame_001.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north/frame_002.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north/frame_003.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north/frame_004.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north/frame_005.png",
+              "Player_Monk_v3_strict/animations/falling_backward-8dbdf2db/north/frame_006.png"
+            ]
+          },
+          "taking_a_punch-04c0be52": {
+            "north-east": [
+              "Player_Monk_v3_strict/animations/taking_a_punch-04c0be52/north-east/frame_000.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-04c0be52/north-east/frame_001.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-04c0be52/north-east/frame_002.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-04c0be52/north-east/frame_003.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-04c0be52/north-east/frame_004.png",
+              "Player_Monk_v3_strict/animations/taking_a_punch-04c0be52/north-east/frame_005.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "96d812cc-8931-4af9-93b1-5e01dd4c3d3b",
+        "name": "wearing worn light l",
+        "prompt": "a dirt-poor humble cloister monk wearing ONLY a plain simple undyed homespun wool robe, completely bald clean-shaven smooth head, pale white skin, gentle blue eyes, absolutely no armor, no pauldrons, no shoulder plates, no metal, no gloves, no glowing, no ember, no fire, no beard, no stubble, nothing but threadbare patched cloth and a knotted rope belt, barefoot, frail gentle and penniless, solemn, dark-fantasy pixel art, dark muted stone palette",
+        "size": {
+          "width": 92,
+          "height": 92
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-06-04T12:01:52.821391+00:00"
+      },
+      "folder": "wearing_worn_light_l",
+      "frames": {
+        "rotations": {
+          "south": "wearing_worn_light_l/rotations/south.png",
+          "south-east": "wearing_worn_light_l/rotations/south-east.png",
+          "east": "wearing_worn_light_l/rotations/east.png",
+          "north-east": "wearing_worn_light_l/rotations/north-east.png",
+          "north": "wearing_worn_light_l/rotations/north.png",
+          "north-west": "wearing_worn_light_l/rotations/north-west.png",
+          "west": "wearing_worn_light_l/rotations/west.png",
+          "south-west": "wearing_worn_light_l/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.0",
+  "export_date": "2026-06-04T12:04:34.681331"
+}
