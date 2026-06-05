@@ -78,6 +78,14 @@ signal swing_wedge_spawned(kind: StringName, wedge: Node)
 ## right.
 signal equipped_weapon_changed(new_weapon)
 
+## Emitted when the equipped ARMOR changes (equip / unequip). The
+## visible-equipment body-look swap (`_on_equipped_armor_changed`) listens to
+## swap the body SpriteFrames by armor tier (`visible-equipment-system §4 / §7
+## step 5`). New armor ItemDef (or null on unequip) on the right. Sibling of
+## `equipped_weapon_changed` — armor and weapon are two independent reads
+## (body-look reads ARMOR tier; attack-SET reads WEAPON class, §7 step 4).
+signal equipped_armor_changed(new_armor)
+
 ## Emitted when a character stat (Vigor / Focus / Edge) changes from level-
 ## up allocation. Carries the stat name and new value so the HUD can pick
 ## the relevant block to refresh without a full snapshot read.
@@ -236,6 +244,16 @@ const ANIM_PREFIX_DODGE: String = "dodge"
 const ANIM_PREFIX_HIT: String = "hit"
 const ANIM_PREFIX_DIE: String = "die"
 
+## ONE_HAND_MELEE attack-SET prefixes (visible-equipment system §2 / §7 step 2).
+## A 1H-weapon equip selects these so the body SWINGS instead of punching.
+## The art does NOT exist yet (`86ca56w4f` is the gen-independent foundation) —
+## `_resolve_attack_set` falls back to the FIST prefixes above when the
+## `<prefix>_<dir>` key is absent from the SpriteFrames, so nothing breaks
+## pre-art. idle/walk/dodge/hit/die are NOT class-suffixed (shared across
+## classes — only the ATTACK animation differs by class, §2).
+const ANIM_PREFIX_ATTACK_LIGHT_1H: String = "attack_light_1h"
+const ANIM_PREFIX_ATTACK_HEAVY_1H: String = "attack_heavy_1h"
+
 # ---- Runtime state ------------------------------------------------------
 
 var _state: StringName = STATE_IDLE
@@ -296,6 +314,29 @@ var _captured_hit_flash_rest: bool = false
 # silently no-op rather than crash.
 var _animated_sprite: AnimatedSprite2D = null
 var _animated_sprite_resolved: bool = false
+
+# ---- Visible-equipment foundation (ticket 86ca56w4f) -------------------
+# §1 LAYER 2 — the weapon-overlay node. A sibling Sprite2D (NOT a child of the
+# body `Sprite` AnimatedSprite2D) pinned over the body at z=1, riding the swing
+# per the §3 hand-anchor convention. Hidden when unarmed. Created in `_ready`
+# (no `.tscn` edit needed — keeps the foundation pure-code) and cached here.
+# Texture/anchor stay EMPTY in this foundation PR — overlay art + the anchor
+# table land with the swing-art pilot step (§5.3 step 2). See
+# `team/uma-ux/visible-equipment-system.md §1 / §3 / §7 step 3-4`.
+const WEAPON_HAND_NODE_NAME: StringName = &"WeaponHand"
+## z_index for the weapon overlay — explicit per the HTML5 z-tie-break rule
+## (`html5-export.md`): over the body (z=0) on most frames; behind-body
+## wind-up frames set -1 explicitly via the anchor table (not authored yet).
+const WEAPON_HAND_Z_INDEX: int = 1
+var _weapon_hand: Sprite2D = null
+
+# §4/§5 armor-tier body-look swap seam. Maps an `ItemDef.Tier` → the body
+# SpriteFrames `.tres` for that armor tier. STUB in this foundation PR — no
+# armor bodies exist yet, so the map is empty and `_apply_armor_body_look`
+# is a guarded no-op. When the armor bodies land, populate this map; the swap
+# path (resource-pointer swap + replay-current-state + hit-flash cache
+# invalidation) is already wired and tested. §7 step 5.
+var _armor_body_frames_by_tier: Dictionary = {}
 
 # ---- M3W-2 walk-feel fix (Sponsor 2026-05-18 soak finding) -------------
 # `_facing` is mouse-derived (PR #255) and correct for attack/dodge aim. But
@@ -530,6 +571,20 @@ func _ready() -> void:
 	if not dodge_started.is_connected(_on_dodge_started_audio):
 		dodge_started.connect(_on_dodge_started_audio)
 
+	# Visible-equipment foundation (ticket 86ca56w4f). Ensure the LAYER 2
+	# weapon-overlay node exists, then wire the equip-change handlers that
+	# show/hide it (weapon) and swap the body look (armor). Idempotent connect
+	# guards mirror the audio wiring above so bare-instance + re-`_ready` tests
+	# don't double-connect. The handlers fire on the existing equip signals; no
+	# state-machine change. See `team/uma-ux/visible-equipment-system.md §7`.
+	_ensure_weapon_hand_overlay()
+	if not equipped_weapon_changed.is_connected(_on_equipped_weapon_changed):
+		equipped_weapon_changed.connect(_on_equipped_weapon_changed)
+	if not equipped_armor_changed.is_connected(_on_equipped_armor_changed):
+		equipped_armor_changed.connect(_on_equipped_armor_changed)
+	# Seed the overlay visibility from the boot equip-state (unarmed → hidden).
+	_on_equipped_weapon_changed(get_equipped_weapon())
+
 
 func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
@@ -721,6 +776,9 @@ func equip_item(instance: ItemInstance) -> bool:
 	if slot == SLOT_WEAPON:
 		_equipped_weapon = instance.def
 		equipped_weapon_changed.emit(instance.def)
+	elif slot == SLOT_ARMOR:
+		# Visible-equipment body-look seam — armor tier drives the body swap.
+		equipped_armor_changed.emit(instance.def)
 	return true
 
 
@@ -827,6 +885,9 @@ func _unequip_internal(slot: StringName, current: ItemInstance) -> void:
 	if slot == SLOT_WEAPON:
 		_equipped_weapon = null
 		equipped_weapon_changed.emit(null)
+	elif slot == SLOT_ARMOR:
+		# Visible-equipment body-look seam — unequip reverts to the rags body.
+		equipped_armor_changed.emit(null)
 
 
 ## Edge stat — read by Damage.compute_player_damage to scale weapon damage.
@@ -1825,19 +1886,59 @@ static func dir_suffix_for_facing(facing: Vector2) -> String:
 
 ## State → anim-prefix resolver. STATE_IDLE + STATE_WALK both → `walk` (idle
 ## is "walk frame 0 hold" placeholder per Priya's brief — no dedicated idle
-## anim in the #265 PixelLab batch). STATE_ATTACK splits on `_current_attack_kind`.
+## anim in the #265 PixelLab batch). STATE_ATTACK splits on `_current_attack_kind`
+## AND on the equipped weapon class (fist-punch vs 1H-swing) via
+## `_resolve_attack_set` (visible-equipment-system §2 / §7 step 2).
 func _anim_prefix_for_state(s: StringName) -> String:
 	if s == STATE_IDLE or s == STATE_WALK:
 		return ANIM_PREFIX_IDLE_AND_WALK
 	if s == STATE_DODGE:
 		return ANIM_PREFIX_DODGE
 	if s == STATE_ATTACK:
-		if _current_attack_kind == ATTACK_HEAVY:
-			return ANIM_PREFIX_ATTACK_HEAVY
-		return ANIM_PREFIX_ATTACK_LIGHT
+		return _resolve_attack_set(_current_attack_kind)
 	# Unknown state — defensive fallback to walk; downstream code never
 	# transitions into a state outside the {idle,walk,dodge,attack} set.
 	return ANIM_PREFIX_IDLE_AND_WALK
+
+
+## Attack-SET selection by weapon class (visible-equipment-system §2 / §7 step 2).
+## Reads the equipped weapon's `weapon_class`:
+##   - FIST (no weapon equipped) → `attack_light` / `attack_heavy` (the existing
+##     bare-fist punch set; M1/M2 behavior, unchanged).
+##   - ONE_HAND_MELEE (`iron_sword`, censer-blade, …) → `attack_light_1h` /
+##     `attack_heavy_1h` (the NEW 1H-swing set).
+## Forward classes (2H/staff/ranged) fall through to the 1H prefixes for now —
+## they have neither art nor a distinct prefix yet; when their swing sets ship,
+## add their cases here. idle/walk/dodge/hit/die are NOT class-suffixed (§2).
+##
+## **Pre-art STUB fallback (load-bearing for `86ca56w4f`).** The `_1h` swing art
+## does NOT exist yet — this is the gen-independent foundation. `_play_anim`
+## detects a missing `<prefix>_<dir>` key and falls back to the FIST set (see
+## `_fist_fallback_prefix`) so equipping a 1H weapon pre-art still plays the
+## punch animation rather than no-op'ing the sprite. Once the swing art lands,
+## the keys resolve and the swing plays with zero code change here.
+func _resolve_attack_set(kind: StringName) -> String:
+	var heavy: bool = kind == ATTACK_HEAVY
+	var weapon: ItemDef = get_equipped_weapon()
+	# FIST: no weapon equipped → the existing punch set.
+	if weapon == null:
+		return ANIM_PREFIX_ATTACK_HEAVY if heavy else ANIM_PREFIX_ATTACK_LIGHT
+	# Any armed class → the 1H swing prefixes for M3 (the only authored armed
+	# set). 2H/staff/ranged reuse these until their own sets ship.
+	if weapon.weapon_class == ItemDef.WeaponClass.FIST:
+		# Defensive: a `.tres` should never author FIST, but honor it if it does.
+		return ANIM_PREFIX_ATTACK_HEAVY if heavy else ANIM_PREFIX_ATTACK_LIGHT
+	return ANIM_PREFIX_ATTACK_HEAVY_1H if heavy else ANIM_PREFIX_ATTACK_LIGHT_1H
+
+
+## Maps a 1H-swing attack prefix back to its FIST-set equivalent — the pre-art
+## fallback target. Returns the input unchanged for any non-`_1h` prefix.
+func _fist_fallback_prefix(prefix: String) -> String:
+	if prefix == ANIM_PREFIX_ATTACK_LIGHT_1H:
+		return ANIM_PREFIX_ATTACK_LIGHT
+	if prefix == ANIM_PREFIX_ATTACK_HEAVY_1H:
+		return ANIM_PREFIX_ATTACK_HEAVY
+	return prefix
 
 
 ## state_changed signal handler — drive the AnimatedSprite2D into the right
@@ -1890,6 +1991,23 @@ func _play_anim(prefix: String) -> void:
 	var dir_suffix: String = _resolve_anim_dir(prefix)
 	var anim_name: StringName = StringName("%s_%s" % [prefix, dir_suffix])
 	if not _animated_sprite.sprite_frames.has_animation(anim_name):
+		# Pre-art STUB fallback (visible-equipment-system §7 step 2, ticket
+		# 86ca56w4f). The 1H swing art does not exist yet — when a `_1h` key is
+		# absent, fall back to the FIST set so equipping a 1H weapon still plays
+		# the punch animation rather than leaving the sprite on a stale frame.
+		var fist_prefix: String = _fist_fallback_prefix(prefix)
+		if fist_prefix != prefix:
+			var fb_name: StringName = StringName("%s_%s" % [fist_prefix, dir_suffix])
+			if _animated_sprite.sprite_frames.has_animation(fb_name):
+				_animated_sprite.play(fb_name)
+				_combat_trace(
+					"Player._play_anim",
+					(
+						"PLAY anim=%s (1H-stub fallback from %s — swing art absent)"
+						% [fb_name, anim_name]
+					)
+				)
+				return
 		_combat_trace(
 			"Player._play_anim", "MISS anim=%s — SpriteFrames lacks this animation key" % anim_name
 		)
@@ -2064,6 +2182,128 @@ func _play_hit_flash() -> void:
 			"Player._play_hit_flash",
 			"modulate-fallback tween_valid=%s" % _hit_flash_tween.is_valid()
 		)
+
+
+# ---- Visible-equipment foundation (ticket 86ca56w4f) -------------------
+# §7 steps 3-5: weapon-overlay node lifecycle + show/hide-on-equip + the
+# armor-tier body-look SpriteFrames swap seam. All STUB-level: the overlay
+# carries no texture and the armor-body map is empty until the pilot art lands
+# (§5.3 steps 2-3). The WIRING is complete + tested here so the art drop is a
+# data-only change. Cross-ref `team/uma-ux/visible-equipment-system.md`.
+
+
+## Create the LAYER 2 weapon-overlay Sprite2D as a sibling of the body
+## `Sprite` (child of Player, NOT child of the AnimatedSprite2D), z=1, hidden.
+## Idempotent — resolves an existing scene-authored "WeaponHand" first, only
+## creating one when absent (so a future `.tscn` that authors it wins). No-op
+## texture/anchor: those land with the swing-art pilot (§3 anchor table).
+func _ensure_weapon_hand_overlay() -> void:
+	if _weapon_hand != null:
+		return
+	var existing: Node = get_node_or_null(NodePath(String(WEAPON_HAND_NODE_NAME)))
+	if existing is Sprite2D:
+		_weapon_hand = existing
+	else:
+		_weapon_hand = Sprite2D.new()
+		_weapon_hand.name = WEAPON_HAND_NODE_NAME
+		_weapon_hand.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(_weapon_hand)
+	_weapon_hand.z_index = WEAPON_HAND_Z_INDEX
+	# Unarmed at boot — overlay starts hidden; `_on_equipped_weapon_changed`
+	# (seeded in `_ready`) is the authority for visibility thereafter.
+	_weapon_hand.visible = false
+
+
+## Returns the weapon-overlay node (creating it if needed). Test surface.
+func get_weapon_hand_overlay() -> Sprite2D:
+	if _weapon_hand == null:
+		_ensure_weapon_hand_overlay()
+	return _weapon_hand
+
+
+## equipped_weapon_changed handler (§7 step 4). Shows/hides the WeaponHand
+## overlay (null weapon → hidden = unarmed) and stub-reads the overlay sprite
+## + anchor for the equipped weapon's class/id. The texture set + anchor-table
+## read are STUBBED to no-ops (no overlay art yet); the show/hide + the
+## attack-SET selection (which reads the weapon class on the NEXT attack via
+## `_resolve_attack_set`) are the live wiring.
+func _on_equipped_weapon_changed(weapon) -> void:
+	if _weapon_hand == null:
+		_ensure_weapon_hand_overlay()
+	if _weapon_hand == null:
+		return
+	if weapon == null:
+		_weapon_hand.visible = false
+		_combat_trace("Player.equip_overlay", "hide WeaponHand (unarmed)")
+		return
+	# Armed: reveal the overlay. Texture + per-direction anchor (Mechanism B,
+	# §3) are read-STUBS here — populated when the weapon-overlay art + anchor
+	# table ship (§5.3 step 2). The overlay stays a positioned-but-empty node
+	# until then, which is intentional: nothing renders, nothing breaks.
+	_weapon_hand.visible = true
+	var wclass: int = -1
+	if weapon is ItemDef:
+		wclass = int((weapon as ItemDef).weapon_class)
+	_combat_trace(
+		"Player.equip_overlay",
+		"show WeaponHand class=%d (overlay art + anchor stubbed — pre-art)" % wclass
+	)
+
+
+## equipped_armor_changed handler (§7 step 5). Swaps the body SpriteFrames to
+## the equipped armor tier's body look. STUB: `_armor_body_frames_by_tier` is
+## empty (no armor bodies yet), so this resolves to a no-op for every tier in
+## the foundation PR — but the swap MECHANISM (resolve frames → swap → replay
+## state → invalidate hit-flash cache) is wired + tested so the art drop is a
+## map-population-only change.
+func _on_equipped_armor_changed(armor) -> void:
+	var tier: int = -1  # -1 = rags (no armor / unequipped)
+	if armor is ItemDef:
+		tier = int((armor as ItemDef).tier)
+	_apply_armor_body_look(tier)
+
+
+## Apply the armor-tier body look by swapping the body AnimatedSprite2D's
+## SpriteFrames resource. `tier == -1` means rags (no armor). Guarded no-op
+## when the tier has no registered body frames (the current STUB state — every
+## tier is unregistered). When a tier's frames ARE registered, the swap:
+##   1. points `Sprite.sprite_frames` at the tier body (silhouette change),
+##   2. invalidates the cached `_hit_flash_target` so the next hit re-resolves
+##      against the new SpriteFrames node (Drew-flagged edge, §5 #5 — the
+##      cache holds the NODE, which survives a frames swap, but the rest-color
+##      snapshot must be re-captured against the new resource),
+##   3. replays the current state's animation so the new body shows the right
+##      pose immediately instead of holding a stale frame.
+func _apply_armor_body_look(tier: int) -> void:
+	if not _armor_body_frames_by_tier.has(tier):
+		# STUB / rags / unregistered tier — nothing to swap. No-op.
+		return
+	var frames: SpriteFrames = _armor_body_frames_by_tier[tier] as SpriteFrames
+	if frames == null:
+		return
+	if not _animated_sprite_resolved:
+		_resolve_animated_sprite()
+	if _animated_sprite == null:
+		return
+	_animated_sprite.sprite_frames = frames
+	# Invalidate the hit-flash target cache so the next hit re-resolves the
+	# rest-color snapshot against the swapped SpriteFrames (the cache pins the
+	# NODE — which is unchanged — but `_sprite_modulate_at_rest` was captured
+	# from the OLD frames' modulate and must be re-read).
+	_invalidate_hit_flash_target_cache()
+	# Replay the current state so the new body shows the correct pose now.
+	_play_anim_for_state(_state)
+	_combat_trace("Player.armor_body", "swapped body SpriteFrames for tier=%d" % tier)
+
+
+## Clear the cached hit-flash target so the next `_play_hit_flash` re-resolves
+## it (used after a body SpriteFrames swap — §5 #5 Drew-flagged edge). The
+## cache normally resolves once on first hit; a mid-life body swap requires a
+## re-resolve so the rest-color snapshot matches the live frames.
+func _invalidate_hit_flash_target_cache() -> void:
+	_hit_flash_target = null
+	_hit_flash_uses_sprite = false
+	_hit_flash_uses_animated_sprite = false
 
 
 # ---- M3 Tier 3 W2 quest persistence I/O (ticket 86c9y7ydg / W2-T6) --------
