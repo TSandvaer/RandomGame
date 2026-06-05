@@ -58,6 +58,7 @@ static func make_item_def(overrides: Dictionary = {}) -> ItemDef:
 	i.display_name = overrides.get("display_name", "Iron Sword")
 	i.slot = overrides.get("slot", ItemDef.Slot.WEAPON)
 	i.tier = overrides.get("tier", ItemDef.Tier.T1)
+	i.weapon_class = overrides.get("weapon_class", ItemDef.WeaponClass.ONE_HAND_MELEE)
 	i.icon_path = overrides.get("icon_path", "")
 	i.base_stats = overrides.get("base_stats", make_item_base_stats({"damage": 5}))
 	# Typed-array copy (Array[AffixDef]).
