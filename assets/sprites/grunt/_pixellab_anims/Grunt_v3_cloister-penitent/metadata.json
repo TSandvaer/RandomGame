@@ -1,0 +1,359 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "1245d6aa-c30d-43be-9567-8f3f0b564e86",
+        "name": "S1 grunt cloister-penitent v3",
+        "prompt": "hooded cloister penitent undead monk, deep dark hood with two glowing red eyes in the shadow, tattered brown monk robe with a rope belt, a short bronze censer-blade (a thurible-censer reforged into a blade) gripped in one hand, hunched stooped penitent posture, aged and corrupted, solemn dark fantasy, dark stone and ash palette, bold dark outline, readable silhouette",
+        "size": {
+          "width": 88,
+          "height": 88
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-06-04T13:26:04.596987+00:00"
+      },
+      "folder": "S1_grunt_cloister-penitent_v3",
+      "frames": {
+        "rotations": {
+          "south": "S1_grunt_cloister-penitent_v3/rotations/south.png",
+          "south-east": "S1_grunt_cloister-penitent_v3/rotations/south-east.png",
+          "east": "S1_grunt_cloister-penitent_v3/rotations/east.png",
+          "north-east": "S1_grunt_cloister-penitent_v3/rotations/north-east.png",
+          "north": "S1_grunt_cloister-penitent_v3/rotations/north.png",
+          "north-west": "S1_grunt_cloister-penitent_v3/rotations/north-west.png",
+          "west": "S1_grunt_cloister-penitent_v3/rotations/west.png",
+          "south-west": "S1_grunt_cloister-penitent_v3/rotations/south-west.png"
+        },
+        "animations": {
+          "falling_backward-0ae43a58": {
+            "north-west": [
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-west/frame_005.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-west/frame_006.png"
+            ],
+            "south-west": [
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-west/frame_005.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-west/frame_006.png"
+            ],
+            "south-east": [
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-east/frame_005.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south-east/frame_006.png"
+            ],
+            "south": [
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south/frame_005.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/south/frame_006.png"
+            ],
+            "west": [
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/west/frame_005.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/west/frame_006.png"
+            ],
+            "north": [
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north/frame_005.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north/frame_006.png"
+            ],
+            "north-east": [
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-east/frame_005.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/north-east/frame_006.png"
+            ],
+            "east": [
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/east/frame_005.png",
+              "S1_grunt_cloister-penitent_v3/animations/falling_backward-0ae43a58/east/frame_006.png"
+            ]
+          },
+          "walking-7291846c": {
+            "east": [
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/east/frame_005.png"
+            ],
+            "south-east": [
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-east/frame_005.png"
+            ],
+            "south": [
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south/frame_005.png"
+            ],
+            "south-west": [
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/south-west/frame_005.png"
+            ],
+            "west": [
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/west/frame_005.png"
+            ],
+            "north-west": [
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-west/frame_005.png"
+            ],
+            "north": [
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north/frame_005.png"
+            ],
+            "north-east": [
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/walking-7291846c/north-east/frame_005.png"
+            ]
+          },
+          "cross_punch_attack-ac8f904b": {
+            "south": [
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south/frame_005.png"
+            ],
+            "west": [
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/west/frame_005.png"
+            ],
+            "south-west": [
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-west/frame_005.png"
+            ],
+            "south-east": [
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/south-east/frame_005.png"
+            ],
+            "north-west": [
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-west/frame_005.png"
+            ],
+            "north": [
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north/frame_005.png"
+            ],
+            "north-east": [
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/north-east/frame_005.png"
+            ],
+            "east": [
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/cross_punch_attack-ac8f904b/east/frame_005.png"
+            ]
+          },
+          "taking_a_punch-75436a4e": {
+            "north-east": [
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-east/frame_005.png"
+            ],
+            "south": [
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south/frame_005.png"
+            ],
+            "south-west": [
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-west/frame_005.png"
+            ],
+            "west": [
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/west/frame_005.png"
+            ],
+            "north-west": [
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-west/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-west/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north-west/frame_005.png"
+            ],
+            "east": [
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/east/frame_005.png"
+            ],
+            "north": [
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/north/frame_005.png"
+            ],
+            "south-east": [
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-east/frame_003.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-east/frame_004.png",
+              "S1_grunt_cloister-penitent_v3/animations/taking_a_punch-75436a4e/south-east/frame_005.png"
+            ]
+          },
+          "animating-fe00a480": {
+            "south-west": [
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south-west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south-west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south-west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south-west/frame_003.png"
+            ],
+            "south": [
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south/frame_003.png"
+            ],
+            "north": [
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north/frame_003.png"
+            ],
+            "north-east": [
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north-east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north-east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north-east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north-east/frame_003.png"
+            ],
+            "west": [
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/west/frame_003.png"
+            ],
+            "north-west": [
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north-west/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north-west/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north-west/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/north-west/frame_003.png"
+            ],
+            "east": [
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/east/frame_003.png"
+            ],
+            "south-east": [
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south-east/frame_000.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south-east/frame_001.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south-east/frame_002.png",
+              "S1_grunt_cloister-penitent_v3/animations/animating-fe00a480/south-east/frame_003.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.0",
+  "export_date": "2026-06-04T16:15:16.844136"
+}

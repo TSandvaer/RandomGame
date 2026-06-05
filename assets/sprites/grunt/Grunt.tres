@@ -1,285 +1,253 @@
-[gd_resource type="SpriteFrames" load_steps=281 format=3 uid="uid://b0embergrave_grunt_sprite_frames"]
+[gd_resource type="SpriteFrames" load_steps=249 format=3 uid="uid://b0embergrave_grunt_sprite_frames"]
 
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south/frame_000.png" id="f_000"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south/frame_001.png" id="f_001"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south/frame_002.png" id="f_002"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south/frame_003.png" id="f_003"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south/frame_004.png" id="f_004"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south/frame_005.png" id="f_005"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south/frame_006.png" id="f_006"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south/frame_007.png" id="f_007"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-east/frame_000.png" id="f_008"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-east/frame_001.png" id="f_009"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-east/frame_002.png" id="f_010"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-east/frame_003.png" id="f_011"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-east/frame_004.png" id="f_012"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-east/frame_005.png" id="f_013"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-east/frame_006.png" id="f_014"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-east/frame_007.png" id="f_015"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/east/frame_000.png" id="f_016"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/east/frame_001.png" id="f_017"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/east/frame_002.png" id="f_018"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/east/frame_003.png" id="f_019"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/east/frame_004.png" id="f_020"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/east/frame_005.png" id="f_021"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/east/frame_006.png" id="f_022"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/east/frame_007.png" id="f_023"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-east/frame_000.png" id="f_024"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-east/frame_001.png" id="f_025"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-east/frame_002.png" id="f_026"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-east/frame_003.png" id="f_027"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-east/frame_004.png" id="f_028"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-east/frame_005.png" id="f_029"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-east/frame_006.png" id="f_030"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-east/frame_007.png" id="f_031"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north/frame_000.png" id="f_032"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north/frame_001.png" id="f_033"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north/frame_002.png" id="f_034"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north/frame_003.png" id="f_035"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north/frame_004.png" id="f_036"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north/frame_005.png" id="f_037"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north/frame_006.png" id="f_038"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north/frame_007.png" id="f_039"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-west/frame_000.png" id="f_040"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-west/frame_001.png" id="f_041"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-west/frame_002.png" id="f_042"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-west/frame_003.png" id="f_043"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-west/frame_004.png" id="f_044"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-west/frame_005.png" id="f_045"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-west/frame_006.png" id="f_046"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/north-west/frame_007.png" id="f_047"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/west/frame_000.png" id="f_048"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/west/frame_001.png" id="f_049"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/west/frame_002.png" id="f_050"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/west/frame_003.png" id="f_051"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/west/frame_004.png" id="f_052"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/west/frame_005.png" id="f_053"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/west/frame_006.png" id="f_054"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/west/frame_007.png" id="f_055"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-west/frame_000.png" id="f_056"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-west/frame_001.png" id="f_057"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-west/frame_002.png" id="f_058"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-west/frame_003.png" id="f_059"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-west/frame_004.png" id="f_060"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-west/frame_005.png" id="f_061"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-west/frame_006.png" id="f_062"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/walk/south-west/frame_007.png" id="f_063"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south/frame_000.png" id="f_064"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south/frame_001.png" id="f_065"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south/frame_002.png" id="f_066"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south/frame_003.png" id="f_067"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south/frame_004.png" id="f_068"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south/frame_005.png" id="f_069"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-east/frame_000.png" id="f_070"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-east/frame_001.png" id="f_071"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-east/frame_002.png" id="f_072"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-east/frame_003.png" id="f_073"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-east/frame_004.png" id="f_074"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-east/frame_005.png" id="f_075"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/east/frame_000.png" id="f_076"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/east/frame_001.png" id="f_077"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/east/frame_002.png" id="f_078"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/east/frame_003.png" id="f_079"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/east/frame_004.png" id="f_080"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/east/frame_005.png" id="f_081"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-east/frame_000.png" id="f_082"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-east/frame_001.png" id="f_083"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-east/frame_002.png" id="f_084"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-east/frame_003.png" id="f_085"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-east/frame_004.png" id="f_086"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-east/frame_005.png" id="f_087"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north/frame_000.png" id="f_088"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north/frame_001.png" id="f_089"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north/frame_002.png" id="f_090"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north/frame_003.png" id="f_091"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north/frame_004.png" id="f_092"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north/frame_005.png" id="f_093"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-west/frame_000.png" id="f_094"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-west/frame_001.png" id="f_095"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-west/frame_002.png" id="f_096"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-west/frame_003.png" id="f_097"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-west/frame_004.png" id="f_098"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/north-west/frame_005.png" id="f_099"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/west/frame_000.png" id="f_100"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/west/frame_001.png" id="f_101"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/west/frame_002.png" id="f_102"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/west/frame_003.png" id="f_103"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/west/frame_004.png" id="f_104"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/west/frame_005.png" id="f_105"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-west/frame_000.png" id="f_106"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-west/frame_001.png" id="f_107"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-west/frame_002.png" id="f_108"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-west/frame_003.png" id="f_109"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-west/frame_004.png" id="f_110"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk/south-west/frame_005.png" id="f_111"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south/frame_000.png" id="f_112"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south/frame_001.png" id="f_113"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south/frame_002.png" id="f_114"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south/frame_003.png" id="f_115"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south/frame_004.png" id="f_116"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south/frame_005.png" id="f_117"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-east/frame_000.png" id="f_118"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-east/frame_001.png" id="f_119"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-east/frame_002.png" id="f_120"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-east/frame_003.png" id="f_121"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-east/frame_004.png" id="f_122"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-east/frame_005.png" id="f_123"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/east/frame_000.png" id="f_124"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/east/frame_001.png" id="f_125"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/east/frame_002.png" id="f_126"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/east/frame_003.png" id="f_127"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/east/frame_004.png" id="f_128"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/east/frame_005.png" id="f_129"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-east/frame_000.png" id="f_130"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-east/frame_001.png" id="f_131"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-east/frame_002.png" id="f_132"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-east/frame_003.png" id="f_133"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-east/frame_004.png" id="f_134"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-east/frame_005.png" id="f_135"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north/frame_000.png" id="f_136"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north/frame_001.png" id="f_137"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north/frame_002.png" id="f_138"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north/frame_003.png" id="f_139"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north/frame_004.png" id="f_140"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north/frame_005.png" id="f_141"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-west/frame_000.png" id="f_142"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-west/frame_001.png" id="f_143"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-west/frame_002.png" id="f_144"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-west/frame_003.png" id="f_145"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-west/frame_004.png" id="f_146"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/north-west/frame_005.png" id="f_147"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/west/frame_000.png" id="f_148"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/west/frame_001.png" id="f_149"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/west/frame_002.png" id="f_150"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/west/frame_003.png" id="f_151"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/west/frame_004.png" id="f_152"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/west/frame_005.png" id="f_153"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-west/frame_000.png" id="f_154"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-west/frame_001.png" id="f_155"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-west/frame_002.png" id="f_156"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-west/frame_003.png" id="f_157"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-west/frame_004.png" id="f_158"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/hit/south-west/frame_005.png" id="f_159"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south/frame_000.png" id="f_160"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south/frame_001.png" id="f_161"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south/frame_002.png" id="f_162"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south/frame_003.png" id="f_163"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south/frame_004.png" id="f_164"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south/frame_005.png" id="f_165"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south/frame_006.png" id="f_166"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-east/frame_000.png" id="f_167"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-east/frame_001.png" id="f_168"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-east/frame_002.png" id="f_169"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-east/frame_003.png" id="f_170"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-east/frame_004.png" id="f_171"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-east/frame_005.png" id="f_172"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-east/frame_006.png" id="f_173"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/east/frame_000.png" id="f_174"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/east/frame_001.png" id="f_175"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/east/frame_002.png" id="f_176"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/east/frame_003.png" id="f_177"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/east/frame_004.png" id="f_178"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/east/frame_005.png" id="f_179"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/east/frame_006.png" id="f_180"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-east/frame_000.png" id="f_181"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-east/frame_001.png" id="f_182"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-east/frame_002.png" id="f_183"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-east/frame_003.png" id="f_184"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-east/frame_004.png" id="f_185"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-east/frame_005.png" id="f_186"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-east/frame_006.png" id="f_187"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north/frame_000.png" id="f_188"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north/frame_001.png" id="f_189"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north/frame_002.png" id="f_190"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north/frame_003.png" id="f_191"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north/frame_004.png" id="f_192"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north/frame_005.png" id="f_193"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north/frame_006.png" id="f_194"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-west/frame_000.png" id="f_195"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-west/frame_001.png" id="f_196"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-west/frame_002.png" id="f_197"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-west/frame_003.png" id="f_198"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-west/frame_004.png" id="f_199"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-west/frame_005.png" id="f_200"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/north-west/frame_006.png" id="f_201"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/west/frame_000.png" id="f_202"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/west/frame_001.png" id="f_203"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/west/frame_002.png" id="f_204"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/west/frame_003.png" id="f_205"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/west/frame_004.png" id="f_206"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/west/frame_005.png" id="f_207"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/west/frame_006.png" id="f_208"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-west/frame_000.png" id="f_209"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-west/frame_001.png" id="f_210"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-west/frame_002.png" id="f_211"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-west/frame_003.png" id="f_212"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-west/frame_004.png" id="f_213"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-west/frame_005.png" id="f_214"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/die/south-west/frame_006.png" id="f_215"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south/frame_000.png" id="f_216"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south/frame_001.png" id="f_217"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south/frame_002.png" id="f_218"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south/frame_003.png" id="f_219"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south/frame_004.png" id="f_220"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south/frame_005.png" id="f_221"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south/frame_006.png" id="f_222"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south/frame_007.png" id="f_223"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-east/frame_000.png" id="f_224"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-east/frame_001.png" id="f_225"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-east/frame_002.png" id="f_226"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-east/frame_003.png" id="f_227"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-east/frame_004.png" id="f_228"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-east/frame_005.png" id="f_229"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-east/frame_006.png" id="f_230"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-east/frame_007.png" id="f_231"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/east/frame_000.png" id="f_232"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/east/frame_001.png" id="f_233"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/east/frame_002.png" id="f_234"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/east/frame_003.png" id="f_235"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/east/frame_004.png" id="f_236"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/east/frame_005.png" id="f_237"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/east/frame_006.png" id="f_238"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/east/frame_007.png" id="f_239"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-east/frame_000.png" id="f_240"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-east/frame_001.png" id="f_241"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-east/frame_002.png" id="f_242"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-east/frame_003.png" id="f_243"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-east/frame_004.png" id="f_244"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-east/frame_005.png" id="f_245"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-east/frame_006.png" id="f_246"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-east/frame_007.png" id="f_247"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north/frame_000.png" id="f_248"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north/frame_001.png" id="f_249"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north/frame_002.png" id="f_250"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north/frame_003.png" id="f_251"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north/frame_004.png" id="f_252"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north/frame_005.png" id="f_253"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north/frame_006.png" id="f_254"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north/frame_007.png" id="f_255"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-west/frame_000.png" id="f_256"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-west/frame_001.png" id="f_257"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-west/frame_002.png" id="f_258"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-west/frame_003.png" id="f_259"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-west/frame_004.png" id="f_260"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-west/frame_005.png" id="f_261"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-west/frame_006.png" id="f_262"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/north-west/frame_007.png" id="f_263"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/west/frame_000.png" id="f_264"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/west/frame_001.png" id="f_265"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/west/frame_002.png" id="f_266"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/west/frame_003.png" id="f_267"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/west/frame_004.png" id="f_268"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/west/frame_005.png" id="f_269"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/west/frame_006.png" id="f_270"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/west/frame_007.png" id="f_271"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-west/frame_000.png" id="f_272"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-west/frame_001.png" id="f_273"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-west/frame_002.png" id="f_274"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-west/frame_003.png" id="f_275"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-west/frame_004.png" id="f_276"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-west/frame_005.png" id="f_277"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-west/frame_006.png" id="f_278"]
-[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v2_S1_Embergrave_red-eyes/animations/atk_telegraph/south-west/frame_007.png" id="f_279"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south/frame_000.png" id="f_000"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south/frame_001.png" id="f_001"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south/frame_002.png" id="f_002"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south/frame_003.png" id="f_003"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south/frame_004.png" id="f_004"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south/frame_005.png" id="f_005"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-east/frame_000.png" id="f_006"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-east/frame_001.png" id="f_007"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-east/frame_002.png" id="f_008"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-east/frame_003.png" id="f_009"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-east/frame_004.png" id="f_010"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-east/frame_005.png" id="f_011"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/east/frame_000.png" id="f_012"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/east/frame_001.png" id="f_013"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/east/frame_002.png" id="f_014"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/east/frame_003.png" id="f_015"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/east/frame_004.png" id="f_016"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/east/frame_005.png" id="f_017"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-east/frame_000.png" id="f_018"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-east/frame_001.png" id="f_019"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-east/frame_002.png" id="f_020"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-east/frame_003.png" id="f_021"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-east/frame_004.png" id="f_022"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-east/frame_005.png" id="f_023"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north/frame_000.png" id="f_024"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north/frame_001.png" id="f_025"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north/frame_002.png" id="f_026"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north/frame_003.png" id="f_027"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north/frame_004.png" id="f_028"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north/frame_005.png" id="f_029"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-west/frame_000.png" id="f_030"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-west/frame_001.png" id="f_031"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-west/frame_002.png" id="f_032"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-west/frame_003.png" id="f_033"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-west/frame_004.png" id="f_034"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/north-west/frame_005.png" id="f_035"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/west/frame_000.png" id="f_036"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/west/frame_001.png" id="f_037"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/west/frame_002.png" id="f_038"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/west/frame_003.png" id="f_039"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/west/frame_004.png" id="f_040"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/west/frame_005.png" id="f_041"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-west/frame_000.png" id="f_042"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-west/frame_001.png" id="f_043"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-west/frame_002.png" id="f_044"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-west/frame_003.png" id="f_045"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-west/frame_004.png" id="f_046"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/walk/south-west/frame_005.png" id="f_047"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south/frame_000.png" id="f_048"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south/frame_001.png" id="f_049"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south/frame_002.png" id="f_050"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south/frame_003.png" id="f_051"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south/frame_004.png" id="f_052"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south/frame_005.png" id="f_053"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-east/frame_000.png" id="f_054"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-east/frame_001.png" id="f_055"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-east/frame_002.png" id="f_056"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-east/frame_003.png" id="f_057"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-east/frame_004.png" id="f_058"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-east/frame_005.png" id="f_059"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/east/frame_000.png" id="f_060"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/east/frame_001.png" id="f_061"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/east/frame_002.png" id="f_062"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/east/frame_003.png" id="f_063"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/east/frame_004.png" id="f_064"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/east/frame_005.png" id="f_065"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-east/frame_000.png" id="f_066"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-east/frame_001.png" id="f_067"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-east/frame_002.png" id="f_068"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-east/frame_003.png" id="f_069"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-east/frame_004.png" id="f_070"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-east/frame_005.png" id="f_071"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north/frame_000.png" id="f_072"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north/frame_001.png" id="f_073"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north/frame_002.png" id="f_074"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north/frame_003.png" id="f_075"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north/frame_004.png" id="f_076"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north/frame_005.png" id="f_077"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-west/frame_000.png" id="f_078"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-west/frame_001.png" id="f_079"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-west/frame_002.png" id="f_080"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-west/frame_003.png" id="f_081"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-west/frame_004.png" id="f_082"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/north-west/frame_005.png" id="f_083"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/west/frame_000.png" id="f_084"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/west/frame_001.png" id="f_085"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/west/frame_002.png" id="f_086"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/west/frame_003.png" id="f_087"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/west/frame_004.png" id="f_088"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/west/frame_005.png" id="f_089"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-west/frame_000.png" id="f_090"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-west/frame_001.png" id="f_091"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-west/frame_002.png" id="f_092"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-west/frame_003.png" id="f_093"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-west/frame_004.png" id="f_094"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk/south-west/frame_005.png" id="f_095"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south/frame_000.png" id="f_096"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south/frame_001.png" id="f_097"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south/frame_002.png" id="f_098"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south/frame_003.png" id="f_099"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south/frame_004.png" id="f_100"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south/frame_005.png" id="f_101"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-east/frame_000.png" id="f_102"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-east/frame_001.png" id="f_103"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-east/frame_002.png" id="f_104"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-east/frame_003.png" id="f_105"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-east/frame_004.png" id="f_106"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-east/frame_005.png" id="f_107"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/east/frame_000.png" id="f_108"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/east/frame_001.png" id="f_109"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/east/frame_002.png" id="f_110"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/east/frame_003.png" id="f_111"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/east/frame_004.png" id="f_112"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/east/frame_005.png" id="f_113"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-east/frame_000.png" id="f_114"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-east/frame_001.png" id="f_115"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-east/frame_002.png" id="f_116"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-east/frame_003.png" id="f_117"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-east/frame_004.png" id="f_118"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-east/frame_005.png" id="f_119"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north/frame_000.png" id="f_120"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north/frame_001.png" id="f_121"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north/frame_002.png" id="f_122"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north/frame_003.png" id="f_123"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north/frame_004.png" id="f_124"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north/frame_005.png" id="f_125"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-west/frame_000.png" id="f_126"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-west/frame_001.png" id="f_127"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-west/frame_002.png" id="f_128"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-west/frame_003.png" id="f_129"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-west/frame_004.png" id="f_130"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/north-west/frame_005.png" id="f_131"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/west/frame_000.png" id="f_132"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/west/frame_001.png" id="f_133"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/west/frame_002.png" id="f_134"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/west/frame_003.png" id="f_135"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/west/frame_004.png" id="f_136"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/west/frame_005.png" id="f_137"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-west/frame_000.png" id="f_138"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-west/frame_001.png" id="f_139"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-west/frame_002.png" id="f_140"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-west/frame_003.png" id="f_141"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-west/frame_004.png" id="f_142"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/atk_telegraph/south-west/frame_005.png" id="f_143"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south/frame_000.png" id="f_144"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south/frame_001.png" id="f_145"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south/frame_002.png" id="f_146"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south/frame_003.png" id="f_147"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south/frame_004.png" id="f_148"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south/frame_005.png" id="f_149"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-east/frame_000.png" id="f_150"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-east/frame_001.png" id="f_151"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-east/frame_002.png" id="f_152"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-east/frame_003.png" id="f_153"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-east/frame_004.png" id="f_154"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-east/frame_005.png" id="f_155"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/east/frame_000.png" id="f_156"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/east/frame_001.png" id="f_157"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/east/frame_002.png" id="f_158"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/east/frame_003.png" id="f_159"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/east/frame_004.png" id="f_160"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/east/frame_005.png" id="f_161"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-east/frame_000.png" id="f_162"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-east/frame_001.png" id="f_163"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-east/frame_002.png" id="f_164"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-east/frame_003.png" id="f_165"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-east/frame_004.png" id="f_166"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-east/frame_005.png" id="f_167"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north/frame_000.png" id="f_168"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north/frame_001.png" id="f_169"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north/frame_002.png" id="f_170"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north/frame_003.png" id="f_171"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north/frame_004.png" id="f_172"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north/frame_005.png" id="f_173"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-west/frame_000.png" id="f_174"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-west/frame_001.png" id="f_175"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-west/frame_002.png" id="f_176"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-west/frame_003.png" id="f_177"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-west/frame_004.png" id="f_178"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/north-west/frame_005.png" id="f_179"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/west/frame_000.png" id="f_180"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/west/frame_001.png" id="f_181"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/west/frame_002.png" id="f_182"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/west/frame_003.png" id="f_183"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/west/frame_004.png" id="f_184"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/west/frame_005.png" id="f_185"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-west/frame_000.png" id="f_186"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-west/frame_001.png" id="f_187"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-west/frame_002.png" id="f_188"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-west/frame_003.png" id="f_189"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-west/frame_004.png" id="f_190"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/hit/south-west/frame_005.png" id="f_191"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south/frame_000.png" id="f_192"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south/frame_001.png" id="f_193"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south/frame_002.png" id="f_194"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south/frame_003.png" id="f_195"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south/frame_004.png" id="f_196"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south/frame_005.png" id="f_197"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south/frame_006.png" id="f_198"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-east/frame_000.png" id="f_199"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-east/frame_001.png" id="f_200"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-east/frame_002.png" id="f_201"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-east/frame_003.png" id="f_202"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-east/frame_004.png" id="f_203"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-east/frame_005.png" id="f_204"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-east/frame_006.png" id="f_205"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/east/frame_000.png" id="f_206"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/east/frame_001.png" id="f_207"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/east/frame_002.png" id="f_208"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/east/frame_003.png" id="f_209"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/east/frame_004.png" id="f_210"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/east/frame_005.png" id="f_211"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/east/frame_006.png" id="f_212"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-east/frame_000.png" id="f_213"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-east/frame_001.png" id="f_214"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-east/frame_002.png" id="f_215"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-east/frame_003.png" id="f_216"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-east/frame_004.png" id="f_217"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-east/frame_005.png" id="f_218"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-east/frame_006.png" id="f_219"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north/frame_000.png" id="f_220"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north/frame_001.png" id="f_221"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north/frame_002.png" id="f_222"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north/frame_003.png" id="f_223"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north/frame_004.png" id="f_224"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north/frame_005.png" id="f_225"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north/frame_006.png" id="f_226"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-west/frame_000.png" id="f_227"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-west/frame_001.png" id="f_228"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-west/frame_002.png" id="f_229"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-west/frame_003.png" id="f_230"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-west/frame_004.png" id="f_231"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-west/frame_005.png" id="f_232"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/north-west/frame_006.png" id="f_233"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/west/frame_000.png" id="f_234"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/west/frame_001.png" id="f_235"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/west/frame_002.png" id="f_236"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/west/frame_003.png" id="f_237"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/west/frame_004.png" id="f_238"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/west/frame_005.png" id="f_239"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/west/frame_006.png" id="f_240"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-west/frame_000.png" id="f_241"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-west/frame_001.png" id="f_242"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-west/frame_002.png" id="f_243"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-west/frame_003.png" id="f_244"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-west/frame_004.png" id="f_245"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-west/frame_005.png" id="f_246"]
+[ext_resource type="Texture2D" path="res://assets/sprites/grunt/_pixellab_anims/Grunt_v3_cloister-penitent/animations/die/south-west/frame_006.png" id="f_247"]
 
 [resource]
 animations = [{
@@ -301,18 +269,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_005")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_006")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_007")
 }],
 "loop": true,
 "name": &"walk_s",
 "speed": 8.0
 }, {
 "frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_006")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_007")
+}, {
 "duration": 1.0,
 "texture": ExtResource("f_008")
 }, {
@@ -324,7 +292,12 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_011")
+}],
+"loop": true,
+"name": &"walk_se",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_012")
 }, {
@@ -336,18 +309,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_015")
-}],
-"loop": true,
-"name": &"walk_se",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_016")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_017")
+}],
+"loop": true,
+"name": &"walk_e",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_018")
 }, {
@@ -367,7 +340,7 @@ animations = [{
 "texture": ExtResource("f_023")
 }],
 "loop": true,
-"name": &"walk_e",
+"name": &"walk_ne",
 "speed": 8.0
 }, {
 "frames": [{
@@ -388,18 +361,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_029")
+}],
+"loop": true,
+"name": &"walk_n",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_030")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_031")
-}],
-"loop": true,
-"name": &"walk_ne",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_032")
 }, {
@@ -411,7 +384,12 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_035")
+}],
+"loop": true,
+"name": &"walk_nw",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_036")
 }, {
@@ -423,18 +401,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_039")
-}],
-"loop": true,
-"name": &"walk_n",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_040")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_041")
+}],
+"loop": true,
+"name": &"walk_w",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_042")
 }, {
@@ -454,7 +432,7 @@ animations = [{
 "texture": ExtResource("f_047")
 }],
 "loop": true,
-"name": &"walk_nw",
+"name": &"walk_sw",
 "speed": 8.0
 }, {
 "frames": [{
@@ -475,18 +453,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_053")
+}],
+"loop": false,
+"name": &"atk_s",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_054")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_055")
-}],
-"loop": true,
-"name": &"walk_w",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_056")
 }, {
@@ -498,7 +476,12 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_059")
+}],
+"loop": false,
+"name": &"atk_se",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_060")
 }, {
@@ -510,18 +493,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_063")
-}],
-"loop": true,
-"name": &"walk_sw",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_064")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_065")
+}],
+"loop": false,
+"name": &"atk_e",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_066")
 }, {
@@ -533,18 +516,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_069")
-}],
-"loop": false,
-"name": &"atk_s",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_070")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_071")
+}],
+"loop": false,
+"name": &"atk_ne",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_072")
 }, {
@@ -556,18 +539,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_075")
-}],
-"loop": false,
-"name": &"atk_se",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_076")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_077")
+}],
+"loop": false,
+"name": &"atk_n",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_078")
 }, {
@@ -579,18 +562,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_081")
-}],
-"loop": false,
-"name": &"atk_e",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_082")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_083")
+}],
+"loop": false,
+"name": &"atk_nw",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_084")
 }, {
@@ -602,18 +585,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_087")
-}],
-"loop": false,
-"name": &"atk_ne",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_088")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_089")
+}],
+"loop": false,
+"name": &"atk_w",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_090")
 }, {
@@ -625,18 +608,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_093")
-}],
-"loop": false,
-"name": &"atk_n",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_094")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_095")
+}],
+"loop": false,
+"name": &"atk_sw",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_096")
 }, {
@@ -648,18 +631,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_099")
-}],
-"loop": false,
-"name": &"atk_nw",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_100")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_101")
+}],
+"loop": false,
+"name": &"atk_telegraph_s",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_102")
 }, {
@@ -671,18 +654,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_105")
-}],
-"loop": false,
-"name": &"atk_w",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_106")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_107")
+}],
+"loop": false,
+"name": &"atk_telegraph_se",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_108")
 }, {
@@ -694,18 +677,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_111")
-}],
-"loop": false,
-"name": &"atk_sw",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_112")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_113")
+}],
+"loop": false,
+"name": &"atk_telegraph_e",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_114")
 }, {
@@ -717,18 +700,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_117")
-}],
-"loop": false,
-"name": &"hit_s",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_118")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_119")
+}],
+"loop": false,
+"name": &"atk_telegraph_ne",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_120")
 }, {
@@ -740,18 +723,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_123")
-}],
-"loop": false,
-"name": &"hit_se",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_124")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_125")
+}],
+"loop": false,
+"name": &"atk_telegraph_n",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_126")
 }, {
@@ -763,18 +746,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_129")
-}],
-"loop": false,
-"name": &"hit_e",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_130")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_131")
+}],
+"loop": false,
+"name": &"atk_telegraph_nw",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_132")
 }, {
@@ -786,18 +769,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_135")
-}],
-"loop": false,
-"name": &"hit_ne",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_136")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_137")
+}],
+"loop": false,
+"name": &"atk_telegraph_w",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_138")
 }, {
@@ -809,18 +792,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_141")
-}],
-"loop": false,
-"name": &"hit_n",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_142")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_143")
+}],
+"loop": false,
+"name": &"atk_telegraph_sw",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_144")
 }, {
@@ -832,18 +815,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_147")
-}],
-"loop": false,
-"name": &"hit_nw",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_148")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_149")
+}],
+"loop": false,
+"name": &"hit_s",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_150")
 }, {
@@ -855,18 +838,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_153")
-}],
-"loop": false,
-"name": &"hit_w",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_154")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_155")
+}],
+"loop": false,
+"name": &"hit_se",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_156")
 }, {
@@ -878,18 +861,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_159")
-}],
-"loop": false,
-"name": &"hit_sw",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_160")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_161")
+}],
+"loop": false,
+"name": &"hit_e",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_162")
 }, {
@@ -904,15 +887,15 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_166")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_167")
 }],
 "loop": false,
-"name": &"die_s",
+"name": &"hit_ne",
 "speed": 8.0
 }, {
 "frames": [{
-"duration": 1.0,
-"texture": ExtResource("f_167")
-}, {
 "duration": 1.0,
 "texture": ExtResource("f_168")
 }, {
@@ -932,7 +915,7 @@ animations = [{
 "texture": ExtResource("f_173")
 }],
 "loop": false,
-"name": &"die_se",
+"name": &"hit_n",
 "speed": 8.0
 }, {
 "frames": [{
@@ -953,15 +936,15 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_179")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_180")
 }],
 "loop": false,
-"name": &"die_e",
+"name": &"hit_nw",
 "speed": 8.0
 }, {
 "frames": [{
+"duration": 1.0,
+"texture": ExtResource("f_180")
+}, {
 "duration": 1.0,
 "texture": ExtResource("f_181")
 }, {
@@ -976,18 +959,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_185")
+}],
+"loop": false,
+"name": &"hit_w",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_186")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_187")
-}],
-"loop": false,
-"name": &"die_ne",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_188")
 }, {
@@ -999,7 +982,12 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_191")
+}],
+"loop": false,
+"name": &"hit_sw",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_192")
 }, {
@@ -1008,12 +996,7 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_194")
-}],
-"loop": false,
-"name": &"die_n",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_195")
 }, {
@@ -1025,7 +1008,12 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_198")
+}],
+"loop": false,
+"name": &"die_s",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_199")
 }, {
@@ -1034,12 +1022,7 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_201")
-}],
-"loop": false,
-"name": &"die_nw",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_202")
 }, {
@@ -1051,7 +1034,12 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_205")
+}],
+"loop": false,
+"name": &"die_se",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_206")
 }, {
@@ -1060,12 +1048,7 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_208")
-}],
-"loop": false,
-"name": &"die_w",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_209")
 }, {
@@ -1077,7 +1060,12 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_212")
+}],
+"loop": false,
+"name": &"die_e",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_213")
 }, {
@@ -1086,12 +1074,7 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_215")
-}],
-"loop": false,
-"name": &"die_sw",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_216")
 }, {
@@ -1103,7 +1086,12 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_219")
+}],
+"loop": false,
+"name": &"die_ne",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_220")
 }, {
@@ -1115,12 +1103,7 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_223")
-}],
-"loop": false,
-"name": &"atk_telegraph_s",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_224")
 }, {
@@ -1129,7 +1112,12 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_226")
+}],
+"loop": false,
+"name": &"die_n",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_227")
 }, {
@@ -1144,18 +1132,18 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_231")
-}],
-"loop": false,
-"name": &"atk_telegraph_se",
-"speed": 8.0
 }, {
-"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_232")
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_233")
+}],
+"loop": false,
+"name": &"die_nw",
+"speed": 8.0
 }, {
+"frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_234")
 }, {
@@ -1173,15 +1161,15 @@ animations = [{
 }, {
 "duration": 1.0,
 "texture": ExtResource("f_239")
+}, {
+"duration": 1.0,
+"texture": ExtResource("f_240")
 }],
 "loop": false,
-"name": &"atk_telegraph_e",
+"name": &"die_w",
 "speed": 8.0
 }, {
 "frames": [{
-"duration": 1.0,
-"texture": ExtResource("f_240")
-}, {
 "duration": 1.0,
 "texture": ExtResource("f_241")
 }, {
@@ -1204,122 +1192,6 @@ animations = [{
 "texture": ExtResource("f_247")
 }],
 "loop": false,
-"name": &"atk_telegraph_ne",
-"speed": 8.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("f_248")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_249")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_250")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_251")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_252")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_253")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_254")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_255")
-}],
-"loop": false,
-"name": &"atk_telegraph_n",
-"speed": 8.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("f_256")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_257")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_258")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_259")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_260")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_261")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_262")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_263")
-}],
-"loop": false,
-"name": &"atk_telegraph_nw",
-"speed": 8.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("f_264")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_265")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_266")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_267")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_268")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_269")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_270")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_271")
-}],
-"loop": false,
-"name": &"atk_telegraph_w",
-"speed": 8.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("f_272")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_273")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_274")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_275")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_276")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_277")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_278")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_279")
-}],
-"loop": false,
-"name": &"atk_telegraph_sw",
+"name": &"die_sw",
 "speed": 8.0
 }]
