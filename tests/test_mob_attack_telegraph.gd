@@ -200,6 +200,24 @@ func test_shooter_attack_telegraph_tint_is_not_white() -> void:
 	)
 
 
+# Sponsor soak #413 regression guard: the prior vivid-red telegraph tint
+# (Color(1.0, 0.30, 0.30)) "did not look good" on the brazier-warden. The fix
+# reduced it to a faint warm ember glaze. Pin that the tint is NO LONGER a
+# vivid red wash — it must NOT have a strongly-suppressed green/blue (which is
+# what makes a colour read as saturated red). Concretely: green and blue must
+# stay high (warm-near-white), so the warden shows his natural colours while
+# aiming. If a future edit re-introduces a saturated red, this fails.
+func test_shooter_telegraph_tint_is_not_a_vivid_red_wash() -> void:
+	var tint: Color = Shooter.ATTACK_TELEGRAPH_TINT
+	assert_true(
+		tint.g >= 0.85 and tint.b >= 0.85,
+		(
+			"Shooter telegraph tint must be warm-near-white (g,b >= 0.85), NOT a vivid red wash"
+			+ " — got (%.2f,%.2f,%.2f)" % [tint.r, tint.g, tint.b]
+		)
+	)
+
+
 # ---- (e) EDGE: Grunt telegraph is re-entry-idempotent ------------------
 
 
