@@ -1,252 +1,247 @@
-[gd_resource type="SpriteFrames" load_steps=233 format=3 uid="uid://b0embergrave_charger_sprite_frames"]
+[gd_resource type="SpriteFrames" load_steps=217 format=3 uid="uid://b0embergrave_charger_sprite_frames"]
 
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south/frame_000.png" id="f_000"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south/frame_001.png" id="f_001"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south/frame_002.png" id="f_002"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south/frame_003.png" id="f_003"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south-east/frame_000.png" id="f_004"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south-east/frame_001.png" id="f_005"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south-east/frame_002.png" id="f_006"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south-east/frame_003.png" id="f_007"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/east/frame_000.png" id="f_008"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/east/frame_001.png" id="f_009"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/east/frame_002.png" id="f_010"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/east/frame_003.png" id="f_011"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north-east/frame_000.png" id="f_012"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north-east/frame_001.png" id="f_013"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north-east/frame_002.png" id="f_014"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north-east/frame_003.png" id="f_015"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north/frame_000.png" id="f_016"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north/frame_001.png" id="f_017"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north/frame_002.png" id="f_018"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north/frame_003.png" id="f_019"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north-west/frame_000.png" id="f_020"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north-west/frame_001.png" id="f_021"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north-west/frame_002.png" id="f_022"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/north-west/frame_003.png" id="f_023"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/west/frame_000.png" id="f_024"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/west/frame_001.png" id="f_025"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/west/frame_002.png" id="f_026"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/west/frame_003.png" id="f_027"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south-west/frame_000.png" id="f_028"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south-west/frame_001.png" id="f_029"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south-west/frame_002.png" id="f_030"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/walk/south-west/frame_003.png" id="f_031"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south/frame_000.png" id="f_032"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south/frame_001.png" id="f_033"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south/frame_002.png" id="f_034"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south/frame_003.png" id="f_035"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south/frame_004.png" id="f_036"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south/frame_005.png" id="f_037"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south/frame_006.png" id="f_038"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south/frame_007.png" id="f_039"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south/frame_008.png" id="f_040"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-east/frame_000.png" id="f_041"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-east/frame_001.png" id="f_042"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-east/frame_002.png" id="f_043"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-east/frame_003.png" id="f_044"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-east/frame_004.png" id="f_045"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-east/frame_005.png" id="f_046"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-east/frame_006.png" id="f_047"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-east/frame_007.png" id="f_048"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-east/frame_008.png" id="f_049"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/east/frame_000.png" id="f_050"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/east/frame_001.png" id="f_051"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/east/frame_002.png" id="f_052"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/east/frame_003.png" id="f_053"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/east/frame_004.png" id="f_054"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/east/frame_005.png" id="f_055"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/east/frame_006.png" id="f_056"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/east/frame_007.png" id="f_057"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/east/frame_008.png" id="f_058"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-east/frame_000.png" id="f_059"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-east/frame_001.png" id="f_060"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-east/frame_002.png" id="f_061"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-east/frame_003.png" id="f_062"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-east/frame_004.png" id="f_063"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-east/frame_005.png" id="f_064"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-east/frame_006.png" id="f_065"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-east/frame_007.png" id="f_066"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-east/frame_008.png" id="f_067"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north/frame_000.png" id="f_068"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north/frame_001.png" id="f_069"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north/frame_002.png" id="f_070"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north/frame_003.png" id="f_071"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north/frame_004.png" id="f_072"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north/frame_005.png" id="f_073"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north/frame_006.png" id="f_074"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north/frame_007.png" id="f_075"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north/frame_008.png" id="f_076"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-west/frame_000.png" id="f_077"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-west/frame_001.png" id="f_078"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-west/frame_002.png" id="f_079"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-west/frame_003.png" id="f_080"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-west/frame_004.png" id="f_081"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-west/frame_005.png" id="f_082"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-west/frame_006.png" id="f_083"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-west/frame_007.png" id="f_084"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/north-west/frame_008.png" id="f_085"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/west/frame_000.png" id="f_086"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/west/frame_001.png" id="f_087"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/west/frame_002.png" id="f_088"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/west/frame_003.png" id="f_089"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/west/frame_004.png" id="f_090"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/west/frame_005.png" id="f_091"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/west/frame_006.png" id="f_092"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/west/frame_007.png" id="f_093"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/west/frame_008.png" id="f_094"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-west/frame_000.png" id="f_095"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-west/frame_001.png" id="f_096"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-west/frame_002.png" id="f_097"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-west/frame_003.png" id="f_098"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-west/frame_004.png" id="f_099"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-west/frame_005.png" id="f_100"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-west/frame_006.png" id="f_101"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-west/frame_007.png" id="f_102"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/telegraph/south-west/frame_008.png" id="f_103"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south/frame_000.png" id="f_104"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south/frame_001.png" id="f_105"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south/frame_002.png" id="f_106"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south/frame_003.png" id="f_107"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south/frame_004.png" id="f_108"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south/frame_005.png" id="f_109"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south/frame_006.png" id="f_110"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south/frame_007.png" id="f_111"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-east/frame_000.png" id="f_112"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-east/frame_001.png" id="f_113"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-east/frame_002.png" id="f_114"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-east/frame_003.png" id="f_115"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-east/frame_004.png" id="f_116"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-east/frame_005.png" id="f_117"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-east/frame_006.png" id="f_118"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-east/frame_007.png" id="f_119"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/east/frame_000.png" id="f_120"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/east/frame_001.png" id="f_121"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/east/frame_002.png" id="f_122"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/east/frame_003.png" id="f_123"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/east/frame_004.png" id="f_124"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/east/frame_005.png" id="f_125"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/east/frame_006.png" id="f_126"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/east/frame_007.png" id="f_127"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-east/frame_000.png" id="f_128"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-east/frame_001.png" id="f_129"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-east/frame_002.png" id="f_130"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-east/frame_003.png" id="f_131"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-east/frame_004.png" id="f_132"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-east/frame_005.png" id="f_133"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-east/frame_006.png" id="f_134"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-east/frame_007.png" id="f_135"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north/frame_000.png" id="f_136"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north/frame_001.png" id="f_137"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north/frame_002.png" id="f_138"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north/frame_003.png" id="f_139"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north/frame_004.png" id="f_140"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north/frame_005.png" id="f_141"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north/frame_006.png" id="f_142"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north/frame_007.png" id="f_143"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-west/frame_000.png" id="f_144"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-west/frame_001.png" id="f_145"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-west/frame_002.png" id="f_146"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-west/frame_003.png" id="f_147"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-west/frame_004.png" id="f_148"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-west/frame_005.png" id="f_149"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-west/frame_006.png" id="f_150"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/north-west/frame_007.png" id="f_151"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/west/frame_000.png" id="f_152"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/west/frame_001.png" id="f_153"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/west/frame_002.png" id="f_154"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/west/frame_003.png" id="f_155"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/west/frame_004.png" id="f_156"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/west/frame_005.png" id="f_157"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/west/frame_006.png" id="f_158"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/west/frame_007.png" id="f_159"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-west/frame_000.png" id="f_160"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-west/frame_001.png" id="f_161"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-west/frame_002.png" id="f_162"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-west/frame_003.png" id="f_163"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-west/frame_004.png" id="f_164"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-west/frame_005.png" id="f_165"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-west/frame_006.png" id="f_166"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/atk/south-west/frame_007.png" id="f_167"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south/frame_000.png" id="f_168"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south/frame_001.png" id="f_169"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south/frame_002.png" id="f_170"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south/frame_003.png" id="f_171"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south/frame_004.png" id="f_172"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south/frame_005.png" id="f_173"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south/frame_006.png" id="f_174"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south/frame_007.png" id="f_175"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-east/frame_000.png" id="f_176"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-east/frame_001.png" id="f_177"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-east/frame_002.png" id="f_178"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-east/frame_003.png" id="f_179"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-east/frame_004.png" id="f_180"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-east/frame_005.png" id="f_181"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-east/frame_006.png" id="f_182"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-east/frame_007.png" id="f_183"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/east/frame_000.png" id="f_184"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/east/frame_001.png" id="f_185"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/east/frame_002.png" id="f_186"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/east/frame_003.png" id="f_187"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/east/frame_004.png" id="f_188"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/east/frame_005.png" id="f_189"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/east/frame_006.png" id="f_190"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/east/frame_007.png" id="f_191"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-east/frame_000.png" id="f_192"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-east/frame_001.png" id="f_193"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-east/frame_002.png" id="f_194"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-east/frame_003.png" id="f_195"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-east/frame_004.png" id="f_196"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-east/frame_005.png" id="f_197"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-east/frame_006.png" id="f_198"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-east/frame_007.png" id="f_199"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north/frame_000.png" id="f_200"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north/frame_001.png" id="f_201"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north/frame_002.png" id="f_202"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north/frame_003.png" id="f_203"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north/frame_004.png" id="f_204"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north/frame_005.png" id="f_205"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north/frame_006.png" id="f_206"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north/frame_007.png" id="f_207"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-west/frame_000.png" id="f_208"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-west/frame_001.png" id="f_209"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-west/frame_002.png" id="f_210"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-west/frame_003.png" id="f_211"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-west/frame_004.png" id="f_212"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-west/frame_005.png" id="f_213"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-west/frame_006.png" id="f_214"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/north-west/frame_007.png" id="f_215"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/west/frame_000.png" id="f_216"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/west/frame_001.png" id="f_217"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/west/frame_002.png" id="f_218"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/west/frame_003.png" id="f_219"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/west/frame_004.png" id="f_220"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/west/frame_005.png" id="f_221"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/west/frame_006.png" id="f_222"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/west/frame_007.png" id="f_223"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-west/frame_000.png" id="f_224"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-west/frame_001.png" id="f_225"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-west/frame_002.png" id="f_226"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-west/frame_003.png" id="f_227"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-west/frame_004.png" id="f_228"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-west/frame_005.png" id="f_229"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-west/frame_006.png" id="f_230"]
-[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/Charger_S1_Embergrave/animations/die/south-west/frame_007.png" id="f_231"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south/frame_000.png" id="f_000"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south/frame_001.png" id="f_001"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south/frame_002.png" id="f_002"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south/frame_003.png" id="f_003"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south/frame_004.png" id="f_004"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south/frame_005.png" id="f_005"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-east/frame_000.png" id="f_006"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-east/frame_001.png" id="f_007"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-east/frame_002.png" id="f_008"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-east/frame_003.png" id="f_009"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-east/frame_004.png" id="f_010"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-east/frame_005.png" id="f_011"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/east/frame_000.png" id="f_012"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/east/frame_001.png" id="f_013"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/east/frame_002.png" id="f_014"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/east/frame_003.png" id="f_015"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/east/frame_004.png" id="f_016"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/east/frame_005.png" id="f_017"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-east/frame_000.png" id="f_018"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-east/frame_001.png" id="f_019"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-east/frame_002.png" id="f_020"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-east/frame_003.png" id="f_021"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-east/frame_004.png" id="f_022"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-east/frame_005.png" id="f_023"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north/frame_000.png" id="f_024"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north/frame_001.png" id="f_025"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north/frame_002.png" id="f_026"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north/frame_003.png" id="f_027"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north/frame_004.png" id="f_028"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north/frame_005.png" id="f_029"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-west/frame_000.png" id="f_030"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-west/frame_001.png" id="f_031"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-west/frame_002.png" id="f_032"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-west/frame_003.png" id="f_033"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-west/frame_004.png" id="f_034"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/north-west/frame_005.png" id="f_035"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/west/frame_000.png" id="f_036"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/west/frame_001.png" id="f_037"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/west/frame_002.png" id="f_038"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/west/frame_003.png" id="f_039"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/west/frame_004.png" id="f_040"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/west/frame_005.png" id="f_041"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-west/frame_000.png" id="f_042"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-west/frame_001.png" id="f_043"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-west/frame_002.png" id="f_044"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-west/frame_003.png" id="f_045"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-west/frame_004.png" id="f_046"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/walk/south-west/frame_005.png" id="f_047"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south/frame_000.png" id="f_048"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south/frame_001.png" id="f_049"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south/frame_002.png" id="f_050"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south/frame_003.png" id="f_051"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south/frame_004.png" id="f_052"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south/frame_005.png" id="f_053"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-east/frame_000.png" id="f_054"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-east/frame_001.png" id="f_055"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-east/frame_002.png" id="f_056"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-east/frame_003.png" id="f_057"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-east/frame_004.png" id="f_058"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-east/frame_005.png" id="f_059"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/east/frame_000.png" id="f_060"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/east/frame_001.png" id="f_061"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/east/frame_002.png" id="f_062"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/east/frame_003.png" id="f_063"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/east/frame_004.png" id="f_064"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/east/frame_005.png" id="f_065"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-east/frame_000.png" id="f_066"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-east/frame_001.png" id="f_067"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-east/frame_002.png" id="f_068"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-east/frame_003.png" id="f_069"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-east/frame_004.png" id="f_070"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-east/frame_005.png" id="f_071"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north/frame_000.png" id="f_072"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north/frame_001.png" id="f_073"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north/frame_002.png" id="f_074"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north/frame_003.png" id="f_075"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north/frame_004.png" id="f_076"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north/frame_005.png" id="f_077"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-west/frame_000.png" id="f_078"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-west/frame_001.png" id="f_079"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-west/frame_002.png" id="f_080"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-west/frame_003.png" id="f_081"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-west/frame_004.png" id="f_082"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/north-west/frame_005.png" id="f_083"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/west/frame_000.png" id="f_084"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/west/frame_001.png" id="f_085"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/west/frame_002.png" id="f_086"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/west/frame_003.png" id="f_087"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/west/frame_004.png" id="f_088"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/west/frame_005.png" id="f_089"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-west/frame_000.png" id="f_090"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-west/frame_001.png" id="f_091"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-west/frame_002.png" id="f_092"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-west/frame_003.png" id="f_093"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-west/frame_004.png" id="f_094"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/telegraph/south-west/frame_005.png" id="f_095"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south/frame_000.png" id="f_096"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south/frame_001.png" id="f_097"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south/frame_002.png" id="f_098"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south/frame_003.png" id="f_099"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south/frame_004.png" id="f_100"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south/frame_005.png" id="f_101"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-east/frame_000.png" id="f_102"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-east/frame_001.png" id="f_103"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-east/frame_002.png" id="f_104"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-east/frame_003.png" id="f_105"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-east/frame_004.png" id="f_106"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-east/frame_005.png" id="f_107"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/east/frame_000.png" id="f_108"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/east/frame_001.png" id="f_109"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/east/frame_002.png" id="f_110"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/east/frame_003.png" id="f_111"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/east/frame_004.png" id="f_112"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/east/frame_005.png" id="f_113"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-east/frame_000.png" id="f_114"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-east/frame_001.png" id="f_115"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-east/frame_002.png" id="f_116"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-east/frame_003.png" id="f_117"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-east/frame_004.png" id="f_118"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-east/frame_005.png" id="f_119"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north/frame_000.png" id="f_120"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north/frame_001.png" id="f_121"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north/frame_002.png" id="f_122"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north/frame_003.png" id="f_123"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north/frame_004.png" id="f_124"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north/frame_005.png" id="f_125"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-west/frame_000.png" id="f_126"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-west/frame_001.png" id="f_127"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-west/frame_002.png" id="f_128"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-west/frame_003.png" id="f_129"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-west/frame_004.png" id="f_130"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/north-west/frame_005.png" id="f_131"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/west/frame_000.png" id="f_132"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/west/frame_001.png" id="f_133"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/west/frame_002.png" id="f_134"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/west/frame_003.png" id="f_135"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/west/frame_004.png" id="f_136"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/west/frame_005.png" id="f_137"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-west/frame_000.png" id="f_138"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-west/frame_001.png" id="f_139"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-west/frame_002.png" id="f_140"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-west/frame_003.png" id="f_141"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-west/frame_004.png" id="f_142"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/atk/south-west/frame_005.png" id="f_143"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south/frame_000.png" id="f_144"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south/frame_001.png" id="f_145"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south/frame_002.png" id="f_146"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south/frame_003.png" id="f_147"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south/frame_004.png" id="f_148"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south/frame_005.png" id="f_149"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south/frame_006.png" id="f_150"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south/frame_007.png" id="f_151"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south/frame_008.png" id="f_152"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-east/frame_000.png" id="f_153"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-east/frame_001.png" id="f_154"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-east/frame_002.png" id="f_155"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-east/frame_003.png" id="f_156"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-east/frame_004.png" id="f_157"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-east/frame_005.png" id="f_158"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-east/frame_006.png" id="f_159"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-east/frame_007.png" id="f_160"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-east/frame_008.png" id="f_161"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/east/frame_000.png" id="f_162"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/east/frame_001.png" id="f_163"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/east/frame_002.png" id="f_164"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/east/frame_003.png" id="f_165"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/east/frame_004.png" id="f_166"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/east/frame_005.png" id="f_167"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/east/frame_006.png" id="f_168"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/east/frame_007.png" id="f_169"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/east/frame_008.png" id="f_170"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-east/frame_000.png" id="f_171"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-east/frame_001.png" id="f_172"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-east/frame_002.png" id="f_173"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-east/frame_003.png" id="f_174"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-east/frame_004.png" id="f_175"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-east/frame_005.png" id="f_176"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-east/frame_006.png" id="f_177"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-east/frame_007.png" id="f_178"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-east/frame_008.png" id="f_179"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north/frame_000.png" id="f_180"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north/frame_001.png" id="f_181"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north/frame_002.png" id="f_182"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north/frame_003.png" id="f_183"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north/frame_004.png" id="f_184"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north/frame_005.png" id="f_185"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north/frame_006.png" id="f_186"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north/frame_007.png" id="f_187"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north/frame_008.png" id="f_188"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-west/frame_000.png" id="f_189"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-west/frame_001.png" id="f_190"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-west/frame_002.png" id="f_191"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-west/frame_003.png" id="f_192"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-west/frame_004.png" id="f_193"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-west/frame_005.png" id="f_194"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-west/frame_006.png" id="f_195"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-west/frame_007.png" id="f_196"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/north-west/frame_008.png" id="f_197"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/west/frame_000.png" id="f_198"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/west/frame_001.png" id="f_199"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/west/frame_002.png" id="f_200"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/west/frame_003.png" id="f_201"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/west/frame_004.png" id="f_202"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/west/frame_005.png" id="f_203"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/west/frame_006.png" id="f_204"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/west/frame_007.png" id="f_205"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/west/frame_008.png" id="f_206"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-west/frame_000.png" id="f_207"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-west/frame_001.png" id="f_208"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-west/frame_002.png" id="f_209"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-west/frame_003.png" id="f_210"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-west/frame_004.png" id="f_211"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-west/frame_005.png" id="f_212"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-west/frame_006.png" id="f_213"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-west/frame_007.png" id="f_214"]
+[ext_resource type="Texture2D" path="res://assets/sprites/charger/_pixellab_anims/S1_charger_bone-hound_v3clean/S1_Charger_Bone-Hound_v3-clean/animations/die/south-west/frame_008.png" id="f_215"]
 
 [resource]
 animations = [{
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("f_000")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_001")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_002")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_003")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_004")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_005")
 }],
 "loop": true,
 "name": &"walk_s",
@@ -254,16 +249,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_004")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_005")
-}, {
-"duration": 1.0,
 "texture": ExtResource("f_006")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_007")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_008")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_009")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_010")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_011")
 }],
 "loop": true,
 "name": &"walk_se",
@@ -271,16 +277,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_008")
-}, {
+"texture": ExtResource("f_012")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_009")
-}, {
+"texture": ExtResource("f_013")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_010")
-}, {
+"texture": ExtResource("f_014")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_011")
+"texture": ExtResource("f_015")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_016")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_017")
 }],
 "loop": true,
 "name": &"walk_e",
@@ -288,16 +305,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_012")
-}, {
+"texture": ExtResource("f_018")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_013")
-}, {
+"texture": ExtResource("f_019")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_014")
-}, {
+"texture": ExtResource("f_020")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_015")
+"texture": ExtResource("f_021")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_022")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_023")
 }],
 "loop": true,
 "name": &"walk_ne",
@@ -305,16 +333,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_016")
-}, {
+"texture": ExtResource("f_024")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_017")
-}, {
+"texture": ExtResource("f_025")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_018")
-}, {
+"texture": ExtResource("f_026")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_019")
+"texture": ExtResource("f_027")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_028")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_029")
 }],
 "loop": true,
 "name": &"walk_n",
@@ -322,16 +361,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_020")
-}, {
+"texture": ExtResource("f_030")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_021")
-}, {
+"texture": ExtResource("f_031")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_022")
-}, {
+"texture": ExtResource("f_032")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_023")
+"texture": ExtResource("f_033")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_034")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_035")
 }],
 "loop": true,
 "name": &"walk_nw",
@@ -339,16 +389,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_024")
-}, {
+"texture": ExtResource("f_036")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_025")
-}, {
+"texture": ExtResource("f_037")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_026")
-}, {
+"texture": ExtResource("f_038")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_027")
+"texture": ExtResource("f_039")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_040")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_041")
 }],
 "loop": true,
 "name": &"walk_w",
@@ -356,16 +417,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_028")
-}, {
+"texture": ExtResource("f_042")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_029")
-}, {
+"texture": ExtResource("f_043")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_030")
-}, {
+"texture": ExtResource("f_044")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_031")
+"texture": ExtResource("f_045")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_046")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_047")
 }],
 "loop": true,
 "name": &"walk_sw",
@@ -373,31 +445,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_032")
-}, {
+"texture": ExtResource("f_048")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_033")
-}, {
+"texture": ExtResource("f_049")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_034")
-}, {
+"texture": ExtResource("f_050")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_035")
-}, {
+"texture": ExtResource("f_051")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_036")
-}, {
+"texture": ExtResource("f_052")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_037")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_038")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_039")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_040")
+"texture": ExtResource("f_053")
 }],
 "loop": false,
 "name": &"telegraph_s",
@@ -405,31 +473,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_041")
-}, {
+"texture": ExtResource("f_054")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_042")
-}, {
+"texture": ExtResource("f_055")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_043")
-}, {
+"texture": ExtResource("f_056")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_044")
-}, {
+"texture": ExtResource("f_057")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_045")
-}, {
+"texture": ExtResource("f_058")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_046")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_047")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_048")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_049")
+"texture": ExtResource("f_059")
 }],
 "loop": false,
 "name": &"telegraph_se",
@@ -437,31 +501,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_050")
-}, {
+"texture": ExtResource("f_060")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_051")
-}, {
+"texture": ExtResource("f_061")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_052")
-}, {
+"texture": ExtResource("f_062")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_053")
-}, {
+"texture": ExtResource("f_063")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_054")
-}, {
+"texture": ExtResource("f_064")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_055")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_056")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_057")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_058")
+"texture": ExtResource("f_065")
 }],
 "loop": false,
 "name": &"telegraph_e",
@@ -469,31 +529,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_059")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_060")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_061")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_062")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_063")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_064")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_065")
-}, {
-"duration": 1.0,
 "texture": ExtResource("f_066")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_067")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_068")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_069")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_070")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_071")
 }],
 "loop": false,
 "name": &"telegraph_ne",
@@ -501,31 +557,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_068")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_069")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_070")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_071")
-}, {
-"duration": 1.0,
 "texture": ExtResource("f_072")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_073")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_074")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_075")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_076")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_077")
 }],
 "loop": false,
 "name": &"telegraph_n",
@@ -533,31 +585,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_077")
-}, {
-"duration": 1.0,
 "texture": ExtResource("f_078")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_079")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_080")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_081")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_082")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_083")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_084")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_085")
 }],
 "loop": false,
 "name": &"telegraph_nw",
@@ -565,31 +613,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
+"texture": ExtResource("f_084")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_085")
+},
+{
+"duration": 1.0,
 "texture": ExtResource("f_086")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_087")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_088")
-}, {
+},
+{
 "duration": 1.0,
 "texture": ExtResource("f_089")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_090")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_091")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_092")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_093")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_094")
 }],
 "loop": false,
 "name": &"telegraph_w",
@@ -597,31 +641,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
+"texture": ExtResource("f_090")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_091")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_092")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_093")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_094")
+},
+{
+"duration": 1.0,
 "texture": ExtResource("f_095")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_096")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_097")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_098")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_099")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_100")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_101")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_102")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_103")
 }],
 "loop": false,
 "name": &"telegraph_sw",
@@ -629,28 +669,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_104")
-}, {
+"texture": ExtResource("f_096")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_105")
-}, {
+"texture": ExtResource("f_097")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_106")
-}, {
+"texture": ExtResource("f_098")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_107")
-}, {
+"texture": ExtResource("f_099")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_108")
-}, {
+"texture": ExtResource("f_100")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_109")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_110")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_111")
+"texture": ExtResource("f_101")
 }],
 "loop": false,
 "name": &"atk_s",
@@ -658,28 +697,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_112")
-}, {
+"texture": ExtResource("f_102")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_113")
-}, {
+"texture": ExtResource("f_103")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_114")
-}, {
+"texture": ExtResource("f_104")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_115")
-}, {
+"texture": ExtResource("f_105")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_116")
-}, {
+"texture": ExtResource("f_106")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_117")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_118")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_119")
+"texture": ExtResource("f_107")
 }],
 "loop": false,
 "name": &"atk_se",
@@ -687,28 +725,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_120")
-}, {
+"texture": ExtResource("f_108")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_121")
-}, {
+"texture": ExtResource("f_109")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_122")
-}, {
+"texture": ExtResource("f_110")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_123")
-}, {
+"texture": ExtResource("f_111")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_124")
-}, {
+"texture": ExtResource("f_112")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_125")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_126")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_127")
+"texture": ExtResource("f_113")
 }],
 "loop": false,
 "name": &"atk_e",
@@ -716,28 +753,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_128")
-}, {
+"texture": ExtResource("f_114")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_129")
-}, {
+"texture": ExtResource("f_115")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_130")
-}, {
+"texture": ExtResource("f_116")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_131")
-}, {
+"texture": ExtResource("f_117")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_132")
-}, {
+"texture": ExtResource("f_118")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_133")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_134")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_135")
+"texture": ExtResource("f_119")
 }],
 "loop": false,
 "name": &"atk_ne",
@@ -745,28 +781,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_136")
-}, {
+"texture": ExtResource("f_120")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_137")
-}, {
+"texture": ExtResource("f_121")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_138")
-}, {
+"texture": ExtResource("f_122")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_139")
-}, {
+"texture": ExtResource("f_123")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_140")
-}, {
+"texture": ExtResource("f_124")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_141")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_142")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_143")
+"texture": ExtResource("f_125")
 }],
 "loop": false,
 "name": &"atk_n",
@@ -774,28 +809,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_144")
-}, {
+"texture": ExtResource("f_126")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_145")
-}, {
+"texture": ExtResource("f_127")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_146")
-}, {
+"texture": ExtResource("f_128")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_147")
-}, {
+"texture": ExtResource("f_129")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_148")
-}, {
+"texture": ExtResource("f_130")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_149")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_150")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_151")
+"texture": ExtResource("f_131")
 }],
 "loop": false,
 "name": &"atk_nw",
@@ -803,28 +837,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_152")
-}, {
+"texture": ExtResource("f_132")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_153")
-}, {
+"texture": ExtResource("f_133")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_154")
-}, {
+"texture": ExtResource("f_134")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_155")
-}, {
+"texture": ExtResource("f_135")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_156")
-}, {
+"texture": ExtResource("f_136")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_157")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_158")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_159")
+"texture": ExtResource("f_137")
 }],
 "loop": false,
 "name": &"atk_w",
@@ -832,28 +865,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_160")
-}, {
+"texture": ExtResource("f_138")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_161")
-}, {
+"texture": ExtResource("f_139")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_162")
-}, {
+"texture": ExtResource("f_140")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_163")
-}, {
+"texture": ExtResource("f_141")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_164")
-}, {
+"texture": ExtResource("f_142")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_165")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_166")
-}, {
-"duration": 1.0,
-"texture": ExtResource("f_167")
+"texture": ExtResource("f_143")
 }],
 "loop": false,
 "name": &"atk_sw",
@@ -861,28 +893,39 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_168")
-}, {
+"texture": ExtResource("f_144")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_169")
-}, {
+"texture": ExtResource("f_145")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_170")
-}, {
+"texture": ExtResource("f_146")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_171")
-}, {
+"texture": ExtResource("f_147")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_172")
-}, {
+"texture": ExtResource("f_148")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_173")
-}, {
+"texture": ExtResource("f_149")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_174")
-}, {
+"texture": ExtResource("f_150")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_175")
+"texture": ExtResource("f_151")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_152")
 }],
 "loop": false,
 "name": &"die_s",
@@ -890,28 +933,39 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_176")
-}, {
+"texture": ExtResource("f_153")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_177")
-}, {
+"texture": ExtResource("f_154")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_178")
-}, {
+"texture": ExtResource("f_155")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_179")
-}, {
+"texture": ExtResource("f_156")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_180")
-}, {
+"texture": ExtResource("f_157")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_181")
-}, {
+"texture": ExtResource("f_158")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_182")
-}, {
+"texture": ExtResource("f_159")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_183")
+"texture": ExtResource("f_160")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_161")
 }],
 "loop": false,
 "name": &"die_se",
@@ -919,28 +973,39 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_184")
-}, {
+"texture": ExtResource("f_162")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_185")
-}, {
+"texture": ExtResource("f_163")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_186")
-}, {
+"texture": ExtResource("f_164")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_187")
-}, {
+"texture": ExtResource("f_165")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_188")
-}, {
+"texture": ExtResource("f_166")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_189")
-}, {
+"texture": ExtResource("f_167")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_190")
-}, {
+"texture": ExtResource("f_168")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_191")
+"texture": ExtResource("f_169")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_170")
 }],
 "loop": false,
 "name": &"die_e",
@@ -948,28 +1013,39 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_192")
-}, {
+"texture": ExtResource("f_171")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_193")
-}, {
+"texture": ExtResource("f_172")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_194")
-}, {
+"texture": ExtResource("f_173")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_195")
-}, {
+"texture": ExtResource("f_174")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_196")
-}, {
+"texture": ExtResource("f_175")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_197")
-}, {
+"texture": ExtResource("f_176")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_198")
-}, {
+"texture": ExtResource("f_177")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_199")
+"texture": ExtResource("f_178")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_179")
 }],
 "loop": false,
 "name": &"die_ne",
@@ -977,28 +1053,39 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_200")
-}, {
+"texture": ExtResource("f_180")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_201")
-}, {
+"texture": ExtResource("f_181")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_202")
-}, {
+"texture": ExtResource("f_182")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_203")
-}, {
+"texture": ExtResource("f_183")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_204")
-}, {
+"texture": ExtResource("f_184")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_205")
-}, {
+"texture": ExtResource("f_185")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_206")
-}, {
+"texture": ExtResource("f_186")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_207")
+"texture": ExtResource("f_187")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_188")
 }],
 "loop": false,
 "name": &"die_n",
@@ -1006,28 +1093,39 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_208")
-}, {
+"texture": ExtResource("f_189")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_209")
-}, {
+"texture": ExtResource("f_190")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_210")
-}, {
+"texture": ExtResource("f_191")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_211")
-}, {
+"texture": ExtResource("f_192")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_212")
-}, {
+"texture": ExtResource("f_193")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_213")
-}, {
+"texture": ExtResource("f_194")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_214")
-}, {
+"texture": ExtResource("f_195")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_215")
+"texture": ExtResource("f_196")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_197")
 }],
 "loop": false,
 "name": &"die_nw",
@@ -1035,28 +1133,39 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_216")
-}, {
+"texture": ExtResource("f_198")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_217")
-}, {
+"texture": ExtResource("f_199")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_218")
-}, {
+"texture": ExtResource("f_200")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_219")
-}, {
+"texture": ExtResource("f_201")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_220")
-}, {
+"texture": ExtResource("f_202")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_221")
-}, {
+"texture": ExtResource("f_203")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_222")
-}, {
+"texture": ExtResource("f_204")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_223")
+"texture": ExtResource("f_205")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_206")
 }],
 "loop": false,
 "name": &"die_w",
@@ -1064,28 +1173,39 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("f_224")
-}, {
+"texture": ExtResource("f_207")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_225")
-}, {
+"texture": ExtResource("f_208")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_226")
-}, {
+"texture": ExtResource("f_209")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_227")
-}, {
+"texture": ExtResource("f_210")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_228")
-}, {
+"texture": ExtResource("f_211")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_229")
-}, {
+"texture": ExtResource("f_212")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_230")
-}, {
+"texture": ExtResource("f_213")
+},
+{
 "duration": 1.0,
-"texture": ExtResource("f_231")
+"texture": ExtResource("f_214")
+},
+{
+"duration": 1.0,
+"texture": ExtResource("f_215")
 }],
 "loop": false,
 "name": &"die_sw",

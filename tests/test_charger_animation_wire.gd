@@ -228,3 +228,69 @@ func test_play_anim_is_safe_noop_on_bare_instanced_charger() -> void:
 	c._play_anim(&"die")
 	c._play_anim(&"hit")  # not authored — must MISS-no-op safely
 	assert_eq(true, true, "bare-instanced _play_anim calls did not crash")
+
+
+# ---- Ribcage ember tell (Sponsor-locked look 2026-06-05) -------------
+
+
+func test_scene_has_ribcage_ember_additive_sprite() -> void:
+	# The bone-hound's "ember-coal-in-ribcage" tell is an additive-blend Sprite2D
+	# child — NOT a per-frame paint, NOT a PointLight2D (HTML5 light quirks).
+	var c: Charger = _make_scene_charger()
+	var ember: Node = c.get_node_or_null("RibcageEmber")
+	assert_not_null(ember, "Charger.tscn has a 'RibcageEmber' child")
+	assert_true(ember is Sprite2D, "RibcageEmber is a Sprite2D")
+	var spr: Sprite2D = ember as Sprite2D
+	assert_not_null(spr.texture, "RibcageEmber has an ember texture")
+	assert_true(spr.material is CanvasItemMaterial, "RibcageEmber uses a CanvasItemMaterial")
+	var mat: CanvasItemMaterial = spr.material as CanvasItemMaterial
+	assert_eq(
+		mat.blend_mode,
+		CanvasItemMaterial.BLEND_MODE_ADD,
+		"RibcageEmber material blend_mode = ADD (additive glow)"
+	)
+
+
+func test_ember_modulate_channels_html5_safe() -> void:
+	# Sub-1.0 alpha breathe so additive output never hard-clamps under WebGL2 sRGB.
+	assert_between(Charger.EMBER_PULSE_ALPHA_LOW, 0.0, 1.0, "ember LOW alpha in [0,1]")
+	assert_between(Charger.EMBER_PULSE_ALPHA_HIGH, 0.0, 1.0, "ember HIGH alpha in [0,1]")
+	assert_lt(
+		Charger.EMBER_PULSE_ALPHA_LOW, Charger.EMBER_PULSE_ALPHA_HIGH, "ember pulses LOW -> HIGH"
+	)
+
+
+func test_ember_pulse_does_not_touch_hit_flash_path() -> void:
+	# The ember pulse must be ISOLATED from the hit-flash modulate path. Taking a
+	# hit creates a hit-flash tween that targets the AnimatedSprite2D `Sprite`
+	# (branch 1) — it must NEVER be the ember-pulse tween, and the ember node must
+	# NOT be the hit-flash target.
+	var c: Charger = _make_scene_charger()
+	var ember_tween: Tween = c._ember_pulse_tween
+	assert_not_null(ember_tween, "ember pulse tween created on _ready")
+	c.take_damage(1, Vector2.ZERO, null)
+	assert_not_null(c._hit_flash_tween, "hit-flash tween created on take_damage")
+	assert_ne(
+		c._hit_flash_tween, c._ember_pulse_tween, "hit-flash tween is NOT the ember-pulse tween"
+	)
+	var ember: Sprite2D = c.get_node("RibcageEmber") as Sprite2D
+	assert_ne(c._hit_flash_target, ember, "hit-flash target is NOT the ember node")
+	assert_true(
+		c._hit_flash_uses_animated_sprite, "hit-flash still lands on AnimatedSprite2D (branch 1)"
+	)
+
+
+func test_ember_pulse_stops_on_death() -> void:
+	var c: Charger = _make_scene_charger()
+	assert_not_null(c._ember_pulse_tween, "ember pulse running pre-death")
+	c.take_damage(c.hp_max, Vector2.ZERO, null)
+	assert_true(c.is_dead(), "charger dead (precondition)")
+	assert_null(c._ember_pulse_tween, "ember pulse tween cleared on _die")
+
+
+func test_ember_pulse_safe_noop_on_bare_instanced_charger() -> void:
+	# Bare-instanced charger (ChargerScript.new()) has no RibcageEmber child;
+	# _start_ember_pulse must no-op without crashing.
+	var c: Charger = ChargerScript.new()
+	add_child_autofree(c)
+	assert_null(c._ember_pulse_tween, "no ember tween on bare-instanced charger (no RibcageEmber)")
