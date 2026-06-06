@@ -158,6 +158,16 @@ var _player: Node2D = null
 ## reaches CORNERED_KITE_TICKS_TO_FIRE.
 var _cornered_kite_ticks: int = 0
 
+## Cornered-aim latch (ticket 86ca5addx, Sponsor soak build 5fd9f45 Room 04).
+## Set true when `_promote_cornered_to_aiming` fires the in-place windup. While
+## true, `_process_aiming`'s kite-interrupt guard is suppressed so the shortened
+## windup can COMPLETE and fire instead of being yanked back to KITING by the
+## still-close player — the pre-fix AIMING<->KITING oscillation that produced the
+## "stuck on the wall + anim flicker" symptom. Cleared when the shot fires
+## (`_process_firing`) or when the player retreats outside KITE_RANGE (so a player
+## who backs off mid-windup lets the shooter resume normal kite/aim banding).
+var _cornered_aim: bool = false
+
 # Throttle accumulator for the HTML5-only `Shooter.pos` harness-observability
 # trace (see `_physics_process`). The Shooter KITES — it walks away from the
 # player rather than into melee — so a browser-driven spec cannot kill it by
@@ -356,9 +366,26 @@ func _process_aiming(_delta: float) -> void:
 	# player closes in below KITE_RANGE.
 	if _player != null:
 		var dist: float = (_player.global_position - global_position).length()
+		# Cornered-aim latch (ticket 86ca5addx): when promoted out of a wall-blocked
+		# kite, the shooter is committed to firing IN PLACE. Suppress the kite-
+		# interrupt so the shortened windup completes instead of bouncing back to
+		# KITING (the AIMING<->KITING oscillation that read as "stuck on the wall +
+		# anim flicker"). If the player retreats back outside KITE_RANGE mid-windup,
+		# clear the latch — the shooter is no longer cornered and can resume normal
+		# banding.
 		if dist < KITE_RANGE:
-			_enter_kite()
+			if not _cornered_aim:
+				_enter_kite()
+				return
+			# Cornered: hold position, let the windup finish. Stay stationary
+			# (wall-blocked anyway) and skip the close-the-gap walk below.
+			velocity = Vector2.ZERO
+			if _aim_left <= 0.0:
+				_set_state(STATE_FIRING)
 			return
+		else:
+			# Player escaped KITE_RANGE — cornered situation resolved.
+			_cornered_aim = false
 		_last_aim_dir = _vec_to_player_dir()
 		if dist > SHOOT_RANGE:
 			# Outside effective firing range — close the gap while still tracking
@@ -390,6 +417,9 @@ func _process_firing(_delta: float) -> void:
 	if _player != null:
 		_last_aim_dir = _vec_to_player_dir()
 	_spawn_projectile(_last_aim_dir)
+	# Cornered windup discharged — clear the latch so the post-fire band logic
+	# resumes normal kite/aim decisions (ticket 86ca5addx).
+	_cornered_aim = false
 	_post_fire_recovery_left = POST_FIRE_RECOVERY
 	_set_state(STATE_POST_FIRE_RECOVERY)
 
@@ -481,6 +511,7 @@ func _process_kiting(_delta: float) -> void:
 ## `_process_kiting`; this helper only owns the state-transition payload.
 func _promote_cornered_to_aiming(dist: float) -> void:
 	_cornered_kite_ticks = 0
+	_cornered_aim = true
 	_aim_left = CORNERED_AIM_DURATION
 	_last_aim_dir = _vec_to_player_dir()
 	_combat_trace(
@@ -541,6 +572,7 @@ func _enter_kite() -> void:
 	# Cancel any pending aim — kiting interrupts.
 	_aim_left = 0.0
 	_cornered_kite_ticks = 0
+	_cornered_aim = false
 	_set_state(STATE_KITING)
 	# Apply kite velocity immediately on the transition tick. Otherwise the
 	# match block has already run the prior state's branch (e.g. AIMING) and
@@ -615,6 +647,7 @@ func _die() -> void:
 	_post_fire_recovery_left = 0.0
 	_spotted_hold_left = 0.0
 	_cornered_kite_ticks = 0
+	_cornered_aim = false
 	velocity = Vector2.ZERO
 	_cancel_attack_telegraph_tween()
 	_set_state(STATE_DEAD)
