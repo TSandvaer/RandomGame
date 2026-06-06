@@ -221,6 +221,21 @@ var _attack_telegraph_tween: Tween = null
 const ATTACK_TELEGRAPH_TINT: Color = Color(1.0, 0.30, 0.30, 1.0)  # vivid red, HTML5 safe
 const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.080
 
+## Ribcage ember tell (Sponsor-locked look 2026-06-05). A small contained
+## additive-blend `RibcageEmber` Sprite2D child (CanvasItemMaterial blend_mode=add,
+## set in Charger.tscn) gets a subtle alpha breathe so the coal "glows". This is
+## a SEPARATE node from the `Sprite` AnimatedSprite2D — it never touches the
+## hit-flash modulate path. NOT a PointLight2D (HTML5 gl_compatibility light
+## quirks per `.claude/docs/html5-export.md`), NOT a per-frame paint.
+## Alpha stays sub-1.0 on the breathe so additive-blend output never clamps hard
+## under WebGL2 sRGB. Pulse runs continuously on a looping tween from `_ready`.
+const EMBER_PULSE_ALPHA_LOW: float = 0.40
+const EMBER_PULSE_ALPHA_HIGH: float = 0.70
+const EMBER_PULSE_HALF_PERIOD: float = 0.85  # seconds per half-breathe (up or down)
+
+var _ember_node: Sprite2D = null
+var _ember_pulse_tween: Tween = null
+
 # Tracks which targets the current charge has already body-hit so a single
 # charge can't multi-tick the player. Reset at the start of each charge.
 var _charge_already_hit: Array[Node] = []
@@ -253,6 +268,7 @@ func _ready() -> void:
 	_resolve_player()
 	_last_position = global_position
 	_wire_audio_cues()
+	_start_ember_pulse()
 
 
 # ---- Public API -------------------------------------------------------
@@ -582,6 +598,7 @@ func _die() -> void:
 	_spotted_hold_left = 0.0
 	velocity = Vector2.ZERO
 	_cancel_attack_telegraph_tween()
+	_stop_ember_pulse()
 	_set_state(STATE_DEAD)
 	# CRITICAL CONTRACT (Uma `combat-visual-feedback.md` §3a): mob_died fires
 	# at the START of the death sequence, not after the visual tween. Loot +
@@ -645,6 +662,36 @@ func _cancel_attack_telegraph_tween() -> void:
 	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
 		_attack_telegraph_tween.kill()
 		_attack_telegraph_tween = null
+
+
+## Ribcage ember "breathe": loop the additive `RibcageEmber` child's alpha
+## between LOW and HIGH so the coal pulses. Separate node + separate tween from
+## the hit-flash path — `_play_hit_flash` targets the `Sprite` AnimatedSprite2D
+## (or `self.modulate` in bare tests); this targets ONLY `RibcageEmber.modulate:a`.
+## No-op (safe) on bare-instanced test chargers that have no `RibcageEmber` child.
+func _start_ember_pulse() -> void:
+	if not is_inside_tree():
+		return
+	var ember: Node = get_node_or_null("RibcageEmber")
+	if not (ember is Sprite2D):
+		return
+	_ember_node = ember as Sprite2D
+	if _ember_pulse_tween != null and _ember_pulse_tween.is_valid():
+		_ember_pulse_tween.kill()
+	_ember_pulse_tween = create_tween()
+	_ember_pulse_tween.set_loops()
+	_ember_pulse_tween.tween_property(
+		_ember_node, "modulate:a", EMBER_PULSE_ALPHA_HIGH, EMBER_PULSE_HALF_PERIOD
+	)
+	_ember_pulse_tween.tween_property(
+		_ember_node, "modulate:a", EMBER_PULSE_ALPHA_LOW, EMBER_PULSE_HALF_PERIOD
+	)
+
+
+func _stop_ember_pulse() -> void:
+	if _ember_pulse_tween != null and _ember_pulse_tween.is_valid():
+		_ember_pulse_tween.kill()
+		_ember_pulse_tween = null
 
 
 ## §2 hit-flash. M3W-3 3-branch resolver — verbatim mirror of
