@@ -464,34 +464,40 @@ func test_player_spawn_reaches_east_exit_gate() -> void:
 	)
 
 
-func test_player_west_edge_corridor_clear_of_solid_boxes() -> void:
-	# Tightest pin on the exact regression: the spawn→west-edge gate-approach
-	# CORRIDOR — Tess's x∈[50,94] y∈[186,226] window (player radius-expanded) —
-	# must hold NO solid-prop box. The old RubbleLargeSWCornerBody@(72,206)
-	# (AABB x[60,84] y[196,216]) sat squarely inside it and wedged the westward
-	# walk-clamp. This is a direct AABB-overlap guard (not a slide-modelling BFS),
-	# so it fails loudly + precisely if a prop is ever placed back in the corridor.
+func test_player_horizontal_walk_lane_clear_of_nonpillar_solids() -> void:
+	# REGRESSION pin for the TWO PR #417 wedge incidents on the player's Y≈200
+	# horizontal walk lane — which is traversed in BOTH directions from spawn
+	# (240,200):
+	#   • WEST  → the spawn→west-edge gate-approach (room-gate-body-entered-
+	#             regression.spec). v1 rubble@(72,206) wedged it ⇒ body_entered=0.
+	#   • EAST  → the ?start_room=1 walk-right that camera-scroll-production.spec
+	#             needs unobstructed to build scroll momentum. The 1st respin
+	#             rubble@(310,212) wedged THAT ⇒ camera barely moved (beforeX=240
+	#             afterX=252) and the SCROLL assertion failed.
+	# Invariant: every NON-PILLAR solid box must clear the player walk band
+	# y[190,210] (center 200 ± radius 10). The 8 colonnade pillars are the DESIGNED
+	# slide-past obstacles (Y=76 / Y=220 rows) and are name-excluded; braziers sit
+	# at Y=40 / Y=240 (outside the band). Any rubble/other solid on the lane is the
+	# regression. A 20-tall box cannot sit south of Y=200 without poking past the
+	# south wall (y=224), so lane-clearing rubble must go NORTH of the aisle —
+	# hence the NW-corner placement (mirror of RubbleLargeNECorner).
+	const LANE_LO_Y: float = 190.0  # player center 200 − radius 10
+	const LANE_HI_Y: float = 210.0  # player center 200 + radius 10
 	var inst: Node = _instantiate_chunk()
 	var boxes: Array = _solid_prop_boxes(inst)
-	# Corridor the player sweeps approaching the west gate, radius-expanded.
-	const C_LO_X: float = 50.0
-	const C_HI_X: float = 94.0
-	const C_LO_Y: float = 186.0
-	const C_HI_Y: float = 226.0
 	for b in boxes:
-		var bx_lo: float = b["cx"] - b["hw"]
-		var bx_hi: float = b["cx"] + b["hw"]
+		if String(b["name"]).begins_with("Pillar"):
+			continue  # designed colonnade slide-past obstacles
 		var by_lo: float = b["cy"] - b["hh"]
 		var by_hi: float = b["cy"] + b["hh"]
-		var overlaps: bool = (
-			bx_hi > C_LO_X and bx_lo < C_HI_X and by_hi > C_LO_Y and by_lo < C_HI_Y
-		)
+		var in_lane: bool = by_hi > LANE_LO_Y and by_lo < LANE_HI_Y
 		assert_false(
-			overlaps,
+			in_lane,
 			(
-				"%s solid box (x[%d,%d] y[%d,%d]) intrudes the player's spawn→west-gate "
-				+ "approach corridor x[50,94] y[186,226] (PR #417 regression)"
-			) % [b["name"], int(bx_lo), int(bx_hi), int(by_lo), int(by_hi)]
+				"%s solid box (y-extent [%d,%d]) intrudes the player's Y≈200 horizontal "
+				+ "walk lane [190,210] — wedges spawn→west-gate AND ?start_room=1 east "
+				+ "scroll walk (PR #417 regression, both incidents)"
+			) % [b["name"], int(by_lo), int(by_hi)]
 		)
 
 
