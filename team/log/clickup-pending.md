@@ -144,3 +144,24 @@ Tags noted: `mobs`, `charger`, `ci-flake`, `html5`, `progression` are NOT existi
     not actioned (could not action without a real ticket ID).
 - created_at: 2026-06-04 (Drew monk-rig-install)
 - attempts: 0
+
+## ENTRY 2026-06-06-001
+- op: update_task (status move IN PROGRESS → READY FOR QA TEST)
+- list_id: 901523123922
+- task_id: 86ca5a5wa
+- payload:
+    name: "feat(mobs): S1 charger bone-hound — re-gen (pro quadruped) + animate + install"
+    target_status: "ready for qa test"
+    pr: "https://github.com/TSandvaer/RandomGame/pull/415"
+- NOTE: Drew install (Step 3) complete. Bone-hound rig installed into the
+    existing Charger mob (frames-swap into Charger.tres + cosmetic additive
+    ribcage ember). Paired GUT green (test_charger_animation_wire.gd 16/16 incl.
+    5 ember asserts; CI job 79877844228 SUCCESS). HTML5 self-soak PASS (skeleton
+    renders, 3/4 wired anim keys fire live, 0 MISS; die covered by GUT).
+    Reviewer: Tess (game-side). Ticket was already `in progress` at dispatch.
+    First CI Playwright run flaked (53 passed / 3 failed, ~4.3s uniform fast-fail
+    cluster); same-artifact local rerun + fresh-SHA CI confirm green.
+    Ends queued for Sponsor in-game soak (first-of-class subjective feel + ember
+    perceptibility probe).
+- created_at: 2026-06-06 (Drew charger-bonehound-install)
+- attempts: 0
