@@ -88,10 +88,27 @@ func _init() -> void:
 func _ready() -> void:
 	_life_left = lifetime
 	_apply_team_layers()
+	_orient_sprite_to_velocity()
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
 	# Re-enable monitoring after the physics flush. See `_init` for context.
 	call_deferred("_activate_monitoring")
+
+
+## Point the projectile's visual at its travel direction so the fireball's
+## comet trail trails correctly in all 8 directions (Sponsor soak #413: the
+## fireball art has a directional head + trailing tail). The fireball texture
+## is authored with its head pointing +X (east / angle 0), so a straight
+## `rotation = velocity.angle()` aligns the head with the travel vector. Travel
+## is straight-line (velocity_vec is constant for the projectile's life), so we
+## orient once on spawn rather than per-tick. No-op when velocity is zero (no
+## meaningful direction) or when there is no `Sprite` child (defensive).
+func _orient_sprite_to_velocity() -> void:
+	if velocity_vec.length_squared() <= 0.0:
+		return
+	var sprite: Node = get_node_or_null("Sprite")
+	if sprite is Node2D:
+		(sprite as Node2D).rotation = velocity_vec.angle()
 
 
 ## Turns monitoring/monitorable back on after the spawn-tick physics flush
