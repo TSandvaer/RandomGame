@@ -159,3 +159,29 @@ Tags noted: `mobs`, `charger`, `ci-flake`, `html5`, `progression` are NOT existi
     `ready for qa test`** paired with PR #413, then route to Tess (game-side QA).
 - created_at: 2026-06-06 (Drew shooter-rig-install)
 - attempts: 0
+
+## ENTRY 2026-06-06-002
+- op: update_task (status move → READY FOR QA TEST, partial — 2 of 3 fixes)
+- task_id: 86ca5agrd
+- list_id: 901523123922
+- payload:
+    name: "fix(combat|art): shooter fire-casting polish — drop red tint + real fireball-projectile art + single-bowl cast (Sponsor soak #413)"
+    target_status: "ready for qa test"
+    pr: "https://github.com/TSandvaer/RandomGame/pull/413"
+- NOTE: Drew lacks the ClickUp MCP tool. Pushed to PR #413's branch
+    (drew/86ca5a5vy-shooter-rig-install) SHA 5295dbd. **Fix #1 (red telegraph
+    tint removed) + #2 (real fireball projectile art + travel-dir rotation)
+    DONE + paired tests + gdlint/gdformat clean.** **Fix #3 (single-bowl cast)
+    BLOCKED on tooling — escalated to orch:** a sub-agent PIL erase of the
+    conjured raised-hand flame is not cleanly viable (brazier + conjured flame
+    overlap+swap position across the 6-frame cast; flame mask contaminated by
+    eye-glow in non-south dirs — preview proved brazier damage + residual 2nd
+    flame). Matches the ticket's own "pixel-mcp surgical edit / orch decides
+    cast approach" note. See PR #413 Self-Test Report comment for full
+    empirical evidence + integ-soak probe targets. **Orchestrator: (a) flip
+    86ca5agrd status reflecting #1+#2 ready-for-QA + #3 open; (b) run the
+    pixel-mcp single-bowl cast edit (orch-only tool) OR re-dispatch #3 once a
+    cast-frame fix exists; (c) route #1+#2 to Tess + fold into the #413/#414
+    integ-build re-soak.**
+- created_at: 2026-06-06 (Drew shooter fire-casting polish)
+- attempts: 0
