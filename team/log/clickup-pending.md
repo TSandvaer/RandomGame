@@ -144,3 +144,18 @@ Tags noted: `mobs`, `charger`, `ci-flake`, `html5`, `progression` are NOT existi
     not actioned (could not action without a real ticket ID).
 - created_at: 2026-06-04 (Drew monk-rig-install)
 - attempts: 0
+
+## ENTRY 2026-06-06-001
+- op: update_task (status move TO DO → IN PROGRESS → READY FOR QA TEST)
+- task_id: 86ca5a5vy
+- list_id: 901523123922
+- payload:
+    name: "feat(mobs): install shooter brazier-warden rig into shooter mob .tres"
+    target_status: "ready for qa test"
+    pr: "https://github.com/TSandvaer/RandomGame/pull/413"
+- NOTE: Drew lacks the ClickUp MCP tool. PR #413 open + all gates green
+    (GUT 0-failing, HTML5 release build success, HTML5 author-self-soak PASS,
+    Playwright strictly-no-worse-than-main). **Orchestrator: flip 86ca5a5vy →
+    `ready for qa test`** paired with PR #413, then route to Tess (game-side QA).
+- created_at: 2026-06-06 (Drew shooter-rig-install)
+- attempts: 0
