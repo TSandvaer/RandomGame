@@ -528,6 +528,19 @@ S1 Grunt v1:
    if the doctrine-critical accent hex (e.g. `#D24A3C` aggro-glow) has no near match, the source
    doesn't contain it and no doctrine-lock will recover it. Re-roll or use `create_character_state`
    to add the missing beat (see below).
+5. **Negative prompts do NOT reliably suppress an element — omit the triggering concept entirely,
+   then add the element in post.** Validated 2026-06-06 on the S1 charger (bone-hound + "ember-coal
+   in ribcage" tell). Across 3 pro gens, PixelLab kept attaching large **head/mane flames** that read
+   as detached fireballs in most rotations — because the prompt contained "ember / glowing / coals".
+   Phrasing the suppression as `"...no fire, no flames on the head..."` is unreliable: on a fire/ember
+   concept the negation word can *reinforce* the very element (same literalism failure as the
+   absolutist-negation trap in rule 3, inverted). The reliable fix was to remove **every** fire/ember/
+   glow word from the description (pure `"skeletal undead dog ... bare bleached bone ... hollow eye
+   sockets"`) → came back clean across all 8 directions on the first try → then add the small contained
+   ribcage ember **in post** (pixel-mcp additive glow on the harvested frames). Generalizes to any
+   creature whose locked tell is a glow/fire/energy element: **gen the base WITHOUT the emissive
+   concept, composite the emissive in post** — far cheaper and more controllable than re-rolling for a
+   contained-fire result PixelLab won't reliably produce.
 
 ---
 
@@ -1039,6 +1052,40 @@ import_image(sprite_path="...", file_path="C:/path/source.png")
 import_image(sprite_path="...", image_path="C:/path/source.png",
              layer_name="...", frame_number=1)
 ```
+
+---
+
+## `create_character` mode ladder + animation job-slot math (validated 2026-06-04, player-monk regen)
+
+**Mode ladder — concept cheap, production v3.** `create_character` `mode` param:
+- `standard` (1 gen, respects `outline`/`shading`/`detail`/`view`, 4 or 8 dir) — use for **concept exploration** (gen 3 identity concepts at `n_directions=4`, let Sponsor pick one). Cheapest.
+- `v3` (2-9 gens, **always 8 dir**, highest quality; **ignores `shading`/`proportions`**, `outline`/`detail` soft; **HUMANOID-ONLY** — rejects `body_type=quadruped` with `"Use mode='standard' or mode='pro' for quadrupeds"`, verified 2026-06-05) — production rig for **humanoids** once the concept is locked. Workflow: cheap `standard` concepts → Sponsor picks → re-gen winner in `v3`.
+- `pro` (20-40 gens, reference-based, ignores all style params, always 8 dir) — production tier for **quadrupeds** (v3 is unavailable for them — e.g. S1 charger bone-hound) AND boss-tier.
+- **Sponsor quality floor (2026-06-05): any production-ready graphic ALWAYS uses the highest-quality mode for its body type — `v3` for humanoids, `pro` for quadrupeds. `standard` mode is a throwaway concept-proof ONLY (silhouette/placement check), never shipped as installed art.** The cheap-concept→confirm→production-regen workflow stays; the production regen must be the max mode.
+- **Drift warning:** `v3`/`pro` re-interpret the description and will *embellish* (a "humble monk" v3'd into an armored bearded ranger). To hold a locked look, write HARD negatives ("NO armor, NO beard, ONLY a plain robe") — the v3 still honors the description text, just not the soft style knobs.
+
+**Canvas size by mode (the size=char-height trap, concrete data):** `size=48` → `standard` yields **68×68** canvas; **`v3` yields 92×92**. Always confirm the actual canvas from `get_character` and match the existing roster rig before installing (don't assume from `size`).
+
+**Animations are SERIAL on Tier 2.** Job-slot cap = **10**; each `animate_character` (template mode, all directions) = **8 jobs** (1/direction). So only ONE animation runs at a time — a 2nd `animate_character` errors `need 8 job slots but only N available`. Fire the animation set **one at a time**, polling `get_character` until `pending jobs` is empty (or download the rig ZIP with `curl --fail` — it 423s until all jobs clear) before firing the next. Budget ~3-5 min/animation × N animations, serial.
+
+**Heavy-load failures + single-direction re-fire (split-folder gotcha).** Under PixelLab "heavy load," individual direction-jobs can FAIL (`Generation failed due to heavy load`) or stall (one direction at ~35-min ETA while siblings finish in seconds). Re-fire just the failed direction with `directions: ["north-east"]` (1 job) — BUT this creates a **SECOND animation folder** for that anim in the ZIP (e.g. `taking_a_punch-04c0be52/` with 7 dirs + `taking_a_punch-56764fe0/` with only north-east). The game-side install must **merge** the re-fired direction back into the main anim's per-direction set. Flag this to the installing agent.
+
+**Rig ZIP layout** (`curl --fail https://api.pixellab.ai/mcp/characters/<id>/download`, valid ~8h): `<CharName>/rotations/<dir>.png` (8 static directional sprites) + `<CharName>/animations/<animname>-<uuid>/<dir>/frame_NNN.png`. Idle from `breathing-idle` lands under a generic `animating-<uuid>` folder — identify by frame count (idle=4f) not folder name.
+
+**CHECK THE TARGET MOB'S ANIM CONTRACT *BEFORE* GENERATING THE ANIM SET — and mind that quadruped templates lack `die`/`hit`.** When re-arting an EXISTING mob (frames-swap into its `.tres`), read the contract FIRST: the keys the game expects are pinned by `tests/test_<mob>_animation_wire.gd` and mirrored by the current `_pixellab_anims/<OldRig>/animations/` folder names. Generate the FULL required set, not a plausible-looking subset. Concrete miss (S1 charger bone-hound, 2026-06-06): the charger is an existing mob with contract `{walk, telegraph, atk, die}`, but the quadruped template list is only `{bark, fast-walk, idle, running-Nf, sneaking, walk-Nf}` — there is **no death or hit or telegraph template for quadrupeds**. Animating idle/walk/running/bark produced a rig MISSING `die` (had to be added afterward as a **v3 custom animation**, `action_description="collapsing and falling over dead..."`, which DOES support arbitrary actions for quadrupeds — pass explicit `directions:[all 8]` since v3 defaults to south-only). Map the rest at install (`running→telegraph`, `bark→atk`). Failing to check the contract up front cost a wasted animation cycle. (Tooling trap that hid this: the Bash tool persists cwd, and `git ls-tree origin/main` applies the cwd prefix — running it from a subdirectory silently scopes the listing to that dir and can look like "the file doesn't exist." Run repo-wide `git ls-tree -r` from the repo root or with `git -C <root>`.)
+
+---
+
+## `create_topdown_tileset` is a terrain-TRANSITION tool — NOT for a uniform crafted floor
+
+Validated 2026-06-06 (S1 tile upgrade `86ca44p4j`, 2 passes). `create_topdown_tileset` is a **Wang/autotile generator for terrain boundaries** (grass↔water↔sand). It takes `lower_description` + `upper_description` and produces 16 corner-based tiles whose whole purpose is the *transition* between two terrains. Consequences when (mis)used for a single crafted surface like a cloister flagstone floor:
+
+- **lower ≠ upper (even subtly):** the autotiler renders one terrain as a PATH/ISLAND over the other as a FIELD. Pass 1 (`lower="dark mortar"` / `upper="flagstone"`, transition 0.5) → beige flagstone **islands in big dark channels**. Pass 2 (`lower="sunken flagstone"` / `upper="foot-worn flagstone"`, transition 0.25) → a beige **path winding over a grey field**. Both are two-zone maps, not a continuous floor.
+- **lower == upper (identical):** no terrain difference → the autotiler only ever places the "all-same" interior tile → a **flat uniform repeat** (the wallpaper failure you were trying to avoid). The tool's variation comes ONLY from corner-terrain differences, which are exactly the path/field split you don't want.
+
+So the Wang tool gives you **path/field OR flat-repeat** — never "continuous floor, richly varied, seam-free." It is the right tool for an actual terrain edge (floor→pit, grass→stone), not for re-arting one surface.
+
+**For a uniform crafted floor/wall surface, use a VARIANT-SET approach instead:** generate several individual seamless tile variants (`create_map_object` / `create_1_direction_object`, or pixel-mcp hand-craft for full control) — each a self-contained worn-stone tile with different crack/wear — then the game-side painter scatters them so no tile repeats in a run (matches the multi-variant-set intent in `team/uma-ux/s1-tile-rework.md` §2.2A). Mind seamlessness: object-gen does not guarantee edge-matching tiles; for a stone floor, mild edge mismatch reads as irregular grooves (acceptable), but verify tiled at game zoom. This corrects the spec's assumption that `create_topdown_tileset` would produce crafted floor/wall sets.
 
 ---
 
