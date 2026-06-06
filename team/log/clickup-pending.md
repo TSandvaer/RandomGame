@@ -144,3 +144,17 @@ Tags noted: `mobs`, `charger`, `ci-flake`, `html5`, `progression` are NOT existi
     not actioned (could not action without a real ticket ID).
 - created_at: 2026-06-04 (Drew monk-rig-install)
 - attempts: 0
+
+---
+- op: update_task (status move IN PROGRESS → READY FOR QA TEST)
+- task_id: 86ca5addx
+- list_id: 901523123922
+- payload:
+    name: "bug(combat|ai): Shooter kites into outer wall → stuck + anim flicker (Sponsor soak #413 build 5fd9f45)"
+    target_status: "ready for qa test"
+    pr: "https://github.com/TSandvaer/RandomGame/pull/414"
+- NOTE: Reviewer Tess (game-side combat) per routing. HTML5-visual-gated
+    (anim flicker) — Self-Test Report posted; Sponsor soak of Room 04 is the
+    flicker visual gate of record.
+- created_at: 2026-06-06 (Devon shooter cornered-aim fix)
+- attempts: 0
