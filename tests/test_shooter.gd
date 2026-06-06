@@ -187,6 +187,80 @@ func test_kiting_returns_to_aiming_when_distance_restored() -> void:
 	assert_eq(s.get_state(), Shooter.STATE_AIMING, "distance restored -> re-aim")
 
 
+# ---- 4b REGRESSION (86ca5addx): cornered shooter must FIRE, not flicker ----
+#
+# Sponsor soak (build 5fd9f45, Room 04): "When I go close to the mob, he flees
+# to a point where he's just stuck on the outer wall (until I move away again)
+# also when stuck his animation flickers."
+#
+# Root cause: the cornered fallback (`_promote_cornered_to_aiming`) sets AIMING
+# while the player is STILL inside KITE_RANGE. On the very next tick,
+# `_process_aiming`'s first guard (`if dist < KITE_RANGE: _enter_kite()`)
+# unconditionally yanks it back to KITING. KITING re-detects the wall, re-promotes
+# to AIMING ... → a 2-frame AIMING<->KITING oscillation. The shortened windup
+# (CORNERED_AIM_DURATION = 0.25s) can NEVER complete, so the shooter never fires
+# (looks "stuck") and the `telegraph`<->`walk` anim toggle every ~2 frames is the
+# flicker. The kite-interrupt must NOT win once the shooter has been promoted to
+# a cornered-aim windup; the windup completes in place and a shot fires.
+
+
+func test_cornered_aim_completes_and_fires_when_player_stays_close() -> void:
+	# Drive the cornered promotion directly (headless GUT can't simulate a real
+	# CharacterBody2D wall collision; `_promote_cornered_to_aiming` is the
+	# extracted promotion payload — see Shooter.gd).
+	var s: Shooter = _make_shooter()
+	s.test_skip_projectile_spawn = true
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	s.global_position = Vector2.ZERO
+	# Player stays glued just inside KITE_RANGE for the whole windup.
+	p.global_position = Vector2(40.0, 0.0)
+	s.set_player(p)
+	watch_signals(s)
+	# Promote as if two consecutive wall-blocked kite ticks fired.
+	s._promote_cornered_to_aiming(40.0)
+	assert_eq(s.get_state(), Shooter.STATE_AIMING, "cornered promotion enters AIMING")
+	# Tick out the shortened windup while the player remains inside KITE_RANGE.
+	# Pre-fix: the FIRST tick flips back to KITING and the shot never fires.
+	var elapsed: float = 0.0
+	while elapsed < Shooter.CORNERED_AIM_DURATION + 0.05 and s.get_shots_fired() == 0:
+		s._physics_process(0.016)
+		elapsed += 0.016
+	assert_eq(
+		s.get_shots_fired(),
+		1,
+		"cornered shooter completes its windup and fires in place (no flee-yank)"
+	)
+	assert_signal_emitted(s, "projectile_fired", "cornered fire emits projectile_fired")
+
+
+func test_cornered_aim_does_not_oscillate_to_kiting() -> void:
+	# Anim-flicker root cause: state must NOT toggle AIMING<->KITING while the
+	# player is glued close during a cornered windup. Capture every state the
+	# machine visits across the windup; assert it does NOT re-enter KITING
+	# (which is what drives the telegraph<->walk anim flicker).
+	var s: Shooter = _make_shooter()
+	s.test_skip_projectile_spawn = true
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	s.global_position = Vector2.ZERO
+	p.global_position = Vector2(40.0, 0.0)
+	s.set_player(p)
+	var visited_kiting_after_promote: Array[bool] = [false]
+	s.state_changed.connect(
+		func(_from: StringName, to: StringName) -> void:
+			if to == Shooter.STATE_KITING:
+				visited_kiting_after_promote[0] = true
+	)
+	s._promote_cornered_to_aiming(40.0)
+	for _i in 5:
+		s._physics_process(0.016)
+	assert_false(
+		visited_kiting_after_promote[0],
+		"cornered windup must not bounce back to KITING (the anim-flicker source)"
+	)
+
+
 # ---- 5: post-fire-recovery -> idle when player out of range ---
 
 
