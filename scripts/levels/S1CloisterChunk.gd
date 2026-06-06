@@ -30,8 +30,24 @@ class_name S1CloisterChunk
 # Atlas-source ids inside s1_cloister.tres.
 const SOURCE_FLOOR: int = 0
 const SOURCE_WALL: int = 1
-# Base tile atlas coordinate used for the bulk paint (top-left tile of each sheet).
+# Base tile atlas coordinate (top-left tile of each sheet). Retained for
+# back-compat / tests; the bulk paint now uses the 4×4 ATLAS-WINDOW tiling
+# below, not this single cell.
 const ATLAS_BASE: Vector2i = Vector2i(0, 0)
+
+## The floor/wall PNGs are each a 128×128 = 4×4 atlas of 32-px sub-tiles that,
+## stitched in their source grid order, form ONE crafted 128-px image (stones
+## flow across the whole block — see the target mock
+## `_tile_judge/ai_floor/FINAL_aiwarm_room3x.png`). The pre-rework painter
+## stamped only `ATLAS_BASE` (cell 0:0) into every cell → it repeated ONE 32-px
+## sub-tile = the "wallpaper at 32px" failure Sponsor rejected on PR #407.
+##
+## The fix: paint each cell from its position WITHIN the 4×4 source window,
+## `Vector2i(tx % ATLAS_PERIOD, ty % ATLAS_PERIOD)`, so the full 128-px AI image
+## tiles with a gentle 4-tile (128-px) period — stones read continuous within
+## each block, the only repeat is the soft 4-tile block seam. Both the floor
+## and wall sources declare all 16 cells (0:0 … 3:3) so every coord resolves.
+const ATLAS_PERIOD: int = 4
 
 ## Grid width/height in tiles. Default = the M1 single-screen 15×8. The
 ## widened proof chunk overrides `grid_w` to 30. Painting derives entirely
@@ -57,4 +73,12 @@ func _paint() -> void:
 		for tx in range(grid_w):
 			var is_perimeter: bool = tx == 0 or tx == grid_w - 1 or ty == 0 or ty == grid_h - 1
 			var source_id: int = SOURCE_WALL if is_perimeter else SOURCE_FLOOR
-			_floor_tiles.set_cell(Vector2i(tx, ty), source_id, ATLAS_BASE)
+			# Paint from the cell's position within the 4×4 source window so the
+			# full 128-px crafted image tiles (4-tile period), NOT a single
+			# repeated 32-px sub-tile (the PR #407 wallpaper failure). The atlas
+			# window is anchored to the WORLD tile coord (tx,ty) — not a
+			# per-region offset — so the floor and wall windows stay phase-locked
+			# to the room grid and the 128-px blocks line up consistently across
+			# the wider proof room.
+			var atlas: Vector2i = Vector2i(tx % ATLAS_PERIOD, ty % ATLAS_PERIOD)
+			_floor_tiles.set_cell(Vector2i(tx, ty), source_id, atlas)
