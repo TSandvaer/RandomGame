@@ -146,22 +146,42 @@ Tags noted: `mobs`, `charger`, `ci-flake`, `html5`, `progression` are NOT existi
 - attempts: 0
 
 ## ENTRY 2026-06-06-001
-- op: update_task (status move IN PROGRESS → READY FOR QA TEST)
+- op: update_task (status move TO DO → IN PROGRESS → READY FOR QA TEST)
+- task_id: 86ca5a5vy
 - list_id: 901523123922
-- task_id: 86ca5a5wa
 - payload:
-    name: "feat(mobs): S1 charger bone-hound — re-gen (pro quadruped) + animate + install"
+    name: "feat(mobs): install shooter brazier-warden rig into shooter mob .tres"
     target_status: "ready for qa test"
-    pr: "https://github.com/TSandvaer/RandomGame/pull/415"
-- NOTE: Drew install (Step 3) complete. Bone-hound rig installed into the
-    existing Charger mob (frames-swap into Charger.tres + cosmetic additive
-    ribcage ember). Paired GUT green (test_charger_animation_wire.gd 16/16 incl.
-    5 ember asserts; CI job 79877844228 SUCCESS). HTML5 self-soak PASS (skeleton
-    renders, 3/4 wired anim keys fire live, 0 MISS; die covered by GUT).
-    Reviewer: Tess (game-side). Ticket was already `in progress` at dispatch.
-    First CI Playwright run flaked (53 passed / 3 failed, ~4.3s uniform fast-fail
-    cluster); same-artifact local rerun + fresh-SHA CI confirm green.
-    Ends queued for Sponsor in-game soak (first-of-class subjective feel + ember
-    perceptibility probe).
-- created_at: 2026-06-06 (Drew charger-bonehound-install)
+    pr: "https://github.com/TSandvaer/RandomGame/pull/413"
+- NOTE: Drew lacks the ClickUp MCP tool. PR #413 open + all gates green
+    (GUT 0-failing, HTML5 release build success, HTML5 author-self-soak PASS,
+    Playwright strictly-no-worse-than-main). **Orchestrator: flip 86ca5a5vy →
+    `ready for qa test`** paired with PR #413, then route to Tess (game-side QA).
+- created_at: 2026-06-06 (Drew shooter-rig-install)
+- attempts: 0
+
+## ENTRY 2026-06-06-002
+- op: update_task (status move → READY FOR QA TEST, partial — 2 of 3 fixes)
+- task_id: 86ca5agrd
+- list_id: 901523123922
+- payload:
+    name: "fix(combat|art): shooter fire-casting polish — drop red tint + real fireball-projectile art + single-bowl cast (Sponsor soak #413)"
+    target_status: "ready for qa test"
+    pr: "https://github.com/TSandvaer/RandomGame/pull/413"
+- NOTE: Drew lacks the ClickUp MCP tool. Pushed to PR #413's branch
+    (drew/86ca5a5vy-shooter-rig-install) SHA 5295dbd. **Fix #1 (red telegraph
+    tint removed) + #2 (real fireball projectile art + travel-dir rotation)
+    DONE + paired tests + gdlint/gdformat clean.** **Fix #3 (single-bowl cast)
+    BLOCKED on tooling — escalated to orch:** a sub-agent PIL erase of the
+    conjured raised-hand flame is not cleanly viable (brazier + conjured flame
+    overlap+swap position across the 6-frame cast; flame mask contaminated by
+    eye-glow in non-south dirs — preview proved brazier damage + residual 2nd
+    flame). Matches the ticket's own "pixel-mcp surgical edit / orch decides
+    cast approach" note. See PR #413 Self-Test Report comment for full
+    empirical evidence + integ-soak probe targets. **Orchestrator: (a) flip
+    86ca5agrd status reflecting #1+#2 ready-for-QA + #3 open; (b) run the
+    pixel-mcp single-bowl cast edit (orch-only tool) OR re-dispatch #3 once a
+    cast-frame fix exists; (c) route #1+#2 to Tess + fold into the #413/#414
+    integ-build re-soak.**
+- created_at: 2026-06-06 (Drew shooter fire-casting polish)
 - attempts: 0
