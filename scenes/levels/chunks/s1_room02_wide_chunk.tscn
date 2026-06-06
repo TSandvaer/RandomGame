@@ -184,8 +184,13 @@ texture = ExtResource("9_banner")
 position = Vector2(888, 72)
 texture = ExtResource("6_rubble")
 
+; Relocated off the player's spawn→west-edge-gate approach lane (Y≈200, X≈16–240)
+; — the prior (72,200) placement wedged the player's westward walk-clamp and
+; killed Room02 gate body_entered (ticket 86ca44p4j PR #417 Tess REQUEST_CHANGES).
+; Now a south-band column-foot rubble EAST of spawn (X=310, between PillarS1/S2),
+; which the player never traverses on the gate walk (it heads WEST from X=240).
 [node name="RubbleLargeSWCorner" type="Sprite2D" parent="Props"]
-position = Vector2(72, 200)
+position = Vector2(310, 206)
 texture = ExtResource("6_rubble")
 
 [node name="RubbleSmallSECorner" type="Sprite2D" parent="Props"]
@@ -293,7 +298,7 @@ position = Vector2(888, 78)
 shape = SubResource("RectangleShape2D_rubble")
 
 [node name="RubbleLargeSWCornerBody" type="StaticBody2D" parent="SolidProps"]
-position = Vector2(72, 206)
+position = Vector2(310, 212)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="SolidProps/RubbleLargeSWCornerBody"]
 shape = SubResource("RectangleShape2D_rubble")

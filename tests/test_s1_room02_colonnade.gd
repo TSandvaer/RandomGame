@@ -44,6 +44,25 @@ const LAYER_WORLD: int = 1 << 0
 # grunt CENTER can travel for the BFS navigability check.
 const GRUNT_R: int = 12
 
+# Player collision radius (CircleShape2D in Player.tscn, radius=10) — used to
+# model where the PLAYER center can travel for the gate-approach BFS. The
+# mob→aisle BFS (GRUNT_R) does NOT cover the player's gate-walk path: AC4-green
+# (mob reaches player) ≠ "the room is traversable on the player's spawn→gate
+# walk". A solid prop wedging that lane kills RoomGate body_entered with the
+# mob-nav check still green — exactly the PR #417 RubbleLargeSWCornerBody
+# regression (Tess REQUEST_CHANGES, room-gate-body-entered-regression.spec.ts).
+const PLAYER_R: int = 10
+
+# Player spawn (Main.gd DEFAULT_PLAYER_SPAWN). The harness walks the player WEST
+# from here into the west-edge entry gate, then traverses EAST to the exit gate.
+const PLAYER_SPAWN: Vector2 = Vector2(240, 200)
+
+# Gate trigger centers (px). West entry gate at the (0,4) port → y144 inner edge;
+# east exit gate at the (29,4) port → y144. The harness drives the player to the
+# west gate via "W 2000ms then N 1500ms" (room-gate-body-entered-regression.spec).
+const WEST_GATE: Vector2 = Vector2(40, 144)
+const EAST_GATE: Vector2 = Vector2(912, 144)
+
 # Aisle band (px) framed by the colonnade — must stay fully clear (Uma §3.1/§4.2).
 const AISLE_LO: int = 112
 const AISLE_HI: int = 176
@@ -303,13 +322,19 @@ func test_small_props_have_no_collision() -> void:
 
 
 func _blocked(px: float, py: float, boxes: Array) -> bool:
-	# Interior walkable bounds for the grunt CENTER (walls 1 tile thick).
-	if px < TILE + GRUNT_R or px > GRID_W * TILE - TILE - GRUNT_R:
+	# Grunt-radius blocked check (mob→aisle navigability). Kept for the existing
+	# grunt BFS tests; delegates to the radius-parametric form.
+	return _blocked_r(px, py, boxes, GRUNT_R)
+
+
+func _blocked_r(px: float, py: float, boxes: Array, r: int) -> bool:
+	# Interior walkable bounds for a body CENTER of radius r (walls 1 tile thick).
+	if px < TILE + r or px > GRID_W * TILE - TILE - r:
 		return true
-	if py < TILE + GRUNT_R or py > GRID_H * TILE - TILE - GRUNT_R:
+	if py < TILE + r or py > GRID_H * TILE - TILE - r:
 		return true
 	for b in boxes:
-		if absf(px - b["cx"]) <= b["hw"] + GRUNT_R and absf(py - b["cy"]) <= b["hh"] + GRUNT_R:
+		if absf(px - b["cx"]) <= b["hw"] + r and absf(py - b["cy"]) <= b["hh"] + r:
 			return true
 	return false
 
@@ -405,7 +430,77 @@ func test_room_clearable_and_every_spawn_reaches_player() -> void:
 		)
 
 
+func test_player_spawn_reaches_west_entry_gate() -> void:
+	# REGRESSION (PR #417, Tess REQUEST_CHANGES — RubbleLargeSWCornerBody@(72,206)):
+	# the player must be able to walk from spawn (240,200) to the WEST entry-gate
+	# trigger. A solid prop wedging the spawn→west-edge approach lane (Y≈200,
+	# X∈[16,240]) leaves the mob→aisle BFS green while killing RoomGate
+	# body_entered (room-gate-body-entered-regression.spec.ts). Player-radius (10)
+	# BFS, not grunt-radius — the player's gate-walk path is a DISTINCT surface.
+	var inst: Node = _instantiate_chunk()
+	var boxes: Array = _solid_prop_boxes(inst)
+	var reach: Dictionary = _bfs_r(PLAYER_SPAWN, boxes, PLAYER_R)
+	assert_true(
+		_set_has_point(reach, WEST_GATE, 12),
+		(
+			"PLAYER must reach the WEST entry gate %s from spawn %s — no solid prop "
+			+ "may wedge the spawn→west-edge gate-approach lane (PR #417 regression)"
+		) % [str(WEST_GATE), str(PLAYER_SPAWN)]
+	)
+
+
+func test_player_spawn_reaches_east_exit_gate() -> void:
+	# Companion: the player must also reach the EAST exit gate from spawn so the
+	# room is traversable end-to-end on the PLAYER path (not only mob→aisle).
+	var inst: Node = _instantiate_chunk()
+	var boxes: Array = _solid_prop_boxes(inst)
+	var reach: Dictionary = _bfs_r(PLAYER_SPAWN, boxes, PLAYER_R)
+	assert_true(
+		_set_has_point(reach, EAST_GATE, 12),
+		(
+			"PLAYER must reach the EAST exit gate %s from spawn %s on the player path"
+			% [str(EAST_GATE), str(PLAYER_SPAWN)]
+		)
+	)
+
+
+func test_player_west_edge_corridor_clear_of_solid_boxes() -> void:
+	# Tightest pin on the exact regression: the spawn→west-edge gate-approach
+	# CORRIDOR — Tess's x∈[50,94] y∈[186,226] window (player radius-expanded) —
+	# must hold NO solid-prop box. The old RubbleLargeSWCornerBody@(72,206)
+	# (AABB x[60,84] y[196,216]) sat squarely inside it and wedged the westward
+	# walk-clamp. This is a direct AABB-overlap guard (not a slide-modelling BFS),
+	# so it fails loudly + precisely if a prop is ever placed back in the corridor.
+	var inst: Node = _instantiate_chunk()
+	var boxes: Array = _solid_prop_boxes(inst)
+	# Corridor the player sweeps approaching the west gate, radius-expanded.
+	const C_LO_X: float = 50.0
+	const C_HI_X: float = 94.0
+	const C_LO_Y: float = 186.0
+	const C_HI_Y: float = 226.0
+	for b in boxes:
+		var bx_lo: float = b["cx"] - b["hw"]
+		var bx_hi: float = b["cx"] + b["hw"]
+		var by_lo: float = b["cy"] - b["hh"]
+		var by_hi: float = b["cy"] + b["hh"]
+		var overlaps: bool = (
+			bx_hi > C_LO_X and bx_lo < C_HI_X and by_hi > C_LO_Y and by_lo < C_HI_Y
+		)
+		assert_false(
+			overlaps,
+			(
+				"%s solid box (x[%d,%d] y[%d,%d]) intrudes the player's spawn→west-gate "
+				+ "approach corridor x[50,94] y[186,226] (PR #417 regression)"
+			) % [b["name"], int(bx_lo), int(bx_hi), int(by_lo), int(by_hi)]
+		)
+
+
 func _bfs(start: Vector2, boxes: Array) -> Dictionary:
+	# Grunt-radius BFS (mob→aisle reachability). Delegates to the radius form.
+	return _bfs_r(start, boxes, GRUNT_R)
+
+
+func _bfs_r(start: Vector2, boxes: Array, r: int) -> Dictionary:
 	const STEP: int = 4
 	var seen: Dictionary = {}
 	var q: Array = []
@@ -422,7 +517,7 @@ func _bfs(start: Vector2, boxes: Array) -> Dictionary:
 			var nxt: Vector2i = cur + d
 			if seen.has(nxt):
 				continue
-			if _blocked(nxt.x, nxt.y, boxes):
+			if _blocked_r(nxt.x, nxt.y, boxes, r):
 				continue
 			seen[nxt] = true
 			q.append(nxt)
