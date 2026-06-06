@@ -184,13 +184,19 @@ texture = ExtResource("9_banner")
 position = Vector2(888, 72)
 texture = ExtResource("6_rubble")
 
-; Relocated off the player's spawn→west-edge-gate approach lane (Y≈200, X≈16–240)
-; — the prior (72,200) placement wedged the player's westward walk-clamp and
-; killed Room02 gate body_entered (ticket 86ca44p4j PR #417 Tess REQUEST_CHANGES).
-; Now a south-band column-foot rubble EAST of spawn (X=310, between PillarS1/S2),
-; which the player never traverses on the gate walk (it heads WEST from X=240).
+; Relocated to the NW corner (above the aisle), OFF the player's Y≈200 walk lane
+; entirely. The original (72,200) wedged the WEST gate-approach (PR #417 Tess
+; REQUEST_CHANGES → room-gate-body-entered-regression.spec). A first respin to a
+; south-band column-foot (310,212) then wedged the EAST walk that
+; camera-scroll-production.spec drives (?start_room=1 → walk right → camera must
+; SCROLL): a 20-tall box can't sit south of the Y=200 lane without poking past
+; the south wall, and north/south pillars at Y=200 only graze (2px) so they slide
+; but the rubble intruded enough to stall the scroll. The Y≈200 horizontal band
+; is walked in BOTH directions, so the solid rubble goes NORTH of it (mirror of
+; RubbleLargeNECorner) — clear of the aisle band [112,176], the gate-walk, and
+; the camera-scroll east walk. Footprint unchanged (24×20, at base).
 [node name="RubbleLargeSWCorner" type="Sprite2D" parent="Props"]
-position = Vector2(310, 206)
+position = Vector2(72, 72)
 texture = ExtResource("6_rubble")
 
 [node name="RubbleSmallSECorner" type="Sprite2D" parent="Props"]
@@ -298,7 +304,7 @@ position = Vector2(888, 78)
 shape = SubResource("RectangleShape2D_rubble")
 
 [node name="RubbleLargeSWCornerBody" type="StaticBody2D" parent="SolidProps"]
-position = Vector2(310, 212)
+position = Vector2(72, 78)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="SolidProps/RubbleLargeSWCornerBody"]
 shape = SubResource("RectangleShape2D_rubble")
