@@ -1089,6 +1089,20 @@ So the Wang tool gives you **path/field OR flat-repeat** — never "continuous f
 
 ---
 
+## `create_tiles_pro` is ALSO wrong for a continuous floor — it makes transparent tile-TOKENS, not full-bleed terrain
+
+Validated 2026-06-06 (S1 tile upgrade `86ca44p4j`, same session as the `create_topdown_tileset` finding above). After the Wang tool was eliminated, `create_tiles_pro` (`tile_type="square_topdown"`, `tile_view="top-down"`, `outline_mode="segmentation"`, `tile_size=128`) looked promising — it generates **multiple tile variations in one call** (exactly the variant-set intent) and the per-tile stone craft is genuinely good (discrete cut stones, tonal variation, no outline grid in isolation). **But it is unusable as a continuous floor**, for a structural reason only visible when you check the alpha channel:
+
+- Each generated tile is a **rounded stone-TOKEN centered on a transparent canvas — ~55% of every tile is fully transparent (alpha 0 at all four corners).** It is designed for stamping discrete tiles onto a base layer (board-game / isometric-map token style), NOT a full-bleed terrain surface.
+- Tiled edge-to-edge, the transparent margins read as a **heavy black/empty grid between rounded boxes** — the exact "grid of bordered boxes / wallpaper" anti-pattern (`env-art-s1-direction.md §6.3`). Same end-symptom as the Wang tool's flat-repeat, different cause.
+- The opaque cores ARE good stone; you can salvage them (crop the opaque center + edge-wrap-blend to seamless + downsample), but the result is soft/uniform and not premium.
+
+**Net: PixelLab has NO full-bleed seamless-floor generator.** `create_topdown_tileset` = terrain-transition Wang; `create_tiles_pro` = transparent tokens; `create_map_object`/`create_1_direction_object` = transparent-background objects by definition (tool desc says so). For a CONTINUOUS crafted floor/wall the reliable path is to **AUTHOR the tile** (pixel-mcp or PIL/numpy), seamless-by-construction.
+
+**Validated authoring recipe (the one that worked — "broken-ashlar" flagstone):** lay irregular rectangular stones in jittered offset courses (course height ~11-13 px for slabs / ~7-9 px for cobbles at a 32 px tile), 1 px mortar gap (`#5C4F38` bed + `#1A1210` shadow side), per-stone flat doctrine tone with a few worn-lighter (`#A89677`) stones, a 1 px lit lip on the top+left of each stone and a 1 px `#1A1210`/`#5C4F38` shadow on bottom+right (carved relief). **Make it seamless by wrapping stone x-positions and course heights toroidally (modulo the tile size)** — every paint op writes at `(px % S, py % S)`. Generate a small variant SET (3 base + worn-path + moss + cracked) by varying the RNG seed; the game-side painter scatters them. A toroidal-**Voronoi** stone model also tiles seamlessly but reads as angular shards/scales — the **rectangular broken-course (ashlar) model is the correct shape for cut flagstone**, Voronoi is not. Judge tiled across a 15×8 (one-screen) span at 3× zoom, not in isolation. This is the path that finally broke the `#407` wallpaper failure.
+
+---
+
 ## Checklist — before every PixelLab + pixel-mcp session
 
 1. Check Sponsor's credit balance / plan tier before starting; do not consume pro-mode credits
