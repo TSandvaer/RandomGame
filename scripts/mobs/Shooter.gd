@@ -184,9 +184,18 @@ const POS_TRACE_INTERVAL: float = 0.25
 # Attack-telegraph tween for the aim-state red-glow visual.
 var _attack_telegraph_tween: Tween = null
 
-## Red tint for the aim telegraph (player-journey.md Beat 6). Sub-1.0 all
-## channels for HTML5 gl_compatibility safety (PR #137 lesson).
-const ATTACK_TELEGRAPH_TINT: Color = Color(1.0, 0.30, 0.30, 1.0)  # vivid red, HTML5 safe
+## Aim-telegraph tint. Sponsor soak #413 (build 5fd9f45, Room 04): the prior
+## vivid-red wash `Color(1.0, 0.30, 0.30)` "did not look good" on the
+## brazier-warden — post-M3W-3 the `Sprite` is an AnimatedSprite2D so the old
+## `else` branch tinted the WHOLE CharacterBody2D `modulate` red (hood + robe +
+## brazier all shifted red). The brazier-warden's `casting_a_fireball` windup
+## frames now ARE the aim telegraph (cast pose + raised hand), so the colour
+## wash is redundant. Reduced to a barely-perceptible warm ember glaze routed
+## onto the SPRITE only (not parent modulate) — keeps the tween contract
+## (`_attack_telegraph_tween` non-null in AIMING; non-white; sub-1.0 HTML5-safe)
+## without the bad red highlight. The warm hint reads as "fire-bowl charging"
+## rather than "character is red". See `_play_attack_telegraph`.
+const ATTACK_TELEGRAPH_TINT: Color = Color(1.0, 0.97, 0.92, 1.0)  # faint warm ember, sub-1.0
 const ATTACK_TELEGRAPH_TWEEN_IN: float = 0.080
 
 # Counter for projectiles fired this life — useful for tests + future
@@ -664,28 +673,38 @@ func _die() -> void:
 # ---- Visual feedback helpers (per Uma `combat-visual-feedback.md`) ---
 
 
-## Attack-telegraph visual (player-journey.md Beat 6 + M1 RC soak-4):
-## tween the Sprite child's color to red for the aim window (AIM_DURATION).
+## Attack-telegraph visual. M3W-3+ / Sponsor soak #413: the brazier-warden's
+## `casting_a_fireball` windup frames carry the aim read, so the colour wash is
+## now a barely-perceptible warm ember glaze (ATTACK_TELEGRAPH_TINT) applied to
+## the SPRITE only — NEVER the parent CharacterBody2D `modulate` (the old `else`
+## branch did that and produced Sponsor's "red highlight on the character"
+## complaint). 3-branch resolver mirrors `_play_hit_flash`:
+##   1. AnimatedSprite2D (production path post-M3W-3) → tween `Sprite.modulate`.
+##   2. ColorRect (back-compat for un-swapped mobs) → tween `Sprite.color`.
+##   3. no Sprite child (bare test mob) → fall back to `self.modulate`.
 ## Sub-1.0 all channels for HTML5 gl_compatibility safety (PR #137 lesson).
-## Targets Sprite child (visible-draw node) not parent modulate (PR #115 lesson).
 func _play_attack_telegraph() -> void:
 	if not is_inside_tree():
 		return
 	var target: CanvasItem = null
-	var uses_sprite: bool = false
+	var prop: String = "modulate"
 	var color_at_rest: Color = Color(1, 1, 1, 1)
 	var sprite: Node = get_node_or_null("Sprite")
-	if sprite is ColorRect:
+	if sprite is AnimatedSprite2D:
+		target = sprite as AnimatedSprite2D
+		prop = "modulate"
+		color_at_rest = (sprite as AnimatedSprite2D).modulate
+	elif sprite is ColorRect:
 		target = sprite as ColorRect
-		uses_sprite = true
+		prop = "color"
 		color_at_rest = (sprite as ColorRect).color
 	else:
 		target = self
+		prop = "modulate"
 		color_at_rest = modulate
 	if _attack_telegraph_tween != null and _attack_telegraph_tween.is_valid():
 		_attack_telegraph_tween.kill()
 	_attack_telegraph_tween = create_tween()
-	var prop: String = "color" if uses_sprite else "modulate"
 	var hold_dur: float = max(0.0, AIM_DURATION - ATTACK_TELEGRAPH_TWEEN_IN * 2.0)
 	_attack_telegraph_tween.tween_property(
 		target, prop, ATTACK_TELEGRAPH_TINT, ATTACK_TELEGRAPH_TWEEN_IN

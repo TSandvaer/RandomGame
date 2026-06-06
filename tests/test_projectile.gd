@@ -228,3 +228,59 @@ func test_hit_world_geometry_vanishes_without_damage() -> void:
 	assert_signal_not_emitted(p, "hit_target", "world body absorbs projectile silently")
 	# But it DOES expire — a wall stops the projectile.
 	assert_signal_emitted(p, "expired", "world body expires the projectile")
+
+
+# ---- 14: sprite orients to travel direction (fireball comet trail) -----
+# Sponsor soak #413: the fireball projectile art has a directional comet head
+# (authored pointing +X / east) + trailing tail. `_orient_sprite_to_velocity`
+# sets the `Sprite` child rotation = velocity.angle() so the trail trails
+# correctly in all 8 directions. These use the real scene (which has the
+# Sprite2D child) — the bare ProjectileScript.new() path has no Sprite child
+# and is exercised by the no-op-safety test below.
+
+const ProjectileScene: PackedScene = preload("res://scenes/projectiles/Projectile.tscn")
+
+
+func test_sprite_rotation_matches_velocity_angle() -> void:
+	# Fire in several octants; the Sprite child rotation must equal the
+	# velocity angle so the comet head points along travel.
+	var cases: Array[Vector2] = [
+		Vector2(90.0, 0.0),  # east
+		Vector2(0.0, 90.0),  # south
+		Vector2(-90.0, 0.0),  # west
+		Vector2(0.0, -90.0),  # north
+		Vector2(64.0, 64.0),  # south-east
+		Vector2(-64.0, -64.0),  # north-west
+	]
+	for vel in cases:
+		var p: Projectile = ProjectileScene.instantiate()
+		p.configure(5, vel, 1.0, Projectile.TEAM_ENEMY, null)
+		add_child_autofree(p)
+		var sprite: Node2D = p.get_node("Sprite") as Node2D
+		assert_not_null(sprite, "scene has a Sprite child")
+		assert_almost_eq(
+			sprite.rotation,
+			vel.angle(),
+			0.001,
+			"Sprite rotation = velocity angle for travel dir (%.0f,%.0f)" % [vel.x, vel.y]
+		)
+
+
+func test_orient_sprite_no_op_on_zero_velocity() -> void:
+	# Zero velocity has no meaningful direction — rotation must stay 0.
+	var p: Projectile = ProjectileScene.instantiate()
+	p.configure(5, Vector2.ZERO, 0.5, Projectile.TEAM_ENEMY, null)
+	add_child_autofree(p)
+	var sprite: Node2D = p.get_node("Sprite") as Node2D
+	assert_almost_eq(sprite.rotation, 0.0, 0.001, "zero-velocity projectile sprite stays unrotated")
+
+
+func test_orient_sprite_safe_with_no_sprite_child() -> void:
+	# The bare ProjectileScript.new() path (used by many tests + the test-skip
+	# escape hatch) has no Sprite child — _orient_sprite_to_velocity must no-op
+	# rather than crash.
+	var p: Projectile = ProjectileScript.new()
+	p.configure(5, Vector2.RIGHT * 90.0, 0.5, Projectile.TEAM_ENEMY, null)
+	add_child_autofree(p)
+	assert_null(p.get_node_or_null("Sprite"), "bare-instanced projectile has no Sprite child")
+	assert_true(true, "reaching here means _orient_sprite_to_velocity did not crash")
