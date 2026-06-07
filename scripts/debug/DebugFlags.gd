@@ -111,6 +111,25 @@ const START_ROOM_MAX: int = 9  # S2_BOSS_ROOM_INDEX in Main.gd (Stage 6)
 ## a direct route that bypasses the click handler entirely).
 const FORCE_DESCEND_QUERY_PARAM: String = "force_descend"
 
+## S1 assembler-retrofit soak control (ticket — S1 cloister-yard keystone
+## retrofit). When `?s1_assembler=1` is set on the HTML5 URL, Main boots the
+## Stratum-1 floor through `FloorAssembler.assemble_floor(...)` (the S2-style
+## `_load_s1_zone` path) INSTEAD of the static `ROOM_SCENE_PATHS` Room01 load.
+## This makes the assembler-driven S1 path soakable from the production-shape
+## release artifact without disturbing the default 8-room traversal (which the
+## existing Playwright suite + onboarding/RoomGate flow depend on).
+##
+## **Scope (foundation + proof):** the retrofit ships the plumbing — S1 assembles
+## through the same producer/consumer chain S2 uses, feeds `bounding_box_px` to
+## `CameraDirector.set_world_bounds`, renders chunk geometry + spawns chunk mobs.
+## Full multi-chunk YARD content authoring is the downstream Drew ticket. Default
+## off → production play is byte-identical to today's static-room boot.
+##
+## Same HTML5-only-via-bridge truthy shape as `force_descend` (any non-empty,
+## non-"0", non-"false" value is truthy). Desktop / headless GUT always read
+## false; tests inject via `set_s1_assembler_for_test`.
+const S1_ASSEMBLER_QUERY_PARAM: String = "s1_assembler"
+
 ## Camera-zoom soak control — Sponsor dials in the S1 perspective himself, then
 ## we lock the value in a follow-up (ticket 86ca3kjyg, 2026-06-02). Sponsor's
 ## recurring S1 soak verdict: "the zoom perspective is still much too zoomed".
@@ -213,6 +232,7 @@ var test_mode_enabled: bool = false
 var boss_hp_mult: float = BOSS_HP_MULT_DEFAULT
 var start_room: int = START_ROOM_DEFAULT
 var force_descend: bool = false
+var s1_assembler: bool = false
 var cam_zoom: float = CAM_ZOOM_DEFAULT
 var char_scale: float = CHAR_SCALE_DEFAULT
 
@@ -239,6 +259,7 @@ func _ready() -> void:
 	_resolve_boss_hp_mult()
 	_resolve_start_room()
 	_resolve_force_descend()
+	_resolve_s1_assembler()
 	_resolve_cam_zoom()
 	_resolve_char_scale()
 	# Single boot-time line for Tess's grep.
@@ -246,7 +267,8 @@ func _ready() -> void:
 		(
 			(
 				"[DebugFlags] debug_build=%s test_mode=%s fast_xp=%s"
-				+ " web=%s boss_hp_mult=%.3f start_room=%d force_descend=%s cam_zoom=%.3f char_scale=%.3f"
+				+ " web=%s boss_hp_mult=%.3f start_room=%d force_descend=%s"
+				+ " s1_assembler=%s cam_zoom=%.3f char_scale=%.3f"
 			)
 			% [
 				OS.is_debug_build(),
@@ -256,6 +278,7 @@ func _ready() -> void:
 				boss_hp_mult,
 				start_room,
 				force_descend,
+				s1_assembler,
 				cam_zoom,
 				char_scale,
 			]
@@ -588,6 +611,44 @@ func set_force_descend_for_test(enabled: bool) -> void:
 ## Test-only: reset to production default.
 func reset_force_descend_for_test() -> void:
 	force_descend = false
+
+
+## Read the `s1_assembler` URL query param via JavaScriptBridge on HTML5; no-op
+## on desktop / headless GUT. Defaults to false (static-room boot) when absent /
+## malformed. Same HTML5-only-via-bridge truthy shape as `force_descend`: any
+## non-empty, non-"0", non-"false" value is truthy.
+func _resolve_s1_assembler() -> void:
+	s1_assembler = false
+	if not OS.has_feature("web"):
+		return
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return
+	var bridge: Object = Engine.get_singleton("JavaScriptBridge")
+	var raw_value: Variant = (
+		bridge
+		. eval(
+			"new URLSearchParams(window.location.search).get('%s')" % S1_ASSEMBLER_QUERY_PARAM,
+			true,
+		)
+	)
+	if raw_value == null:
+		return
+	var raw_str: String = str(raw_value).strip_edges().to_lower()
+	if raw_str.is_empty() or raw_str == "null":
+		return
+	if raw_str == "0" or raw_str == "false":
+		return
+	s1_assembler = true
+
+
+## Test-only: inject s1_assembler without going through the JS bridge.
+func set_s1_assembler_for_test(enabled: bool) -> void:
+	s1_assembler = enabled
+
+
+## Test-only: reset to production default.
+func reset_s1_assembler_for_test() -> void:
+	s1_assembler = false
 
 
 ## Read the `cam_zoom` URL query param via JavaScriptBridge on HTML5; no-op on

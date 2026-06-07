@@ -185,3 +185,25 @@ Tags noted: `mobs`, `charger`, `ci-flake`, `html5`, `progression` are NOT existi
     integ-build re-soak.**
 - created_at: 2026-06-06 (Drew shooter fire-casting polish)
 - attempts: 0
+
+## ENTRY 2026-06-07-001
+- op: update_task (status move → READY FOR QA TEST)
+- task_id: 86ca5errv
+- list_id: 901523123922
+- payload:
+    name: "feat(level): S1 → FloorAssembler retrofit in Main.gd (keystone)"
+    target_status: "ready for qa test"
+    pr: "https://github.com/TSandvaer/RandomGame/pull/421"
+- NOTE: Devon lacks the ClickUp MCP tool. S1→assembler keystone retrofit done +
+    paired GUT tests (10/10 green local: integration + grunt-radius BFS
+    navigability gate) + cross-lane regression sets green (S2 traversal/mob-spawns,
+    camera wiring, floor assembler, M1 play loop) + Self-Test Report posted on
+    PR #421. gdformat/gdlint clean (no new findings). Soak-gated behind
+    ?s1_assembler=1 — default boot byte-identical. HTML5 visual gate: escape
+    clause invoked (no interactive Chromium in CLI env); Sponsor-soak probe
+    targets in PR body — route a diag-build artifact (path INERT in production
+    until the flag is set). **Orchestrator: (a) flip 86ca5errv →
+    ready for qa test paired with PR #421; (b) route to Tess (engine/integration
+    QA).**
+- created_at: 2026-06-07 (Devon S1 assembler retrofit)
+- attempts: 0
