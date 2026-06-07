@@ -40,21 +40,23 @@ class_name S1YardChunk
 const SOURCE_COBBLE: int = 0
 const SOURCE_WALL_FINE: int = 1
 
-## The cobble PNG is a 128px 4x4 atlas of 32-px sub-tiles that, stitched in source
-## grid order, form ONE seamless varied-cobble block (toroidal-wrapped by the T1
-## generator, 256px source downsampled to 128px). 128px preserves the VARIED-STONE
-## relief the Sponsor locked (v2 = lighter warm-neutral GREY + genuinely varied stone
-## sizes, ref `_tile_judge/cobble_proc/cobble_proc_field_zoom_v2.png`); a 64px
-## downsample flattened small/medium stones together so the floor read uniform + tan
-## (the PR #424 blocker) — 128px keeps the per-stone variation by eye. The painter
-## paints each cell from its position WITHIN the source window,
-## `Vector2i(tx % period, ty % period)`, so the block tiles with a period-4 (128px)
-## repeat — stones read continuous, the only repeat is the soft block seam (which the
-## generator wraps seamlessly across, so no dark grid line; verified seamcheck).
-const COBBLE_ATLAS_PERIOD: int = 4
+## The cobble PNG is a MULTI-VARIANT atlas: SIX 4x4 variant-blocks side by side
+## (768x128 = 24x4 cells; variant v occupies atlas columns [v*4 .. v*4+3]). Each
+## variant is a distinct 384px source downsampled to 128px (preserves the Sponsor-
+## LOVED fine varied-stone scale + grey tone). dirt CUT; green VARIED by the generator.
+##
+## REPEAT-BREAK (PR #424 Sponsor fix — he marked identical feature-rectangles every
+## block period): a single repeated block stamped its moss positions identically
+## across the yard. The painter now SCATTERS the 6 variants per 4-tile block with a
+## NON-TILING hash of the block coords, so adjacent blocks differ and no feature-
+## cluster repeats. Within a block the 4x4 cells map to the chosen variant's columns;
+## each variant's STONES stay toroidally seamless internally (the loved read), so the
+## variation is at the block level — pan the yard and see no repeating stamp.
+const COBBLE_BLOCK_TILES: int = 4  # one variant-block spans 4x4 game tiles
+const COBBLE_VARIANTS: int = 6  # number of variant-blocks packed in the atlas
 
 ## The finer-brick wall is a 128px 4x4 atlas (period 4). Building bricks use this
-## period independently of the cobble period above (here equal — both period 4).
+## period independently of the cobble (which is now multi-variant, see above).
 const WALL_ATLAS_PERIOD: int = 4
 
 ## Yard grid size in tiles. 40x24 @ 32px = 1280x768px — WIDER (1280 > 480) AND
@@ -65,6 +67,11 @@ const WALL_ATLAS_PERIOD: int = 4
 ## .tres size_tiles MUST match these (pinned by the GUT test).
 @export var grid_w: int = 40
 @export var grid_h: int = 24
+
+## Seed for the per-block cobble-variant scatter (the repeat-break hash). Fixed so
+## the yard's variant layout is deterministic across boots (GUT + visual repro);
+## change it to re-roll the scatter. NOT the per-character world_seed.
+@export var cobble_seed: int = 1763
 
 ## Building footprints — landmark STRUCTURES standing IN the open expanse
 ## (s1-cloister-yard.md §2.1: north range / south range / central / far
@@ -105,16 +112,35 @@ func _ready() -> void:
 
 ## Paint the full grid_w x grid_h grid as OPEN COBBLE — no perimeter wall ring
 ## (the yard is open; buildings block via .tscn collision, not a painted wall).
-## Idempotent (set_cell overwrites). The atlas window is anchored to the WORLD
-## tile coord so the cobble block stays phase-locked across the wide expanse.
+## Idempotent (set_cell overwrites).
+##
+## REPEAT-BREAK: each 4x4 block of game tiles is assigned ONE of the 6 atlas
+## variants via a non-tiling hash of the block coords (`_block_variant`), so the
+## moss-feature positions differ block-to-block and the field never reads a repeating
+## stamp (PR #424 Sponsor fix). Within a block, the local (bx,by) cell maps to that
+## variant's atlas columns `[v*4 + bx, by]`. Stones stay seamless WITHIN each variant.
 func _paint_floor() -> void:
 	if _floor_tiles == null:
 		push_warning("S1YardChunk: FloorTiles TileMapLayer missing — cannot paint")
 		return
 	for ty in range(grid_h):
 		for tx in range(grid_w):
-			var atlas: Vector2i = Vector2i(tx % COBBLE_ATLAS_PERIOD, ty % COBBLE_ATLAS_PERIOD)
+			var block_x: int = tx / COBBLE_BLOCK_TILES
+			var block_y: int = ty / COBBLE_BLOCK_TILES
+			var variant: int = _block_variant(block_x, block_y)
+			var local_x: int = tx % COBBLE_BLOCK_TILES
+			var local_y: int = ty % COBBLE_BLOCK_TILES
+			var atlas := Vector2i(variant * COBBLE_BLOCK_TILES + local_x, local_y)
 			_floor_tiles.set_cell(Vector2i(tx, ty), SOURCE_COBBLE, atlas)
+
+
+## Pick a cobble variant [0, COBBLE_VARIANTS) for a 4x4 block via a non-tiling
+## integer hash of the block coords + cobble_seed. The hash mixes x and y with
+## distinct large odd primes so the variant sequence does NOT realign on any small
+## period (no visible variant grid). Deterministic per seed (GUT + visual repro).
+func _block_variant(block_x: int, block_y: int) -> int:
+	var h: int = (block_x * 73856093) ^ (block_y * 19349663) ^ (cobble_seed * 83492791)
+	return absi(h) % COBBLE_VARIANTS
 
 
 ## Build the cloister BUILDINGS as solid landmark structures (s1-cloister-yard.md

@@ -21,11 +21,18 @@ class_name S1YardDescentChunk
 ## assembler retrofit"); this slice is the FEEL soak of the open yard.
 
 const SOURCE_COBBLE: int = 0
-## Matches S1YardChunk.COBBLE_ATLAS_PERIOD (128px 4x4 varied-cobble atlas).
-const COBBLE_ATLAS_PERIOD: int = 4
+## The cobble atlas is the multi-variant 24x4 set (6 variant-blocks of 4x4). The
+## descent cap scatters variants per 4x4 block too (non-tiling hash) so it reads
+## continuous with the main yard, no repeat. Mirrors S1YardChunk's scheme.
+const COBBLE_BLOCK_TILES: int = 4
+const COBBLE_VARIANTS: int = 6
 
 @export var grid_w: int = 6
 @export var grid_h: int = 24
+## Offset so the descent cap's variant scatter continues the yard's (the cap sits
+## east of the 40-wide yard = 10 blocks; start its block-x at 10 for continuity).
+@export var cobble_seed: int = 1763
+@export var block_x_offset: int = 10
 
 @onready var _floor_tiles: TileMapLayer = $FloorTiles
 
@@ -40,5 +47,11 @@ func _paint_floor() -> void:
 		return
 	for ty in range(grid_h):
 		for tx in range(grid_w):
-			var atlas: Vector2i = Vector2i(tx % COBBLE_ATLAS_PERIOD, ty % COBBLE_ATLAS_PERIOD)
+			var block_x: int = block_x_offset + tx / COBBLE_BLOCK_TILES
+			var block_y: int = ty / COBBLE_BLOCK_TILES
+			var h: int = (block_x * 73856093) ^ (block_y * 19349663) ^ (cobble_seed * 83492791)
+			var variant: int = absi(h) % COBBLE_VARIANTS
+			var atlas := Vector2i(
+				variant * COBBLE_BLOCK_TILES + tx % COBBLE_BLOCK_TILES, ty % COBBLE_BLOCK_TILES
+			)
 			_floor_tiles.set_cell(Vector2i(tx, ty), SOURCE_COBBLE, atlas)

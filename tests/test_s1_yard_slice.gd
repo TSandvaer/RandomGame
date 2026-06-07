@@ -202,6 +202,57 @@ func test_yard_chunk_paints_open_cobble_floor() -> void:
 		)
 
 
+## REPEAT-BREAK (PR #424 Sponsor fix). The yard must NOT stamp one repeating cobble
+## block — the painter scatters 6 atlas variants per 4x4 block via a non-tiling hash.
+## Assert that across the yard's blocks MULTIPLE distinct variants are used (the
+## variant = atlas_col / 4), so the field doesn't read a single repeating stamp. A
+## regression back to a single-tile period would use exactly ONE variant → fails.
+func test_yard_cobble_uses_multiple_variants_no_single_stamp() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
+	if floor_tiles == null:
+		return
+	var variants_seen := {}
+	# Sample one cell per 4x4 block across the whole yard; record its variant.
+	for by: int in range(0, YARD_H, 4):
+		for bx: int in range(0, YARD_W, 4):
+			var coords: Vector2i = floor_tiles.get_cell_atlas_coords(Vector2i(bx, by))
+			if coords.x < 0:
+				continue
+			var variant: int = coords.x / 4  # 6 variant-blocks of 4 cols each
+			variants_seen[variant] = true
+	# A single-stamp regression yields exactly 1 variant; the scatter must use several.
+	assert_gt(
+		variants_seen.size(),
+		2,
+		(
+			"yard must scatter MULTIPLE cobble variants (no single repeating stamp), got %d"
+			% variants_seen.size()
+		)
+	)
+
+
+## The variant scatter is NON-TILING — it must not realign on a small period (which
+## would re-introduce a visible variant grid). Assert two blocks a short period apart
+## differ for at least one offset (cheap non-tiling probe).
+func test_yard_cobble_variant_scatter_is_non_tiling() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
+	if floor_tiles == null:
+		return
+	# Compare the variant of block row 0 across consecutive blocks — they must not be
+	# all identical (a tiling period of 1) and not strictly alternating in a trivial
+	# way. Cheap check: collect the row-0 variant sequence; assert ≥3 distinct values.
+	var seq := {}
+	for bx: int in range(0, YARD_W, 4):
+		var coords: Vector2i = floor_tiles.get_cell_atlas_coords(Vector2i(bx, 0))
+		if coords.x >= 0:
+			seq[coords.x / 4] = true
+	assert_gt(
+		seq.size(), 2, "row-0 variant sequence must vary (non-tiling), got %d distinct" % seq.size()
+	)
+
+
 func test_yard_chunk_builds_solid_building_structures() -> void:
 	var inst: Node = _instantiate_yard_chunk()
 	var bodies_root: Node = inst.get_node("BuildingBodies")

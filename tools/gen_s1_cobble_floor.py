@@ -292,42 +292,49 @@ def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
     ao = (border >= joint_w) & (border < joint_w * 1.8)
     img[ao] *= 0.97
 
-    # --- ORGANIC INVASION: moss + dirt (clustered toroidal-noise driven) -------
-    # Both are INVASION accents, not carpets: doctrine says moss CREEPS in joints
-    # and clusters in damp patches; dirt is where stones have SUNK/gone missing.
-    # Keep total coverage modest so the cobble material stays the dominant read.
+    # --- ORGANIC INVASION: moss only (clustered toroidal-noise driven) ---------
+    # COBBLE + MOSS ONLY (Sponsor lock 2026-06-07): the brown DIRT puddles/patches
+    # were cut — Sponsor disliked them. Moss CREEPS in joints + clusters in damp
+    # patches; no bare-earth feature. Keep coverage modest so the loved cobble stays
+    # the dominant read. `dirt_amount` is retained as an inert arg for CLI back-compat
+    # but no longer paints anything.
     moss_field = toroidal_value_noise(S, np.random.default_rng(seed * 7 + 1), cells=3, octaves=4)
-    dirt_field = toroidal_value_noise(S, np.random.default_rng(seed * 13 + 5), cells=2, octaves=4)
-
-    # DIRT: rare sunk patches — only the strongest field peaks, biased to small stones.
-    # v2: slightly rarer + tuned (lighter/warmer) so it sits in the lighter floor.
-    dirt_thresh = 0.86 - 0.07 * dirt_amount
-    small_stone = w_own < (9 * k)                        # pebbles/small = more likely sunk
-    dirt_mask = (dirt_field > dirt_thresh) & (small_stone | (dirt_field > dirt_thresh + 0.07))
-    dd = dirt_mask & (joint | (dirt_field > dirt_thresh + 0.10))
-    img[dirt_mask] = tune(PAL["dirt"])
-    img[dd] = tune(PAL["dirt_deep"])
-    spk = dirt_mask & (rng.random((S, S)) < 0.22)        # speckle so dirt isn't flat
-    img[spk] = np.clip(tune(PAL["dirt_deep"]) * 1.10, 0, 255)
+    # Second, INDEPENDENT toroidal field drives moss SHADE + DENSITY variation so the
+    # green is not one flat tone (Sponsor: vary shades + thickness). High = wetter/
+    # darker/thicker moss; low = lighter/sparser. Different seed + cell count so it is
+    # de-correlated from the damp-cluster field (varied look, not aligned bands).
+    moss_var = toroidal_value_noise(S, np.random.default_rng(seed * 23 + 9), cells=4, octaves=4)
 
     # MOSS: confined to CLUSTERED damp zones (where the moss field is genuinely
     # high) so it reads as patches of invasion, NOT green grout in every joint.
     # Within a damp zone it creeps along the joints + spills a little onto stone.
-    # v2: damp gate raised slightly (a touch less moss so it doesn't dominate the
-    # lighter floor). Moss stays olive-green (NOT warm-tuned) but lightened ~8% to
-    # sit consistently in the lighter cobble.
-    moss_c = np.clip(PAL["moss"] * 1.08, 0, 255)
-    moss_deep_c = np.clip(PAL["moss_deep"] * 1.08, 0, 255)
-    # FINE-COBBLE: raise the damp gate so moss stays a sparse CLUSTERED accent (the
-    # dense joints would otherwise carry green grout everywhere, dominating the grey).
+    # FINE-COBBLE: raised damp gate so moss stays a sparse CLUSTERED accent (the dense
+    # joints would otherwise carry green grout everywhere, dominating the grey).
+    #
+    # VARIED GREEN (Sponsor): three olive tones — light/lit, mid, deep/wet — selected
+    # per-pixel by the de-correlated `moss_var` field so a patch reads lighter+sparser
+    # here, darker+wetter there, never one flat green. moss stays olive (NOT warm-tuned)
+    # and lightened ~8% to sit in the lighter cobble.
+    moss_light_c = np.clip(PAL["moss"] * 1.26, 0, 255)        # light/lit olive (sparse, dry)
+    moss_mid_c = np.clip(PAL["moss"] * 1.08, 0, 255)         # mid olive
+    moss_deep_c = np.clip(PAL["moss_deep"] * 1.08, 0, 255)   # deep/wet olive (thick, shaded)
     damp = moss_field > (0.80 - 0.10 * moss_amount)       # the damp-cluster gate (raised)
     moss_in_joint = joint & damp                          # joint creep WITHIN damp zones
     moss_cluster = (moss_field > (0.88 - 0.06 * moss_amount)) & (rng.random((S, S)) < 0.40)
-    moss_mask = (moss_in_joint | moss_cluster) & (~dirt_mask)
-    moss_deep_mask = moss_mask & (deep | (moss_field > 0.86))
-    img[moss_mask] = moss_c
-    img[moss_deep_mask] = moss_deep_c
-    tuft = moss_mask & (rng.random((S, S)) < 0.22)       # lighter olive tuft tips
+    moss_mask = moss_in_joint | moss_cluster
+    # DENSITY varies with moss_var: in LOW-var zones, thin the moss out (drop a
+    # fraction of would-be moss pixels) so those patches read sparser; HIGH-var zones
+    # stay full + reach onto stone (deep). This makes thickness vary across the field.
+    density_keep = 0.45 + 0.55 * moss_var                 # 0.45..1.0 keep-probability
+    thinned = rng.random((S, S)) < density_keep
+    moss_mask = moss_mask & thinned
+    # SHADE: split the surviving moss into light / mid / deep by moss_var bands.
+    img[moss_mask] = moss_mid_c
+    light_band = moss_mask & (moss_var < 0.40)            # dry/sparse zones → lighter
+    deep_band = moss_mask & ((moss_var > 0.72) | deep)    # wet zones / deepest joints → deep
+    img[light_band] = moss_light_c
+    img[deep_band] = moss_deep_c
+    tuft = moss_mask & (rng.random((S, S)) < 0.18)       # occasional lighter olive tuft tips
     img[tuft] = np.clip(PAL["moss"] * 1.26, 0, 255)
 
     return np.clip(img, 0, 255).astype(np.uint8)
@@ -378,12 +385,15 @@ def main():
     S = args.res
     print(f"[gen] generating {args.variants} seamless cobble variants @ {S}px ...")
     variants = []
+    # Per-variant MOSS amount spread so the 6-variant base set carries genuinely
+    # different moss density (some near-clean, some mossy) — this is the multi-variant
+    # repeat-breaker (Uma §3.4): the painter scatters these variants so adjacent yard
+    # blocks differ and no feature-cluster repeats. dirt is gone (Sponsor cut).
+    moss_spread = [0.55, 0.80, 1.0, 1.0, 1.25, 1.5]
     for i in range(args.variants):
-        # vary moss/dirt amount per variant => repeat-breaker accents
-        moss_a = 1.0 + (0.4 if i == args.variants - 1 else 0.0)   # last = heavy-moss accent
-        dirt_a = 1.0 + (0.5 if i == args.variants - 2 else 0.0)   # 2nd-last = dirt-through accent
+        moss_a = moss_spread[i % len(moss_spread)]
         t = make_cobble_tile(args.seed + i * 17, S=S, warm_bias=args.warm,
-                             lighten=args.lighten, moss_amount=moss_a, dirt_amount=dirt_a)
+                             lighten=args.lighten, moss_amount=moss_a, dirt_amount=0.0)
         variants.append(t)
         Image.fromarray(t).save(os.path.join(out, f"cobble{sfx}_v{i}_{S}.png"))
         print(f"  - cobble{sfx}_v{i}_{S}.png")
