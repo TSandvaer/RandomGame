@@ -272,37 +272,28 @@ func test_carried_forward_props_present_at_calibrated_scales() -> void:
 	assert_true(seen.has("brazier_lit.png"), "braziers present as atmosphere landmarks")
 
 
-func test_yard_chunk_scatters_decoration() -> void:
+## Decoration prop scatter is EMPTY (Sponsor scale soak fix, PR #424). The prior
+## moss_patch tuft scatter rendered ~player-sized dark spiky blobs ("ugly objects
+## out of proportion" — Sponsor). The vegetation/"nature reclaiming" story is carried
+## by the cobble FLOOR tiles' baked-in moss (s1-cloister-yard.md §5.2); a proper
+## correctly-proportioned ground-vegetation prop is T3's surface. Pin the no-op so a
+## future re-introduction of oversized blob props fails this gate loudly.
+func test_yard_chunk_decoration_has_no_oversized_blob_props() -> void:
 	var inst: Node = _instantiate_yard_chunk()
 	var deco: Node = inst.get_node("Decoration")
-	assert_not_null(deco, "Decoration node present")
+	assert_not_null(deco, "Decoration node present (empty container; T3 repopulates)")
 	if deco == null:
 		return
 	var tufts: Array = _collect_nodes(deco, "Sprite2D")
-	# Sparse-but-present: ~1 cluster per 40 tiles × 2-3 tufts → a handful, NOT a
-	# per-tile field (anti-grass-field). Expect a modest non-zero count.
-	assert_gt(tufts.size(), 0, "decoration scatter places grass/moss tufts")
-	assert_lt(
-		tufts.size(), YARD_W * YARD_H / 4, "decoration stays SPARSE (not a per-tile grass field)"
+	assert_eq(
+		tufts.size(),
+		0,
+		(
+			"yard places NO prop-scatter tufts — the moss_patch blobs read ~player-sized"
+			+ " and ugly (Sponsor); vegetation lives in the cobble floor tiles. T3 adds a"
+			+ " proper proportional ground-vegetation prop."
+		)
 	)
-
-
-func test_decoration_is_jittered_not_grid_aligned() -> void:
-	# The #1 grass complaint fix: tufts must NOT snap to tile centres. Assert at
-	# least one tuft has a sub-tile offset from its cell centre (jittered).
-	var inst: Node = _instantiate_yard_chunk()
-	var deco: Node = inst.get_node("Decoration")
-	if deco == null:
-		return
-	var tufts: Array = _collect_nodes(deco, "Sprite2D")
-	var any_jittered: bool = false
-	for spr: Sprite2D in tufts:
-		var cell_cx: float = (floor(spr.position.x / TILE_PX) + 0.5) * TILE_PX
-		var cell_cy: float = (floor(spr.position.y / TILE_PX) + 0.5) * TILE_PX
-		if absf(spr.position.x - cell_cx) > 1.0 or absf(spr.position.y - cell_cy) > 1.0:
-			any_jittered = true
-			break
-	assert_true(any_jittered, "grass tufts are position-jittered (NOT grid-snapped)")
 
 
 # ---- Surface 4: navigability (T6 gate for the yard) ------------------

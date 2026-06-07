@@ -28,6 +28,18 @@ func _init() -> void:
 	descent.position = Vector2(40 * 32, 0)
 	world.add_child(descent)
 
+	# Real player sprite at the production char_scale (0.6) for an HONEST in-frame
+	# scale reference (Sponsor asked for the player in frame to judge cobble size).
+	# Placed near the west spawn (x=24, y=384) — the spawn-vista crop frames it.
+	var player_tex: Texture2D = load("res://assets/sprites/player/idle_s.png") as Texture2D
+	if player_tex != null:
+		var pl := Sprite2D.new()
+		pl.texture = player_tex
+		pl.scale = Vector2(0.6, 0.6)  # shipped production char_scale (PR #405)
+		pl.position = Vector2(60, 384)
+		pl.z_index = 50
+		world.add_child(pl)
+
 	var cam := Camera2D.new()
 	vp.add_child(cam)
 	cam.make_current()

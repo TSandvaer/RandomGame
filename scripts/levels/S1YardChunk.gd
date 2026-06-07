@@ -66,11 +66,6 @@ const WALL_ATLAS_PERIOD: int = 4
 @export var grid_w: int = 40
 @export var grid_h: int = 24
 
-## Deterministic decoration seed — fixed so the scatter is reproducible across
-## boots (GUT + visual). NOT the per-character world_seed; decoration layout is
-## authored content, not procgen variance (that's the floor-assembler's job).
-@export var decoration_seed: int = 86
-
 ## Building footprints — landmark STRUCTURES standing IN the open expanse
 ## (s1-cloister-yard.md §2.1: north range / south range / central / far
 ## outbuilding). Each Rect2i is (x, y, w, h) in TILES. The painter paints
@@ -100,7 +95,6 @@ const WALL_ATLAS_PERIOD: int = 4
 @onready var _floor_tiles: TileMapLayer = $FloorTiles
 @onready var _buildings: TileMapLayer = $Buildings
 @onready var _building_bodies: Node2D = $BuildingBodies
-@onready var _decoration: Node2D = $Decoration
 
 
 func _ready() -> void:
@@ -169,70 +163,21 @@ func _add_building_collision(foot: Rect2i) -> void:
 	_building_bodies.add_child(body)
 
 
-## Scatter sparse + jittered + clustered grass/moss decoration into the
-## `Decoration` node (s1-cloister-yard.md §5.2). Uses the carried-forward
-## `moss_patch` prop as the vegetation stamp. Placement rules:
-##   - SPARSE: ~1 cluster per 6-10 tiles (here: a target count derived from area),
-##     never one-per-tile.
-##   - JITTERED: each tuft offset randomly within its cell (NOT snapped to grid).
-##   - CLUSTERED: 2-3 tufts grouped near a chosen anchor, biased toward the yard
-##     EDGES + corners (damp zones), the open central lanes left clear for
-##     traversal + combat (the "density at edges, clear in the middle" rule).
-## Deterministic via `decoration_seed` so the scatter is reproducible.
+## Yard decoration. INTENTIONALLY a NO-OP as of the Sponsor scale soak (2026-06-07,
+## PR #424): the prior pass scattered the carried-forward `moss_patch` prop as
+## grass/moss tufts, but that 32x32 sprite renders ~85x85 px at baseline game zoom
+## (≈ player-sized) and reads as a DARK SPIKY BLOB with green flecks — the Sponsor
+## flagged these as "ugly objects out of proportion" (he didn't recognize them).
+## They were the moss-patch tufts, NOT mobs.
+##
+## The vegetation/"nature reclaiming" story is ALREADY carried by the cobble FLOOR
+## tiles — the v2 generator bakes clustered olive moss into the cobble joints
+## (s1-cloister-yard.md §5.2: "the tile-level moss carries most of the moss story").
+## So the floor keeps its overgrown-yard read WITHOUT the oversized ugly prop blobs.
+##
+## T3 (the dedicated decoration ticket) owns adding PROPER ground-vegetation props
+## (a clean, correctly-proportioned grass/sprout asset at the right scale) — the
+## `tile-scale-small-player-large-world` north-star extends to props: nice +
+## proportional, no ugly placeholders. Until that asset exists, no prop scatter.
 func _scatter_decoration() -> void:
-	if _decoration == null:
-		return
-	var moss_tex: Texture2D = load("res://assets/props/s1_cloister/moss_patch.png") as Texture2D
-	if moss_tex == null:
-		push_warning("S1YardChunk: moss_patch.png missing — skipping decoration scatter")
-		return
-	var rng := RandomNumberGenerator.new()
-	rng.seed = decoration_seed
-	var tile_px: float = 32.0
-	# Target cluster count: ~1 per 8 tiles of open area, capped so the yard stays
-	# OPEN (sparse-but-alive, never a grass field). 40x24=960 tiles → ~24 clusters.
-	var cluster_count: int = int((grid_w * grid_h) / 40.0)
-	for _c in range(cluster_count):
-		# Anchor biased toward edges/corners (damp zones): pick a band within
-		# `edge_band` tiles of an edge with high probability, else anywhere.
-		var anchor: Vector2i = _pick_damp_anchor(rng)
-		var tufts: int = rng.randi_range(2, 3)  # grass grows in patches
-		for _t in range(tufts):
-			var jx: float = rng.randf_range(-0.4, 0.4) * tile_px
-			var jy: float = rng.randf_range(-0.4, 0.4) * tile_px
-			var spread: float = rng.randf_range(-0.8, 0.8) * tile_px
-			var spread_y: float = rng.randf_range(-0.8, 0.8) * tile_px
-			var pos := Vector2(
-				(anchor.x + 0.5) * tile_px + jx + spread, (anchor.y + 0.5) * tile_px + jy + spread_y
-			)
-			var spr := Sprite2D.new()
-			spr.texture = moss_tex
-			spr.position = pos
-			# Slight per-tuft scale + flip jitter so no two read identical.
-			var s: float = rng.randf_range(0.7, 1.05)
-			spr.scale = Vector2(s, s)
-			spr.flip_h = rng.randf() < 0.5
-			_decoration.add_child(spr)
-
-
-## Pick a decoration anchor tile biased toward the yard edges/corners (where damp
-## collects — s1-cloister-yard.md §5.2), keeping the open central lanes clear.
-func _pick_damp_anchor(rng: RandomNumberGenerator) -> Vector2i:
-	var edge_band: int = 4
-	if rng.randf() < 0.7:
-		# Edge-biased: snap one axis into the edge band.
-		if rng.randf() < 0.5:
-			var x: int = (
-				rng.randi_range(0, edge_band - 1)
-				if rng.randf() < 0.5
-				else rng.randi_range(grid_w - edge_band, grid_w - 1)
-			)
-			return Vector2i(x, rng.randi_range(0, grid_h - 1))
-		var y: int = (
-			rng.randi_range(0, edge_band - 1)
-			if rng.randf() < 0.5
-			else rng.randi_range(grid_h - edge_band, grid_h - 1)
-		)
-		return Vector2i(rng.randi_range(0, grid_w - 1), y)
-	# Else anywhere (a little life in the open too).
-	return Vector2i(rng.randi_range(0, grid_w - 1), rng.randi_range(0, grid_h - 1))
+	pass
