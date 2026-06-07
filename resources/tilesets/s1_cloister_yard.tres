@@ -3,17 +3,19 @@
 ; S1 cloister-YARD TileSet — ticket 86ca5erzk (S1-YARD T4; Uma s1-cloister-yard.md §3).
 ; The open-air YARD floor + finer perimeter-brick, distinct from the interior-hall
 ; `s1_cloister.tres` (sandstone flagstone). Two atlas sources, 32px tiles:
-;   Source 0 = floor_cobble.png   → cobblestone+MOSS (no dirt) yard ground (generator
-;                `tools/gen_s1_cobble_floor.py`, LOCKED tone = lighter warm-neutral GREY
-;                + fine varied-size stones the Sponsor LOVED). MULTI-VARIANT atlas:
-;                768x128 = 24x4 cells = SIX 4x4 variant-blocks (each variant a distinct
-;                384px source downsampled to 128px; variant v = cols [v*4 .. v*4+3]).
-;                The painter (S1YardChunk._paint_floor) scatters the 6 variants per
-;                4-tile block with a NON-TILING hash so adjacent yard blocks differ and
-;                no feature-cluster repeats (PR #424 Sponsor repeat-stamp fix; Uma §3.4
-;                multi-variant set). Each variant's STONES stay toroidally seamless
-;                internally; variation is at the block level. dirt CUT (Sponsor);
-;                green VARIED (light/mid/deep olive + varied density).
+;   Source 0 = floor_cobble.png   → CLEAN GREY cobblestone yard ground, NO baked
+;                vegetation (generator `tools/gen_s1_cobble_floor.py`, LOCKED tone =
+;                lighter warm-neutral GREY + fine varied-size stones the Sponsor LOVED).
+;                Sponsor approval lock 2026-06-07: "drop the grass in the cobblestone" —
+;                ALL moss/green/grass stripped from the tile (dirt was cut earlier).
+;                Vegetation returns LATER as a deliberate decoration LAYER, not baked in.
+;                MULTI-VARIANT atlas: 768x128 = 24x4 cells = SIX 4x4 variant-blocks (each
+;                a distinct 384px source downsampled to 128px; variant v = cols
+;                [v*4 .. v*4+3]). The painter (S1YardChunk._paint_floor) scatters the 6
+;                variants per 4-tile block with a NON-TILING hash so adjacent yard blocks
+;                differ and no block-cluster repeats (PR #424 Sponsor repeat-stamp fix;
+;                Uma §3.4 multi-variant set). Each variant's STONES stay toroidally
+;                seamless internally; variation is at the block level.
 ;   Source 1 = wall_cloister_fine.png → finer-brick perimeter (T2; Sponsor flagged the
 ;                old 128px running-bond bricks as oversized vs the finer cobble). Brick
 ;                pitch shrunk ~2x (downsample-to-64 + 2x2 retile) so bricks read ~6

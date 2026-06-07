@@ -43,15 +43,16 @@ const SOURCE_WALL_FINE: int = 1
 ## The cobble PNG is a MULTI-VARIANT atlas: SIX 4x4 variant-blocks side by side
 ## (768x128 = 24x4 cells; variant v occupies atlas columns [v*4 .. v*4+3]). Each
 ## variant is a distinct 384px source downsampled to 128px (preserves the Sponsor-
-## LOVED fine varied-stone scale + grey tone). dirt CUT; green VARIED by the generator.
+## LOVED fine varied-stone scale + grey tone). CLEAN grey cobble — no baked
+## vegetation (Sponsor lock: dirt CUT, then green/moss stripped too).
 ##
-## REPEAT-BREAK (PR #424 Sponsor fix — he marked identical feature-rectangles every
-## block period): a single repeated block stamped its moss positions identically
-## across the yard. The painter now SCATTERS the 6 variants per 4-tile block with a
-## NON-TILING hash of the block coords, so adjacent blocks differ and no feature-
-## cluster repeats. Within a block the 4x4 cells map to the chosen variant's columns;
-## each variant's STONES stay toroidally seamless internally (the loved read), so the
-## variation is at the block level — pan the yard and see no repeating stamp.
+## REPEAT-BREAK (PR #424 Sponsor fix — he marked identical block-rectangles every
+## block period): a single repeated block stamped its stone layout identically across
+## the yard. The painter SCATTERS the 6 variants per 4-tile block with a NON-TILING
+## hash of the block coords, so adjacent blocks differ and no block-cluster repeats.
+## Within a block the 4x4 cells map to the chosen variant's columns; each variant's
+## STONES stay toroidally seamless internally (the loved read), so the variation is at
+## the block level — pan the yard and see no repeating stamp.
 const COBBLE_BLOCK_TILES: int = 4  # one variant-block spans 4x4 game tiles
 const COBBLE_VARIANTS: int = 6  # number of variant-blocks packed in the atlas
 
