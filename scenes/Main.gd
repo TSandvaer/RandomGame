@@ -143,7 +143,17 @@ const S2_STRATUM_ID: int = 2
 ## traversal (PR #391) was ADDED as a new path rather than by deleting room loads.
 ## Full multi-chunk YARD content authoring + cut-over of the default boot is the
 ## downstream Drew ticket. Default off → production play is byte-identical today.
-const S1_ZONE_ID: StringName = &"s1_z1_outer_cloister"
+##
+## **S1-YARD T4 (ticket 86ca5erzk):** the soak zone is now the open cloister-YARD
+## first slice (`s1_z1_yard_slice` — one big 40x24 open-cobble expanse + a 6x24
+## east descent-cap = 1472x768 assembled, WIDER+TALLER than the 480x270 viewport
+## so the camera scrolls in BOTH axes; the "big + endless" read). Buildings stand
+## as solid landmark structures IN the expanse; cobble floor + finer-brick walls +
+## carried-forward props + jittered grass. STILL soak-gated behind ?s1_assembler=1
+## — the default 8-room boot off ROOM_SCENE_PATHS is UNTOUCHED (cut-over is a
+## follow-on after Sponsor approves the feel). The narrative-arc ZoneDef
+## `s1_z1_outer_cloister` is retained for the T7 full-extension work.
+const S1_ZONE_ID: StringName = &"s1_z1_yard_slice"
 
 ## Stratum index passed to FloorAssembler.derive_stratum_seed for S1 zones.
 const S1_STRATUM_ID: int = 1

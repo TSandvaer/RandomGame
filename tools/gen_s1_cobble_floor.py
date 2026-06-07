@@ -173,14 +173,22 @@ def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
     # Varied stone-size plan, scaled to source res. Counts/radii tuned at 256px.
     # Large + medium + small + pebbles => chaotic natural mix, NO uniform sizing.
     k = S / 256.0
-    # Fewer, BIGGER stones so the varied-size read survives the downsample to a
-    # 32px in-engine tile. Still a chaotic mix (large+medium+small+pebble), no rows.
+    # FINE-COBBLE plan (Sponsor scale fix, 2026-06-07): the prior plan's stones
+    # rendered ~player-sized at game zoom ("tiles 10x bigger than supposed to be").
+    # Rendered stone size = source_radius * (period*32 / source_res) * cam_zoom, so
+    # the ONLY scale lever at a fixed atlas period is SMALLER SOURCE RADII (NOT
+    # downsampling a coarse source — that re-flattens the relief). Radii dropped ~4x
+    # + counts up ~15x => MANY small cobbles; the 4-tier mix keeps genuine size
+    # VARIATION (the locked v2 read) and the toroidal Poisson keeps it SEAMLESS.
+    # Authored against a 384px source (gives the ~3.6px pebbles real pixels) tiled
+    # at period 4: a large cobble now renders ~18 screen px ≈ 1/3 the 0.6 player,
+    # so the player walks on a FINE cobble ground (`tile-scale-small-player-large-world`).
     radii_plan = [
         # (count, min_radius_px, weight)  weight feeds additively-weighted Voronoi
-        (5,  58 * k, 30 * k),   # LARGE cobbles  (sparse, dominant set-stones)
-        (11, 38 * k, 17 * k),   # MEDIUM cobbles
-        (22, 25 * k,  9 * k),   # SMALL cobbles
-        (40, 15 * k,  3 * k),   # PEBBLES packed into the gaps
+        (70,  15 * k, 8.0 * k),   # LARGER cobbles  (still the dominant set-stones, but small)
+        (150,  9 * k, 4.5 * k),   # MEDIUM cobbles
+        (320,  6 * k, 2.2 * k),   # SMALL cobbles
+        (650, 3.6 * k, 1.0 * k),  # PEBBLES packed into the gaps
     ]
     pts, weights = toroidal_poisson_varied(S, rng, radii_plan)
     n = len(pts)
@@ -265,53 +273,36 @@ def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
     # --- JOINTS between stones (recessed gaps, irregular width) -----------------
     # v2: LIGHTER joints so the floor doesn't read dark/gloomy. The joint is still
     # the darkest part (reads as a recess) but mid-grey-dark, not near-black.
-    joint_w = 2.6 * k
+    # FINE-COBBLE (Sponsor scale fix): with ~15x more, much SMALLER stones the joint
+    # is a far larger fraction of each tiny cobble, so a fixed joint_w darkened +
+    # warmed the overall mean (dropped from the locked ~152,132,99 toward ~132,113,81).
+    # THIN the joints (1.5px vs 2.6px) so the dense floor keeps the locked v2 lighter
+    # warm-neutral GREY read — the stones stay the dominant surface, not the gaps.
+    joint_w = 1.5 * k
     joint = border < joint_w
-    deep = border < (joint_w * 0.55)
-    # joint = tuned shadow lifted partway toward base; deep = a touch darker still.
-    joint_col = tune(PAL["cobble_shadow"]) * 0.7 + cobble_base_t * 0.3
-    deep_col = tune(PAL["joint_deep"]) * 0.55 + tune(PAL["cobble_shadow"]) * 0.45
+    deep = border < (joint_w * 0.5)
+    # joint = tuned shadow lifted FURTHER toward base (lighter) so dense joints don't
+    # darken the floor; deep = a touch darker still.
+    joint_col = tune(PAL["cobble_shadow"]) * 0.55 + cobble_base_t * 0.45
+    deep_col = tune(PAL["joint_deep"]) * 0.45 + cobble_base_t * 0.55
     img[joint] = joint_col
     img[deep] = deep_col
-    # ambient-occlusion darkening just inside each stone next to a joint (gentler)
-    ao = (border >= joint_w) & (border < joint_w * 2.4)
-    img[ao] *= 0.95
+    # ambient-occlusion darkening just inside each stone next to a joint (gentler,
+    # and a thinner band so the dense small stones don't read AO-heavy).
+    ao = (border >= joint_w) & (border < joint_w * 1.8)
+    img[ao] *= 0.97
 
-    # --- ORGANIC INVASION: moss + dirt (clustered toroidal-noise driven) -------
-    # Both are INVASION accents, not carpets: doctrine says moss CREEPS in joints
-    # and clusters in damp patches; dirt is where stones have SUNK/gone missing.
-    # Keep total coverage modest so the cobble material stays the dominant read.
-    moss_field = toroidal_value_noise(S, np.random.default_rng(seed * 7 + 1), cells=3, octaves=4)
-    dirt_field = toroidal_value_noise(S, np.random.default_rng(seed * 13 + 5), cells=2, octaves=4)
-
-    # DIRT: rare sunk patches — only the strongest field peaks, biased to small stones.
-    # v2: slightly rarer + tuned (lighter/warmer) so it sits in the lighter floor.
-    dirt_thresh = 0.86 - 0.07 * dirt_amount
-    small_stone = w_own < (9 * k)                        # pebbles/small = more likely sunk
-    dirt_mask = (dirt_field > dirt_thresh) & (small_stone | (dirt_field > dirt_thresh + 0.07))
-    dd = dirt_mask & (joint | (dirt_field > dirt_thresh + 0.10))
-    img[dirt_mask] = tune(PAL["dirt"])
-    img[dd] = tune(PAL["dirt_deep"])
-    spk = dirt_mask & (rng.random((S, S)) < 0.22)        # speckle so dirt isn't flat
-    img[spk] = np.clip(tune(PAL["dirt_deep"]) * 1.10, 0, 255)
-
-    # MOSS: confined to CLUSTERED damp zones (where the moss field is genuinely
-    # high) so it reads as patches of invasion, NOT green grout in every joint.
-    # Within a damp zone it creeps along the joints + spills a little onto stone.
-    # v2: damp gate raised slightly (a touch less moss so it doesn't dominate the
-    # lighter floor). Moss stays olive-green (NOT warm-tuned) but lightened ~8% to
-    # sit consistently in the lighter cobble.
-    moss_c = np.clip(PAL["moss"] * 1.08, 0, 255)
-    moss_deep_c = np.clip(PAL["moss_deep"] * 1.08, 0, 255)
-    damp = moss_field > (0.73 - 0.10 * moss_amount)       # the damp-cluster gate
-    moss_in_joint = joint & damp                          # joint creep WITHIN damp zones
-    moss_cluster = (moss_field > (0.84 - 0.06 * moss_amount)) & (rng.random((S, S)) < 0.48)
-    moss_mask = (moss_in_joint | moss_cluster) & (~dirt_mask)
-    moss_deep_mask = moss_mask & (deep | (moss_field > 0.86))
-    img[moss_mask] = moss_c
-    img[moss_deep_mask] = moss_deep_c
-    tuft = moss_mask & (rng.random((S, S)) < 0.22)       # lighter olive tuft tips
-    img[tuft] = np.clip(PAL["moss"] * 1.26, 0, 255)
+    # --- NO BAKED VEGETATION: CLEAN GREY COBBLE ONLY ---------------------------
+    # Sponsor approval-gating lock (2026-06-07): "drop the grass in the cobblestone."
+    # ALL moss/green/grass is stripped from the floor tiles — the cobble base is now
+    # CLEAN grey cobblestone, no green at all. (Earlier: dirt puddles were cut; now
+    # the moss field too.) Vegetation returns LATER as a deliberate decoration /
+    # composition LAYER on top of the ground, NOT baked into the tile.
+    #
+    # Everything else is preserved exactly: the loved cobble stone scale/shape/tone,
+    # the 6-variant non-repeating block scatter (painter side), no brown puddles,
+    # toroidal seamlessness, grey tone. `moss_amount` / `dirt_amount` are retained as
+    # inert CLI args for back-compat but no longer paint anything.
 
     return np.clip(img, 0, 255).astype(np.uint8)
 
@@ -361,12 +352,15 @@ def main():
     S = args.res
     print(f"[gen] generating {args.variants} seamless cobble variants @ {S}px ...")
     variants = []
+    # Per-variant MOSS amount spread so the 6-variant base set carries genuinely
+    # different moss density (some near-clean, some mossy) — this is the multi-variant
+    # repeat-breaker (Uma §3.4): the painter scatters these variants so adjacent yard
+    # blocks differ and no feature-cluster repeats. dirt is gone (Sponsor cut).
+    moss_spread = [0.55, 0.80, 1.0, 1.0, 1.25, 1.5]
     for i in range(args.variants):
-        # vary moss/dirt amount per variant => repeat-breaker accents
-        moss_a = 1.0 + (0.4 if i == args.variants - 1 else 0.0)   # last = heavy-moss accent
-        dirt_a = 1.0 + (0.5 if i == args.variants - 2 else 0.0)   # 2nd-last = dirt-through accent
+        moss_a = moss_spread[i % len(moss_spread)]
         t = make_cobble_tile(args.seed + i * 17, S=S, warm_bias=args.warm,
-                             lighten=args.lighten, moss_amount=moss_a, dirt_amount=dirt_a)
+                             lighten=args.lighten, moss_amount=moss_a, dirt_amount=0.0)
         variants.append(t)
         Image.fromarray(t).save(os.path.join(out, f"cobble{sfx}_v{i}_{S}.png"))
         print(f"  - cobble{sfx}_v{i}_{S}.png")

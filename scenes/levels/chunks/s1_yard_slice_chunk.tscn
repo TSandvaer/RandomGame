@@ -1,0 +1,128 @@
+[gd_scene load_steps=9 format=3 uid="uid://b0embergrave_s1yard_slice_chunk"]
+
+; S1 open cloister-YARD first-slice chunk (ticket 86ca5erzk, S1-YARD T4).
+; The first WALKABLE yard: an open cobble expanse (1280x768 — wider+taller than
+; the 480x270 viewport, so the camera scrolls in both axes) with cloister
+; buildings as solid landmark structures and the carried-forward props placed as
+; landmarks. The S1YardChunk painter paints the cobble floor + finer-brick
+; buildings + jittered grass at _ready; this .tscn declares the node skeleton +
+; the prop landmarks. Consumed by Main._load_s1_zone via the FloorAssembler path
+; (s1_z1_yard_slice ZoneDef), soak-gated behind ?s1_assembler=1.
+;
+; Z-order (html5-export.md §Z-index — floor z=0, structures/props z=+1, player
+; above): FloorTiles z=0; Buildings z=1; BuildingBodies (collision, invisible);
+; Decoration z=1; Props z=2 (read above buildings — braziers/pillars on faces).
+
+[ext_resource type="Script" path="res://scripts/levels/S1YardChunk.gd" id="1_yard"]
+[ext_resource type="TileSet" path="res://resources/tilesets/s1_cloister_yard.tres" id="2_yardset"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/pillar_arch.png" id="3_pillar"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/brazier_lit.png" id="4_brazier"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/banner_worn.png" id="5_banner"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/rubble_01.png" id="6_rubble"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/parchment_01.png" id="7_parchment"]
+
+[node name="S1YardSliceChunk" type="Node2D"]
+script = ExtResource("1_yard")
+
+[node name="FloorTiles" type="TileMapLayer" parent="."]
+texture_filter = 1
+tile_set = ExtResource("2_yardset")
+
+[node name="Buildings" type="TileMapLayer" parent="."]
+z_index = 1
+texture_filter = 1
+tile_set = ExtResource("2_yardset")
+
+[node name="BuildingBodies" type="Node2D" parent="."]
+
+[node name="Decoration" type="Node2D" parent="."]
+z_index = 1
+
+[node name="Props" type="Node2D" parent="."]
+z_index = 2
+
+; --- Carried-forward props as landmarks (s1-cloister-yard.md §4.1 + ticket
+; scale calibration: pillars 0.85 / braziers 0.65 / banners+rubble 0.70). Placed
+; at building faces + yard corners; open cobble lanes left clear for traversal. ---
+
+; Pillars fronting the central cloister building face (the colonnade edge).
+[node name="PillarCentralW" type="Sprite2D" parent="Props"]
+position = Vector2(568, 480)
+scale = Vector2(0.85, 0.85)
+texture = ExtResource("3_pillar")
+
+[node name="PillarCentralE" type="Sprite2D" parent="Props"]
+position = Vector2(776, 480)
+scale = Vector2(0.85, 0.85)
+texture = ExtResource("3_pillar")
+
+; Pillars fronting the north chapel range.
+[node name="PillarNorthW" type="Sprite2D" parent="Props"]
+position = Vector2(288, 104)
+scale = Vector2(0.85, 0.85)
+texture = ExtResource("3_pillar")
+
+[node name="PillarNorthE" type="Sprite2D" parent="Props"]
+position = Vector2(576, 104)
+scale = Vector2(0.85, 0.85)
+texture = ExtResource("3_pillar")
+
+; Lit braziers — warm guttering light pooling on cobble (atmosphere, §0.6 C).
+; Flank the central building + light the eastern descent approach.
+[node name="BrazierCentralW" type="Sprite2D" parent="Props"]
+position = Vector2(536, 416)
+scale = Vector2(0.65, 0.65)
+texture = ExtResource("4_brazier")
+
+[node name="BrazierCentralE" type="Sprite2D" parent="Props"]
+position = Vector2(808, 416)
+scale = Vector2(0.65, 0.65)
+texture = ExtResource("4_brazier")
+
+[node name="BrazierDescentN" type="Sprite2D" parent="Props"]
+position = Vector2(1168, 336)
+scale = Vector2(0.65, 0.65)
+texture = ExtResource("4_brazier")
+
+[node name="BrazierDescentS" type="Sprite2D" parent="Props"]
+position = Vector2(1168, 432)
+scale = Vector2(0.65, 0.65)
+texture = ExtResource("4_brazier")
+
+; Worn banners on building faces (faded-symbol mystery hook, §0.6 C).
+[node name="BannerCentral" type="Sprite2D" parent="Props"]
+position = Vector2(672, 360)
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("5_banner")
+
+[node name="BannerNorth" type="Sprite2D" parent="Props"]
+position = Vector2(432, 72)
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("5_banner")
+
+; Rubble pooled at building bases + the dormitory ruin (settle-decoration §5.2).
+[node name="RubbleDormW" type="Sprite2D" parent="Props"]
+position = Vector2(248, 712)
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("6_rubble")
+
+[node name="RubbleDormE" type="Sprite2D" parent="Props"]
+position = Vector2(520, 712)
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("6_rubble")
+
+[node name="RubbleCentral" type="Sprite2D" parent="Props"]
+position = Vector2(736, 472)
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("6_rubble")
+
+; Parchment scraps in yard corners (settle-decoration).
+[node name="ParchmentNW" type="Sprite2D" parent="Props"]
+position = Vector2(120, 200)
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("7_parchment")
+
+[node name="ParchmentSE" type="Sprite2D" parent="Props"]
+position = Vector2(1080, 600)
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("7_parchment")
