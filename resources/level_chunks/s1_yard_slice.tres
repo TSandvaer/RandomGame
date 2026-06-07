@@ -1,0 +1,64 @@
+[gd_resource type="Resource" script_class="LevelChunkDef" load_steps=8 format=3]
+
+; S1 open cloister-YARD first-slice chunk def (ticket 86ca5erzk, S1-YARD T4).
+; The first WALKABLE yard chunk, consumed by the FloorAssembler path
+; (s1_z1_yard_slice ZoneDef → Main._load_s1_zone, soak-gated ?s1_assembler=1).
+;
+; size_tiles = 40x24 @ 32px = 1280x768px — WIDER (1280 > 480) AND TALLER (768 >
+; 270) than the viewport, so the assembled bounding_box_px drives the camera to
+; scroll in BOTH axes (the "big + endless" read; s1-cloister-yard.md §2.1). The
+; assembler computes bounding_box_px from this size_tiles, so this MUST match the
+; S1YardChunk painter's grid_w/grid_h (40x24) — pinned by the GUT test.
+;
+; Ports: WEST entry (player spawn side) + EAST exit (toward the descent) on the
+; vertical centre row (y=12). The EAST exit lets T7 mate additional yard chunks
+; off this one toward "endless" (procgen-pipeline.md EAST/WEST mating); for THIS
+; single-anchor slice the EAST seam is open (no right neighbour) — clean mating.
+;
+; mob_spawns: a MODERATE cloister-penitent encounter (grunts) in the OPEN cobble
+; lanes (s1-cloister-yard.md §0.6 "combat density stays MODERATE" — the world is
+; alive with more than enemies). Tile coords chosen to sit in open ground, NOT on
+; a building footprint (north 8-19×0-2, south 6-19×21-23, central 18-23×9-13,
+; outbuilding 33-35×6-8) so every mob spawns on walkable cobble + can reach the
+; player (T6 navigability gate).
+
+[ext_resource type="Script" path="res://scripts/levels/LevelChunkDef.gd" id="1_chunk"]
+[ext_resource type="Script" path="res://scripts/levels/MobSpawnPoint.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://scripts/levels/ChunkPort.gd" id="3_port"]
+
+[sub_resource type="Resource" id="Resource_entry_port"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(0, 12)
+direction = 3
+tag = &"entry"
+
+[sub_resource type="Resource" id="Resource_exit_port"]
+script = ExtResource("3_port")
+position_tiles = Vector2i(39, 12)
+direction = 1
+tag = &"exit"
+
+[sub_resource type="Resource" id="Resource_spawn_grunt_w"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(12, 14)
+mob_id = &"grunt"
+
+[sub_resource type="Resource" id="Resource_spawn_grunt_c"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(26, 6)
+mob_id = &"grunt"
+
+[sub_resource type="Resource" id="Resource_spawn_grunt_e"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(30, 16)
+mob_id = &"grunt"
+
+[resource]
+script = ExtResource("1_chunk")
+id = &"s1_yard_slice"
+display_name = "Outer Cloister — Yard (first slice)"
+size_tiles = Vector2i(40, 24)
+tile_size_px = 32
+scene_path = "res://scenes/levels/chunks/s1_yard_slice_chunk.tscn"
+ports = [SubResource("Resource_entry_port"), SubResource("Resource_exit_port")]
+mob_spawns = [SubResource("Resource_spawn_grunt_w"), SubResource("Resource_spawn_grunt_c"), SubResource("Resource_spawn_grunt_e")]

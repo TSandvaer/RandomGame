@@ -1,0 +1,54 @@
+[gd_resource type="Resource" script_class="ZoneDef" load_steps=5 format=3]
+
+; S1 cloister-YARD first-slice ZoneDef (ticket 86ca5erzk, S1-YARD T4).
+; The first WALKABLE open-yard zone, assembled by FloorAssembler.assemble_floor
+; and rendered by Main._load_s1_zone (soak-gated ?s1_assembler=1). This is a
+; FOCUSED FIRST SLICE: ONE open-yard anchor chunk (s1_yard_slice, 40x24=1280x768)
+; whose bounding_box_px is wider+taller than the 480x270 viewport → the camera
+; scrolls in BOTH axes (the "big + endless" read; s1-cloister-yard.md §2.1).
+;
+; Anchors:
+;   1. entry → s1_yard_slice    (the big 40x24 open yard; player spawns WEST,
+;                                §2.2 spawn-vista; buildings + props + combat)
+;   2. exit  → s1_yard_descent  (the narrow 6x24 east descent-cap; mates WEST onto
+;                                the yard's EAST exit → ONE continuous expanse;
+;                                leads to s2_z1_entry_hall). A DISTINCT small chunk
+;                                (not a 2nd copy of the yard) so no landmarks stamp
+;                                twice — the soft scroll-horizon east terminus.
+;
+; max_slots_between_anchors = 0 → NO procedural fill (single-anchor-pair slice),
+; so procedural_slot_pool is intentionally empty (validate() only requires a pool
+; when max_slots > 0). Full multi-chunk endless extension is T7 — that ticket adds
+; the pool + chains additional yard chunks off this one's EAST exit port.
+;
+; The exit's target_zone_id = &"s2_z1_entry_hall" preserves the S1→S2 descent
+; (cross-zone mating, level-chunks.md § "Cross-zone transitions") so the slice
+; leads INTO the existing descent rather than dead-ending.
+
+[ext_resource type="Script" path="res://resources/level/ZoneDef.gd" id="1_zone"]
+[ext_resource type="Script" path="res://resources/level/ZoneAnchor.gd" id="2_anchor"]
+
+[sub_resource type="Resource" id="Resource_anchor_entry"]
+script = ExtResource("2_anchor")
+room_id = &"s1_yard_west_gate"
+chunk_id = &"s1_yard_slice"
+anchor_kind = &"entry"
+target_zone_id = &""
+
+[sub_resource type="Resource" id="Resource_anchor_exit"]
+script = ExtResource("2_anchor")
+room_id = &"s1_yard_descent"
+chunk_id = &"s1_yard_descent"
+anchor_kind = &"exit"
+target_zone_id = &"s2_z1_entry_hall"
+
+[resource]
+script = ExtResource("1_zone")
+zone_id = &"s1_z1_yard_slice"
+display_name = "Outer Cloister Yard"
+stratum_id = 1
+anchors = [SubResource("Resource_anchor_entry"), SubResource("Resource_anchor_exit")]
+procedural_slot_pool = []
+min_slots_between_anchors = 0
+max_slots_between_anchors = 0
+port_mating_rules = {}

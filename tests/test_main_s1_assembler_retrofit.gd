@@ -106,13 +106,18 @@ func test_s1_render_engages_camera_for_assembled_floor() -> void:
 	assert_gt(helper.find("set_world_bounds"), 0, "must call set_world_bounds")
 
 
-## The S1 zone def path resolves the single authored S1 ZoneDef constant.
+## The S1 zone def path resolves the soak-target S1 ZoneDef constant. Updated by
+## S1-YARD T4 (ticket 86ca5erzk): the ?s1_assembler=1 soak zone is now the open
+## cloister-YARD first slice (`s1_z1_yard_slice` — the big walkable open expanse)
+## rather than the narrative-arc `s1_z1_outer_cloister` zone (retained for T7's
+## full-extension work). The retrofit wiring (camera-bounds swap, mob spawn, clean
+## render) is zone-agnostic — the behavioural tests below still hold for the yard.
 func test_s1_zone_id_constant_matches_authored_zone() -> void:
 	var src: String = _read_source(MAIN_SOURCE_PATH)
 	assert_gt(
-		src.find('S1_ZONE_ID: StringName = &"s1_z1_outer_cloister"'),
+		src.find('S1_ZONE_ID: StringName = &"s1_z1_yard_slice"'),
 		0,
-		"S1_ZONE_ID must be the authored s1_z1_outer_cloister zone"
+		"S1_ZONE_ID must be the S1-YARD soak zone s1_z1_yard_slice"
 	)
 
 
@@ -148,9 +153,9 @@ func test_load_s1_zone_renders_assembled_floor_clean() -> void:
 	await get_tree().process_frame
 
 	assert_true(main.is_s1_floor_active(), "load_s1_zone_for_test must activate the S1 floor")
-	# The authored s1_z1_outer_cloister chunks all carry mob_spawns, so a
-	# non-degenerate assemble spawns mobs. A zero count would mean the chunk
-	# mob_spawns silently failed to resolve through Main.
+	# The yard-slice chunk carries 3 grunt mob_spawns, so a non-degenerate
+	# assemble spawns mobs. A zero count would mean the chunk mob_spawns silently
+	# failed to resolve through Main.
 	assert_gt(
 		main.s1_mobs_remaining(),
 		0,
@@ -185,9 +190,9 @@ func test_load_s1_zone_sets_camera_bounds_from_assembled_floor() -> void:
 	await get_tree().process_frame
 
 	var bounds: Rect2 = cd.get_world_bounds()
-	# The s1_z1_outer_cloister floor is ≥9 chunks × 480 px each → well over the
-	# 480-px viewport. The bounds MUST be wider than the hardcoded S1_ROOM_BOUNDS
-	# (480) — that wider-than-viewport bounds is what makes the camera scroll.
+	# The yard-slice floor is 1280 (yard) + 192 (descent) = 1472 px wide → well
+	# over the 480-px viewport. The bounds MUST be wider than the hardcoded
+	# S1_ROOM_BOUNDS (480) — that wider-than-viewport bounds is what scrolls.
 	assert_gt(
 		bounds.size.x,
 		main.S1_ROOM_BOUNDS.size.x,
