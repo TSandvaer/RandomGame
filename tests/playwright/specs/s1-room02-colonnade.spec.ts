@@ -5,8 +5,10 @@
  *
  * Boots into widened Room 02 (`?start_room=1`) — the proof room reworked by
  * this PR — and verifies the HTML5 / gl_compatibility render path for:
- *   1. Build boots cleanly into Room 02 (the reworked chunk + 4×4 atlas-window
- *      floor painter + 14 new solid-prop StaticBody2D nodes load without error).
+ *   1. Build boots cleanly into Room 02 (the reworked chunk + per-source
+ *      atlas-window floor painter — floor period-2 / 64px, wall period-4 / 128px,
+ *      ticket 86ca44p4j stone-pitch shrink — + solid-prop StaticBody2D nodes
+ *      load without error).
  *   2. [BuildInfo] SHA present (7 hex chars, not dev-local).
  *   3. Room 02 actually loaded + mobs are ticking — first `Grunt.pos` trace line
  *      is the Room-02 load sentinel (no [Main] _load_room_at_index line exists;

@@ -90,98 +90,90 @@ position = Vector2(944, 128)
 [node name="CollisionShape2D" type="CollisionShape2D" parent="WallEast"]
 shape = SubResource("RectangleShape2D_wall_v")
 
-[node name="FloorWallSeam" type="Node2D" parent="."]
-z_index = 1
-
-[node name="SeamTop" type="ColorRect" parent="FloorWallSeam"]
-offset_left = 32.0
-offset_top = 32.0
-offset_right = 928.0
-offset_bottom = 34.0
-color = Color(0.102, 0.071, 0.063, 0.85)
-
-[node name="SeamBottom" type="ColorRect" parent="FloorWallSeam"]
-offset_left = 32.0
-offset_top = 222.0
-offset_right = 928.0
-offset_bottom = 224.0
-color = Color(0.102, 0.071, 0.063, 0.85)
-
-[node name="SeamLeft" type="ColorRect" parent="FloorWallSeam"]
-offset_left = 32.0
-offset_top = 32.0
-offset_right = 34.0
-offset_bottom = 224.0
-color = Color(0.102, 0.071, 0.063, 0.85)
-
-[node name="SeamRight" type="ColorRect" parent="FloorWallSeam"]
-offset_left = 926.0
-offset_top = 32.0
-offset_right = 928.0
-offset_bottom = 224.0
-color = Color(0.102, 0.071, 0.063, 0.85)
+; FloorWallSeam REMOVED (ticket 86ca44p4j, Sponsor f0a8fc8 soak: "some of the old
+; ugly objects were still in Room 2"). These were four thin translucent-dark
+; ColorRect primitives faking a floor-wall boundary line — at game zoom they read
+; as the "grey translucent rectangles on the mid-left floor edge" Sponsor flagged.
+; Redundant: the tiled wall band already provides the floor-wall boundary. Removed
+; rather than restyled — a primitive ColorRect seam has no place against crafted
+; tiles (VD-13: no fake grid/outline lines).
 
 [node name="Props" type="Node2D" parent="."]
 z_index = 1
 
 [node name="PillarN1" type="Sprite2D" parent="Props"]
 position = Vector2(200, 64)
+scale = Vector2(0.85, 0.85)
 texture = ExtResource("7_pillar")
 
 [node name="PillarN2" type="Sprite2D" parent="Props"]
 position = Vector2(420, 64)
+scale = Vector2(0.85, 0.85)
 texture = ExtResource("7_pillar")
 
 [node name="PillarN3" type="Sprite2D" parent="Props"]
 position = Vector2(640, 64)
+scale = Vector2(0.85, 0.85)
 texture = ExtResource("7_pillar")
 
 [node name="PillarN4" type="Sprite2D" parent="Props"]
 position = Vector2(860, 64)
+scale = Vector2(0.85, 0.85)
 texture = ExtResource("7_pillar")
 
 [node name="PillarS1" type="Sprite2D" parent="Props"]
 position = Vector2(200, 208)
+scale = Vector2(0.85, 0.85)
 texture = ExtResource("7_pillar")
 
 [node name="PillarS2" type="Sprite2D" parent="Props"]
 position = Vector2(420, 208)
+scale = Vector2(0.85, 0.85)
 texture = ExtResource("7_pillar")
 
 [node name="PillarS3" type="Sprite2D" parent="Props"]
 position = Vector2(640, 208)
+scale = Vector2(0.85, 0.85)
 texture = ExtResource("7_pillar")
 
 [node name="PillarS4" type="Sprite2D" parent="Props"]
 position = Vector2(860, 208)
+scale = Vector2(0.85, 0.85)
 texture = ExtResource("7_pillar")
 
 [node name="BrazierLitN1" type="Sprite2D" parent="Props"]
 position = Vector2(310, 28)
+scale = Vector2(0.65, 0.65)
 texture = ExtResource("3_brazier_lit")
 
 [node name="BrazierLitN2" type="Sprite2D" parent="Props"]
 position = Vector2(530, 28)
+scale = Vector2(0.65, 0.65)
 texture = ExtResource("3_brazier_lit")
 
 [node name="BrazierLitN3" type="Sprite2D" parent="Props"]
 position = Vector2(750, 28)
+scale = Vector2(0.65, 0.65)
 texture = ExtResource("3_brazier_lit")
 
 [node name="BrazierColdS1" type="Sprite2D" parent="Props"]
 position = Vector2(530, 228)
+scale = Vector2(0.65, 0.65)
 texture = ExtResource("8_brazier_cold")
 
 [node name="BannerN1" type="Sprite2D" parent="Props"]
 position = Vector2(420, 44)
+scale = Vector2(0.7, 0.7)
 texture = ExtResource("9_banner")
 
 [node name="BannerN2" type="Sprite2D" parent="Props"]
 position = Vector2(640, 44)
+scale = Vector2(0.7, 0.7)
 texture = ExtResource("9_banner")
 
 [node name="RubbleLargeNECorner" type="Sprite2D" parent="Props"]
 position = Vector2(888, 72)
+scale = Vector2(0.7, 0.7)
 texture = ExtResource("6_rubble")
 
 ; Relocated to the NW corner (above the aisle), OFF the player's Y≈200 walk lane
@@ -197,30 +189,37 @@ texture = ExtResource("6_rubble")
 ; the camera-scroll east walk. Footprint unchanged (24×20, at base).
 [node name="RubbleLargeSWCorner" type="Sprite2D" parent="Props"]
 position = Vector2(72, 72)
+scale = Vector2(0.7, 0.7)
 texture = ExtResource("6_rubble")
 
 [node name="RubbleSmallSECorner" type="Sprite2D" parent="Props"]
 position = Vector2(888, 200)
+scale = Vector2(0.7, 0.7)
 texture = ExtResource("6_rubble")
 
 [node name="ParchmentNW" type="Sprite2D" parent="Props"]
 position = Vector2(72, 56)
+scale = Vector2(0.65, 0.65)
 texture = ExtResource("5_parchment")
 
 [node name="ParchmentSW" type="Sprite2D" parent="Props"]
 position = Vector2(120, 200)
+scale = Vector2(0.65, 0.65)
 texture = ExtResource("5_parchment")
 
 [node name="MossSWBase" type="Sprite2D" parent="Props"]
 position = Vector2(264, 208)
+scale = Vector2(0.65, 0.65)
 texture = ExtResource("4_moss")
 
 [node name="MossSEBase" type="Sprite2D" parent="Props"]
 position = Vector2(696, 208)
+scale = Vector2(0.65, 0.65)
 texture = ExtResource("4_moss")
 
 [node name="MossSouthMid" type="Sprite2D" parent="Props"]
 position = Vector2(888, 208)
+scale = Vector2(0.65, 0.65)
 texture = ExtResource("4_moss")
 
 [node name="SolidProps" type="Node2D" parent="."]

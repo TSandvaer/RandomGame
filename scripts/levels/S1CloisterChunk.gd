@@ -35,19 +35,29 @@ const SOURCE_WALL: int = 1
 # below, not this single cell.
 const ATLAS_BASE: Vector2i = Vector2i(0, 0)
 
-## The floor/wall PNGs are each a 128×128 = 4×4 atlas of 32-px sub-tiles that,
-## stitched in their source grid order, form ONE crafted 128-px image (stones
-## flow across the whole block — see the target mock
-## `_tile_judge/ai_floor/FINAL_aiwarm_room3x.png`). The pre-rework painter
-## stamped only `ATLAS_BASE` (cell 0:0) into every cell → it repeated ONE 32-px
-## sub-tile = the "wallpaper at 32px" failure Sponsor rejected on PR #407.
+## The wall PNG is a 128×128 = 4×4 atlas of 32-px sub-tiles that, stitched in
+## source grid order, form ONE crafted 128-px image (running-bond ashlar flows
+## across the whole block). The floor PNG was the same 128×128 4×4 — but Sponsor
+## feel-rejected f0a8fc8 ("the tiles should be much much much smaller": ~8
+## flagstones spanned the whole hall at 2.667× camera zoom). Ticket 86ca44p4j
+## shrinks the FLOOR stone pitch 2×: the crafted 128-px block was downsampled to
+## 64×64 (a 2×2 = 4-sub-tile atlas), so each 32-px game cell now shows ~2× finer
+## flagstones and the block tiles at a 2-tile (64-px) period instead of 4-tile.
+## The wall is UNCHANGED (4×4 / 128-px / period-4) — the reject was floor-only
+## and the running-bond ashlar reads correct at game zoom (no scope creep).
 ##
-## The fix: paint each cell from its position WITHIN the 4×4 source window,
-## `Vector2i(tx % ATLAS_PERIOD, ty % ATLAS_PERIOD)`, so the full 128-px AI image
-## tiles with a gentle 4-tile (128-px) period — stones read continuous within
-## each block, the only repeat is the soft 4-tile block seam. Both the floor
-## and wall sources declare all 16 cells (0:0 … 3:3) so every coord resolves.
+## The painter paints each cell from its position WITHIN the source window,
+## `Vector2i(tx % period, ty % period)`, so the full AI image tiles with a
+## gentle period — stones read continuous within each block, the only repeat is
+## the soft block seam (which the crafted source tiles seamlessly across, so no
+## dark grid line). This is the PR #407 wallpaper-grid avoidance; verified
+## intact at the smaller 2× floor scale (see PR #417 Self-Test Report).
+##
+## Per-source period: the floor (64-px / 2×2) tiles at 2; the wall (128-px /
+## 4×4) tiles at 4.
 const ATLAS_PERIOD: int = 4
+const FLOOR_ATLAS_PERIOD: int = 2
+const WALL_ATLAS_PERIOD: int = 4
 
 ## Grid width/height in tiles. Default = the M1 single-screen 15×8. The
 ## widened proof chunk overrides `grid_w` to 30. Painting derives entirely
@@ -73,12 +83,13 @@ func _paint() -> void:
 		for tx in range(grid_w):
 			var is_perimeter: bool = tx == 0 or tx == grid_w - 1 or ty == 0 or ty == grid_h - 1
 			var source_id: int = SOURCE_WALL if is_perimeter else SOURCE_FLOOR
-			# Paint from the cell's position within the 4×4 source window so the
-			# full 128-px crafted image tiles (4-tile period), NOT a single
-			# repeated 32-px sub-tile (the PR #407 wallpaper failure). The atlas
-			# window is anchored to the WORLD tile coord (tx,ty) — not a
-			# per-region offset — so the floor and wall windows stay phase-locked
-			# to the room grid and the 128-px blocks line up consistently across
-			# the wider proof room.
-			var atlas: Vector2i = Vector2i(tx % ATLAS_PERIOD, ty % ATLAS_PERIOD)
+			# Paint from the cell's position within the source window so the full
+			# crafted image tiles at its period, NOT a single repeated 32-px
+			# sub-tile (the PR #407 wallpaper failure). The atlas window is
+			# anchored to the WORLD tile coord (tx,ty) — not a per-region offset —
+			# so the windows stay phase-locked to the room grid and the blocks
+			# line up consistently across the wider proof room. Per-source period:
+			# floor tiles at 2 (64-px 2×2), wall at 4 (128-px 4×4) — see header.
+			var period: int = WALL_ATLAS_PERIOD if is_perimeter else FLOOR_ATLAS_PERIOD
+			var atlas: Vector2i = Vector2i(tx % period, ty % period)
 			_floor_tiles.set_cell(Vector2i(tx, ty), source_id, atlas)
