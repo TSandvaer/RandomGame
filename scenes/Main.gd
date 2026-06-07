@@ -127,6 +127,44 @@ const S2_ZONE_DEF_PATH_FMT: String = "res://resources/level/zones/%s.tres"
 ## Stratum index passed to FloorAssembler.derive_stratum_seed for S2 zones.
 const S2_STRATUM_ID: int = 2
 
+## S1 assembler retrofit (S1 cloister-yard keystone). The single authored S1
+## ZoneDef covering the full Stratum-1 narrative arc (9 anchors, all hand-pinned
+## per SI-8 (b); see `resources/level/zones/s1_z1_outer_cloister.tres`). When the
+## `?s1_assembler=1` soak flag is set (DebugFlags), Main boots THIS zone through
+## `FloorAssembler.assemble_floor(...)` instead of the static `ROOM_SCENE_PATHS`
+## Room01 load — the S2-style production consumer path, finally wired into S1.
+##
+## **Why a soak-gated path, not a hard swap (foundation scope).** A hard swap off
+## `ROOM_SCENE_PATHS` would break the Room01 onboarding pickup gate, the RoomGate
+## room-clear chain, the boss-room reachability wiring, and the ~dozens of
+## Playwright specs that drive the 8-room traversal. The keystone deliverable is
+## that the assembler-driven S1 path EXISTS, boots cleanly, feeds
+## `bounding_box_px` to the camera, and is provably correct — mirroring how S2
+## traversal (PR #391) was ADDED as a new path rather than by deleting room loads.
+## Full multi-chunk YARD content authoring + cut-over of the default boot is the
+## downstream Drew ticket. Default off → production play is byte-identical today.
+const S1_ZONE_ID: StringName = &"s1_z1_outer_cloister"
+
+## Stratum index passed to FloorAssembler.derive_stratum_seed for S1 zones.
+const S1_STRATUM_ID: int = 1
+
+## Mob ids that an assembled chunk may declare in `mob_spawns` but that are
+## NOT registered in `MobRegistry` BY DESIGN — the assembled-floor spawner skips
+## them silently (no WarningBus warning) so the universal-warning gate still
+## catches a GENUINE unknown-id content regression while not flagging these
+## known-intentional gaps.
+##
+## `practice_dummy` is the onboarding tutorial dummy: it lives on the authored
+## `Stratum1Room01._spawn_mob` surface with custom iron_sword-drop wiring (see
+## combat-architecture.md § "MobRegistry" — Stratum1Room01 is deliberately NOT
+## registry-driven; there is no `practice_dummy` MobDef). When S1 boots through
+## the assembler, the `s1_room01` chunk still declares a `practice_dummy` spawn;
+## the assembler floor is a TRAVERSAL surface, not the onboarding surface, so the
+## dummy is intentionally not spawned here. This is one of the OOS gaps carried
+## forward consciously for the keystone (the onboarding-via-assembler path is a
+## downstream concern — the static-room boot remains the onboarding surface).
+const ASSEMBLED_FLOOR_INTENTIONAL_SKIP_MOB_IDS: Array[StringName] = [&"practice_dummy"]
+
 ## Fallback world-bounds for an S2 assembled floor whose bounding box is
 ## degenerate (zero-size). Mirrors the S1_ROOM_BOUNDS viewport-native shape;
 ## the live floor normally drives bounds from `assembled.bounding_box_px`.
@@ -277,6 +315,26 @@ var _s2_chunks_remaining: int = 0
 var _s2_mobs_remaining: int = 0
 var _s2_mobs: Array[Node] = []
 
+## S1 assembler-retrofit floor state (S1 cloister-yard keystone). Parallel to the
+## S2 floor state above but for the Stratum-1 assembler path (soak-gated on
+## `DebugFlags.s1_assembler`). `_s1_floor_active` is the single source of truth
+## for "Main is currently rendering the assembler-driven S1 floor" — when true,
+## the static-room `_load_room_at_index` path is not the active S1 surface.
+## `_s1_floor_container` holds the instantiated chunk geometry + spawned mobs (a
+## Node2D under `_world`); `_s1_mobs` / `_s1_mobs_remaining` track live mobs for
+## XP/loot wiring + a future chunk-clear gate. NOTE: unlike S2 there is no
+## multi-zone advance — S1 is a single zone (one assembled floor); the
+## "remaining" counter exists for parity + the forward-compat clear gate, NOT to
+## drive zone progression. Carries the same two S2 OOS gaps forward consciously:
+## (1) no progression gate is wired off this counter yet (single-floor S1 has
+## nothing to advance TO within the zone), (2) the assembled floor renders chunk
+## geometry shells (the placeholder s1_room01_chunk.tscn) — full multi-chunk YARD
+## content is the downstream Drew authoring ticket.
+var _s1_floor_active: bool = false
+var _s1_floor_container: Node2D = null
+var _s1_mobs_remaining: int = 0
+var _s1_mobs: Array[Node] = []
+
 ## Room01 onboarding gate (ticket 86c9qbb3k). When the Room01 PracticeDummy
 ## dies it drops an iron_sword Pickup; the room advance to Room02 must WAIT
 ## until the player walks onto that Pickup and auto-equips it — otherwise the
@@ -406,6 +464,17 @@ func _ready() -> void:
 		if target >= 0 and target != 0:
 			print("[Main] DebugFlags.start_room=%d — bypassing Room 01 traversal" % target)
 			_load_room_at_index(target)
+	# DebugFlags.s1_assembler soak utility (S1 cloister-yard keystone retrofit,
+	# ticket 86ca5errv). When `?s1_assembler=1` is set on the HTML5 URL, boot the
+	# Stratum-1 floor through the FloorAssembler path (`_load_s1_zone`) INSTEAD of
+	# the static Room01 traversal — the S2-style production consumer, finally wired
+	# into S1. The static Room01 load above still happens first (so autoloads /
+	# signals wire identically); this replaces the active S1 surface with the
+	# assembled floor. Default off → production play stays on the static rooms.
+	# Same HTML5-only soak shape as start_room / force_descend.
+	if df != null and bool(df.get("s1_assembler")):
+		print("[Main] DebugFlags.s1_assembler=true — booting S1 via FloorAssembler")
+		_load_s1_zone(S1_ZONE_ID)
 	# DebugFlags.force_descend URL-param soak utility (W2-T5 fix ticket
 	# `86c9y10fv`, 2026-05-24). When `?force_descend=1` is set on the HTML5
 	# URL, open the DescendScreen immediately AFTER the normal Room 01 boot.
@@ -620,6 +689,32 @@ func get_s2_mobs() -> Array[Node]:
 ## in an S2 procgen floor.
 func s2_mobs_remaining() -> int:
 	return _s2_mobs_remaining
+
+
+## Test/dispatch entry-point — boot the S1 floor through the FloorAssembler path
+## (the keystone retrofit). Production fires this from `_ready` when the
+## `?s1_assembler=1` soak flag is set; tests + future callers drive it directly
+## to exercise the assembler-driven S1 surface without the URL param.
+func load_s1_zone_for_test(zone_id: StringName = S1_ZONE_ID) -> void:
+	_load_s1_zone(zone_id)
+
+
+## True when Main is currently rendering the assembler-driven S1 floor (vs the
+## static `ROOM_SCENE_PATHS` rooms). Tests pin the retrofit path is reachable.
+func is_s1_floor_active() -> bool:
+	return _s1_floor_active
+
+
+## The live mobs spawned from the current S1 assembled floor's chunk `mob_spawns`.
+## Empty when the assembler-driven S1 floor is not active.
+func get_s1_mobs() -> Array[Node]:
+	return _s1_mobs
+
+
+## Count of live S1 mobs spawned from the current assembled floor. 0 when the
+## assembler-driven S1 floor is not active.
+func s1_mobs_remaining() -> int:
+	return _s1_mobs_remaining
 
 
 ## Snapshot all autoload state into a payload + persist via Save autoload.
@@ -1748,9 +1843,9 @@ func _render_assembled_floor(assembled: AssembledFloor) -> void:
 		_world.add_child(_s2_floor_container)
 	else:
 		add_child(_s2_floor_container)
-	var live_chunks: Array[Node] = _instantiate_chunks(assembled)
+	var live_chunks: Array[Node] = _instantiate_chunks(assembled, _s2_floor_container)
 	_s2_chunks_remaining = live_chunks.size()
-	_s2_mobs = _spawn_assembled_floor_mobs(assembled)
+	_s2_mobs = _spawn_assembled_floor_mobs(assembled, _s2_floor_container, _on_s2_mob_died)
 	_s2_mobs_remaining = _s2_mobs.size()
 	_reparent_player_into(_s2_floor_container, _s2_floor_spawn(assembled))
 	_engage_camera_for_assembled_floor(assembled)
@@ -1768,7 +1863,7 @@ func _render_assembled_floor(assembled: AssembledFloor) -> void:
 ## chunks whose `scene_path` is empty (defensive — S2 chunks have geometry, but
 ## a future zone could reference a geometry-less chunk) and chunks whose scene
 ## fails to load (warned via WarningBus).
-func _instantiate_chunks(assembled: AssembledFloor) -> Array[Node]:
+func _instantiate_chunks(assembled: AssembledFloor, container: Node) -> Array[Node]:
 	var live: Array[Node] = []
 	for placed: PlacedChunk in assembled.placed_chunks:
 		var chunk_def: LevelChunkDef = _resolve_chunk_def(placed.chunk_id)
@@ -1777,13 +1872,13 @@ func _instantiate_chunks(assembled: AssembledFloor) -> Array[Node]:
 		var packed: PackedScene = load(chunk_def.scene_path) as PackedScene
 		if packed == null:
 			WarningBus.warn(
-				"[Main] S2 chunk scene failed to load: %s" % chunk_def.scene_path, &"level"
+				"[Main] assembled chunk scene failed to load: %s" % chunk_def.scene_path, &"level"
 			)
 			continue
 		var inst: Node = packed.instantiate()
 		if inst is Node2D:
 			(inst as Node2D).position = placed.position_px
-		_s2_floor_container.add_child(inst)
+		container.add_child(inst)
 		live.append(inst)
 	return live
 
@@ -1800,35 +1895,67 @@ func _instantiate_chunks(assembled: AssembledFloor) -> Array[Node]:
 ## warning gate catches a content regression. Returns the live mob nodes for
 ## the caller to track (`_s2_mobs_remaining`) — the chunk-clear zone-advance
 ## gate (sibling ticket `86ca3amyb`) consumes that count later.
-func _spawn_assembled_floor_mobs(assembled: AssembledFloor) -> Array[Node]:
+func _spawn_assembled_floor_mobs(
+	assembled: AssembledFloor, container: Node, died_handler: Callable, wire_combat: bool = false
+) -> Array[Node]:
 	var live: Array[Node] = []
 	var registry: Node = _mob_registry()
 	if registry == null:
-		WarningBus.warn("[Main] S2 mob spawn: MobRegistry autoload unavailable", &"level")
+		WarningBus.warn(
+			"[Main] assembled-floor mob spawn: MobRegistry autoload unavailable", &"level"
+		)
 		return live
 	for placed: PlacedChunk in assembled.placed_chunks:
 		var chunk_def: LevelChunkDef = _resolve_chunk_def(placed.chunk_id)
 		if chunk_def == null:
 			continue
 		for spawn: MobSpawnPoint in chunk_def.mob_spawns:
-			var mob: Node = _spawn_one_chunk_mob(registry, chunk_def, placed, spawn)
-			if mob != null:
-				live.append(mob)
+			var mob: Node = _spawn_one_chunk_mob(registry, chunk_def, placed, spawn, container)
+			if mob == null:
+				continue
+			# Optional combat pipeline (XP + loot + player-target) — S1 enables it
+			# so assembled-floor mobs behave like authored-room mobs; S2 leaves it
+			# off (preserves the #391/#392 behaviour where chunk mobs were
+			# counter-only). `_wire_mob` connects `mob_died`→`_on_mob_died` (XP/loot).
+			if wire_combat:
+				_wire_mob(mob)
+			# Chunk-clear gate counter (ticket `86ca3amyb` precedent). CONNECT_DEFERRED
+			# so the decrement queues to end-of-frame rather than running inside the
+			# synchronous `_die → mob_died.emit` chain (rooted in a physics-flush
+			# Hitbox.body_entered callback) — mirrors RoomGate.register_mob exactly
+			# (combat-architecture.md § "RoomGate uses CONNECT_DEFERRED"). A
+			# synchronous connect could lose a decrement under physics-flush re-entry
+			# and soft-lock the floor.
+			if mob.has_signal("mob_died"):
+				mob.mob_died.connect(died_handler, CONNECT_DEFERRED)
+			live.append(mob)
 	return live
 
 
-## Resolve + instantiate a single `MobSpawnPoint`. Returns the live mob node, or
-## null (warned + skipped) on an unknown / unloadable mob_id. Mirrors
-## `MobRegistry.spawn`'s scene-instantiate + mob_def-apply shape but parents
-## under the S2 floor container and positions from the chunk-relative tile
-## offset.
+## Resolve + instantiate a single `MobSpawnPoint` into `container`. Returns the
+## live mob node, or null (warned + skipped) on an unknown / unloadable mob_id.
+## Mirrors `MobRegistry.spawn`'s scene-instantiate + mob_def-apply shape but
+## parents under the given floor container and positions from the chunk-relative
+## tile offset. Signal wiring (clear-gate counter + optional combat pipeline) is
+## the CALLER's responsibility (`_spawn_assembled_floor_mobs`) so this helper
+## stays a pure instantiate+place primitive shared by the S1 + S2 paths.
 func _spawn_one_chunk_mob(
-	registry: Node, chunk_def: LevelChunkDef, placed: PlacedChunk, spawn: MobSpawnPoint
+	registry: Node,
+	chunk_def: LevelChunkDef,
+	placed: PlacedChunk,
+	spawn: MobSpawnPoint,
+	container: Node
 ) -> Node:
 	if not registry.has_mob(spawn.mob_id):
+		# Known-intentional skip (e.g. the onboarding practice_dummy) — silent, so
+		# the universal-warning gate still catches GENUINE unknown-id regressions
+		# while not flagging the documented OOS gaps (see
+		# ASSEMBLED_FLOOR_INTENTIONAL_SKIP_MOB_IDS).
+		if ASSEMBLED_FLOOR_INTENTIONAL_SKIP_MOB_IDS.has(spawn.mob_id):
+			return null
 		WarningBus.warn(
 			(
-				"[Main] S2 mob spawn: unknown mob_id '%s' in chunk '%s' -- skipped"
+				"[Main] assembled-floor mob spawn: unknown mob_id '%s' in chunk '%s' -- skipped"
 				% [String(spawn.mob_id), String(chunk_def.id)]
 			),
 			&"level"
@@ -1849,19 +1976,7 @@ func _spawn_one_chunk_mob(
 	if node is Node2D:
 		var local_px := Vector2(spawn.position_tiles * chunk_def.tile_size_px)
 		(node as Node2D).position = placed.position_px + local_px
-	_s2_floor_container.add_child(node)
-	# Wire the chunk-clear gate (ticket `86ca3amyb`). Every S2 spawn mob exposes
-	# `mob_died(mob, pos, def)` (Grunt / Charger / Shooter / SunkenScholar / etc.).
-	# We connect with CONNECT_DEFERRED so the `_s2_mobs_remaining` decrement is
-	# queued to end-of-frame rather than running inside the synchronous
-	# `_die → mob_died.emit` chain (which is rooted in a Hitbox.body_entered
-	# physics-flush callback). This mirrors RoomGate.register_mob exactly
-	# (ticket 86c9qcf9z — see combat-architecture.md § "RoomGate uses
-	# CONNECT_DEFERRED"). A synchronous connect would race the decrement against
-	# other physics-flush mutations and could lose a decrement, leaving the gate
-	# stuck > 0 and soft-locking the zone.
-	if node.has_signal("mob_died"):
-		node.mob_died.connect(_on_s2_mob_died, CONNECT_DEFERRED)
+	container.add_child(node)
 	return node
 
 
@@ -1975,6 +2090,133 @@ func _teardown_s2_floor() -> void:
 	_s2_chunks_remaining = 0
 	_s2_mobs_remaining = 0
 	_s2_mobs = []
+
+
+# ---- S1 assembler retrofit (keystone, ticket 86ca5errv) --------------
+#
+# The Stratum-1 cloister-yard keystone: S1's live play loop, wired onto the
+# SAME FloorAssembler → AssembledFloor → render → camera chain S2 uses
+# (`_load_s2_zone` / `_render_assembled_floor`). Soak-gated behind
+# `DebugFlags.s1_assembler` so the default 8-room traversal (onboarding gate,
+# RoomGate clears, boss reachability, the Playwright suite) is undisturbed.
+# This is the foundation the "big + endless" S1 cloister-yard direction needs —
+# it makes the assembler/continuous-scroll path an architectural property of S1.
+
+
+## Assemble the S1 zone via FloorAssembler and render it into the world — the
+## production consumer the W2-T3 data layer authored but never wired into Main
+## (the `product-vs-component-completeness` gap Priya's scope flagged). Derives
+## the seed via the standard cascade (`derive_stratum_seed` → `derive_zone_seed`)
+## off `_resolve_s1_world_seed()`, exactly like `_load_s2_zone`.
+func _load_s1_zone(zone_id: StringName) -> void:
+	var zone_path: String = S2_ZONE_DEF_PATH_FMT % String(zone_id)
+	var zone_def: ZoneDef = load(zone_path) as ZoneDef
+	if zone_def == null:
+		WarningBus.warn("[Main] S1 zone def failed to load: %s" % zone_path, &"level")
+		return
+	var world_seed: int = _resolve_s1_world_seed()
+	var stratum_seed: int = FloorAssembler.derive_stratum_seed(world_seed, S1_STRATUM_ID)
+	var zone_seed: int = FloorAssembler.derive_zone_seed(stratum_seed, zone_def.zone_id)
+	var assembler: FloorAssembler = FloorAssembler.new()
+	var assembled: AssembledFloor = assembler.assemble_floor(zone_def, zone_seed)
+	# A non-empty port_mating_errors list means a chunk seam failed to mate. The
+	# authored s1_z1_outer_cloister assembles cleanly across seeds (pinned by
+	# test_floor_assembler.gd::test_s1_z1_clean_mating_across_8_seeds), so a
+	# non-empty list here is a content regression — surface it via WarningBus (the
+	# universal warning gate) but still render (R-PROCGEN.b record-not-raise).
+	if not assembled.is_well_mated():
+		WarningBus.warn(
+			(
+				"[Main] S1 assembled floor has %d port-mating error(s): %s"
+				% [assembled.port_mating_errors.size(), str(assembled.port_mating_errors)]
+			),
+			&"level"
+		)
+	_render_assembled_s1_floor(assembled)
+	_record_discovered_zone(zone_def.zone_id)
+	_combat_trace_main(
+		"Main.load_s1_zone",
+		(
+			"zone_id=%s seed=%d chunks=%d mobs=%d bounds=%s"
+			% [
+				String(zone_def.zone_id),
+				zone_seed,
+				assembled.chunk_count(),
+				_s1_mobs_remaining,
+				str(assembled.bounding_box_px),
+			]
+		)
+	)
+	_persist_to_save()
+
+
+## Resolve the per-character world seed S1 zone seeds derive from. Mirrors
+## `_resolve_s2_world_seed` exactly — reads `Save.get_world_seed()` if present,
+## else a fixed deterministic 0 (no `world_seed` save surface ships yet;
+## Commitment 5 — randomized maps per character — is unimplemented). One-line
+## swap when that lands; every other S1 seam already keys off the derived seed.
+func _resolve_s1_world_seed() -> int:
+	var save: Node = _save()
+	if save != null and save.has_method("get_world_seed"):
+		return int(save.get_world_seed())
+	return 0
+
+
+## Render the assembled S1 floor: tear down whatever S1 surface is active (the
+## static room OR a prior S1 floor), instantiate the chunk geometry + spawn chunk
+## mobs into a fresh container, re-parent the player to the floor spawn, and
+## engage the continuous-scroll camera against `bounding_box_px` (replacing the
+## hardcoded S1_ROOM_BOUNDS — the keystone camera swap). Not inside a physics
+## flush (reached from `_ready` boot or `load_s1_zone_for_test`), so the
+## synchronous CharacterBody2D chunk-mob adds are safe — same justification as
+## `_render_assembled_floor` (S2) + `Stratum1BossRoom._spawn_boss`.
+func _render_assembled_s1_floor(assembled: AssembledFloor) -> void:
+	_teardown_active_room_for_s2()  # unparent player + free the static room (generic)
+	_teardown_s1_floor()
+	_s1_floor_active = true
+	_s1_floor_container = Node2D.new()
+	_s1_floor_container.name = "S1FloorContainer"
+	if _world != null:
+		_world.add_child(_s1_floor_container)
+	else:
+		add_child(_s1_floor_container)
+	_instantiate_chunks(assembled, _s1_floor_container)
+	# wire_combat=true → S1 assembled-floor mobs grant XP + drop loot (authored-
+	# room parity), unlike the S2 chunk mobs (counter-only). The clear-counter is
+	# wired via `_on_s1_mob_died` for the forward-compat clear gate + diagnostics.
+	_s1_mobs = _spawn_assembled_floor_mobs(assembled, _s1_floor_container, _on_s1_mob_died, true)
+	_s1_mobs_remaining = _s1_mobs.size()
+	_reparent_player_into(_s1_floor_container, _s2_floor_spawn(assembled))
+	# Re-apply the live char-scale dial to the freshly-spawned floor mobs + player
+	# (mirrors `_load_room_at_index` — each assemble spawns NEW mob instances at
+	# default scale). No-op when no scale override is active.
+	_reapply_char_scale_if_active()
+	_engage_camera_for_assembled_floor(assembled)
+
+
+## A mob spawned into the S1 assembled floor died. CONNECT_DEFERRED from
+## `_spawn_assembled_floor_mobs` (same physics-flush-safety rationale as the S2
+## counterpart). Decrements the live-mob counter for the forward-compat
+## chunk-clear gate + a diagnostic trace. There is NO zone advance off this
+## counter — S1 is a single assembled floor (the descent terminus is the
+## StratumExit, unchanged); the counter exists for parity + the future clear gate
+## a downstream yard-content ticket will consume.
+func _on_s1_mob_died(_mob: Variant = null, _pos: Variant = null, _def: Variant = null) -> void:
+	if not _s1_floor_active:
+		return
+	_s1_mobs_remaining = maxi(0, _s1_mobs_remaining - 1)
+	_combat_trace_main("Main.s1_mob_died", "remaining=%d" % _s1_mobs_remaining)
+
+
+func _teardown_s1_floor() -> void:
+	_s1_floor_active = false
+	_s1_mobs_remaining = 0
+	_s1_mobs = []
+	if _s1_floor_container == null:
+		return
+	if is_instance_valid(_s1_floor_container):
+		_s1_floor_container.queue_free()
+	_s1_floor_container = null
 
 
 ## Re-parent the player under `parent` at `spawn` (world pos). Mirrors the
