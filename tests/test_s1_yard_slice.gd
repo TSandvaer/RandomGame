@@ -39,6 +39,16 @@ const VIEWPORT_H: float = 270.0
 
 const SOURCE_COBBLE: int = 0
 const SOURCE_WALL_FINE: int = 1
+const SOURCE_SLAB: int = 2  # warm-sandstone flagstone slab-path source (T8)
+
+# Well-head footprint mirror (matches S1YardChunk.well_footprint) — the nav grid
+# bakes this as a wall too (the well is a solid walk-AROUND landmark, like buildings).
+const WELL_FOOTPRINT := Rect2i(20, 16, 3, 3)
+
+# S1_YARD_WATER_DOCTRINE / path doctrine eye-dropper hexes (Uma §2.4 / §3.3) — pinned
+# so a regression that recolours the doctrine surfaces fails loudly. Values are the
+# painter-side constants (water ColorRect) + the spec's named hexes for documentation.
+const WATER_BASE_HEX := "2e2a26"  # PL-WATER-01 dark warm-neutral (NOT pure-black PL-WATER-02)
 
 # Yard grid (must match S1YardChunk.grid_w/grid_h + s1_yard_slice.tres size_tiles).
 const YARD_W: int = 40
@@ -257,7 +267,9 @@ func test_yard_chunk_builds_solid_building_structures() -> void:
 	var inst: Node = _instantiate_yard_chunk()
 	var bodies_root: Node = inst.get_node("BuildingBodies")
 	assert_not_null(bodies_root, "BuildingBodies node present")
-	var bodies: Array = _collect_nodes(inst, "StaticBody2D")
+	# Scope to BuildingBodies — the well-head also has a StaticBody2D (in WellBody, T8),
+	# so a whole-tree scan would over-count. One body per authored building footprint (4).
+	var bodies: Array = _collect_nodes(bodies_root, "StaticBody2D")
 	# One StaticBody2D per authored footprint (4) → buildings are walk-AROUND
 	# solids, NOT teleport-room walls.
 	assert_eq(bodies.size(), _building_footprints().size(), "one collision body per building")
@@ -373,6 +385,14 @@ func _build_yard_walk_grid(assembled: AssembledFloor) -> Dictionary:
 				placed.position_px + Vector2(foot.position) * TILE_PX, Vector2(foot.size) * TILE_PX
 			)
 			building_world_rects.append(r)
+		# The well-head is ALSO a solid landmark (T8) — bake its footprint as a wall so
+		# the nav gate proves mobs/player path AROUND it, not through it.
+		building_world_rects.append(
+			Rect2(
+				placed.position_px + Vector2(WELL_FOOTPRINT.position) * TILE_PX,
+				Vector2(WELL_FOOTPRINT.size) * TILE_PX
+			)
+		)
 
 	for r: int in range(rows):
 		for c: int in range(cols):
@@ -574,3 +594,197 @@ func test_bfs_detects_disconnected_component() -> void:
 	var reachable: Dictionary = _reachable_from(Vector2i(0, 1), grid)
 	assert_true(reachable.has(Vector2i(4, 1)), "left-half reachable")
 	assert_false(reachable.has(Vector2i(6, 1)), "right-half UNREACHABLE (wall splits floor)")
+
+
+# ====================================================================
+# S1-YARD T8 — ground-composition layer (slab paths + well + springs + garden)
+# ====================================================================
+
+
+## The slab-path tileset source (warm-sandstone flagstone, source 2) is wired into the
+## yard TileSet. A regression dropping the source would break every slab cell.
+func test_tileset_has_slab_source() -> void:
+	var ts: TileSet = load(YARD_TILESET_PATH)
+	assert_not_null(ts, "yard TileSet loads")
+	if ts == null:
+		return
+	assert_true(ts.has_source(SOURCE_SLAB), "yard TileSet has the slab-path source (id 2)")
+
+
+## Slab paths are painted as a RIBBON into the SlabPaths layer, AND the cobble cell
+## beneath each slab is ERASED in FloorTiles — exactly ONE tile-class per cell, no
+## stacked-z, no z-fight (T8 AC9 / html5-export.md §Z-index). This is the load-bearing
+## anti-z-fight invariant: assert that EVERY painted slab cell has empty cobble beneath.
+func test_slab_paths_painted_with_cobble_erased_beneath_no_zfight() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var slab: TileMapLayer = inst.get_node("SlabPaths")
+	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
+	assert_not_null(slab, "SlabPaths layer present")
+	assert_not_null(floor_tiles, "FloorTiles layer present")
+	if slab == null or floor_tiles == null:
+		return
+	var slab_cells: int = 0
+	for cell: Vector2i in slab.get_used_cells():
+		assert_eq(
+			slab.get_cell_source_id(cell),
+			SOURCE_SLAB,
+			"slab cell %s painted with the flagstone source" % str(cell)
+		)
+		# THE AC9 INVARIANT: no cobble underneath a slab cell (one tile-class per cell).
+		assert_eq(
+			floor_tiles.get_cell_source_id(cell),
+			-1,
+			(
+				"cobble ERASED beneath slab cell %s — one tile-class per cell, no z-fight (AC9)"
+				% str(cell)
+			)
+		)
+		slab_cells += 1
+	# The spine + links + apron paint a meaningful ribbon, not zero cells.
+	assert_gt(slab_cells, 30, "slab paths paint a real processional ribbon (got %d)" % slab_cells)
+
+
+## The processional spine runs west→east — assert slab cells exist near the WEST edge
+## (spawn gate) AND near the EAST edge (descent), so the path is a continuous wayfinding
+## ribbon spanning the journey, not a disconnected blob.
+func test_slab_spine_spans_west_to_east() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var slab: TileMapLayer = inst.get_node("SlabPaths")
+	if slab == null:
+		return
+	var has_west: bool = false
+	var has_east: bool = false
+	for cell: Vector2i in slab.get_used_cells():
+		if cell.x <= 2:
+			has_west = true
+		if cell.x >= YARD_W - 3:
+			has_east = true
+	assert_true(has_west, "slab spine reaches the WEST spawn-gate edge")
+	assert_true(has_east, "slab spine reaches the EAST descent edge (journey span)")
+
+
+## Slabs never run through a building footprint (a path doesn't cross a solid wall).
+func test_slab_cells_never_inside_a_building() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var slab: TileMapLayer = inst.get_node("SlabPaths")
+	if slab == null:
+		return
+	for cell: Vector2i in slab.get_used_cells():
+		for foot: Rect2i in _building_footprints():
+			assert_false(
+				foot.has_point(cell), "slab cell %s must NOT be inside building %s" % [cell, foot]
+			)
+
+
+## The well-head landmark is present: a Sprite2D in Props using well_head.png at the
+## calibrated landmark scale 0.85, AND a solid StaticBody2D collision (walk-around).
+func test_well_head_prop_and_collision_present() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var props: Node = inst.get_node("Props")
+	var well_body: Node = inst.get_node("WellBody")
+	assert_not_null(props, "Props node present")
+	assert_not_null(well_body, "WellBody node present")
+	if props == null or well_body == null:
+		return
+	var sprites: Array = _collect_nodes(props, "Sprite2D")
+	var found_well := false
+	for spr: Sprite2D in sprites:
+		if spr.texture != null and spr.texture.resource_path.ends_with("well_head.png"):
+			found_well = true
+			assert_almost_eq(spr.scale.x, 0.85, 0.001, "well at landmark scale 0.85")
+	assert_true(found_well, "well-head prop present (well_head.png landmark)")
+	# Collision: one StaticBody2D with a CollisionShape2D (solid walk-around landmark).
+	var bodies: Array = _collect_nodes(well_body, "StaticBody2D")
+	assert_eq(bodies.size(), 1, "well-head has exactly one collision body")
+	for body: Node in bodies:
+		assert_gt(_collect_nodes(body, "CollisionShape2D").size(), 0, "well body has a shape")
+
+
+## Springs are still dark warm-neutral ColorRect pools (NO bespoke asset; orch handoff).
+## Assert: ≥1 pool ColorRect with the doctrine water-base hex AND it is NOT pure-black
+## (PL-WATER-01/02). Also assert NO Polygon2D anywhere in Springs (PR #137 / §3.3 rule).
+func test_springs_are_colorrect_pools_doctrine_water_not_black_no_polygon2d() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var springs: Node = inst.get_node("Springs")
+	assert_not_null(springs, "Springs node present")
+	if springs == null:
+		return
+	# No Polygon2D in the water surface (HTML5 invisibility class, PR #137).
+	assert_eq(
+		_collect_nodes(springs, "Polygon2D").size(), 0, "springs use NO Polygon2D (ColorRect only)"
+	)
+	var rects: Array = _collect_nodes(springs, "ColorRect")
+	assert_gt(rects.size(), 0, "springs author ColorRect pools")
+	var found_water := false
+	for rect: ColorRect in rects:
+		if rect.color.to_html(false) == WATER_BASE_HEX:
+			found_water = true
+			# PL-WATER-02: NOT pure-black.
+			assert_ne(rect.color, Color(0, 0, 0, 1.0), "spring water is NOT pure black (PL-09)")
+			# Sub-1.0 HDR-clamp-safe every channel (PL-WATER-01 doctrine).
+			assert_lt(rect.color.r, 1.0, "water R sub-1.0 (HDR-clamp safe)")
+			assert_lt(rect.color.g, 1.0, "water G sub-1.0")
+			assert_lt(rect.color.b, 1.0, "water B sub-1.0")
+	assert_true(
+		found_water, "a spring pool uses the S1_YARD_WATER_DOCTRINE base hex #%s" % WATER_BASE_HEX
+	)
+
+
+## Springs sit in OPEN cobble (no slab, no building) so they read as low damp spots in
+## the field, and there are 1-2 of them (§3.2 "1-2 in the yard").
+func test_springs_count_in_range() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var springs: Node = inst.get_node("Springs")
+	if springs == null:
+		return
+	# Count distinct pool ColorRects (the water-base hex) — should be 1-2 hero springs.
+	var pools := 0
+	for rect: ColorRect in _collect_nodes(springs, "ColorRect"):
+		if rect.color.to_html(false) == WATER_BASE_HEX:
+			pools += 1
+	assert_between(pools, 1, 2, "1-2 spring pools in the yard (§3.2)")
+
+
+## ONE garden bed gone wild (§4 "one hero bed, not multiple") — a soil ColorRect bed +
+## clustered moss overgrowth, near the dormitory range (south half).
+func test_one_garden_bed_with_overgrowth() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var springs: Node = inst.get_node("Springs")
+	if springs == null:
+		return
+	# The garden soil bed is the largest non-water ColorRect; assert exactly one soil bed
+	# distinct from the spring pools/highlights/aprons by its garden-soil tint signature.
+	var garden_soil_hex := Color(0.329, 0.271, 0.184, 0.78).to_html(true)
+	var beds := 0
+	for rect: ColorRect in _collect_nodes(springs, "ColorRect"):
+		if rect.color.to_html(true) == garden_soil_hex:
+			beds += 1
+			# Sits in the south half (near dormitory range).
+			assert_gt(rect.position.y, float(YARD_H) * TILE_PX * 0.5, "garden bed in south half")
+	assert_eq(beds, 1, "exactly ONE garden bed (§4 one hero bed)")
+
+
+## The well-baked nav grid still keeps a walkable interior + every mob spawn reachable
+## (already covered by the spawn-reachability test, which now bakes the well too). This
+## adds an explicit pin that adding the well did NOT pocket the descent journey.
+func test_descent_still_reachable_with_well_baked() -> void:
+	var assembled: AssembledFloor = _assemble()
+	if assembled == null:
+		return
+	var grid: Dictionary = _build_yard_walk_grid(assembled)  # now bakes WELL_FOOTPRINT
+	var bounds: Rect2 = assembled.bounding_box_px
+	var player_world := Vector2(bounds.position.x + 24.0, bounds.position.y + bounds.size.y * 0.5)
+	var player_cell: Vector2i = _nearest_walkable(
+		_world_to_cell(player_world, assembled, grid), grid
+	)
+	if player_cell == Vector2i(-1, -1):
+		return
+	var reachable: Dictionary = _reachable_from(player_cell, grid)
+	var descent_world := Vector2(bounds.end.x - 32.0, bounds.position.y + bounds.size.y * 0.5)
+	var descent_cell: Vector2i = _nearest_walkable(
+		_world_to_cell(descent_world, assembled, grid), grid
+	)
+	assert_true(
+		reachable.has(descent_cell),
+		"descent reachable AROUND the well (well didn't pocket the journey)"
+	)

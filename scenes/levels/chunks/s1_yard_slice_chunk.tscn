@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://b0embergrave_s1yard_slice_chunk"]
+[gd_scene load_steps=11 format=3 uid="uid://b0embergrave_s1yard_slice_chunk"]
 
 ; S1 open cloister-YARD first-slice chunk (ticket 86ca5erzk, S1-YARD T4).
 ; The first WALKABLE yard: an open cobble expanse (1280x768 — wider+taller than
@@ -10,8 +10,12 @@
 ; (s1_z1_yard_slice ZoneDef), soak-gated behind ?s1_assembler=1.
 ;
 ; Z-order (html5-export.md §Z-index — floor z=0, structures/props z=+1, player
-; above): FloorTiles z=0; Buildings z=1; BuildingBodies (collision, invisible);
-; Decoration z=1; Props z=2 (read above buildings — braziers/pillars on faces).
+; above): FloorTiles z=0; SlabPaths z=0 (SAME floor layer — slab paths are a
+; second floor tile-class painted into their own layer with the cobble cell
+; ERASED beneath, so exactly ONE tile-class renders per cell = no z-fight, T8 AC9);
+; Springs z=0 (ColorRect still-water pools, floor-level, painted over cobble);
+; Buildings z=1; BuildingBodies (collision, invisible); Decoration z=1;
+; Props z=2 (read above buildings — braziers/pillars/well on faces/landmarks).
 
 [ext_resource type="Script" path="res://scripts/levels/S1YardChunk.gd" id="1_yard"]
 [ext_resource type="TileSet" path="res://resources/tilesets/s1_cloister_yard.tres" id="2_yardset"]
@@ -20,6 +24,8 @@
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/banner_worn.png" id="5_banner"]
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/rubble_01.png" id="6_rubble"]
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/parchment_01.png" id="7_parchment"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/well_head.png" id="8_well"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/moss_patch.png" id="9_moss"]
 
 [node name="S1YardSliceChunk" type="Node2D"]
 script = ExtResource("1_yard")
@@ -28,12 +34,29 @@ script = ExtResource("1_yard")
 texture_filter = 1
 tile_set = ExtResource("2_yardset")
 
+; Slab-path tiles (warm-sandstone flagstone REUSE, S1-YARD T8). Painted by
+; S1YardChunk._paint_slab_paths into THIS layer at z=0; the cobble cell beneath
+; each slab is ERASED in FloorTiles so exactly one tile-class renders per cell
+; (no stacked-z, no z-fight — T8 AC9 / html5-export.md §Z-index).
+[node name="SlabPaths" type="TileMapLayer" parent="."]
+texture_filter = 1
+tile_set = ExtResource("2_yardset")
+
+; Springs — still dark warm-neutral ColorRect pools (S1_YARD_WATER_DOCTRINE) at
+; floor level, with a moss_patch ring + damp-cobble feel. NO bespoke asset (orch
+; handoff: spring is a ColorRect-pool decoration over the cobble). z=0 floor-level.
+[node name="Springs" type="Node2D" parent="."]
+
 [node name="Buildings" type="TileMapLayer" parent="."]
 z_index = 1
 texture_filter = 1
 tile_set = ExtResource("2_yardset")
 
 [node name="BuildingBodies" type="Node2D" parent="."]
+
+; Collision body for the well-head landmark (solid like buildings). Built by the
+; painter (footprint mirrored in the nav GUT test) so the well is walk-AROUND.
+[node name="WellBody" type="Node2D" parent="."]
 
 [node name="Decoration" type="Node2D" parent="."]
 z_index = 1
@@ -126,3 +149,14 @@ texture = ExtResource("7_parchment")
 position = Vector2(1080, 600)
 scale = Vector2(0.7, 0.7)
 texture = ExtResource("7_parchment")
+
+; --- WELL-HEAD hero landmark (S1-YARD T8, Uma s1-yard-ground-composition.md §3.1).
+; South-central, OFF the processional spine at the south route-choice decision
+; point, ringed by a worn slab apron (painted by the script) — a wonder-landmark +
+; NPC-station seed the player is drawn toward. Collision-solid (WellBody, built by
+; the painter) so it's a walk-AROUND structure. Scale 0.85 (orch handoff: landmark,
+; sibling to pillar 0.85; reads ~2.6x player height). z=2 (Props, above floor/buildings).
+[node name="WellHead" type="Sprite2D" parent="Props"]
+position = Vector2(688, 560)
+scale = Vector2(0.85, 0.85)
+texture = ExtResource("8_well")
