@@ -4,13 +4,15 @@
 ; The open-air YARD floor + finer perimeter-brick, distinct from the interior-hall
 ; `s1_cloister.tres` (sandstone flagstone). Two atlas sources, 32px tiles:
 ;   Source 0 = floor_cobble.png   → cobblestone+moss+dirt yard ground (T1 generator
-;                output `tools/gen_s1_cobble_floor.py`, locked v2 tone). 64x64 = 2x2
-;                atlas of 32px cells (256px source downsampled to 64px for the FINER
-;                "small player, large world" stone scale — at baseline 2.6667x zoom the
-;                0.6 player spans ~2-3 cobbles, not ~1); the painter tiles it at period 2
-;                so the seamless varied-cobble block reads continuous, not a single
-;                repeated 32px sub-tile (PR #407 wallpaper-grid avoidance; seamcheck
-;                verified no grid line). `tile-scale-small-player-large-world` north-star.
+;                output `tools/gen_s1_cobble_floor.py`, LOCKED v2 tone = lighter warm-
+;                neutral GREY + genuinely varied stone sizes). 128x128 = 4x4 atlas of
+;                32px cells (256px source downsampled to 128px); the painter tiles it at
+;                period 4 so the seamless varied-cobble block reads continuous, not a
+;                single repeated 32px sub-tile (PR #407 wallpaper-grid avoidance;
+;                seamcheck verified no grid line). 128px (not 64px) PRESERVES the varied-
+;                stone relief the Sponsor locked — a 64px downsample flattened the stones
+;                to a uniform tan read (PR #424 blocker). Matches by eye
+;                `_tile_judge/cobble_proc/cobble_proc_field_zoom_v2.png`.
 ;   Source 1 = wall_cloister_fine.png → finer-brick perimeter (T2; Sponsor flagged the
 ;                old 128px running-bond bricks as oversized vs the finer cobble). Brick
 ;                pitch shrunk ~2x (downsample-to-64 + 2x2 retile) so bricks read ~6
@@ -29,8 +31,20 @@ texture = ExtResource("1_cobble")
 texture_region_size = Vector2i(32, 32)
 0:0/0 = 0
 1:0/0 = 0
+2:0/0 = 0
+3:0/0 = 0
 0:1/0 = 0
 1:1/0 = 0
+2:1/0 = 0
+3:1/0 = 0
+0:2/0 = 0
+1:2/0 = 0
+2:2/0 = 0
+3:2/0 = 0
+0:3/0 = 0
+1:3/0 = 0
+2:3/0 = 0
+3:3/0 = 0
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_wall_fine"]
 texture = ExtResource("2_wall_fine")

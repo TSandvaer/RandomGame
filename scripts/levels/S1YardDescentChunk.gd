@@ -21,8 +21,8 @@ class_name S1YardDescentChunk
 ## assembler retrofit"); this slice is the FEEL soak of the open yard.
 
 const SOURCE_COBBLE: int = 0
-## Matches S1YardChunk.COBBLE_ATLAS_PERIOD (64px 2x2 finer cobble atlas).
-const COBBLE_ATLAS_PERIOD: int = 2
+## Matches S1YardChunk.COBBLE_ATLAS_PERIOD (128px 4x4 varied-cobble atlas).
+const COBBLE_ATLAS_PERIOD: int = 4
 
 @export var grid_w: int = 6
 @export var grid_h: int = 24

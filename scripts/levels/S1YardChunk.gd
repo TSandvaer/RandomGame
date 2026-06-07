@@ -40,18 +40,21 @@ class_name S1YardChunk
 const SOURCE_COBBLE: int = 0
 const SOURCE_WALL_FINE: int = 1
 
-## The cobble PNG is a 64px 2x2 atlas of 32-px sub-tiles that, stitched in source
+## The cobble PNG is a 128px 4x4 atlas of 32-px sub-tiles that, stitched in source
 ## grid order, form ONE seamless varied-cobble block (toroidal-wrapped by the T1
-## generator, 256px source downsampled to 64px for the FINER "small player, large
-## world" stone scale — at baseline 2.6667x zoom the 0.6 player spans ~2-3 cobbles,
-## not ~1). The painter paints each cell from its position WITHIN the source window,
-## `Vector2i(tx % period, ty % period)`, so the block tiles with a period-2 (64px)
-## repeat — stones read continuous, the only repeat is the soft block seam (which
-## the generator wraps seamlessly across, so no dark grid line; verified seamcheck).
-const COBBLE_ATLAS_PERIOD: int = 2
+## generator, 256px source downsampled to 128px). 128px preserves the VARIED-STONE
+## relief the Sponsor locked (v2 = lighter warm-neutral GREY + genuinely varied stone
+## sizes, ref `_tile_judge/cobble_proc/cobble_proc_field_zoom_v2.png`); a 64px
+## downsample flattened small/medium stones together so the floor read uniform + tan
+## (the PR #424 blocker) — 128px keeps the per-stone variation by eye. The painter
+## paints each cell from its position WITHIN the source window,
+## `Vector2i(tx % period, ty % period)`, so the block tiles with a period-4 (128px)
+## repeat — stones read continuous, the only repeat is the soft block seam (which the
+## generator wraps seamlessly across, so no dark grid line; verified seamcheck).
+const COBBLE_ATLAS_PERIOD: int = 4
 
 ## The finer-brick wall is a 128px 4x4 atlas (period 4). Building bricks use this
-## period independently of the cobble period above.
+## period independently of the cobble period above (here equal — both period 4).
 const WALL_ATLAS_PERIOD: int = 4
 
 ## Yard grid size in tiles. 40x24 @ 32px = 1280x768px — WIDER (1280 > 480) AND
