@@ -6,9 +6,12 @@ extends GutTest
 ## the HTML5 visual gate cannot assert headlessly (the crafted-floor read +
 ## colonnade feel are the Sponsor-soak gate of record; these pin the mechanics):
 ##
-##   1. FLOOR/WALL render as the FULL 128-px crafted image tiled (4-tile period)
-##      — the S1CloisterChunk painter writes each cell from its 4×4 atlas-window
-##      position, NOT cell (0,0) repeated (the PR #407 single-32px wallpaper bug).
+##   1. FLOOR renders the crafted block downsampled 128→64 (2×2 atlas) tiled at a
+##      2-tile period (~2× finer flagstones — ticket 86ca44p4j, Sponsor f0a8fc8
+##      "much much much smaller"); WALL renders the full 128-px crafted image
+##      tiled at a 4-tile period (unchanged). The S1CloisterChunk painter writes
+##      each cell from its per-source atlas-window position, NOT cell (0,0)
+##      repeated (the PR #407 single-32px wallpaper bug — guarded at both scales).
 ##   2. COLONNADE composition: 8 pillars in 2 mirrored vertically-aligned rows
 ##      framing a CLEAR aisle; braziers + banners present.
 ##   3. COLLISION: pillars + braziers + large rubble are SOLID StaticBody2D on
@@ -34,6 +37,12 @@ const TILE: int = 32
 const SOURCE_FLOOR: int = 0
 const SOURCE_WALL: int = 1
 const ATLAS_PERIOD: int = 4
+# Per-source tiling period (ticket 86ca44p4j — floor stone-pitch shrink). The
+# floor source was downsampled 128→64 (2×2 atlas) so each game cell shows ~2×
+# finer flagstones; it now tiles at a 2-tile period. The wall is unchanged
+# (128px 4×4, period-4). Sponsor f0a8fc8 feel-reject was floor-only.
+const FLOOR_ATLAS_PERIOD: int = 2
+const WALL_ATLAS_PERIOD: int = 4
 
 # Layer convention (project.godot): world=bit1, player=bit2(layer 2), enemy=bit4.
 # Solid props must be on the WORLD layer (bit 1) to block BOTH the player
@@ -135,22 +144,31 @@ func _props_named_prefixed(inst: Node, prefix: String) -> Array:
 # ---- 1. Floor/wall render as the full 128-px crafted image (4-tile period) ----
 
 
-func test_painter_uses_4x4_atlas_window_not_single_cell() -> void:
-	# The headline fix: the painter must paint each cell from its 4×4 source
-	# window position (tx%4, ty%4), NOT cell (0,0) repeated. Source-scan pin —
+func test_painter_uses_atlas_window_not_single_cell() -> void:
+	# The headline fix: the painter must paint each cell from its source-window
+	# position (tx%period, ty%period), NOT cell (0,0) repeated. Source-scan pin —
 	# the visible read is the Sponsor soak gate, this guards the code shape.
 	var src: String = FileAccess.get_file_as_string(PAINTER_SOURCE)
 	assert_gt(src.length(), 0, "painter source readable")
 	assert_true(
-		src.find("tx % ATLAS_PERIOD") > -1 and src.find("ty % ATLAS_PERIOD") > -1,
-		"painter must paint from the 4×4 atlas window (tx%%4, ty%%4) — not a single repeated cell"
+		src.find("tx % period") > -1 and src.find("ty % period") > -1,
+		"painter must paint from the atlas window (tx%%period, ty%%period) — not a single cell"
+	)
+	# Per-source period is the 86ca44p4j shrink: floor=2 (64px 2×2), wall=4.
+	assert_true(
+		src.find("FLOOR_ATLAS_PERIOD: int = 2") > -1,
+		"floor must tile at a 2-tile period (128→64 downsample, ~2× finer flagstones)"
+	)
+	assert_true(
+		src.find("WALL_ATLAS_PERIOD: int = 4") > -1,
+		"wall must keep its 4-tile period (128px source unchanged — reject was floor-only)"
 	)
 
 
-func test_floor_interior_tiles_span_all_4x4_atlas_coords() -> void:
+func test_floor_interior_tiles_span_full_2x2_atlas_coords() -> void:
 	# Behavioural proof of the fix: across the painted interior, the floor cells
-	# must use MORE THAN ONE atlas coordinate — specifically the full 4×4 set —
-	# so the crafted 128-px image renders, not one repeated 32-px sub-tile.
+	# must use the full 2×2 atlas set (the downsampled crafted block tiled at a
+	# 2-tile period), NOT one repeated 32-px sub-tile.
 	var inst: Node = _instantiate_chunk()
 	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
 	var seen: Dictionary = {}
@@ -161,16 +179,16 @@ func test_floor_interior_tiles_span_all_4x4_atlas_coords() -> void:
 				continue
 			var ac: Vector2i = floor_tiles.get_cell_atlas_coords(cell)
 			seen[ac] = true
-			# Each interior cell's atlas coord must equal its 4×4-window position.
+			# Each interior cell's atlas coord must equal its 2×2-window position.
 			assert_eq(
 				ac,
-				Vector2i(tx % ATLAS_PERIOD, ty % ATLAS_PERIOD),
-				"floor cell %s must paint from its 4×4 atlas-window position" % cell
+				Vector2i(tx % FLOOR_ATLAS_PERIOD, ty % FLOOR_ATLAS_PERIOD),
+				"floor cell %s must paint from its 2×2 atlas-window position" % cell
 			)
 	assert_eq(
 		seen.size(),
-		ATLAS_PERIOD * ATLAS_PERIOD,
-		"interior floor must use all 16 atlas cells (full crafted image), got %d" % seen.size()
+		FLOOR_ATLAS_PERIOD * FLOOR_ATLAS_PERIOD,
+		"interior floor must use all 4 atlas cells (full downsampled block), got %d" % seen.size()
 	)
 
 
@@ -203,7 +221,7 @@ func test_wall_perimeter_uses_4x4_atlas_window() -> void:
 			seen[floor_tiles.get_cell_atlas_coords(cell)] = true
 			assert_eq(
 				floor_tiles.get_cell_atlas_coords(cell),
-				Vector2i(tx % ATLAS_PERIOD, 0),
+				Vector2i(tx % WALL_ATLAS_PERIOD, 0),
 				"north wall cell %s paints from its 4×4 atlas-window column" % cell
 			)
 	assert_gt(
