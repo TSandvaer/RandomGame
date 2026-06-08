@@ -73,6 +73,17 @@ const PATH_CORNERS := {
 	Vector2i(4, 7): [0, 1, 1, 1], Vector2i(5, 7): [1, 0, 1, 1],
 }
 
+# Cells excluded from the terrain entirely. (6,7) and (7,7) are partial/leftover
+# grass tiles at the sheet's bottom-right corner with a ~10px transparent NOTCH —
+# if the autotiler picks them as grass-fill, the dark clear-color shows through as
+# a small black "L" mark (caught in the first in-game capture, ticket 86ca64xzb).
+# Excluding them keeps grass-fill on the clean, fully-opaque rows 0-3. They stay
+# plain-paintable tiles, just not part of the auto-blend terrain.
+const TERRAIN_EXCLUDE := {
+	Vector2i(6, 7): true,
+	Vector2i(7, 7): true,
+}
+
 
 func _init() -> void:
 	var ts := TileSet.new()
@@ -158,6 +169,10 @@ func _assign_grass_terrain(src: TileSetAtlasSource) -> void:
 		for x in range(cols):
 			var coord := Vector2i(x, y)
 			if not src.has_tile(coord):
+				continue
+			if TERRAIN_EXCLUDE.has(coord):
+				# Notched leftover tile — keep paintable but out of the terrain so
+				# the autotiler never selects it (no clear-color bleed-through).
 				continue
 			var data := src.get_tile_data(coord, 0)
 			if data == null:
