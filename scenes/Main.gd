@@ -267,6 +267,24 @@ const S1_ROOM_BOUNDS: Rect2 = Rect2(0, 0, 480, 270)
 ## large enough that single-frame WASD doesn't shake the camera.
 const CAMERA_FOLLOW_DEADZONE: Vector2 = Vector2(40, 24)
 
+## Non-boss-mob size multiplier ON TOP of the applied char-scale (ticket
+## 86ca5hwmx soak-rev #426, Sponsor 2026-06-08). The char-scale Sponsor dialed
+## (CHAR_SCALE_PRODUCTION_DEFAULT = 0.48) is applied to the PLAYER directly, but
+## every NON-BOSS mob renders at `char_scale × MOB_SCALE_FACTOR` so mobs read
+## clearly BIGGER than the player again (≈0.552 at the 0.48 default). The 0.48
+## tune had made mobs read the same size as — or smaller than — the player;
+## Sponsor wants the 15%-bigger silhouette back. Bosses are UNCHANGED (already
+## char-scale-exempt via `_char_scale_is_boss`), so this factor never touches
+## them. The factor is applied ONLY inside `_scale_mob_list` (the single
+## non-boss-mob scaling point shared by BOTH mob-spawn surfaces — static-room
+## `get_spawned_mobs()` and assembled-floor `_s1_mobs`/`_s2_mobs`); the player's
+## `_player.scale = s` write in `_apply_char_scale` is deliberately NOT
+## multiplied. Scale-aware mob attack-reach (`Grunt`/`Charger`
+## `_effective_attack_range = ATTACK_RANGE * scale.x`) reads the mob's own root
+## scale, so the dead-gap stays closed — the reach scales WITH the now-bigger
+## body (0.48→13.44 px reach becomes 0.552→15.46 px).
+const MOB_SCALE_FACTOR: float = 1.15
+
 # ---- Runtime ---------------------------------------------------------
 
 # Active scene-tree pointers. _world holds the current room; _player is
@@ -2424,9 +2442,14 @@ func _reapply_char_scale_if_active() -> void:
 ## room. Scaling the ROOT CharacterBody2D scales its Sprite AND CollisionShape2D
 ## / Hitbox children together (no big-hitbox-on-small-sprite mismatch). **Bosses
 ## are EXCLUDED** via `_char_scale_is_boss` (Sponsor's explicit choice). As of
-## ticket 86ca3rgxq this IS called in normal play — with the SHIPPED 0.6
-## production default, every boot + room load applies 0.6 to player + non-boss
-## mobs. A `?char_scale=N` param / `[`/`]`/`\` dial overrides the value passed in.
+## ticket 86ca3rgxq this IS called in normal play — with the SHIPPED 0.48
+## production default, every boot + room load applies the scale to player +
+## non-boss mobs. A `?char_scale=N` param / `[`/`]`/`\` dial overrides the value.
+##
+## **Player vs mob divergence (ticket 86ca5hwmx soak-rev #426):** the PLAYER is
+## scaled to plain `s` here; every NON-BOSS mob is scaled to `s × MOB_SCALE_FACTOR`
+## inside `_scale_mob_list` so mobs read clearly BIGGER than the player (≈0.552 vs
+## 0.48 at the default). Bosses stay 1.0× (the multiplier never reaches them).
 func _apply_char_scale(normalized: float) -> void:
 	var s: Vector2 = Vector2(normalized, normalized)
 	if _player != null and is_instance_valid(_player):
@@ -2451,7 +2474,16 @@ func _apply_char_scale(normalized: float) -> void:
 ## `_char_scale_is_boss` (Sponsor's explicit choice). Scaling the ROOT
 ## CharacterBody2D scales its Sprite AND CollisionShape2D / Hitbox children
 ## together — no big-hitbox-on-small-sprite mismatch.
+##
+## Non-boss mobs render at `s × MOB_SCALE_FACTOR` (≈0.552 at the 0.48 default)
+## so they read clearly BIGGER than the player, which is scaled to plain `s`
+## directly in `_apply_char_scale` (ticket 86ca5hwmx soak-rev #426). The
+## multiplier lives HERE — the single non-boss-mob scaling point shared by both
+## mob-spawn surfaces — so the static-room and assembled-floor paths get it
+## identically and the player path never does. Bosses skip the multiply (and
+## the scale) entirely via the `_char_scale_is_boss` continue.
 func _scale_mob_list(mobs: Array, s: Vector2) -> void:
+	var mob_s: Vector2 = s * MOB_SCALE_FACTOR
 	for m: Node in mobs:
 		if m == null or not is_instance_valid(m):
 			continue
@@ -2459,7 +2491,7 @@ func _scale_mob_list(mobs: Array, s: Vector2) -> void:
 			continue
 		if _char_scale_is_boss(m):
 			continue
-		(m as Node2D).scale = s
+		(m as Node2D).scale = mob_s
 
 
 ## The static-room spawned-mob list, or an empty array when no static room is
