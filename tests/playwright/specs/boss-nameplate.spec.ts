@@ -122,31 +122,10 @@ test.describe("M3-T13 BossNameplate visibility + slide-in + phase transition", (
 
     // Damage the boss until phase 2 fires.
     // boss_hp_mult=0.05 → 30 HP max. Phase 2 at 66% = 20 HP. Player fist =
-    // 1 damage / swing; need ~10 swings to cross. Allow up to 40 attempts
+    // 1 damage / swing; need ~10 swings to cross. Allow up to 30 attempts
     // before giving up (test failure rather than wandering off).
-    //
-    // **Scale-robust (ticket 86ca5hwmx soak-rev).** The player's swing reach
-    // scales with char_scale: at the Sponsor-locked 0.48 the light hitbox covers
-    // only ~27.8 px of contact (vs ~34.8 px at the prior 0.6). The boss is
-    // char_scale-EXEMPT (stays 1.0, large hurtbox) and parks at its own melee
-    // range, which can leave the SHRUNKEN player swing just short — so a fixed
-    // "click N + swing" loop landed fewer hits at 0.48 and could miss the 10-hit
-    // phase-2 threshold inside the old 30-attempt budget. We now NUDGE the player
-    // NORTH toward the boss (spawns at world (240,135), due N of the (240,200)
-    // player spawn) before each swing so the player closes into its own reach —
-    // robust at 0.48 AND any future scale. Budget bumped 30→40 for margin.
     let phase2Hit = false;
-    for (let i = 0; i < 40 && !phase2Hit; i++) {
-      // Close the initial ~65 px gap to the boss (player spawn (240,200) → boss
-      // (240,135)) over the first ~8 iterations only. 120 px/s × 90 ms ≈ 11 px /
-      // burst → ~6-8 bursts cover 65 px; the boss CHASES thereafter so contact
-      // is maintained without walking the player past/around the (large) boss.
-      if (i < 8) {
-        await page.keyboard.down("w");
-        await page.waitForTimeout(90);
-        await page.keyboard.up("w");
-        await page.waitForTimeout(40);
-      }
+    for (let i = 0; i < 30 && !phase2Hit; i++) {
       await clickAimedFromPlayer(canvas, capture, "N", { offsetPx: 80 });
       await page.waitForTimeout(180);
       const phase2Line = capture
