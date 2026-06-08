@@ -61,12 +61,21 @@ a tile and stamp it.)
 
 Two ways:
 
-### A. Copy from the prop palette (best for big landmarks)
+### A. Copy from the prop palette (best for buildings + big landmarks)
 
 1. Open `scenes/levels/s1_prop_palette.tscn` — a tray of every placeable prop
-   with name labels (pillars, braziers, banners, rubble, parchment, plus a few
-   Cainos props).
-2. In its Scene tree, click the prop you want (e.g. **Pillar**), press **Ctrl+C**.
+   with name labels. Two groups:
+   - **TOP ROW = the 5 BUILDING landmarks** (warm-sandstone PixelLab buildings,
+     from `assets/props/s1_yard/`): **ChapelBelltower**, **CloisterCentral** (lit
+     ember window), **DormitoryRuinLeft**, **DormitoryRuinRight**,
+     **OutbuildingFar**. These are the real yard landmarks — place them first to
+     frame the space.
+   - **Below = DECORATION props** (smaller, from `assets/props/s1_cloister/`):
+     pillars, braziers, banners, rubble, parchment — plus a few Cainos props
+     (barrel, crate, signpost, gravestone, statue). Dress the yard with these
+     around the buildings.
+2. In its Scene tree, click the prop you want (e.g. **ChapelBelltower**), press
+   **Ctrl+C**.
 3. Switch back to `s1_yard_authored.tscn`, click the **Props** node, press
    **Ctrl+V**.
 4. The prop appears — drag it where you want it. Scale/rotate in the Inspector
@@ -74,8 +83,9 @@ Two ways:
 
 ### B. Drag a texture straight in
 
-1. In the FileSystem dock, browse `assets/props/s1_cloister/` (the 5 carried-
-   forward building props) or `assets/tilesets/cainos/` (the Cainos sheets).
+1. In the FileSystem dock, browse `assets/props/s1_yard/` (the 5 BUILDING
+   landmarks), `assets/props/s1_cloister/` (the smaller decoration props), or
+   `assets/tilesets/cainos/` (the Cainos sheets).
 2. Drag a `.png` onto the **Props** node in the Scene tree → choose **Sprite2D**.
 3. Position it. For the Cainos prop SHEETS (tx_props/tx_plant/tx_struct), set the
    Sprite2D's **Region → Enabled** and drag a region box over the single prop you
@@ -106,7 +116,8 @@ Two ways:
 | Prop palette | `scenes/levels/s1_prop_palette.tscn` |
 | Cainos tileset | `resources/tilesets/cainos_s1.tres` |
 | Cainos textures | `assets/tilesets/cainos/` |
-| 5 carried-forward props | `assets/props/s1_cloister/` |
+| 5 BUILDING landmarks (chapel / central / 2 dormitory ruins / outbuilding) | `assets/props/s1_yard/` |
+| Decoration props (pillars / braziers / banners / rubble / parchment) | `assets/props/s1_cloister/` |
 
 If you want more terrains (e.g. a dirt↔grass blend, water edges), or more props
 pre-sliced into the palette, just ask — the team adds them to the tileset/palette

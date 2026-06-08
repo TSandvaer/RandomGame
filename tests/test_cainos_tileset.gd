@@ -205,6 +205,38 @@ func test_prop_palette_scene_loads() -> void:
 	assert_not_null(ps, "s1_prop_palette.tscn loads")
 	var root := ps.instantiate()
 	add_child_autofree(root)
-	# Carried-forward props present as copyable Sprite2D nodes.
+	# Carried-forward decoration props present as copyable Sprite2D nodes.
 	assert_not_null(root.get_node_or_null("Pillar"), "Pillar prop sprite present")
 	assert_not_null(root.get_node_or_null("BrazierLit"), "BrazierLit prop sprite present")
+
+
+func test_palette_has_all_five_building_landmarks() -> void:
+	# The 5 REAL S1 building landmarks (assets/props/s1_yard) — distinct from the
+	# smaller s1_cloister decoration props.
+	var ps := load(PALETTE_PATH) as PackedScene
+	var root := ps.instantiate()
+	add_child_autofree(root)
+	for node_name in [
+		"ChapelBelltower", "CloisterCentral", "DormitoryRuinLeft",
+		"DormitoryRuinRight", "OutbuildingFar",
+	]:
+		var spr := root.get_node_or_null(node_name) as Sprite2D
+		assert_not_null(spr, "%s building sprite present in palette" % node_name)
+		if spr != null:
+			assert_not_null(spr.texture, "%s has a texture assigned" % node_name)
+
+
+func test_notched_grass_cells_excluded_from_terrain() -> void:
+	# (6,7) and (7,7) are partial grass tiles with a transparent notch that would
+	# bleed the dark clear-color through if the autotiler picked them as grass-fill
+	# (the black-mark artifact, ticket 86ca64xzb). They MUST NOT carry a terrain.
+	var ts := _load_tileset()
+	var src := ts.get_source(0) as TileSetAtlasSource
+	for coord in [Vector2i(6, 7), Vector2i(7, 7)]:
+		var data := src.get_tile_data(coord, 0)
+		assert_not_null(data, "%s still exists as a plain paintable tile" % str(coord))
+		if data != null:
+			assert_eq(
+				data.terrain_set, -1,
+				"%s is NOT part of any terrain set (excluded — no clear-color bleed)" % str(coord)
+			)

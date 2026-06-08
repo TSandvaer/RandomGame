@@ -1,31 +1,36 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=18 format=3]
 
-[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/pillar_arch.png" id="1_xyc0p"]
-[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/brazier_lit.png" id="2_1yb81"]
-[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/brazier_cold.png" id="3_yh5of"]
-[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/banner_worn.png" id="4_csc7s"]
-[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/rubble_01.png" id="5_cksyi"]
-[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/parchment_01.png" id="6_b11i2"]
-[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_props.png" id="7_nigks"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_yard/chapel_belltower.png" id="1_wdc7w"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_yard/cloister_central.png" id="2_flkbs"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_yard/dormitory_ruin_left.png" id="3_naff8"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_yard/dormitory_ruin_right.png" id="4_ybndd"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_yard/outbuilding_far.png" id="5_m431x"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/pillar_arch.png" id="6_ux1o2"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/brazier_lit.png" id="7_4mc3y"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/brazier_cold.png" id="8_5s5jf"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/banner_worn.png" id="9_7op76"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/rubble_01.png" id="10_5n2u3"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/parchment_01.png" id="11_wwpj2"]
+[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_props.png" id="12_dj6ls"]
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_v4c0y"]
-atlas = ExtResource("7_nigks")
+[sub_resource type="AtlasTexture" id="AtlasTexture_tjris"]
+atlas = ExtResource("12_dj6ls")
 region = Rect2(96, 160, 32, 48)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_mxsg0"]
-atlas = ExtResource("7_nigks")
+[sub_resource type="AtlasTexture" id="AtlasTexture_wjgi7"]
+atlas = ExtResource("12_dj6ls")
 region = Rect2(64, 16, 40, 40)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_4qu17"]
-atlas = ExtResource("7_nigks")
+[sub_resource type="AtlasTexture" id="AtlasTexture_tu48u"]
+atlas = ExtResource("12_dj6ls")
 region = Rect2(96, 176, 40, 64)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_31kuo"]
-atlas = ExtResource("7_nigks")
+[sub_resource type="AtlasTexture" id="AtlasTexture_4hwoq"]
+atlas = ExtResource("12_dj6ls")
 region = Rect2(224, 160, 48, 64)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_4k7hr"]
-atlas = ExtResource("7_nigks")
+[sub_resource type="AtlasTexture" id="AtlasTexture_a1tdt"]
+atlas = ExtResource("12_dj6ls")
 region = Rect2(416, 16, 64, 80)
 
 [node name="S1PropPalette" type="Node2D"]
@@ -35,136 +40,196 @@ offset_left = 16.0
 offset_top = 8.0
 offset_right = 16.0
 offset_bottom = 8.0
-text = "PROP PALETTE — click a prop's Sprite2D in the Scene tree, Ctrl+C, open s1_yard_authored.tscn, click the Props node, Ctrl+V, then drag into place."
+text = "PROP PALETTE — click a prop's Sprite2D in the Scene tree, Ctrl+C, open s1_yard_authored.tscn, click the Props node, Ctrl+V, then drag into place. TOP ROW = the 5 BUILDING landmarks (assets/props/s1_yard). Below = decoration props (assets/props/s1_cloister) + Cainos props."
+
+[node name="ChapelBelltower" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(160, 200)
+texture = ExtResource("1_wdc7w")
+
+[node name="@Label@2" type="Label" parent="."]
+offset_left = 90.0
+offset_top = 330.0
+offset_right = 90.0
+offset_bottom = 330.0
+text = "ChapelBelltower"
+
+[node name="CloisterCentral" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(460, 200)
+texture = ExtResource("2_flkbs")
+
+[node name="@Label@3" type="Label" parent="."]
+offset_left = 390.0
+offset_top = 330.0
+offset_right = 390.0
+offset_bottom = 330.0
+text = "CloisterCentral"
+
+[node name="DormitoryRuinLeft" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(760, 200)
+texture = ExtResource("3_naff8")
+
+[node name="@Label@4" type="Label" parent="."]
+offset_left = 690.0
+offset_top = 330.0
+offset_right = 690.0
+offset_bottom = 330.0
+text = "DormitoryRuinLeft"
+
+[node name="DormitoryRuinRight" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(1060, 200)
+texture = ExtResource("4_ybndd")
+
+[node name="@Label@5" type="Label" parent="."]
+offset_left = 990.0
+offset_top = 330.0
+offset_right = 990.0
+offset_bottom = 330.0
+text = "DormitoryRuinRight"
+
+[node name="OutbuildingFar" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(1360, 200)
+texture = ExtResource("5_m431x")
+
+[node name="@Label@6" type="Label" parent="."]
+offset_left = 1290.0
+offset_top = 330.0
+offset_right = 1290.0
+offset_bottom = 330.0
+text = "OutbuildingFar"
 
 [node name="Pillar" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(64, 96)
-texture = ExtResource("1_xyc0p")
+position = Vector2(64, 480)
+texture = ExtResource("6_ux1o2")
 
-[node name="@Label@2" type="Label" parent="."]
+[node name="@Label@7" type="Label" parent="."]
 offset_left = 24.0
-offset_top = 156.0
+offset_top = 540.0
 offset_right = 24.0
-offset_bottom = 156.0
+offset_bottom = 540.0
 text = "Pillar"
 
 [node name="BrazierLit" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(224, 96)
-texture = ExtResource("2_1yb81")
+position = Vector2(224, 480)
+texture = ExtResource("7_4mc3y")
 
-[node name="@Label@3" type="Label" parent="."]
+[node name="@Label@8" type="Label" parent="."]
 offset_left = 184.0
-offset_top = 156.0
+offset_top = 540.0
 offset_right = 184.0
-offset_bottom = 156.0
+offset_bottom = 540.0
 text = "BrazierLit"
 
 [node name="BrazierCold" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(384, 96)
-texture = ExtResource("3_yh5of")
+position = Vector2(384, 480)
+texture = ExtResource("8_5s5jf")
 
-[node name="@Label@4" type="Label" parent="."]
+[node name="@Label@9" type="Label" parent="."]
 offset_left = 344.0
-offset_top = 156.0
+offset_top = 540.0
 offset_right = 344.0
-offset_bottom = 156.0
+offset_bottom = 540.0
 text = "BrazierCold"
 
 [node name="Banner" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(544, 96)
-texture = ExtResource("4_csc7s")
+position = Vector2(544, 480)
+texture = ExtResource("9_7op76")
 
-[node name="@Label@5" type="Label" parent="."]
+[node name="@Label@10" type="Label" parent="."]
 offset_left = 504.0
-offset_top = 156.0
+offset_top = 540.0
 offset_right = 504.0
-offset_bottom = 156.0
+offset_bottom = 540.0
 text = "Banner"
 
 [node name="Rubble" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(64, 276)
-texture = ExtResource("5_cksyi")
+position = Vector2(64, 660)
+texture = ExtResource("10_5n2u3")
 
-[node name="@Label@6" type="Label" parent="."]
+[node name="@Label@11" type="Label" parent="."]
 offset_left = 24.0
-offset_top = 336.0
+offset_top = 720.0
 offset_right = 24.0
-offset_bottom = 336.0
+offset_bottom = 720.0
 text = "Rubble"
 
 [node name="Parchment" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(224, 276)
-texture = ExtResource("6_b11i2")
+position = Vector2(224, 660)
+texture = ExtResource("11_wwpj2")
 
-[node name="@Label@7" type="Label" parent="."]
+[node name="@Label@12" type="Label" parent="."]
 offset_left = 184.0
-offset_top = 336.0
+offset_top = 720.0
 offset_right = 184.0
-offset_bottom = 336.0
+offset_bottom = 720.0
 text = "Parchment"
 
 [node name="CainosBarrel" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(64, 456)
-texture = SubResource("AtlasTexture_v4c0y")
+position = Vector2(64, 840)
+texture = SubResource("AtlasTexture_tjris")
 
-[node name="@Label@8" type="Label" parent="."]
+[node name="@Label@13" type="Label" parent="."]
 offset_left = 24.0
-offset_top = 506.0
+offset_top = 890.0
 offset_right = 24.0
-offset_bottom = 506.0
+offset_bottom = 890.0
 text = "CainosBarrel"
 
 [node name="CainosCrate" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(224, 456)
-texture = SubResource("AtlasTexture_mxsg0")
+position = Vector2(224, 840)
+texture = SubResource("AtlasTexture_wjgi7")
 
-[node name="@Label@9" type="Label" parent="."]
+[node name="@Label@14" type="Label" parent="."]
 offset_left = 184.0
-offset_top = 506.0
+offset_top = 890.0
 offset_right = 184.0
-offset_bottom = 506.0
+offset_bottom = 890.0
 text = "CainosCrate"
 
 [node name="CainosSignpost" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(384, 456)
-texture = SubResource("AtlasTexture_4qu17")
+position = Vector2(384, 840)
+texture = SubResource("AtlasTexture_tu48u")
 
-[node name="@Label@10" type="Label" parent="."]
+[node name="@Label@15" type="Label" parent="."]
 offset_left = 344.0
-offset_top = 506.0
+offset_top = 890.0
 offset_right = 344.0
-offset_bottom = 506.0
+offset_bottom = 890.0
 text = "CainosSignpost"
 
 [node name="CainosGravestone" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(544, 456)
-texture = SubResource("AtlasTexture_31kuo")
+position = Vector2(544, 840)
+texture = SubResource("AtlasTexture_4hwoq")
 
-[node name="@Label@11" type="Label" parent="."]
+[node name="@Label@16" type="Label" parent="."]
 offset_left = 504.0
-offset_top = 506.0
+offset_top = 890.0
 offset_right = 504.0
-offset_bottom = 506.0
+offset_bottom = 890.0
 text = "CainosGravestone"
 
 [node name="CainosStatue" type="Sprite2D" parent="."]
 texture_filter = 1
-position = Vector2(64, 616)
-texture = SubResource("AtlasTexture_4k7hr")
+position = Vector2(64, 1000)
+texture = SubResource("AtlasTexture_a1tdt")
 
-[node name="@Label@12" type="Label" parent="."]
+[node name="@Label@17" type="Label" parent="."]
 offset_left = 24.0
-offset_top = 666.0
+offset_top = 1050.0
 offset_right = 24.0
-offset_bottom = 666.0
+offset_bottom = 1050.0
 text = "CainosStatue"

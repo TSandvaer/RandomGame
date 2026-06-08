@@ -24,8 +24,20 @@ extends SceneTree
 const OUT_PATH := "res://scenes/levels/s1_prop_palette.tscn"
 const TILE := 32
 
-# Carried-forward PixelLab props (the real on-main set — see PR body note on the
-# ticket's `s1_yard/` path vs the actual `s1_cloister/` location).
+# The 5 REAL S1 BUILDING LANDMARKS — warm-sandstone PixelLab buildings,
+# orch-generated + judged-good, the actual yard landmarks. Large sprites (up to
+# ~246px) — placed in their own top row with wide spacing. Distinct from the
+# smaller s1_cloister DECORATION props below.
+const BUILDING_PROPS := [
+	["ChapelBelltower", "res://assets/props/s1_yard/chapel_belltower.png"],
+	["CloisterCentral", "res://assets/props/s1_yard/cloister_central.png"],
+	["DormitoryRuinLeft", "res://assets/props/s1_yard/dormitory_ruin_left.png"],
+	["DormitoryRuinRight", "res://assets/props/s1_yard/dormitory_ruin_right.png"],
+	["OutbuildingFar", "res://assets/props/s1_yard/outbuilding_far.png"],
+]
+
+# Carried-forward PixelLab DECORATION props (smaller — pillars/braziers/banners/
+# rubble/parchment) at assets/props/s1_cloister/.
 const PIXELLAB_PROPS := [
 	["Pillar", "res://assets/props/s1_cloister/pillar_arch.png"],
 	["BrazierLit", "res://assets/props/s1_cloister/brazier_lit.png"],
@@ -55,15 +67,32 @@ func _init() -> void:
 	info.name = "HowTo"
 	info.position = Vector2(16, 8)
 	info.text = "PROP PALETTE — click a prop's Sprite2D in the Scene tree, Ctrl+C, " + \
-		"open s1_yard_authored.tscn, click the Props node, Ctrl+V, then drag into place."
+		"open s1_yard_authored.tscn, click the Props node, Ctrl+V, then drag into place. " + \
+		"TOP ROW = the 5 BUILDING landmarks (assets/props/s1_yard). Below = decoration " + \
+		"props (assets/props/s1_cloister) + Cainos props."
 	info.owner = null
 	root.add_child(info)
 	info.owner = root
 
-	var x := 64.0
-	var y := 96.0
+	var x := 160.0
+	var y := 200.0
 	var col := 0
 
+	# --- Row 1: the 5 BUILDING landmarks (large, wide spacing) ---
+	for entry in BUILDING_PROPS:
+		var spr := _make_sprite(entry[0], load(entry[1]) as Texture2D, Vector2(x, y))
+		root.add_child(spr)
+		spr.owner = root
+		_add_label(root, entry[0], Vector2(x - 70, y + 130))
+		x += 300.0
+		col += 1
+		if col >= 5:
+			col = 0
+
+	# --- Decoration props (smaller) ---
+	x = 64.0
+	y = 480.0
+	col = 0
 	for entry in PIXELLAB_PROPS:
 		var spr := _make_sprite(entry[0], load(entry[1]) as Texture2D, Vector2(x, y))
 		root.add_child(spr)
