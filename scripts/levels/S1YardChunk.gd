@@ -123,7 +123,8 @@ const WALL_ATLAS_PERIOD: int = 4
 ## SPRING pools (S1-YARD T8, Uma §3.2; orch handoff: ColorRect-pool, NO bespoke asset).
 ## Each is a damp low/shadow corner where ground water surfaces. Authored in TILES as
 ## (x, y) pool-centre; the painter draws a still dark warm-neutral ColorRect pool there
-## ringed by the carried-forward moss_patch (wettest-moss clustering) over the cobble.
+## drawn as just the ColorRect water pool (the moss_patch sprite ring was REMOVED in #426 —
+## Sponsor flagged the green-flecked spiky moss sprites as ugly trash; water is the feature).
 ## Two pools: one at the north-wall base (damp shadow under the chapel range), one in the
 ## dip near the dormitory ruin (SW). Both sit in OPEN cobble, clear of mob spawns + the spine.
 @export var spring_tiles: Array[Vector2i] = [
@@ -133,7 +134,8 @@ const WALL_ATLAS_PERIOD: int = 4
 
 ## GARDEN BED gone wild (S1-YARD T8, Uma §4). ONE hero bed of tilled-soil-gone-to-weeds
 ## near the dormitory range (south). Authored as a TILE rect; the painter tints a damp
-## earth ColorRect bed + clusters moss_patch overgrowth (reuse, no new asset). Placed in
+## earth ColorRect bed (the moss_patch overgrowth clustering was REMOVED in #426 — Sponsor
+## flagged those green-flecked spiky moss sprites as ugly trash). Placed in
 ## open cobble south of the central building, clear of the south range footprint + spawns.
 @export var garden_bed: Rect2i = Rect2i(12, 17, 4, 3)
 
@@ -367,8 +369,8 @@ func _build_well_collision() -> void:
 
 ## Paint the SPRING pools (S1-YARD T8, Uma §3.2 + orch handoff). Each spring is a still
 ## dark warm-neutral ColorRect pool (S1_YARD_WATER_DOCTRINE — sub-1.0, NEVER pure-black,
-## PL-WATER-01/02) over the cobble, ringed by the carried-forward moss_patch (wettest-moss
-## clustering, the most-reclaimed spots). NO bespoke asset, NO animation (still water =
+## PL-WATER-01/02) over the cobble. The moss_patch sprite ring is REMOVED (#426 — Sponsor
+## flagged the green-flecked spiky moss sprites as ugly trash). NO bespoke asset, NO animation (still water =
 ## zero HTML5 gate per §3.3); a single fixed sparse highlight ColorRect reads "quiet catch
 ## of light on the surface" without any tween. NO Polygon2D (PR #137).
 func _paint_springs() -> void:

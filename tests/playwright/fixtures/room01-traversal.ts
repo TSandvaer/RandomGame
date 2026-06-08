@@ -69,7 +69,37 @@
 
 import type { Locator, Page } from "@playwright/test";
 import type { ConsoleCapture } from "./console-capture";
-import { clickAtWorldPos } from "./mouse-facing";
+import { clickAtWorldPos, latestPlayerPos } from "./mouse-facing";
+
+/**
+ * Dummy world position (mirrors `s1_room01.tres` → assembled world ~(368,144)).
+ */
+const DUMMY_WORLD_POS = { x: 368, y: 144 };
+
+/**
+ * Scale-robust approach threshold (world px) the helper walks the player to
+ * within of the dummy BEFORE attack-sweeping (ticket 86ca5hwmx soak-rev).
+ *
+ * **Why this exists.** The player's swing reach scales with `char_scale`: the
+ * light hitbox is `(LIGHT_REACH 28 + LIGHT_HITBOX_RADIUS 18)·s` of contact +
+ * the dummy body `(12·s)`, so the player-center-to-dummy-center distance the
+ * swing can cover is `(28+18+12)·s = 58·s` px. At the prior 0.6 scale that's
+ * ~34.8 px; at the Sponsor-locked 0.48 it's ~27.8 px — a 7 px tighter window.
+ * The pre-fix helper relied on FIXED-duration WASD walks (Phases A/B) tuned to
+ * land inside the 0.6 window, then click-spammed at the dummy world pos. At
+ * 0.48 those fixed walks left the player at ~47-76 px during attack frames
+ * (empirically, run 27119614721's Room01 trace: player attacking from
+ * pos≈(356,219)/(366,81), ~63-76 px from the dummy) — just OUTSIDE the shrunken
+ * reach, so 0 hits landed and the dummy never died ("Player likely never
+ * reached the dummy").
+ *
+ * Rather than re-tune the fixed walks to 0.48 (which would re-break at the next
+ * scale change), `walkPlayerToDummy` reads the LIVE `Player.pos` trace and
+ * closes the gap until within this threshold — robust at 0.48 AND any future
+ * scale. Set conservatively (24 px) BELOW the 0.48 reach (27.8 px) so a few px
+ * of residual drift between the last pos-read and the swing still lands.
+ */
+const DUMMY_APPROACH_THRESHOLD_PX = 24;
 
 /**
  * 8-direction sweep covering every approach angle the player could have
@@ -191,6 +221,54 @@ export async function clearRoom01Dummy(
 
   let attacksFired = 0;
 
+  // **Scale-robust gap-close (ticket 86ca5hwmx soak-rev).** Read the live
+  // `Player.pos` trace and walk the player toward the dummy until within
+  // `DUMMY_APPROACH_THRESHOLD_PX`. Each iteration walks the dominant-error axis
+  // for a short burst, then re-reads position. Bounded by `maxMs` so it can't
+  // hang the budget if pos traces stall. Returns the last measured distance
+  // (Infinity if no Player.pos trace was ever seen). Walking is by WORLD-delta
+  // sign — robust to char_scale (movement speed is scale-independent; only the
+  // bodies' geometry scales), so this converges identically at 0.48 and 0.6.
+  const walkPlayerToDummy = async (maxMs: number): Promise<number> => {
+    const deadline = Date.now() + maxMs;
+    let lastDist = Number.POSITIVE_INFINITY;
+    while (Date.now() < deadline && Date.now() - t0 < budgetMs) {
+      const pos = latestPlayerPos(capture);
+      if (pos == null) {
+        // No pos trace yet — nudge N a hair to provoke a physics tick, retry.
+        await page.keyboard.down("w");
+        await page.waitForTimeout(60);
+        await page.keyboard.up("w");
+        await page.waitForTimeout(60);
+        continue;
+      }
+      const dx = DUMMY_WORLD_POS.x - pos.x;
+      const dy = DUMMY_WORLD_POS.y - pos.y;
+      lastDist = Math.hypot(dx, dy);
+      if (lastDist <= DUMMY_APPROACH_THRESHOLD_PX) return lastDist;
+      // Walk both axes whose error exceeds the threshold/2, so diagonal
+      // approaches converge without overshoot oscillation. Burst length scales
+      // mildly with remaining error (clamped) so we don't overshoot the dummy.
+      const keys: string[] = [];
+      if (Math.abs(dx) > DUMMY_APPROACH_THRESHOLD_PX / 2)
+        keys.push(dx > 0 ? "d" : "a");
+      if (Math.abs(dy) > DUMMY_APPROACH_THRESHOLD_PX / 2)
+        keys.push(dy > 0 ? "s" : "w");
+      if (keys.length === 0) return lastDist;
+      // WALK_SPEED ≈ 120 px/s → ~8.3 ms/px. Burst toward the larger error,
+      // clamped to [60, 240] ms so a single step never blows past the dummy.
+      const burstMs = Math.max(
+        60,
+        Math.min(240, Math.round(Math.max(Math.abs(dx), Math.abs(dy)) * 6))
+      );
+      for (const k of keys) await page.keyboard.down(k);
+      await page.waitForTimeout(burstMs);
+      for (const k of keys) await page.keyboard.up(k);
+      await page.waitForTimeout(120); // settle + let a fresh Player.pos emit
+    }
+    return lastDist;
+  };
+
   const attackSweep = async (
     directions: { keys: string[]; label: string }[]
   ): Promise<boolean> => {
@@ -204,7 +282,7 @@ export async function clearRoom01Dummy(
     // marker (does nothing facing-wise post-PR-#255) so the call shape stays
     // stable for any future spec that wants to layer movement back in; the
     // load-bearing aim is the world-coord click. See `mouse-facing.ts` header.
-    const DUMMY_WORLD_POS = { x: 368, y: 144 };
+    // (DUMMY_WORLD_POS is module-scoped — shared with `walkPlayerToDummy`.)
     for (const dir of directions) {
       // No-op input cycle — preserved for diff-stability with pre-#255 specs.
       // The chord does NOT set facing post-#255; it's the click that aims.
@@ -240,33 +318,31 @@ export async function clearRoom01Dummy(
     dummyKilled = checkDummyDead();
   }
 
+  // ---- Phase B2: scale-robust gap-close (ticket 86ca5hwmx) ----
+  // Phases A/B are a fast fixed approximation; B2 reads the LIVE Player.pos
+  // and closes any residual gap to within the (scale-aware) reach threshold.
+  // This is the load-bearing fix for the char_scale-0.48 reach shrink — the
+  // fixed walks alone leave the player just outside the shrunken swing reach.
+  if (!dummyKilled) {
+    await walkPlayerToDummy(6_000);
+    dummyKilled = checkDummyDead();
+  }
+
   // ---- Phase C: 8-direction attack sweep ----
   if (!dummyKilled) {
     dummyKilled = await attackSweep(SWEEP_DIRECTIONS);
   }
 
-  // ---- Phase D: small SW correction + retry sweep (in case walls clamped
-  // the player far from the dummy) ----
+  // ---- Phase D: re-close the gap + retry sweep (in case walls clamped
+  // the player far from the dummy, or the sweep drift carried them out) ----
   if (!dummyKilled && Date.now() - t0 < budgetMs - 12_000) {
-    await page.keyboard.down("s");
-    await page.keyboard.down("a");
-    await page.waitForTimeout(200);
-    await page.keyboard.up("a");
-    await page.keyboard.up("s");
-    await page.waitForTimeout(150);
+    await walkPlayerToDummy(6_000);
     dummyKilled = await attackSweep(SWEEP_DIRECTIONS);
   }
 
-  // ---- Phase E: extra N+E walk + sweep retry (if phase B undershot) ----
+  // ---- Phase E: final gap-close + sweep retry ----
   if (!dummyKilled && Date.now() - t0 < budgetMs - 12_000) {
-    await page.keyboard.down("w");
-    await page.waitForTimeout(500);
-    await page.keyboard.up("w");
-    await page.waitForTimeout(100);
-    await page.keyboard.down("d");
-    await page.waitForTimeout(800);
-    await page.keyboard.up("d");
-    await page.waitForTimeout(150);
+    await walkPlayerToDummy(8_000);
     dummyKilled = await attackSweep(SWEEP_DIRECTIONS);
   }
 

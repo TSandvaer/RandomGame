@@ -370,7 +370,7 @@ func _process_chase(_delta: float) -> void:
 	if dist < 0.0001:
 		velocity = Vector2.ZERO
 		return
-	if dist <= ATTACK_RANGE:
+	if dist <= _effective_attack_range():
 		# In melee range — begin light-attack telegraph (M1 RC soak-4 fix).
 		# Lock attack direction and root the grunt for LIGHT_TELEGRAPH_DURATION
 		# so the player can see the red-glow windup and react.
@@ -573,6 +573,26 @@ func _apply_post_contact_pushback(dir: Vector2) -> void:
 		if away.length_squared() > 0.0:
 			pushback_dir = away.normalized()
 	velocity = pushback_dir * POST_CONTACT_PUSHBACK_SPEED
+
+
+## Scale-effective melee trigger distance (ticket 86ca5hwmx soak-rev).
+##
+## `ATTACK_RANGE` is authored in the grunt's LOCAL space (it was implicitly
+## tuned against the light hitbox's contact envelope at scale 1.0). But the
+## chase check compares it against `dist`, which is the UNSCALED world distance
+## between two CharacterBody2D `global_position`s — positions don't scale, only
+## the bodies' Sprite + CollisionShape2D + Hitbox children do (via the root
+## scale `Main._apply_char_scale` writes). When the char-scale shrinks (Sponsor
+## locked 0.48), the light hitbox's world contact distance shrinks linearly
+## ((24+16)·s + player_body·s) but a FIXED `ATTACK_RANGE` did not — so the grunt
+## parked just inside the unscaled 28 px trigger yet just OUTSIDE its shrunken
+## 24 px hitbox contact, swinging into empty air forever (0 `Hitbox.hit` against
+## a passive player; empirically dist≈27-28 in run 27119614721's Room02 trace).
+## Multiplying by `scale.x` makes the trigger track the hitbox contact across
+## ANY scale: 1.0→28, 0.48→13.44 (comfortably inside the 0.48 contact AND
+## outside the body block-floor). `max(scale.x, 0.0001)` guards a zeroed scale.
+func _effective_attack_range() -> float:
+	return ATTACK_RANGE * maxf(scale.x, 0.0001)
 
 
 func _spawn_hitbox(

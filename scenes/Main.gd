@@ -2431,11 +2431,28 @@ func _apply_char_scale(normalized: float) -> void:
 	var s: Vector2 = Vector2(normalized, normalized)
 	if _player != null and is_instance_valid(_player):
 		_player.scale = s
-	if _current_room == null:
-		return
-	if not _current_room.has_method("get_spawned_mobs"):
-		return
-	for m: Node in _current_room.get_spawned_mobs():
+	# Two distinct mob-spawn surfaces carry non-boss mobs and BOTH must be
+	# scaled (ticket 86ca5hwmx soak-rev — Sponsor caught a full-size grunt in
+	# the `?s1_assembler=1` yard standing ~2x the 0.48 player). Pre-fix this
+	# function early-returned on `_current_room == null`, which is exactly the
+	# state on the assembler path (`_render_assembled_s1_floor` tears the static
+	# room down), so assembled-floor mobs NEVER got scaled — the player shrank,
+	# the mobs stayed at 1.0.
+	#   1. Static-room path — `_current_room.get_spawned_mobs()`.
+	#   2. Assembled-floor path — `_s1_mobs` / `_s2_mobs` under the floor
+	#      container. The static room is null here.
+	# Both are scaled when present; an inactive surface contributes nothing.
+	_scale_mob_list(_room_spawned_mobs(), s)
+	_scale_mob_list(_s1_mobs, s)
+	_scale_mob_list(_s2_mobs, s)
+
+
+## Non-boss-filtered root scale over a mob list. Bosses are EXCLUDED via
+## `_char_scale_is_boss` (Sponsor's explicit choice). Scaling the ROOT
+## CharacterBody2D scales its Sprite AND CollisionShape2D / Hitbox children
+## together — no big-hitbox-on-small-sprite mismatch.
+func _scale_mob_list(mobs: Array, s: Vector2) -> void:
+	for m: Node in mobs:
 		if m == null or not is_instance_valid(m):
 			continue
 		if not (m is Node2D):
@@ -2443,6 +2460,16 @@ func _apply_char_scale(normalized: float) -> void:
 		if _char_scale_is_boss(m):
 			continue
 		(m as Node2D).scale = s
+
+
+## The static-room spawned-mob list, or an empty array when no static room is
+## active (assembler path) or the room lacks the accessor.
+func _room_spawned_mobs() -> Array:
+	if _current_room == null:
+		return []
+	if not _current_room.has_method("get_spawned_mobs"):
+		return []
+	return _current_room.get_spawned_mobs()
 
 
 ## Boss discriminator for char-scale exclusion. A node is a boss iff it has the

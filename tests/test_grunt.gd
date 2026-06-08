@@ -180,6 +180,59 @@ func test_state_swings_when_in_attack_range() -> void:
 	assert_signal_emitted(g, "swing_spawned")
 
 
+func test_effective_attack_range_tracks_root_scale() -> void:
+	# REGRESSION-86ca5hwmx (Sponsor soak-rev): the melee trigger must scale with
+	# the grunt's root scale. `ATTACK_RANGE` is authored in LOCAL space (tuned
+	# against the light hitbox's contact envelope at scale 1.0), but the chase
+	# check compares it against `dist`, the UNSCALED world distance. At char-scale
+	# 0.48 the light hitbox's world contact shrinks to ~24 px while a FIXED 28 px
+	# trigger does not — so the grunt parked just inside the trigger yet just
+	# OUTSIDE its own shrunken hitbox, swinging into empty air (0 hits vs a passive
+	# player; empirically dist≈27-28 in run 27119614721). Multiplying by scale.x
+	# makes the trigger track the contact across ANY scale.
+	var g: Grunt = _make_grunt()
+	g.scale = Vector2.ONE
+	assert_almost_eq(
+		g._effective_attack_range(), Grunt.ATTACK_RANGE, 0.0001, "1.0 scale → unchanged 28 px"
+	)
+	g.scale = Vector2(0.48, 0.48)
+	assert_almost_eq(
+		g._effective_attack_range(),
+		Grunt.ATTACK_RANGE * 0.48,
+		0.0001,
+		"0.48 scale → 13.44 px trigger (well inside the 0.48 hitbox contact)"
+	)
+
+
+func test_scaled_grunt_keeps_closing_inside_unscaled_attack_range() -> void:
+	# Behavioral pin for the dead-gap fix: at scale 0.48 a grunt at dist=27 (inside
+	# the UNSCALED 28 px ATTACK_RANGE but OUTSIDE the scaled 13.44 px trigger AND
+	# outside its ~24 px scaled hitbox contact) must KEEP CHASING — NOT park and
+	# swing into air. Pre-fix it triggered the telegraph here and never landed a hit.
+	var g: Grunt = _make_grunt()
+	g.scale = Vector2(0.48, 0.48)
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	g.global_position = Vector2.ZERO
+	p.global_position = Vector2(27.0, 0.0)  # inside unscaled 28, outside scaled 13.44
+	g.set_player(p)
+	g._physics_process(0.016)
+	assert_eq(
+		g.get_state(),
+		Grunt.STATE_CHASING,
+		"scaled grunt keeps closing the gap instead of parking out-of-reach (dead-gap fix)"
+	)
+	assert_gt(g.velocity.x, 0.0, "still steering toward the player")
+	# And once it closes inside the scaled trigger, it DOES telegraph.
+	p.global_position = Vector2(12.0, 0.0)  # inside scaled 13.44
+	g._physics_process(0.016)
+	assert_eq(
+		g.get_state(),
+		Grunt.STATE_TELEGRAPHING_LIGHT,
+		"scaled grunt telegraphs once inside the scale-effective trigger"
+	)
+
+
 func test_state_recovers_then_returns_to_chasing() -> void:
 	var g: Grunt = _make_grunt()
 	var p: FakePlayer = FakePlayer.new()

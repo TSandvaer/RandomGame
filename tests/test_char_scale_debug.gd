@@ -291,6 +291,49 @@ func test_main_apply_char_scale_scales_player_and_nonboss_mobs() -> void:
 		)
 
 
+func test_apply_char_scale_scales_assembler_floor_mobs() -> void:
+	# REGRESSION-86ca5hwmx (Sponsor soak of a1a809d): in the `?s1_assembler=1`
+	# yard a full-size (1.0) grunt stood ~2x the 0.48 player. Root cause: the
+	# pre-fix `_apply_char_scale` early-returned on `_current_room == null` —
+	# which is exactly the state on the assembler path (`_render_assembled_s1_floor`
+	# tears the static room down). So the PLAYER scaled but the assembled-floor
+	# mobs (`_s1_mobs`) NEVER did. This test boots the assembler floor and asserts
+	# every spawned non-boss mob's ROOT scale tracks the applied value — the
+	# `_current_room == null`-guard regression cannot recur silently.
+	var main: Node = MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+	main.call("load_s1_zone_for_test")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_true(main.call("is_s1_floor_active"), "S1 assembler floor active")
+	# The static room is null on the assembler path — the exact pre-fix early-out.
+	assert_null(main.get("_current_room"), "assembler path has no static _current_room")
+	main.call("_apply_char_scale", 0.48)
+	var player: Node = main.get("_player")
+	assert_not_null(player, "Main has a player on the assembler floor")
+	assert_almost_eq(
+		(player as Node2D).scale.x, 0.48, 0.0001, "player root scaled to 0.48 on assembler floor"
+	)
+	var s1_mobs: Array = main.call("get_s1_mobs")
+	assert_gt(s1_mobs.size(), 0, "assembler yard slice spawned the authored grunt mobs")
+	for m in s1_mobs:
+		if m == null or not is_instance_valid(m):
+			continue
+		# Boss exclusion still holds — the yard slice spawns only grunts, but the
+		# filter is the same `_char_scale_is_boss` path, so a future boss spawn
+		# stays 1.0. Here every mob is a non-boss grunt → must be 0.48.
+		assert_almost_eq(
+			(m as Node2D).scale.x,
+			0.48,
+			0.0001,
+			"assembler-floor non-boss mob %s scaled to 0.48 (the application-gap fix)" % str(m.name)
+		)
+	main.queue_free()
+
+
 func test_main_room_load_applies_production_default_with_no_param() -> void:
 	# THE LOCK end-to-end (ticket 86ca3rgxq): with NO `?char_scale` param active
 	# (the default headless/desktop state — no JS bridge), loading a room must scale

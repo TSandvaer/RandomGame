@@ -43,7 +43,7 @@ const SOURCE_SLAB: int = 2  # warm-sandstone flagstone slab-path source (T8)
 
 # Well-head footprint mirror (matches S1YardChunk.well_footprint) — the nav grid
 # bakes this as a wall too (the well is a solid walk-AROUND landmark, like buildings).
-const WELL_FOOTPRINT := Rect2i(20, 16, 2, 2)  # SOAK-REVISION #426: 3x3→2x2 (well scale 0.85→0.42)
+const WELL_FOOTPRINT := Rect2i(20, 16, 2, 2)  # SOAK-REVISION #426: 3x3→2x2 (well scale 0.85→0.35)
 
 # S1_YARD_WATER_DOCTRINE / path doctrine eye-dropper hexes (Uma §2.4 / §3.3) — pinned
 # so a regression that recolours the doctrine surfaces fails loudly. Values are the

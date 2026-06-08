@@ -550,9 +550,17 @@ func _maybe_charge_hit_player() -> void:
 	if _player in _charge_already_hit:
 		return
 	var dist: float = (_player.global_position - global_position).length()
-	# Body-hitbox is roughly the charger's radius + small reach. Use the
-	# same scale as the contact hitbox we'd spawn.
-	if dist > CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH:
+	# Body-hitbox is roughly the charger's radius + small reach. The envelope
+	# is authored in LOCAL space; `dist` is UNSCALED world distance (positions
+	# don't scale, only the body's Sprite + CollisionShape2D + Hitbox children
+	# do via the root scale Main._apply_char_scale writes). Multiply by `scale.x`
+	# so the spawn gate tracks the SHRUNKEN contact envelope at char-scale 0.48
+	# (ticket 86ca5hwmx soak-rev) — otherwise the charger spawns a contact
+	# hitbox at up to 32 px while the scaled hitbox only reaches ~20 px contact,
+	# "using up" the charge on a swing that can't connect. `max(scale.x, …)`
+	# guards a zeroed scale. Sibling of `Grunt._effective_attack_range`.
+	var envelope: float = (CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH) * maxf(scale.x, 0.0001)
+	if dist > envelope:
 		return
 	# Spawn the contact hitbox and stop charge.
 	var hb: Hitbox = _spawn_charge_hitbox()

@@ -428,6 +428,48 @@ func test_charge_contact_hitbox_is_enemy_team() -> void:
 	assert_eq(c.get_state(), Charger.STATE_RECOVERING)
 
 
+# ---- 12b: charge-contact envelope scales with root scale --------
+
+
+func test_charge_contact_envelope_scales_with_root_scale() -> void:
+	# REGRESSION-86ca5hwmx (Sponsor soak-rev, sibling of Grunt._effective_attack_range):
+	# the charge-contact spawn gate `dist > CHARGE_HITBOX_RADIUS + CHARGE_HITBOX_REACH`
+	# is authored in LOCAL space (32 px) but compares against UNSCALED world `dist`.
+	# At char-scale 0.48 the spawned hitbox only reaches ~20 px contact, so a gate
+	# of 32 px would "use up" the charge on a swing that can't connect. Multiplying
+	# by scale.x makes the gate track the shrunken envelope: at dist=24 (inside the
+	# unscaled 32 px gate but OUTSIDE the scaled 0.48 envelope of ~15.4 px) the
+	# charger must NOT spawn a contact hitbox.
+	#
+	# We call `_maybe_charge_hit_player()` DIRECTLY (not via a physics tick) so the
+	# positions stay FIXED — the charger is a moving dasher, so a `_physics_process`
+	# tick would integrate the charge velocity and move the body out from under the
+	# fixed-distance assertion. The gate math is what's under test, not the dash.
+	var c: Charger = _make_charger()
+	c.scale = Vector2(0.48, 0.48)
+	var p: FakePlayer = FakePlayer.new()
+	add_child_autofree(p)
+	c.global_position = Vector2.ZERO
+	p.global_position = Vector2(24.0, 0.0)  # inside unscaled 32, outside scaled ~15.4
+	c.set_player(p)
+	# Put the charger in a charging posture with a locked direction so the
+	# contact-hitbox spawn path (`_spawn_charge_hitbox` reads `_charge_dir`) is valid.
+	c._charge_dir = Vector2.RIGHT
+	var captured_hb: Array = [null]
+	c.charge_hit_spawned.connect(func(hb: Node) -> void: captured_hb[0] = hb)
+	c._maybe_charge_hit_player()
+	assert_null(
+		captured_hb[0],
+		"scaled charger does NOT spawn a contact hitbox beyond its shrunken envelope (dist=24 > 15.4)"
+	)
+	# Close inside the scaled envelope — now it DOES spawn.
+	p.global_position = Vector2(12.0, 0.0)  # inside scaled ~15.4
+	c._maybe_charge_hit_player()
+	assert_not_null(
+		captured_hb[0], "scaled charger spawns the contact hitbox once inside the scaled envelope"
+	)
+
+
 # ---- 13: apply_mob_def() rebinds at runtime ---------------------
 
 
