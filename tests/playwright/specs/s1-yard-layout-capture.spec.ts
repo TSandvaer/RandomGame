@@ -4,32 +4,29 @@
  * S1 yard APPROVED-LAYOUT in-game GPU capture (ticket 86ca5hwmx, PR #426).
  *
  * The VISUAL-VERIFICATION-GATE capture for the Sponsor-approved s1-yard-layout-
- * design.md layout: boots the release artifact with `?s1_assembler=1` so Main
- * loads the yard through the FloorAssembler path, then drives the player WEST→EAST
- * (and a SOUTH detour to the well) capturing IN-GAME GPU screenshots of the key
- * layout beats:
- *   1. spawn vista (chapel + bell-tower NW, the lane leading east)
- *   2. the upper-center rise + the FORK at the central building
- *   3. the WELL focal landmark (south detour) + spring + garden
- *   4. the central building's lit south window facing the approach
- *   5. the east descent approach
+ * design.md layout: boots the release artifact with `?s1_assembler=1`, then drives
+ * the player to FRAME each building landmark (the camera follows + clamps to the
+ * assembled-floor bounds) and captures IN-GAME GPU screenshots:
+ *   - chapel + bell-tower (NW spawn shoulder; drive N from spawn)
+ *   - dormitory ruins LEFT + RIGHT (S edge; drive S)
+ *   - the WELL focal landmark + spring seep + garden (south-center)
+ *   - central cloister building w/ the lit ember south-window (drive E+N)
+ *   - far outbuilding (east horizon; drive far E)
+ *   - a wide-as-possible overview framing spine/fork + multiple silhouettes
  *
- * Per the HARD verification gate (orch dispatch): this is an IN-GAME GPU
- * screenshot — NEVER a standalone render tool (the render tool diverged from the
- * game and caused the S1-saga false approvals). The captures are the author
- * self-soak evidence attached to the Self-Test Report + PR body.
+ * Per the HARD gate (orch dispatch): IN-GAME GPU screenshot — NEVER a standalone
+ * render tool (the render-tool divergence caused the S1-saga false approvals).
+ *
+ * v2 (orch black-square + landmark-framing re-judge 2026-06-08): the first 6 shots
+ * were ground-centric (player spawns vertical-CENTER at tile y12; the chapel at
+ * y0-2 sits ABOVE the viewport, so the spawn vista never framed it). This pass
+ * DRIVES the player TO each building so the camera centers it. The black-square
+ * artifact (the opaque spring ColorRect, diagnosed via [prop-trace]) is fixed —
+ * the damp seep is now semi-transparent.
  *
  * Per html5-export.md § "Playwright headless ≠ real-browser perception", these
- * captures prove the layout RENDERS in-engine (buildings/spine/well/grunts in the
- * right places, warning-clean) — Sponsor's interactive soak remains the FEEL gate
- * of record.
- *
- * References:
- *   - team/uma-ux/s1-yard-layout-design.md — the APPROVED coordinate layout
- *   - team/uma-ux/s1-yard-building-assets.md — the iso building-sprite spec
- *   - scenes/levels/chunks/s1_yard_slice_chunk.tscn — building sprites + props
- *   - scripts/levels/S1YardChunk.gd — lane router + collision + well/spring/garden
- *   - tests/playwright/fixtures/test-base.ts — universal USER WARNING gate
+ * captures prove the layout RENDERS in-engine; Sponsor's interactive soak remains
+ * the FEEL gate of record.
  */
 
 import { test, expect } from "../fixtures/test-base";
@@ -47,7 +44,7 @@ async function shot(page: import("@playwright/test").Page, name: string): Promis
   await page.screenshot({ path: path.join(SHOT_DIR, `${name}.png`) });
 }
 
-/** Hold a key for `ms` to drive the player (camera follows). */
+/** Hold a key for `ms` to drive the player (camera follows + clamps to floor bounds). */
 async function drive(
   page: import("@playwright/test").Page,
   key: string,
@@ -56,11 +53,11 @@ async function drive(
   await page.keyboard.down(key);
   await page.waitForTimeout(ms);
   await page.keyboard.up(key);
-  await page.waitForTimeout(250); // settle a frame for the camera + render
+  await page.waitForTimeout(300); // settle a frame for the camera + render
 }
 
 test.describe("S1 yard APPROVED-LAYOUT in-game GPU capture", () => {
-  test("captures the layout beats on the assembler path", async ({ page, context }) => {
+  test("frames each building landmark on the assembler path", async ({ page, context }) => {
     await context.route("**/*", (route) => route.continue());
     const capture = new ConsoleCapture(page);
     capture.attach();
@@ -68,8 +65,6 @@ test.describe("S1 yard APPROVED-LAYOUT in-game GPU capture", () => {
     const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:8000";
     await page.goto(`${baseURL}?s1_assembler=1`, { waitUntil: "domcontentloaded" });
 
-    // Confirm the build + assembler-path load (the render is meaningful only if the
-    // yard actually loaded through the assembler).
     await capture.waitForLine(/\[BuildInfo\] build: [0-9a-f]{7}/, SMOKE_LINE_TIMEOUT_MS);
     const loadLine = await capture.waitForLine(
       /\[combat-trace\] Main\.load_s1_zone \|.*zone_id=s1_z1_yard_slice/,
@@ -79,30 +74,38 @@ test.describe("S1 yard APPROVED-LAYOUT in-game GPU capture", () => {
 
     const canvas = page.locator("canvas");
     await canvas.focus().catch(() => {});
-    await page.waitForTimeout(600); // let the first frame settle
+    await page.waitForTimeout(600);
 
-    // 1. SPAWN VISTA — chapel + bell-tower NW, the lane leading east.
-    await shot(page, "01_spawn_vista");
+    // Spawn is left-edge, vertical-center (~world 24, 384). Drive N toward the chapel
+    // (footprint x0-7,y0-2 → base ~y96): the camera clamps to the top floor bound, framing
+    // the chapel + bell-tower at the NW spawn shoulder.
+    await drive(page, "KeyW", 1600);
+    await shot(page, "b1_chapel_belltower");
 
-    // 2. THE RISE + FORK — drive east along the upper-center spine toward the central
-    //    building / fork. Several east bursts move the camera across the yard.
-    await drive(page, "KeyD", 1400);
-    await shot(page, "02_rise_east");
-    await drive(page, "KeyD", 1400);
-    await shot(page, "03_fork_central");
+    // Back to center then S toward the dormitory ruins (footprint x0-14,y21-23, S edge).
+    await drive(page, "KeyS", 2400);
+    await shot(page, "b2_dormitory_ruins");
 
-    // 3. THE WELL — detour SOUTH toward the south-center well + spring + garden.
-    await drive(page, "KeyS", 1100);
-    await shot(page, "04_well_south");
+    // E a little + stay low → the WELL (tile 12,17 → world ~400,560) + spring + garden.
+    await drive(page, "KeyD", 1300);
+    await shot(page, "b3_well_focal");
 
-    // 4. CONTINUE EAST — central building lit-S-window face + east approach.
-    await drive(page, "KeyW", 900);
-    await drive(page, "KeyD", 1600);
-    await shot(page, "05_central_window");
-    await drive(page, "KeyD", 1600);
-    await shot(page, "06_east_descent");
+    // Up to the central building (footprint x26-29,y0-3 → world ~896,64) via E then N. The
+    // lit ember SOUTH window faces the approach (canvas-S of the structure).
+    await drive(page, "KeyD", 2600);
+    await drive(page, "KeyW", 1500);
+    await shot(page, "b4_central_lit_window");
 
-    // Universal warning gate — the capture run must also be USER WARNING / ERROR clean.
+    // Far E + N to the outbuilding (footprint x38-39,y2-3 → world ~1248,80) on the east horizon.
+    await drive(page, "KeyD", 2600);
+    await shot(page, "b5_far_outbuilding");
+
+    // Wide overview: drop to mid-yard (the fork/spine + well + central silhouette together).
+    await drive(page, "KeyA", 1400);
+    await drive(page, "KeyS", 700);
+    await shot(page, "b6_overview_spine_fork");
+
+    // Universal warning gate.
     const warns = capture
       .getLines()
       .filter((l) => /USER WARNING:/.test(l.text) || /USER ERROR:/.test(l.text));

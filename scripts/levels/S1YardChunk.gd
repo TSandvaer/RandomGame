@@ -162,8 +162,13 @@ const BLEND_BAND_CELLS: int = 3
 @export var garden_bed: Rect2i = Rect2i(19, 18, 2, 3)
 
 ## S1_YARD_WATER_DOCTRINE (Uma §3.3) — still, dark, warm-neutral, sub-1.0, NEVER pure-black.
-const WATER_BASE := Color(0.180, 0.165, 0.149, 1.0)  # #2E2A26 dark warm-neutral still surface
-const WATER_HIGHLIGHT := Color(0.522, 0.486, 0.424, 1.0)  # #857C6C sparse still catch
+## BLACK-SQUARE FIX (#426 orch-judge 2026-06-08): the spring was an OPAQUE (alpha=1.0) flat
+## near-black ColorRect — on the warm dirt it read as the same hard-edged BLACK-SQUARE artifact
+## class Sponsor rejected in v4. The damp SEEP is a subtle ground-darkening, NOT an opaque pool:
+## alpha dropped 1.0→0.42 so the dirt shows through (a damp patch, not a black hole) + the hue
+## kept warm-neutral. The doctrine hex (#2E2A26) stays as the RGB; only the alpha + read change.
+const WATER_BASE := Color(0.180, 0.165, 0.149, 0.42)  # #2E2A26 damp seep (semi-transparent, sub-1.0)
+const WATER_HIGHLIGHT := Color(0.522, 0.486, 0.424, 0.55)  # #857C6C sparse still catch (softened)
 const GARDEN_SOIL := Color(0.329, 0.271, 0.184, 0.78)  # #54452F soil, semi-transparent
 
 ## Fine-grid dimensions (derived). The painter iterates these; geometry decisions map a
@@ -200,6 +205,44 @@ func _ready() -> void:
 	_paint_garden_bed()
 	_paint_building_aprons()
 	_scatter_decoration()
+	_trace_props.call_deferred()  # diagnostic: emit building-sprite render-state after the tree settles
+
+
+## [prop-trace] diagnostic (combat-architecture.md § attack-visual trace-bridge pattern applied
+## to props). Emits one renderer-observable line per building/well Sprite2D so a Playwright/soak
+## investigation can confirm — from the live trace, not a hardcoded label — that each landmark
+## sprite has a LOADED texture, a NON-DARK modulate, the right z, and a real footprint-scaled
+## size (texture_px × scale). A missing/black/shrunk building surfaces here instead of being
+## invisible to the harness. Deferred so global_position resolves after the chunk is placed.
+func _trace_props() -> void:
+	var groups: Array = [
+		{"root": get_node_or_null("BuildingSprites"), "tag": "building"},
+		{"root": get_node_or_null("Props"), "tag": "prop"},
+	]
+	for g: Dictionary in groups:
+		var root: Node = g["root"]
+		if root == null:
+			continue
+		for child in root.get_children():
+			if child is Sprite2D:
+				var s := child as Sprite2D
+				var tex_sz := Vector2.ZERO
+				var tex_path := "<null>"
+				if s.texture != null:
+					tex_sz = s.texture.get_size()
+					tex_path = s.texture.resource_path.get_file()
+				print(
+					(
+						"[prop-trace] %s.%s | tex=%s tex_px=(%d,%d) scale=(%.3f,%.3f)"
+						+ " rendered_px=(%d,%d) gpos=(%.0f,%.0f) z=%d mod=(%.2f,%.2f,%.2f,%.2f) vis=%s"
+					)
+					% [
+						g["tag"], s.name, tex_path, int(tex_sz.x), int(tex_sz.y),
+						s.scale.x, s.scale.y, int(tex_sz.x * s.scale.x), int(tex_sz.y * s.scale.y),
+						s.global_position.x, s.global_position.y, s.z_index,
+						s.modulate.r, s.modulate.g, s.modulate.b, s.modulate.a, str(s.visible),
+					]
+				)
 
 
 # ---- PASS 1: dirt+grass AUTOTILE TERRAIN base (v5) ----------------------------
