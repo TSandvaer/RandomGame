@@ -1,10 +1,42 @@
 #!/usr/bin/env python3
 """
-S1 cloister-yard COBBLE FLOOR — procedural generator (T1, ticket 86ca5erva).
+S1 cloister-yard GROUND generator — procedural (T1 86ca5erva; v2 ground-composition
+RE-DO 86ca5hwmx, 2026-06-08).
 
 Sponsor decision 2026-06-07: procedural over PixelLab. PixelLab's seamless Wang
 tool caps at 32px/tile; the Sponsor wants HIGHER-quality (higher-res + seamless +
 genuinely varied). Procedural delivers all three.
+
+V2 GROUND-COMPOSITION RE-DO (Uma s1-ground-composition-v2.md, after the ASHLAR SLAB
+PATH was soak-rejected a THIRD time). The EXECUTION INSIGHT (spec §0): Sponsor LOVED
+this Voronoi cobble tech and REJECTED the fresh-procedural ashlar slab. So the new
+surfaces LEAN ON THIS LOVED TECH — they are one-parameter VARIANTS of this generator,
+NOT new models, NOT PixelLab. `--profile` selects which surface to emit:
+
+  --profile cobble  (default) — the LOVED ground cobble (LOCKED): warm-grey domed
+                    set-stones, ~18px largest at game zoom ≈ 1/3 the player. The
+                    ground's surviving-paving PATCHES reuse this unchanged.
+  --profile path    — the FINE-COBBLE LANE (the v2 path, replacing the dead slab):
+                    the SAME Voronoi tech with (1) a FINER radii plan (~25-40%
+                    smaller stones, more of them → largest renders ~10-14px, finer
+                    than the ground cobble) + (2) S1_PATH_COBBLE_DOCTRINE (a touch
+                    WARMER + LIGHTER) for the "walk here" path-vs-ground contrast
+                    (spec §2). Still rounded-domed cobble (the loved read), NEVER
+                    ashlar (the rejected model). ZERO baked green.
+  --profile dirt    — the WORN-DIRT FIELD (the new MAJORITY ground, ~55-65%): the
+                    same toroidal value-noise scaffolding emits a STONE-FREE worn
+                    earth field — `#6B5A41`/`#54452F` with worn-lighter (foot-trodden)
+                    + damp-darker (shadow) organic variation (spec §3.3). ZERO green.
+  --profile grass   — the GRASS RECLAMATION ground tile (~20-30%, edges/corners): a
+                    clean noise-driven green-tonal GROUND tile (the deliberate-planting
+                    foundation, painted as PATCHES, never baked into the walking tiles
+                    per spec §5). This is a SEPARATE ground material (a tile-class the
+                    painter places at chosen cells), NOT the rejected spiky moss_patch
+                    prop. The ONLY profile that is green (it IS the grass layer).
+
+All four are seamless-by-construction (toroidal), doctrine-locked, multi-variant —
+the proven recipe. The painter (S1YardChunk) composes them per spec §3 (dirt majority
++ grass patches + cobble patches + the fine-cobble lane), one tile-class per cell (AC9).
 
 HARD REQUIREMENTS (each prior PixelLab attempt failed one of these):
   1. Genuinely VARIED stone sizes — chaotic natural mix of large + medium + small
@@ -59,6 +91,50 @@ DOCTRINE = {
     "moss_deep":    "#47592F",  # shadowed moss in wettest joints
     "dirt":         "#6B5A41",  # bare earth where cobbles missing/sunk
     "dirt_deep":    "#54452F",  # damp packed soil, shadowed
+}
+
+# ---------------------------------------------------------------------------
+# S1_PATH_COBBLE_DOCTRINE — Uma s1-ground-composition-v2.md §2.3 (sub-1.0 verified).
+# The fine-cobble LANE: the SAME cobble material, shifted a touch WARMER + LIGHTER
+# for the walked-lane "walk here" read (a real walked lane wears lighter/smoother).
+# Subtle — NOT a jarring material swap. The path-vs-ground contrast (PL-PATH-02) is
+# the wayfinding payload: path base #7E7460 is perceptibly warmer+lighter than the
+# ground cobble #6E665A AND the stones are finer.
+# ---------------------------------------------------------------------------
+PATH_DOCTRINE = {
+    "cobble_base":  "#7E7460",  # path base — warm-grey set-stone, WARMER+LIGHTER than ground
+    "cobble_lit":   "#988C76",  # path lit — domed top of a walked-smooth path stone
+    "cobble_shadow":"#5E564A",  # path stone base shadow / joint (slightly warmer)
+    "joint_deep":   "#3D372F",  # joint deep — SHARED dirt-shadow gap (one joint hex yard-wide)
+}
+
+# ---------------------------------------------------------------------------
+# S1_DIRT_DOCTRINE — Uma s1-ground-composition-v2.md §3.1/§3.3 (sub-1.0 verified).
+# The worn-DIRT field (the new MAJORITY ground). Reuses the cobble doctrine's dirt
+# hexes as a worn-earth surface: bare trodden earth, foot-worn lighter where walked,
+# damp darker in shadow. ZERO green (PL-PATH-04 class). Graveyard-Keeper ground ref.
+# ---------------------------------------------------------------------------
+DIRT_DOCTRINE = {
+    "dirt_base":   "#6B5A41",  # bare trodden earth, dominant
+    "dirt_lit":    "#82704F",  # foot-worn lighter dirt (where feet wore it smooth/dry)
+    "dirt_deep":   "#54452F",  # damp packed soil, shadowed
+    "dirt_dark":   "#453825",  # wettest/deepest shadow earth (organic dark variation)
+}
+
+# ---------------------------------------------------------------------------
+# S1_GRASS_DOCTRINE — Uma s1-ground-composition-v2.md §3.1/§3.3 (sub-1.0 verified).
+# The grass RECLAMATION ground tile (edges/corners — where feet DIDN'T fall). A clean
+# noise-driven green-tonal GROUND material (the deliberate-planting foundation),
+# painted as PATCHES with feathered borders, NOT the rejected spiky moss_patch prop,
+# NOT baked into the walking tiles. Olive-to-mid greens, sub-1.0 (HDR-clamp-safe),
+# NEVER pure-saturated (a worn monastery-yard reclaiming-grass, not a lawn). This is
+# the ONE profile that is intentionally GREEN — it IS the grass layer.
+# ---------------------------------------------------------------------------
+GRASS_DOCTRINE = {
+    "grass_base":  "#5C7044",  # olive reclaiming grass, dominant (= the cobble moss hue)
+    "grass_lit":   "#6E8451",  # sun-caught lighter grass blade tops
+    "grass_deep":  "#47592F",  # shadowed grass in the thickest clumps
+    "grass_dark":  "#3A4A28",  # darkest damp grass-root shadow (organic dark variation)
 }
 
 
@@ -153,9 +229,18 @@ def toroidal_value_noise(S, rng, cells, octaves=3):
 # The cobble tile
 # ---------------------------------------------------------------------------
 def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
-                     moss_amount=1.0, dirt_amount=1.0, fine_scale=1.0):
+                     moss_amount=1.0, dirt_amount=1.0, fine_scale=1.0,
+                     doctrine=None, path_fine=False):
     """
     Generate ONE seamless varied-size cobble tile (S x S, RGB uint8).
+
+    doctrine: the palette dict (DOCTRINE for ground cobble, PATH_DOCTRINE for the
+              fine-cobble lane). Defaults to the ground-cobble DOCTRINE.
+    path_fine: when True (the v2 PATH profile), drop the radii-plan tier sizes ~30%
+               + raise counts so the path stones render FINER than the ground cobble
+               (~10-14px largest vs ~18px) — the spec §2.2 "fine, deliberately-laid
+               pavement of small set stones" read. Same Voronoi model + tone treatment;
+               only the radii plan + palette differ from the ground cobble.
 
     TONE (Sponsor feel-gate v2, 2026-06-07): lighter + warmer-neutral mid-grey.
     The v1 cool-bias read too dark + blue/teal-grey; Sponsor's reference is a
@@ -169,6 +254,10 @@ def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
     moss_amount / dirt_amount: scale the organic invasion (1.0 = doctrine default).
     """
     rng = np.random.default_rng(seed)
+
+    # Local palette from the chosen doctrine (ground cobble vs warm path cobble).
+    doc = doctrine if doctrine is not None else DOCTRINE
+    LP = {k: hexrgb(v) for k, v in doc.items()}
 
     # Varied stone-size plan, scaled to source res. Counts/radii tuned at 256px.
     # Large + medium + small + pebbles => chaotic natural mix, NO uniform sizing.
@@ -189,6 +278,13 @@ def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
     # Voronoi cell area scales ~radius^2, so count ∝ 1/scale^2 keeps the field packed.
     # fine_scale=1.0 = the locked T8 (#424) read; 0.8 = the 20%-finer soak-revision.
     fs = fine_scale
+    # PATH profile (v2 §2.2): the lane is FINER than the ground cobble — drop tier
+    # radii ~30% (0.70) on top of fine_scale so the largest path stone renders
+    # ~10-14px (vs the ground cobble's ~18px) and the lane reads as a deliberately-
+    # laid fine pavement of small set stones (village-street ref 08h00_28). count ∝
+    # 1/scale^2 keeps the field packed at the finer stone size.
+    if path_fine:
+        fs = fs * 0.70
     cinv = 1.0 / max(fs * fs, 1e-3)
     radii_plan = [
         # (count, min_radius_px, weight)  weight feeds additively-weighted Voronoi
@@ -233,8 +329,8 @@ def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
     def tune(c):
         return np.clip((c + warm_vec) * lighten, 0, 255)
 
-    cobble_base_t = tune(PAL["cobble_base"])
-    cobble_lit_t = tune(PAL["cobble_lit"])
+    cobble_base_t = tune(LP["cobble_base"])
+    cobble_lit_t = tune(LP["cobble_lit"])
     # joints lightened separately (less heavy shadow) — see joint block below.
 
     # --- base stone color, per-stone tone jitter + a few worn-lighter stones ---
@@ -269,7 +365,7 @@ def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
     lit = cobble_lit_t                                    # tuned (lighter+warmer) lit
     # base-shadow is lightened toward the base tone (was full doctrine shadow) so
     # cobble bases read mid-grey, not heavy dark.
-    shp = tune(PAL["cobble_shadow"]) * 0.5 + cobble_base_t * 0.5
+    shp = tune(LP["cobble_shadow"]) * 0.5 + cobble_base_t * 0.5
     # blend toward lit at the upper-left dome tops, toward shadow at the rims/bases
     t_lit = np.clip((light - 1.08) * 1.8, 0, 1)[:, :, None]
     t_shp = np.clip((0.90 - light) * 1.4, 0, 1)[:, :, None]   # gentler dark blend
@@ -290,8 +386,8 @@ def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
     deep = border < (joint_w * 0.5)
     # joint = tuned shadow lifted FURTHER toward base (lighter) so dense joints don't
     # darken the floor; deep = a touch darker still.
-    joint_col = tune(PAL["cobble_shadow"]) * 0.55 + cobble_base_t * 0.45
-    deep_col = tune(PAL["joint_deep"]) * 0.45 + cobble_base_t * 0.55
+    joint_col = tune(LP["cobble_shadow"]) * 0.55 + cobble_base_t * 0.45
+    deep_col = tune(LP["joint_deep"]) * 0.45 + cobble_base_t * 0.55
     img[joint] = joint_col
     img[deep] = deep_col
     # ambient-occlusion darkening just inside each stone next to a joint (gentler,
@@ -310,6 +406,80 @@ def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
     # the 6-variant non-repeating block scatter (painter side), no brown puddles,
     # toroidal seamlessness, grey tone. `moss_amount` / `dirt_amount` are retained as
     # inert CLI args for back-compat but no longer paint anything.
+
+    return np.clip(img, 0, 255).astype(np.uint8)
+
+
+# ---------------------------------------------------------------------------
+# The STONE-FREE field tile (worn dirt / reclaiming grass) — v2 §3.3.
+# ---------------------------------------------------------------------------
+def make_field_tile(seed, doctrine, S=384, var_amount=1.0):
+    """
+    Generate ONE seamless STONE-FREE field tile (S x S, RGB uint8) — the worn-DIRT
+    majority ground OR the reclaiming-GRASS patch tile, depending on `doctrine`.
+
+    There is NO Voronoi stone structure here (a field is not paved): the look is
+    driven entirely by TOROIDAL value noise (seamless by construction) blending across
+    the doctrine's 4 tones — base / lit (worn-lighter / sun-caught) / deep (damp
+    shadow) / dark (deepest shadow). The result is an organic, never-flat earth/grass
+    surface that tiles perfectly across the wide yard (anti-repeat, spec §1 BIG/ENDLESS).
+
+    doctrine keys expected: "<x>_base", "<x>_lit", "<x>_deep", "<x>_dark" (the dirt or
+    grass ramp). var_amount scales the noise contrast (multi-variant spread).
+
+    ZERO green for the DIRT doctrine (warm-earth ramp, R>=G>=B); the GRASS doctrine IS
+    green by design (it is the grass layer). The painter places grass as PATCHES only,
+    never baked into the walking dirt/cobble/path tiles (spec §5).
+    """
+    rng = np.random.default_rng(seed)
+    keys = list(doctrine.keys())
+    base = hexrgb(doctrine[keys[0]])
+    lit = hexrgb(doctrine[keys[1]])
+    deep = hexrgb(doctrine[keys[2]])
+    dark = hexrgb(doctrine[keys[3]])
+
+    # THREE toroidal noise fields: a broad one (large damp/worn zones), a mid one
+    # (patch grain), and a FINE one (trodden-earth/blade speckle so the surface reads
+    # TEXTURED, not smooth fog — the prior cloudy look exposed the cross-tile seam).
+    # All seamless. Combine into a 0..1 elevation across the 4-tone ramp.
+    broad = toroidal_value_noise(S, rng, cells=2, octaves=3)     # large zones
+    mid = toroidal_value_noise(S, rng, cells=7, octaves=3)       # patch grain
+    fine = toroidal_value_noise(S, rng, cells=18, octaves=2)     # fine speckle
+    elev = (0.46 * broad + 0.34 * mid + 0.20 * fine)
+    # contrast-stretch around the MEAN (centred at 0.5) for shape variation per variant,
+    # then NORMALIZE the per-variant mean to a fixed target. Equalizing the mean across
+    # variants is what kills the cross-tile BRIGHTNESS GRID (adjacent cells from different
+    # variant-blocks must read the same average tone — Sponsor repeat-stamp class). Only
+    # the *texture/shape* differs per variant, not the overall brightness.
+    elev = 0.5 + (elev - elev.mean()) * (1.15 * var_amount)
+    elev = np.clip(elev, 0.0, 1.0)
+    # renormalize the post-clip mean back to 0.5 so EVERY variant has the same average
+    # elevation → same average tone → no brightness step at variant-block seams.
+    elev = elev - elev.mean() + 0.5
+    elev = np.clip(elev, 0.0, 1.0)
+
+    # 4-stop ramp: [0..0.30] dark->deep, [0.30..0.62] deep->base, [0.62..1.0] base->lit.
+    img = np.empty((S, S, 3), np.float32)
+
+    def lerp(a, b, t):
+        return a[None, None, :] * (1 - t[:, :, None]) + b[None, None, :] * t[:, :, None]
+
+    seg0 = elev < 0.30
+    seg1 = (elev >= 0.30) & (elev < 0.62)
+    seg2 = elev >= 0.62
+    t0 = np.clip(elev / 0.30, 0, 1)
+    t1 = np.clip((elev - 0.30) / 0.32, 0, 1)
+    t2 = np.clip((elev - 0.62) / 0.38, 0, 1)
+    ramp = lerp(dark, deep, t0)
+    ramp = np.where(seg1[:, :, None], lerp(deep, base, t1), ramp)
+    ramp = np.where(seg2[:, :, None], lerp(base, lit, t2), ramp)
+    img = ramp
+
+    # per-pixel grain so the surface reads as TEXTURED earth/grass, not a smooth gradient
+    # (the cloudy/foggy look exposed the cross-tile seam + read flat). A high-freq dither,
+    # hue-preserving (brightness only). Stronger than the prior 0.06 for real grit.
+    grain = (rng.random((S, S)).astype(np.float32) - 0.5) * 0.11
+    img = np.clip(img * (1.0 + grain[:, :, None]), 0, 255)
 
     return np.clip(img, 0, 255).astype(np.uint8)
 
@@ -336,8 +506,32 @@ def tile_field(variants, cols, rows, rng):
     return field
 
 
+def assert_zero_green(variants, label):
+    """Hard guard (PL-PATH-04): NO pixel may read green (G clearly exceeds R and B).
+    The walking surfaces (cobble / path / dirt) are warm/neutral — R >= G >= B always.
+    A green pixel = the rejected baked-vegetation class — fail loudly. NOT called for
+    the grass profile (grass IS green by design)."""
+    for i, v in enumerate(variants):
+        r = v[:, :, 0].astype(np.int32)
+        g = v[:, :, 1].astype(np.int32)
+        b = v[:, :, 2].astype(np.int32)
+        green = (g > r + 4) & (g > b + 4)
+        n = int(green.sum())
+        if n > 0:
+            raise SystemExit(
+                "PL-PATH-04 VIOLATION (%s): variant %d has %d green pixel(s) — the "
+                "rejected baked-vegetation class. Regen aborted." % (label, i, n)
+            )
+    print("[gen] PL-PATH-04 OK (%s) — zero green pixels across all variants." % label)
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--profile", default="cobble",
+                    choices=["cobble", "path", "dirt", "grass"],
+                    help="which ground surface to emit (v2 §0): cobble=ground cobble "
+                         "(LOCKED); path=fine-cobble lane (finer+warmer); dirt=worn-earth "
+                         "majority field; grass=reclamation green tile (the only green one)")
     ap.add_argument("--out", default=None, help="output dir")
     ap.add_argument("--res", type=int, default=256, help="source tile resolution")
     ap.add_argument("--variants", type=int, default=6)
@@ -359,32 +553,56 @@ def main():
     sfx = ("_" + args.suffix) if args.suffix else ""
 
     here = os.path.dirname(os.path.abspath(__file__))
-    out = args.out or os.path.join(here, "..", "_tile_judge", "cobble_proc")
+    out = args.out or os.path.join(here, "..", "_tile_judge", "%s_proc" % args.profile)
     out = os.path.abspath(out)
     os.makedirs(out, exist_ok=True)
 
     S = args.res
-    print(f"[gen] generating {args.variants} seamless cobble variants @ {S}px ...")
+    profile = args.profile
+    # Profile → output filename stem + which generator + (for cobble/path) the doctrine.
+    stem = {"cobble": "cobble", "path": "path", "dirt": "dirt", "grass": "grass"}[profile]
+    print(f"[gen] profile={profile}: generating {args.variants} seamless {stem} "
+          f"variants @ {S}px ...")
     variants = []
-    # Per-variant MOSS amount spread so the 6-variant base set carries genuinely
-    # different moss density (some near-clean, some mossy) — this is the multi-variant
-    # repeat-breaker (Uma §3.4): the painter scatters these variants so adjacent yard
-    # blocks differ and no feature-cluster repeats. dirt is gone (Sponsor cut).
-    moss_spread = [0.55, 0.80, 1.0, 1.0, 1.25, 1.5]
-    for i in range(args.variants):
-        moss_a = moss_spread[i % len(moss_spread)]
-        t = make_cobble_tile(args.seed + i * 17, S=S, warm_bias=args.warm,
-                             lighten=args.lighten, moss_amount=moss_a, dirt_amount=0.0,
-                             fine_scale=args.fine_scale)
-        variants.append(t)
-        Image.fromarray(t).save(os.path.join(out, f"cobble{sfx}_v{i}_{S}.png"))
-        print(f"  - cobble{sfx}_v{i}_{S}.png")
+    if profile in ("cobble", "path"):
+        # COBBLE / PATH — the loved Voronoi domed-stone tech. PATH uses PATH_DOCTRINE
+        # (warmer+lighter) + path_fine (finer radii) for the "walk here" lane read.
+        doc = PATH_DOCTRINE if profile == "path" else DOCTRINE
+        path_fine = (profile == "path")
+        moss_spread = [0.55, 0.80, 1.0, 1.0, 1.25, 1.5]
+        for i in range(args.variants):
+            moss_a = moss_spread[i % len(moss_spread)]
+            t = make_cobble_tile(args.seed + i * 17, S=S, warm_bias=args.warm,
+                                 lighten=args.lighten, moss_amount=moss_a, dirt_amount=0.0,
+                                 fine_scale=args.fine_scale, doctrine=doc, path_fine=path_fine)
+            variants.append(t)
+            Image.fromarray(t).save(os.path.join(out, f"{stem}{sfx}_v{i}_{S}.png"))
+            print(f"  - {stem}{sfx}_v{i}_{S}.png")
+    else:
+        # DIRT / GRASS — the stone-free toroidal-noise field. var_amount spread gives
+        # each variant a different contrast (the multi-variant repeat-breaker).
+        field_doc = DIRT_DOCTRINE if profile == "dirt" else GRASS_DOCTRINE
+        # Tight spread: variants differ in TEXTURE/shape, NOT brightness (the mean is
+        # equalized in make_field_tile). A narrow range keeps every variant's contrast
+        # similar so no single block reads anomalously busy/flat at a seam.
+        var_spread = [0.92, 1.00, 1.08, 0.96, 1.04, 1.00]
+        for i in range(args.variants):
+            va = var_spread[i % len(var_spread)]
+            t = make_field_tile(args.seed + i * 17, field_doc, S=S, var_amount=va)
+            variants.append(t)
+            Image.fromarray(t).save(os.path.join(out, f"{stem}{sfx}_v{i}_{S}.png"))
+            print(f"  - {stem}{sfx}_v{i}_{S}.png")
+
+    # PL-PATH-04 self-guard: the walking surfaces (cobble/path/dirt) must be ZERO green.
+    # Grass is exempt (it IS the green layer).
+    if profile in ("cobble", "path", "dirt"):
+        assert_zero_green(variants, profile)
 
     # SEAMCHECK: one variant tiled 3x3 — must show NO grid/seam.
     v0 = variants[0]
     seam = np.tile(v0, (3, 3, 1))
-    Image.fromarray(seam).save(os.path.join(out, f"cobble_proc_seamcheck{sfx}.png"))
-    print(f"[gen] cobble_proc_seamcheck{sfx}.png (variant 0 tiled 3x3 — seam test)")
+    Image.fromarray(seam).save(os.path.join(out, f"{stem}_proc_seamcheck{sfx}.png"))
+    print(f"[gen] {stem}_proc_seamcheck{sfx}.png (variant 0 tiled 3x3 — seam test)")
 
     # CONTACT SHEET: all variants at 2x for material judging.
     cs_cols = min(3, args.variants)
@@ -394,15 +612,15 @@ def main():
         r, c = divmod(i, cs_cols)
         sheet.paste(Image.fromarray(t), (c * S, r * S))
     sheet.resize((cs_cols * S * 2, cs_rows * S * 2), Image.NEAREST).save(
-        os.path.join(out, f"cobble_proc_contactsheet{sfx}.png"))
-    print(f"[gen] cobble_proc_contactsheet{sfx}.png")
+        os.path.join(out, f"{stem}_proc_contactsheet{sfx}.png"))
+    print(f"[gen] {stem}_proc_contactsheet{sfx}.png")
 
     # LARGE NON-REPEATING FIELD: mix variants across a wide yard span.
     rng = np.random.default_rng(args.seed + 999)
     fcols, frows = 5, 4   # 5x4 source tiles = a wide yard span
     field = tile_field(variants, fcols, frows, rng)
-    Image.fromarray(field).save(os.path.join(out, f"cobble_proc_field{sfx}.png"))
-    print(f"[gen] cobble_proc_field{sfx}.png ({fcols}x{frows} source tiles, "
+    Image.fromarray(field).save(os.path.join(out, f"{stem}_proc_field{sfx}.png"))
+    print(f"[gen] {stem}_proc_field{sfx}.png ({fcols}x{frows} source tiles, "
           f"{field.shape[1]}x{field.shape[0]}px)")
 
     # FIELD AT GAME ZOOM: a 1:1 crop of the field at TRUE source-pixel scale, so the
@@ -420,8 +638,8 @@ def main():
     pxp, pyp = 40, 40
     draw.rectangle([pxp, pyp, pxp + pw, pyp + ph], outline=(255, 80, 40), width=3)
     draw.text((pxp, max(2, pyp - 16)), "player ~0.6", fill=(255, 130, 70))
-    gz.save(os.path.join(out, f"cobble_proc_field_zoom{sfx}.png"))
-    print(f"[gen] cobble_proc_field_zoom{sfx}.png (1:1 yard crop at game zoom + player-scale ref)")
+    gz.save(os.path.join(out, f"{stem}_proc_field_zoom{sfx}.png"))
+    print(f"[gen] {stem}_proc_field_zoom{sfx}.png (1:1 yard crop at game zoom + player-scale ref)")
 
     # SHIPPED ATLAS (#426): assemble the 768x128 6-variant atlas the painter consumes.
     # Each variant source (authored at --res, typically 384px) is downsampled to 128px

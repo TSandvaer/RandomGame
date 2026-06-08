@@ -1,5 +1,6 @@
-# gdlint:disable=max-public-methods
-# GUT test class — high test_* count IS the design (one test per scenario).
+# gdlint:disable=max-public-methods,max-file-lines
+# GUT test class — high test_* count IS the design (one test per scenario); the v2
+# ground-composition pins push the file past 1000 lines (each surface gets its own pin).
 extends GutTest
 ## S1 open cloister-YARD first-slice tests (ticket 86ca5erzk, S1-YARD T4;
 ## Uma s1-cloister-yard.md). Covers the FIRST WALKABLE yard slice on the
@@ -8,9 +9,9 @@ extends GutTest
 ##      bounding_box_px is WIDER AND TALLER than the 480x270 viewport (the two-axis
 ##      "big + endless" scroll lever) + well-mated (yard EAST exit ↔ descent WEST
 ##      entry).
-##   2. The yard chunk scene paints OPEN cobble (no perimeter wall ring), builds
-##      the authored building structures (visual brick + StaticBody2D collision),
-##      and scatters jittered decoration after _ready.
+##   2. The yard chunk scene paints the v2 VARIED open ground (dirt majority + grass
+##      patches + cobble patches + the fine-cobble lane, no perimeter wall ring), builds
+##      the authored building structures (visual brick + StaticBody2D collision).
 ##   3. The carried-forward props are present at the calibrated scales
 ##      (pillars 0.85 / braziers 0.65 / banners+rubble+parchment 0.70).
 ##   4. NAVIGABILITY (folds in T6 for the yard): grunt-radius BFS over a walk grid
@@ -31,16 +32,22 @@ const ZONE_PATH: String = "res://resources/level/zones/s1_z1_yard_slice.tres"
 const YARD_CHUNK_DEF_PATH: String = "res://resources/level_chunks/s1_yard_slice.tres"
 const DESCENT_CHUNK_DEF_PATH: String = "res://resources/level_chunks/s1_yard_descent.tres"
 const YARD_TILESET_PATH: String = "res://resources/tilesets/s1_cloister_yard.tres"
-const SLAB_ATLAS_PATH: String = "res://assets/tilesets/s1_cloister/floor_slab.png"
+# v2 ground composition (86ca5hwmx): the path is the FINE-COBBLE lane atlas (replaces
+# the dead ashlar slab); the ground is dirt-majority + grass + cobble patches.
+const PATH_ATLAS_PATH: String = "res://assets/tilesets/s1_cloister/floor_path.png"
+const DIRT_ATLAS_PATH: String = "res://assets/tilesets/s1_cloister/floor_dirt.png"
+const GRASS_ATLAS_PATH: String = "res://assets/tilesets/s1_cloister/floor_grass.png"
 const YARD_CHUNK_SCENE_PATH: String = "res://scenes/levels/chunks/s1_yard_slice_chunk.tscn"
 
 # The viewport the yard must EXCEED on BOTH axes for two-axis scroll.
 const VIEWPORT_W: float = 480.0
 const VIEWPORT_H: float = 270.0
 
-const SOURCE_COBBLE: int = 0
+const SOURCE_COBBLE: int = 0  # surviving-paving cobble patches (v2)
 const SOURCE_WALL_FINE: int = 1
-const SOURCE_SLAB: int = 2  # warm-sandstone flagstone slab-path source (T8)
+const SOURCE_PATH: int = 2  # fine-cobble LANE source (v2, replaces the dead slab)
+const SOURCE_DIRT: int = 3  # worn-dirt majority ground (v2)
+const SOURCE_GRASS: int = 4  # grass reclamation patches (v2)
 
 # Well-head footprint mirror (matches S1YardChunk.well_footprint) — the nav grid
 # bakes this as a wall too (the well is a solid walk-AROUND landmark, like buildings).
@@ -191,33 +198,80 @@ func test_assembled_floor_is_well_mated() -> void:
 # ---- Surface 2 + 3: chunk scene paint + props -----------------------
 
 
-func test_yard_chunk_paints_open_cobble_floor() -> void:
+## v2 GROUND COMPOSITION (86ca5hwmx): the ground is NO LONGER wall-to-wall cobble — it
+## is a VARIED open expanse of dirt (majority) + grass (edges) + cobble (patches), with
+## NO perimeter wall ring (still the open-yard model). Every FloorTiles cell that is NOT
+## under the fine-cobble lane must be exactly one valid GROUND class (dirt/grass/cobble),
+## and EVERY cell must be painted (no holes in the open expanse).
+func test_yard_chunk_paints_varied_open_ground_no_wall_ring() -> void:
 	var inst: Node = _instantiate_yard_chunk()
 	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
+	var lane: TileMapLayer = inst.get_node("PathLane")
 	assert_not_null(floor_tiles, "FloorTiles TileMapLayer present")
+	if floor_tiles == null or lane == null:
+		return
+	var valid_ground := [SOURCE_COBBLE, SOURCE_DIRT, SOURCE_GRASS]
+	for ty in range(YARD_H):
+		for tx in range(YARD_W):
+			var cell := Vector2i(tx, ty)
+			# A cell is EITHER a lane cell (painted in PathLane, erased in FloorTiles) OR a
+			# ground cell (painted in FloorTiles with a valid ground class). Exactly one.
+			var lane_src: int = lane.get_cell_source_id(cell)
+			var floor_src: int = floor_tiles.get_cell_source_id(cell)
+			if lane_src == SOURCE_PATH:
+				assert_eq(floor_src, -1, "lane cell %s has ground ERASED beneath (AC9)" % str(cell))
+			else:
+				assert_true(
+					floor_src in valid_ground,
+					(
+						"ground cell %s is a valid class (dirt/grass/cobble), got %d"
+						% [str(cell), floor_src]
+					)
+				)
+
+
+## v2 §3: the ground is DIRT-MAJORITY (~55-65%), with grass (~20-30%) + cobble (~10-20%)
+## as PARTS, NOT a cobble carpet (Sponsor: "cobblestone should only be parts of the
+## walking background"). Pin the composition ratios so a regression back to a cobble (or
+## any single-class) carpet fails loudly. Counts are over ground (non-lane) cells.
+func test_ground_composition_is_dirt_majority_cobble_is_parts() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
 	if floor_tiles == null:
 		return
-	# Every interior cell painted with the cobble source — OPEN expanse, no
-	# perimeter wall ring (the room model). Sample the four corners + centre.
-	for probe: Vector2i in [
-		Vector2i(0, 0),
-		Vector2i(YARD_W - 1, 0),
-		Vector2i(0, YARD_H - 1),
-		Vector2i(YARD_W - 1, YARD_H - 1),
-		Vector2i(YARD_W / 2, YARD_H / 2),
-	]:
-		assert_eq(
-			floor_tiles.get_cell_source_id(probe),
-			SOURCE_COBBLE,
-			"cell %s painted as open cobble (no perimeter wall ring)" % str(probe)
-		)
+	var counts := {SOURCE_DIRT: 0, SOURCE_GRASS: 0, SOURCE_COBBLE: 0}
+	var total := 0
+	for ty in range(YARD_H):
+		for tx in range(YARD_W):
+			var src: int = floor_tiles.get_cell_source_id(Vector2i(tx, ty))
+			if counts.has(src):
+				counts[src] += 1
+				total += 1
+	assert_gt(total, 0, "ground has painted cells")
+	var dirt_frac: float = float(counts[SOURCE_DIRT]) / float(total)
+	var grass_frac: float = float(counts[SOURCE_GRASS]) / float(total)
+	var cobble_frac: float = float(counts[SOURCE_COBBLE]) / float(total)
+	# DIRT is the clear majority (the new default ground).
+	assert_gt(dirt_frac, 0.50, "dirt is the MAJORITY ground (got %.1f%%)" % (dirt_frac * 100.0))
+	# GRASS + COBBLE are PARTS, not the dominant surface (each well under half).
+	assert_lt(
+		grass_frac, 0.40, "grass is a PART, not the majority (got %.1f%%)" % (grass_frac * 100.0)
+	)
+	assert_lt(
+		cobble_frac, 0.40, "cobble is a PART, not a carpet (got %.1f%%)" % (cobble_frac * 100.0)
+	)
+	# All three materials are actually PRESENT (the composition is genuinely varied).
+	assert_gt(counts[SOURCE_DIRT], 0, "dirt present")
+	assert_gt(counts[SOURCE_GRASS], 0, "grass present (reclamation patches)")
+	assert_gt(counts[SOURCE_COBBLE], 0, "cobble present (surviving-paving patches)")
 
 
-## REPEAT-BREAK (PR #424 Sponsor fix). The yard must NOT stamp one repeating cobble
-## block — the painter scatters 6 atlas variants per 4x4 block via a non-tiling hash.
-## Assert that across the yard's blocks MULTIPLE distinct variants are used (the
-## variant = atlas_col / 4), so the field doesn't read a single repeating stamp. A
-## regression back to a single-tile period would use exactly ONE variant → fails.
+## REPEAT-BREAK (PR #424 Sponsor fix; carried into v2). The ground must NOT stamp one
+## repeating block — the painter scatters 6 atlas variants per 4x4 block via a non-tiling
+## hash (all ground classes share the 6-variant layout). Assert that across the yard's
+## blocks MULTIPLE distinct variants are used (variant = atlas_col / 4), so the field
+## doesn't read a single repeating stamp. A regression to a single-period would use
+## exactly ONE variant → fails.
 func test_yard_cobble_uses_multiple_variants_no_single_stamp() -> void:
 	var inst: Node = _instantiate_yard_chunk()
 	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
@@ -598,82 +652,87 @@ func test_bfs_detects_disconnected_component() -> void:
 
 
 # ====================================================================
-# S1-YARD T8 — ground-composition layer (slab paths + well + springs + garden)
+# S1-YARD ground-composition layer — v2 (86ca5hwmx): fine-cobble lane + varied ground
+# (dirt majority + grass patches + cobble patches) + well + springs + garden. Replaces
+# the dead ashlar slab path (third soak rejection).
 # ====================================================================
 
 
-## The slab-path tileset source (warm-sandstone flagstone, source 2) is wired into the
-## yard TileSet. A regression dropping the source would break every slab cell.
-func test_tileset_has_slab_source() -> void:
+## The fine-cobble LANE tileset source (source 2, v2) is wired into the yard TileSet. A
+## regression dropping the source would break every lane cell. (Replaces the dead slab.)
+func test_tileset_has_path_source() -> void:
 	var ts: TileSet = load(YARD_TILESET_PATH)
 	assert_not_null(ts, "yard TileSet loads")
 	if ts == null:
 		return
-	assert_true(ts.has_source(SOURCE_SLAB), "yard TileSet has the slab-path source (id 2)")
+	assert_true(ts.has_source(SOURCE_PATH), "yard TileSet has the fine-cobble lane source (id 2)")
+	# v2 also wires the dirt + grass ground sources (3 + 4).
+	assert_true(ts.has_source(SOURCE_DIRT), "yard TileSet has the worn-dirt source (id 3)")
+	assert_true(ts.has_source(SOURCE_GRASS), "yard TileSet has the grass source (id 4)")
 
 
-## Slab paths are painted as a RIBBON into the SlabPaths layer, AND the cobble cell
-## beneath each slab is ERASED in FloorTiles — exactly ONE tile-class per cell, no
-## stacked-z, no z-fight (T8 AC9 / html5-export.md §Z-index). This is the load-bearing
-## anti-z-fight invariant: assert that EVERY painted slab cell has empty cobble beneath.
-func test_slab_paths_painted_with_cobble_erased_beneath_no_zfight() -> void:
+## The fine-cobble LANE is painted as a RIBBON into the PathLane layer, AND the ground
+## cell beneath each lane cell is ERASED in FloorTiles — exactly ONE tile-class per cell,
+## no stacked-z, no z-fight (AC9 / html5-export.md §Z-index). This is the load-bearing
+## anti-z-fight invariant: assert that EVERY painted lane cell has empty ground beneath.
+func test_lane_painted_with_ground_erased_beneath_no_zfight() -> void:
 	var inst: Node = _instantiate_yard_chunk()
-	var slab: TileMapLayer = inst.get_node("SlabPaths")
+	var lane: TileMapLayer = inst.get_node("PathLane")
 	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
-	assert_not_null(slab, "SlabPaths layer present")
+	assert_not_null(lane, "PathLane layer present")
 	assert_not_null(floor_tiles, "FloorTiles layer present")
-	if slab == null or floor_tiles == null:
+	if lane == null or floor_tiles == null:
 		return
-	var slab_cells: int = 0
-	for cell: Vector2i in slab.get_used_cells():
+	var lane_cells: int = 0
+	for cell: Vector2i in lane.get_used_cells():
 		assert_eq(
-			slab.get_cell_source_id(cell),
-			SOURCE_SLAB,
-			"slab cell %s painted with the flagstone source" % str(cell)
+			lane.get_cell_source_id(cell),
+			SOURCE_PATH,
+			"lane cell %s painted with the fine-cobble path source" % str(cell)
 		)
-		# THE AC9 INVARIANT: no cobble underneath a slab cell (one tile-class per cell).
+		# THE AC9 INVARIANT: no ground underneath a lane cell (one tile-class per cell).
 		assert_eq(
 			floor_tiles.get_cell_source_id(cell),
 			-1,
 			(
-				"cobble ERASED beneath slab cell %s — one tile-class per cell, no z-fight (AC9)"
+				"ground ERASED beneath lane cell %s — one tile-class per cell, no z-fight (AC9)"
 				% str(cell)
 			)
 		)
-		slab_cells += 1
+		lane_cells += 1
 	# The spine + links + apron paint a meaningful ribbon, not zero cells.
-	assert_gt(slab_cells, 30, "slab paths paint a real processional ribbon (got %d)" % slab_cells)
+	assert_gt(lane_cells, 30, "the lane paints a real wayfinding ribbon (got %d)" % lane_cells)
 
 
-## The processional spine runs west→east — assert slab cells exist near the WEST edge
-## (spawn gate) AND near the EAST edge (descent), so the path is a continuous wayfinding
-## ribbon spanning the journey, not a disconnected blob.
-func test_slab_spine_spans_west_to_east() -> void:
+## The lane spine runs west→east — assert lane cells exist near the WEST edge (spawn gate)
+## AND near the EAST edge (descent), so the path is a continuous wayfinding ribbon spanning
+## the journey, not a disconnected blob.
+func test_lane_spine_spans_west_to_east() -> void:
 	var inst: Node = _instantiate_yard_chunk()
-	var slab: TileMapLayer = inst.get_node("SlabPaths")
-	if slab == null:
+	var lane: TileMapLayer = inst.get_node("PathLane")
+	if lane == null:
 		return
 	var has_west: bool = false
 	var has_east: bool = false
-	for cell: Vector2i in slab.get_used_cells():
+	for cell: Vector2i in lane.get_used_cells():
 		if cell.x <= 2:
 			has_west = true
 		if cell.x >= YARD_W - 3:
 			has_east = true
-	assert_true(has_west, "slab spine reaches the WEST spawn-gate edge")
-	assert_true(has_east, "slab spine reaches the EAST descent edge (journey span)")
+	assert_true(has_west, "lane reaches the WEST spawn-gate edge")
+	assert_true(has_east, "lane reaches the EAST descent edge (journey span)")
 
 
-## Slabs never run through a building footprint (a path doesn't cross a solid wall).
-func test_slab_cells_never_inside_a_building() -> void:
+## The lane never runs through a building footprint (a path doesn't cross a solid wall).
+func test_lane_cells_never_inside_a_building() -> void:
 	var inst: Node = _instantiate_yard_chunk()
-	var slab: TileMapLayer = inst.get_node("SlabPaths")
-	if slab == null:
+	var lane: TileMapLayer = inst.get_node("PathLane")
+	if lane == null:
 		return
-	for cell: Vector2i in slab.get_used_cells():
+	for cell: Vector2i in lane.get_used_cells():
 		for foot: Rect2i in _building_footprints():
 			assert_false(
-				foot.has_point(cell), "slab cell %s must NOT be inside building %s" % [cell, foot]
+				foot.has_point(cell), "lane cell %s must NOT be inside building %s" % [cell, foot]
 			)
 
 
@@ -794,103 +853,182 @@ func test_ground_composition_has_no_moss_patch_trash_sprites() -> void:
 	)
 
 
-## REGRESSION GUARD PL-PATH-04 (#426 soak-rev, the rejection guard). The twice-rejected
-## floor_sandstone.png slab had baked green moss-sprout DOTS in the joints ("awful").
-## The NEW ashlar slab (floor_slab.png) has ZERO baked vegetation — joints are dirt-
-## shadow ONLY. Eye-dropper EVERY pixel of the shipped slab atlas: warm-sandstone always
-## has R >= G >= B; grout is near-neutral-warm. A green pixel (G clearly exceeds R) is the
-## rejected baked-vegetation class — assert NONE exist. This is the pin that proves the
-## "awful" baked-dot rejection is fixed (mirrors the generator's self-guard).
-func test_slab_atlas_has_zero_green_pixels_pl_path_04() -> void:
-	var tex: Texture2D = load(SLAB_ATLAS_PATH)
-	assert_not_null(tex, "floor_slab.png loads")
-	if tex == null:
-		return
-	var img: Image = tex.get_image()
-	assert_not_null(img, "slab atlas image readable")
-	if img == null:
-		return
-	var w: int = img.get_width()
-	var h: int = img.get_height()
-	# Sample on a stride grid (full per-pixel is ~65k reads; a 4px stride = ~4k, still
-	# dense enough to catch any baked green dot, which would be a multi-pixel cluster).
-	var green_pixels: int = 0
-	for y: int in range(0, h, 2):
-		for x: int in range(0, w, 2):
-			var c: Color = img.get_pixel(x, y)
-			# Green = G channel clearly dominant over BOTH R and B (warm sandstone /
-			# dirt-shadow grout never does this). Small tolerance for AA.
-			if c.g > c.r + 0.02 and c.g > c.b + 0.02:
-				green_pixels += 1
-	assert_eq(
-		green_pixels,
-		0,
-		(
-			"PL-PATH-04: slab atlas must have ZERO green pixels (the rejected baked moss-dot"
-			+ " class) — found %d. Joints are dirt-shadow ONLY; vegetation is a separate"
-			+ " painted-decoration pass, never baked into the ground tile." % green_pixels
+## REGRESSION GUARD PL-PATH-04 (v2, the rejection guard). The twice-rejected
+## floor_sandstone.png + the thrice-rejected ashlar slab are dead. The v2 fine-cobble
+## LANE (floor_path.png) + the worn-DIRT field (floor_dirt.png) are walking surfaces
+## that ship with ZERO baked vegetation — joints/gaps are dirt-shadow ONLY. Eye-dropper
+## EVERY pixel of the shipped path + dirt atlases: warm-grey/earth always has R >= G >= B.
+## A green pixel (G clearly exceeds R) is the rejected baked-vegetation class — assert NONE
+## exist on the WALKING surfaces (grass is the SEPARATE green layer, tested elsewhere).
+func test_walking_atlases_have_zero_green_pixels_pl_path_04() -> void:
+	for atlas_path: String in [PATH_ATLAS_PATH, DIRT_ATLAS_PATH]:
+		var tex: Texture2D = load(atlas_path)
+		assert_not_null(tex, "%s loads" % atlas_path)
+		if tex == null:
+			continue
+		var img: Image = tex.get_image()
+		assert_not_null(img, "atlas image readable: %s" % atlas_path)
+		if img == null:
+			continue
+		var w: int = img.get_width()
+		var h: int = img.get_height()
+		var green_pixels: int = 0
+		for y: int in range(0, h, 2):
+			for x: int in range(0, w, 2):
+				var c: Color = img.get_pixel(x, y)
+				# Green = G clearly dominant over BOTH R and B. Small tolerance for AA.
+				if c.g > c.r + 0.02 and c.g > c.b + 0.02:
+					green_pixels += 1
+		assert_eq(
+			green_pixels,
+			0,
+			(
+				(
+					"PL-PATH-04: walking atlas %s must have ZERO green pixels (the rejected baked"
+					+ " moss-dot class) — found %d. Vegetation is the SEPARATE grass ground layer,"
+					+ " never baked into a walking tile."
+				)
+				% [atlas_path, green_pixels]
+			)
 		)
-	)
 
 
-## The slab atlas is the NEW multi-variant ashlar atlas (#426): 512x128 = 16x4 cells =
-## FOUR 4x4 variant-blocks (region 32x32). A regression back to the old 64x64 sandstone
-## (or a wrong region size) would break the variant scatter. Pin the atlas dimensions +
-## region geometry so the painter's [v*4 + bx, by] addressing stays valid.
-func test_slab_atlas_is_multi_variant_geometry() -> void:
-	var tex: Texture2D = load(SLAB_ATLAS_PATH)
-	assert_not_null(tex, "floor_slab.png loads")
-	if tex == null:
-		return
-	# 4 variants * 128px = 512 wide; 128 tall (a 4x4 atlas of 32px cells per variant).
-	assert_eq(tex.get_width(), 512, "slab atlas 512px wide (4 variant-blocks of 128px)")
-	assert_eq(tex.get_height(), 128, "slab atlas 128px tall (4 rows of 32px cells)")
-	# The .tres declares 32x32 regions over this atlas.
+## The path/dirt/grass atlases are the v2 multi-variant atlases: 768x128 = 24x4 cells =
+## SIX 4x4 variant-blocks (region 32x32) — the same layout as the cobble atlas, so the
+## painter's [v*4 + bx, by] addressing is uniform across every ground class. A regression
+## to a wrong size/region would break the variant scatter. Pin dimensions + region.
+func test_ground_atlases_are_multi_variant_geometry() -> void:
+	for atlas_path: String in [PATH_ATLAS_PATH, DIRT_ATLAS_PATH, GRASS_ATLAS_PATH]:
+		var tex: Texture2D = load(atlas_path)
+		assert_not_null(tex, "%s loads" % atlas_path)
+		if tex == null:
+			continue
+		# 6 variants * 128px = 768 wide; 128 tall (a 4x4 atlas of 32px cells per variant).
+		assert_eq(tex.get_width(), 768, "%s 768px wide (6 variant-blocks of 128px)" % atlas_path)
+		assert_eq(tex.get_height(), 128, "%s 128px tall (4 rows of 32px cells)" % atlas_path)
+	# The .tres declares 32x32 regions over the path/dirt/grass sources.
 	var ts: TileSet = load(YARD_TILESET_PATH)
 	if ts == null:
 		return
-	var src: TileSetAtlasSource = ts.get_source(SOURCE_SLAB) as TileSetAtlasSource
-	assert_not_null(src, "slab source is a TileSetAtlasSource")
-	if src != null:
-		assert_eq(src.texture_region_size, Vector2i(32, 32), "slab region size = 32px game tile")
+	for src_id: int in [SOURCE_PATH, SOURCE_DIRT, SOURCE_GRASS]:
+		var src: TileSetAtlasSource = ts.get_source(src_id) as TileSetAtlasSource
+		assert_not_null(src, "source %d is a TileSetAtlasSource" % src_id)
+		if src != null:
+			assert_eq(
+				src.texture_region_size,
+				Vector2i(32, 32),
+				"source %d region size = 32px tile" % src_id
+			)
 
 
-## The slab ribbon scatters MULTIPLE atlas variants (the repeat-break, spec §3.2) — a
-## single repeated stamp down the processional spine is the rejected grid read. Assert
-## the painted slab cells use more than one variant (variant = atlas_col / 4).
-func test_slab_paths_scatter_multiple_variants_no_single_stamp() -> void:
+## The lane scatters MULTIPLE atlas variants (the repeat-break, spec §2.4) — a single
+## repeated stamp down the lane is the rejected grid read. Assert the painted lane cells
+## use more than one variant (variant = atlas_col / 4).
+func test_lane_scatters_multiple_variants_no_single_stamp() -> void:
 	var inst: Node = _instantiate_yard_chunk()
-	var slab: TileMapLayer = inst.get_node("SlabPaths")
-	if slab == null:
+	var lane: TileMapLayer = inst.get_node("PathLane")
+	if lane == null:
 		return
 	var variants_seen := {}
-	for cell: Vector2i in slab.get_used_cells():
-		var coords: Vector2i = slab.get_cell_atlas_coords(cell)
+	for cell: Vector2i in lane.get_used_cells():
+		var coords: Vector2i = lane.get_cell_atlas_coords(cell)
 		if coords.x < 0:
 			continue
-		variants_seen[coords.x / 4] = true  # 4 variant-blocks of 4 cols each
+		variants_seen[coords.x / 4] = true  # 6 variant-blocks of 4 cols each
 	assert_gt(
 		variants_seen.size(),
 		1,
 		(
-			"slab paths must scatter MULTIPLE ashlar variants (no single repeating stamp down"
-			+ " the spine — spec §3.2 anti-grid), got %d" % variants_seen.size()
+			"the lane must scatter MULTIPLE fine-cobble variants (no single repeating stamp —"
+			+ " spec §2.4 anti-grid), got %d" % variants_seen.size()
 		)
 	)
 
 
-## The slab atlas column addressing must stay in-bounds: variant in [0,4), local col in
-## [0,4), so atlas col = v*4 + bx ∈ [0,16). Pin every painted slab cell's atlas coords
-## within the 16x4 atlas (catches an off-by-one in the variant/local mapping).
-func test_slab_atlas_coords_in_bounds() -> void:
+## The lane atlas column addressing must stay in-bounds: variant in [0,6), local col in
+## [0,4), so atlas col = v*4 + bx ∈ [0,24). Pin every painted lane cell's atlas coords
+## within the 24x4 atlas (catches an off-by-one in the variant/local mapping).
+func test_lane_atlas_coords_in_bounds() -> void:
 	var inst: Node = _instantiate_yard_chunk()
-	var slab: TileMapLayer = inst.get_node("SlabPaths")
-	if slab == null:
+	var lane: TileMapLayer = inst.get_node("PathLane")
+	if lane == null:
 		return
-	for cell: Vector2i in slab.get_used_cells():
-		var coords: Vector2i = slab.get_cell_atlas_coords(cell)
-		assert_between(coords.x, 0, 15, "slab atlas col in [0,16) for cell %s" % str(cell))
-		assert_between(coords.y, 0, 3, "slab atlas row in [0,4) for cell %s" % str(cell))
+	for cell: Vector2i in lane.get_used_cells():
+		var coords: Vector2i = lane.get_cell_atlas_coords(cell)
+		assert_between(coords.x, 0, 23, "lane atlas col in [0,24) for cell %s" % str(cell))
+		assert_between(coords.y, 0, 3, "lane atlas row in [0,4) for cell %s" % str(cell))
+
+
+## The fine-cobble LANE reads PERCEPTIBLY WARMER + LIGHTER than the surrounding ground
+## (the PL-PATH-02 "walk here" wayfinding contrast, spec §2.3). The path doctrine base
+## #7E7460 is warmer+lighter than the ground cobble #6E665A AND the dirt #6B5A41. Pin
+## that the path atlas mean luminance EXCEEDS the dirt atlas mean (so the lane stands out
+## against the dirt-majority ground it threads), proving the contrast didn't collapse.
+func test_lane_reads_lighter_than_dirt_ground_pl_path_02() -> void:
+	var path_tex: Texture2D = load(PATH_ATLAS_PATH)
+	var dirt_tex: Texture2D = load(DIRT_ATLAS_PATH)
+	if path_tex == null or dirt_tex == null:
+		return
+	var path_lum: float = _atlas_mean_luminance(path_tex.get_image())
+	var dirt_lum: float = _atlas_mean_luminance(dirt_tex.get_image())
+	assert_gt(
+		path_lum,
+		dirt_lum,
+		(
+			"the fine-cobble LANE must read LIGHTER than the dirt ground (PL-PATH-02 walk-here"
+			+ " contrast) — path lum %.3f vs dirt lum %.3f" % [path_lum, dirt_lum]
+		)
+	)
+
+
+## Mean perceptual luminance of an atlas image (stride-sampled). Helper for PL-PATH-02.
+func _atlas_mean_luminance(img: Image) -> float:
+	if img == null:
+		return 0.0
+	var w: int = img.get_width()
+	var h: int = img.get_height()
+	var acc: float = 0.0
+	var n: int = 0
+	for y: int in range(0, h, 4):
+		for x: int in range(0, w, 4):
+			var c: Color = img.get_pixel(x, y)
+			acc += 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+			n += 1
+	return acc / float(maxi(n, 1))
+
+
+## The GRASS atlas IS green (it is the deliberate-planting reclamation layer, v2 §3/§5) —
+## the complement of PL-PATH-04: the walking surfaces ship ZERO green, but the grass
+## GROUND material must actually read green (a regression generating a grey grass tile
+## would silently strip the reclamation read). Assert a substantial fraction of grass
+## pixels are green-dominant (G >= R and G >= B).
+func test_grass_atlas_is_actually_green() -> void:
+	var tex: Texture2D = load(GRASS_ATLAS_PATH)
+	assert_not_null(tex, "floor_grass.png loads")
+	if tex == null:
+		return
+	var img: Image = tex.get_image()
+	if img == null:
+		return
+	var w: int = img.get_width()
+	var h: int = img.get_height()
+	var green: int = 0
+	var total: int = 0
+	for y: int in range(0, h, 2):
+		for x: int in range(0, w, 2):
+			var c: Color = img.get_pixel(x, y)
+			total += 1
+			if c.g >= c.r and c.g >= c.b:
+				green += 1
+	# The grass tile is overwhelmingly green-dominant (olive-to-mid greens).
+	assert_gt(
+		float(green) / float(maxi(total, 1)),
+		0.80,
+		(
+			"grass atlas is the GREEN reclamation layer (got %.1f%% green-dominant)"
+			% (100.0 * green / total)
+		)
+	)
 
 
 ## The well-baked nav grid still keeps a walkable interior + every mob spawn reachable

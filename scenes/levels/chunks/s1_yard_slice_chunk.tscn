@@ -10,11 +10,12 @@
 ; (s1_z1_yard_slice ZoneDef), soak-gated behind ?s1_assembler=1.
 ;
 ; Z-order (html5-export.md §Z-index — floor z=0, structures/props z=+1, player
-; above): FloorTiles z=0; SlabPaths z=0 (SAME floor layer — slab paths are a
-; second floor tile-class painted into their own layer with the cobble cell
-; ERASED beneath, so exactly ONE tile-class renders per cell = no z-fight, T8 AC9);
-; Springs z=0 (ColorRect still-water pools, floor-level, painted over cobble);
-; Buildings z=1; BuildingBodies (collision, invisible); Decoration z=1;
+; above): FloorTiles z=0 (the VARIED ground — dirt majority + cobble patches +
+; grass patches, one class per cell, v2 86ca5hwmx); PathLane z=0 (the fine-cobble
+; LANE — a floor tile-class painted into its own layer with the ground cell ERASED
+; beneath, so exactly ONE tile-class renders per cell = no z-fight, AC9);
+; Springs z=0 (ColorRect still-water pools, floor-level); Buildings z=1;
+; BuildingBodies (collision, invisible); Decoration z=1;
 ; Props z=2 (read above buildings — braziers/pillars/well on faces/landmarks).
 
 [ext_resource type="Script" path="res://scripts/levels/S1YardChunk.gd" id="1_yard"]
@@ -33,11 +34,12 @@ script = ExtResource("1_yard")
 texture_filter = 1
 tile_set = ExtResource("2_yardset")
 
-; Slab-path tiles (warm-sandstone flagstone REUSE, S1-YARD T8). Painted by
-; S1YardChunk._paint_slab_paths into THIS layer at z=0; the cobble cell beneath
-; each slab is ERASED in FloorTiles so exactly one tile-class renders per cell
-; (no stacked-z, no z-fight — T8 AC9 / html5-export.md §Z-index).
-[node name="SlabPaths" type="TileMapLayer" parent="."]
+; Fine-cobble LANE (the v2 path, 86ca5hwmx — replaces the dead ashlar slab). Painted
+; by S1YardChunk._paint_path_lane into THIS layer at z=0; the ground cell beneath each
+; lane cell is ERASED in FloorTiles so exactly one tile-class renders per cell (no
+; stacked-z, no z-fight — AC9 / html5-export.md §Z-index). The lane is finer + warmer-
+; lighter than the surrounding ground (the "walk here" wayfinding read, spec §2).
+[node name="PathLane" type="TileMapLayer" parent="."]
 texture_filter = 1
 tile_set = ExtResource("2_yardset")
 
