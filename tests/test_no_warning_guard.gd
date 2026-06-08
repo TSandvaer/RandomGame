@@ -102,6 +102,10 @@ func test_guard_catches_deliberate_error_via_warning_bus() -> void:
 	_bus().error("TEST-86c9uf0mm: deliberate canary error — guard must catch this", "test-canary")
 	assert_eq(guard.captured_count(), 1, "NoWarningGuard must capture a WarningBus.error() call")
 	guard.detach()
+	# GUT 9.6 (Godot 4.6) error-capture opt-in: WarningBus.error() routes to the
+	# native push_error, which GUT now captures. This canary deliberately fires
+	# one — assert it so GUT does not fail the test on the deliberate path.
+	assert_push_error("deliberate canary error")
 
 
 # ---- AC5: Mismatched expect_warning does NOT consume a real warning -----

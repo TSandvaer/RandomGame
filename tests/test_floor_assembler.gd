@@ -415,6 +415,10 @@ func test_null_zone_def_returns_empty_floor() -> void:
 	var f: AssembledFloor = asm.assemble_floor(null, 1)
 	assert_not_null(f, "must return an AssembledFloor, not null")
 	assert_true(f.is_empty(), "empty placement list")
+	# GUT 9.6 (Godot 4.6) captures engine push_error and fails the test unless
+	# the deliberate negative-path error is asserted. This also pins the
+	# contract that the assembler emits a diagnostic on null input.
+	assert_push_error("zone_def is null")
 
 
 func test_invalid_zone_def_returns_empty_floor() -> void:
@@ -429,6 +433,8 @@ func test_invalid_zone_def_returns_empty_floor() -> void:
 	var asm: FloorAssembler = FloorAssemblerScript.new()
 	var f: AssembledFloor = asm.assemble_floor(zone, 1, chunks)
 	assert_true(f.is_empty(), "invalid zone → empty floor")
+	# GUT 9.6 (Godot 4.6) error-capture opt-in for the deliberate validate-fail.
+	assert_push_error("zone_def invalid")
 
 
 func test_unresolvable_chunk_id_returns_empty_floor() -> void:
@@ -448,6 +454,15 @@ func test_unresolvable_chunk_id_returns_empty_floor() -> void:
 	# chunks named "does_not_exist_*".
 	var f: AssembledFloor = asm.assemble_floor(zone, 1, {})
 	assert_true(f.is_empty(), "unresolvable chunk id → empty floor")
+	# GUT 9.6 (Godot 4.6): the production load() of nonexistent chunk .tres
+	# paths emits multiple ResourceLoader engine errors per missing file
+	# ("Failed loading resource" + 'Condition "err != OK" is true'), and the
+	# exact count is loader-internal + version-sensitive. Rather than assert a
+	# brittle per-string count, mark ALL captured errors handled — the deliberate
+	# unresolvable-chunk path is EXPECTED to emit engine errors; the contract
+	# under test is "empty floor, no crash", asserted above.
+	for e in get_errors():
+		e.handled = true
 
 
 # -----------------------------------------------------------------------

@@ -567,6 +567,10 @@ func test_load_returns_empty_on_corrupt_json() -> void:
 	f.close()
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_true(loaded.is_empty(), "corrupt JSON -> {}, never crash")
+	# GUT 9.6 (Godot 4.6) error-capture opt-in: malformed JSON makes
+	# JSON.parse_string emit an engine error AND Save.load_game push_error.
+	assert_engine_error("error != Error::OK")
+	assert_push_error("JSON parse failed or root not Dictionary")
 
 
 func test_load_returns_empty_on_root_not_dictionary() -> void:
@@ -575,6 +579,8 @@ func test_load_returns_empty_on_root_not_dictionary() -> void:
 	f.close()
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_true(loaded.is_empty())
+	# Valid JSON, wrong root type → only Save.load_game's push_error fires.
+	assert_push_error("JSON parse failed or root not Dictionary")
 
 
 # --- Atomic write --------------------------------------------------------

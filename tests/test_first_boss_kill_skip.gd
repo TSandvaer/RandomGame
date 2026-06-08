@@ -444,3 +444,8 @@ func test_movement_before_trigger_does_not_engage_skip() -> void:
 		room.is_entry_sequence_skipped(),
 		"pre-trigger movement press is rejected by the skip handler"
 	)
+	# GUT 9.6 (Godot 4.6) error-capture opt-in: the bare-test escape
+	# (`boss_scene_path = ""`) makes `_spawn_boss`'s `load("")` emit an engine
+	# error + Stratum1BossRoom push_error during the deferred fixture pass.
+	assert_engine_error("failed")
+	assert_push_error("failed to load boss scene")
