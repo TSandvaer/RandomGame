@@ -14,17 +14,29 @@ class_name S1YardChunk
 ## are landmark STRUCTURES standing IN the expanse, set back with open ground running
 ## PAST them toward a soft scroll-horizon.
 ##
-## V2 GROUND COMPOSITION (s1-ground-composition-v2.md, after the ASHLAR SLAB path was
-## soak-rejected a THIRD time). Sponsor: "the path is too big and not at all like a real
-## path. Fine small-cobble pavers is preferred. The cobblestone should only be parts of
-## the walking background." So:
-##   - The ground is NO LONGER a cobble carpet. It is VARIED: worn DIRT majority
-##     (~55-65%, source 3) + GRASS reclamation patches (~20-30%, source 4, edges/corners/
-##     shadowed bases via a soft noise field) + surviving COBBLE patches (~10-20%,
-##     source 0). `_paint_floor` composes these, ONE class per cell (`_ground_class_for`).
-##   - The PATH is the FINE-COBBLE LANE (source 2) — a finer + warmer-lighter variant of
-##     the LOVED cobble gen, NOT slabs/ashlar (dead). `_paint_path_lane` threads it through
-##     the ground, erasing the ground cell beneath (AC9 one-class-per-cell, no z-fight).
+## V3 GROUND COMPOSITION — HAND-PLACED STRUCTURE (Sponsor 2026-06-08, FOURTH bounce on
+## the v2 procedural-SCATTER render). Sponsor verbatim: "there is no structure to the
+## tiles, it's just chaos." The v2 design noise-SCATTERED grass across the whole grid +
+## strewed 5 cobble patches through the mid-field → the render read as random noise, not a
+## yard. The references (inspiration/2026-06-08_11h18_12 Graveyard Keeper + 11h19_36
+## Stardew) have STRUCTURE: a smooth dirt field, ONE deliberate path, grass only at the
+## margins. So v3 DROPS the random scatter entirely and HAND-PLACES every material:
+##   1. DIRT (source 3) = the SMOOTH continuous base field across the WHOLE yard. Painted
+##      as ONE seamless wrapped variant (`_paint_dirt_field`) so the field reads as one
+##      continuous expanse — NO per-block variant swap (that was the visible ~256px block-
+##      seam grid in the v2 render: two different toroidal tiles don't mate at their shared
+##      edge, and a smooth dirt field has no high-freq texture to hide the discontinuity).
+##   2. PATH (source 2) = ONE clear, continuous, DELIBERATE fine-cobble LANE, hand-placed
+##      as a connected ribbon along the route (spawn-gate WEST → curving → descent EAST),
+##      3 tiles wide (`_compute_lane_cells`). The single most important structure element —
+##      the path must READ as a path. Painted into PathLane, ground erased beneath (AC9).
+##   3. GRASS (source 4) = ONLY at the OUTER edges / corners / margins, as a FEW deliberate
+##      hand-placed regions with soft feathered borders (`_is_grass_cell` over authored
+##      `grass_regions`, NOT a noise field across the middle). Reclaiming the borders.
+##   4. COBBLE (source 0) = the well apron ONLY (a deliberate paved ring around the well),
+##      nowhere else. NO mid-field cobble scatter (that was the chaos). The path lane is the
+##      only OTHER cobble, and it lives in PathLane.
+##   - Soft transitions between materials (feathered grass borders); AC9 one-class-per-cell.
 ##
 ## Why a script-painter: TileMapLayer serialises painted cells as a binary PackedByteArray
 ## that is impossible to diff-review. Painting via `set_cell` in `_ready` is deterministic,
@@ -71,6 +83,15 @@ const SOURCE_GRASS: int = 4
 const GROUND_BLOCK_TILES: int = 4  # one variant-block spans 4x4 game tiles
 const GROUND_VARIANTS: int = 6  # variant-blocks packed in each ground atlas
 
+## v3 (Sponsor 2026-06-08 seam fix): the DIRT field + GRASS regions paint from ONE variant
+## each, addressed CONTINUOUSLY (world coord wrapped into the variant's 4x4 cells) so a
+## single seamless toroidal tile wraps onto itself with ZERO block seam. The v2 per-block
+## variant SWAP produced the visible ~256px grid (two different toroidal tiles don't mate).
+## A FLAT field needs toroidal-CONTINUOUS, not variant-SCATTER. (Cobble/path keep the
+## scatter — their high-freq stones mask variant edges.) Variant 0 chosen arbitrarily.
+const DIRT_FIELD_VARIANT: int = 0
+const GRASS_FIELD_VARIANT: int = 0
+
 ## Back-compat aliases for the cobble-patch repeat-break (the surviving-paving patches
 ## reuse the loved cobble gen + the same per-block variant scatter as before).
 const COBBLE_BLOCK_TILES: int = 4
@@ -94,28 +115,43 @@ const WALL_ATLAS_PERIOD: int = 4
 ## change it to re-roll the scatter. NOT the per-character world_seed.
 @export var cobble_seed: int = 1763
 
-## Seed for the GRASS-patch placement noise (v2 §3.2: grass clusters at corners/edges/
-## shadowed bases in SOFT organic borders, never a hard grid). Deterministic per boot.
+## Seed for the GRASS-region feathered-border STIPPLE (v3: grass is HAND-PLACED in the
+## authored `grass_regions` at the yard margins; this seed only drives the per-cell
+## dither that softens each region's BORDER so the dirt↔grass edge is feathered, never a
+## hard rectangle). Deterministic per boot. NOT a mid-field scatter field (that was v2's
+## chaos — Sponsor "no structure ... just chaos").
 @export var grass_seed: int = 2207
 
-## Surviving-COBBLE-patch footprints (v2 §3.1: ~10-20% of the ground, "old paving that
-## survived" — a few deliberate patches, NOT a carpet). Each Rect2i is (x, y, w, h) in
-## TILES. Placed where the story wants paving: a courtyard remnant by the central
-## building, an entrance patch, and (separately) the well apron is added by the lane
-## pass. Authored as data (diff-reviewable). The well apron is handled in the lane pass.
-@export var cobble_patches: Array[Rect2i] = [
-	# Courtyard remnant south of the central building (an old paved court that survived) —
-	# the largest surviving patch, by the central landmark where paving earns its place.
-	Rect2i(15, 14, 10, 5),
-	# Entrance apron at the central-building east face.
-	Rect2i(24, 8, 5, 6),
-	# Spawn-gate threshold patch (the worn paving just inside the west gate).
-	Rect2i(1, 8, 5, 8),
-	# A surviving patch near the north chapel range base.
-	Rect2i(8, 3, 7, 4),
-	# Descent-approach apron near the east outbuilding (paving by the far landmark).
-	Rect2i(30, 9, 6, 6),
+## HAND-PLACED GRASS REGIONS (v3, Sponsor 2026-06-08). Grass reclaims ONLY the OUTER
+## edges / corners / margins of the yard — a FEW deliberate regions, NOT scattered across
+## the middle (the v2 noise-scatter was the chaos). Each Rect2i is (x, y, w, h) in TILES,
+## authored to hug the yard rim + corners (matching the Stardew ref 11h19_36: grass at the
+## margins reclaiming the borders, smooth dirt field in the middle). The region INTERIOR is
+## solid grass; the OUTER ring of each region feathers back to dirt on a fine dither
+## (`_is_grass_cell`) so the border is soft, never a hard tile edge. Diff-reviewable data.
+@export var grass_regions: Array[Rect2i] = [
+	# --- NW corner: grass reclaiming the top-left margin (above + left of the chapel range).
+	Rect2i(0, 0, 7, 6),
+	# --- NE corner: grass at the top-right margin (right of the chapel range, N rim).
+	Rect2i(33, 0, 7, 5),
+	# --- SW corner: the wettest, grassiest corner (dormitory ruin + SW spring dip).
+	Rect2i(0, 18, 9, 6),
+	# --- SE corner: grass at the bottom-right margin (S rim toward the descent).
+	Rect2i(34, 19, 6, 5),
+	# --- North rim strip: a thin grass margin along the very top edge between the corners
+	#     (the unwalked top border reclaimed) — kept thin so the mid-yard stays smooth dirt.
+	Rect2i(20, 0, 10, 2),
+	# --- South rim strip: a thin grass margin along the very bottom edge.
+	Rect2i(22, 22, 11, 2),
 ]
+
+## Surviving-COBBLE apron region (v3 §4): cobble appears in the FloorTiles field ONLY as a
+## deliberate paved apron ringing the well (the most-walked-and-paved spot — "everyone drew
+## water here"). NO mid-field cobble scatter (that was the v2 chaos). The path LANE is the
+## only OTHER cobble and it lives in PathLane. One Rect2i (x, y, w, h) in TILES around the
+## well_footprint, painted in `_paint_well_apron` AFTER dirt (overwrites dirt) but the lane
+## + grass + building passes still win where they overlap. Diff-reviewable.
+@export var well_apron: Rect2i = Rect2i(19, 15, 4, 4)
 
 ## Building footprints — landmark STRUCTURES standing IN the open expanse
 ## (s1-cloister-yard.md §2.1: north range / south range / central / far
@@ -194,7 +230,16 @@ const TILE_PX: float = 32.0
 
 
 func _ready() -> void:
-	_paint_floor()
+	# v3 STRUCTURED ground (Sponsor 2026-06-08 "no structure ... just chaos"): paint the
+	# materials in deliberate LAYER ORDER, hand-placed, NOT a random scatter:
+	#   1. DIRT  — the smooth continuous base field across the WHOLE yard (seamless).
+	#   2. GRASS — overwrite dirt ONLY in the authored edge/corner regions (feathered).
+	#   3. WELL APRON — overwrite with the surviving-cobble paved ring around the well.
+	#   4. LANE  — the one clear fine-cobble PATH ribbon (PathLane; erases ground beneath).
+	# Later: building bricks, well/spring/garden/apron decoration.
+	_paint_dirt_field()
+	_paint_grass_regions()
+	_paint_well_apron()
 	_paint_path_lane()
 	_build_structures()
 	_build_well_collision()
@@ -204,158 +249,111 @@ func _ready() -> void:
 	_scatter_decoration()
 
 
-## Paint the VARIED GROUND into FloorTiles (v2 §3, Uma s1-ground-composition-v2.md).
-## The ground is NO LONGER a wall-to-wall cobble carpet — Sponsor: "the cobblestone
-## should only be parts of the walking background." Each cell gets EXACTLY ONE ground
-## class (the AC9 paint-not-stack rule, no z-fight):
-##   - DIRT (source 3) is the DEFAULT majority ground (~55-65%): worn trodden earth.
-##   - COBBLE patches (source 0) are surviving paving (~10-20%): authored `cobble_patches`
-##     footprints (courtyard remnant / entrance / chapel-base patch).
-##   - GRASS patches (source 4) reclaim edges/corners/shadowed bases (~20-30%): placed by
-##     a NOISE field (`_is_grass_cell`) so the dirt↔grass border is SOFT + organic, never
-##     a hard grid edge (Stardew ref 11h19_36). Grass is the deliberate-planting GROUND
-##     material (spec §5), painted as patches, NOT the rejected spiky moss_patch prop.
-## The fine-cobble LANE (the path) is painted on top in `_paint_path_lane`, erasing the
-## ground cell beneath. All ground atlases share the 768x128 6-variant-block layout, so
-## the per-block variant scatter (`_block_variant`) breaks the repeating stamp identically
-## for every class (PR #424 fix carried forward).
-func _paint_floor() -> void:
+## v3 PASS 1 — paint the SMOOTH continuous DIRT base field across the WHOLE yard.
+##
+## SEAM FIX (Sponsor 2026-06-08 "hard square block seams forming a visible grid"): the v2
+## painter swapped a DIFFERENT atlas variant per 4x4 block (`_block_variant`). Each dirt
+## variant is INDIVIDUALLY toroidal-seamless (it wraps onto ITSELF), but two DIFFERENT
+## toroidal tiles do NOT mate at their shared edge — variant A's right column ≠ variant B's
+## left column → a hard discontinuity at every 4-tile block boundary (the ~256px grid in
+## the render). The high-freq cobble texture HID this; a smooth low-freq dirt field has no
+## texture to hide it, so the grid is plainly visible. The fix is to paint the dirt from
+## ONE variant CONTINUOUSLY — address the atlas by the cell's WORLD coord wrapped into that
+## variant's 4x4 cells (`tx % 4`, `ty % 4`). A single seamless tile wrapping onto itself
+## has ZERO seam at every repeat, so the whole field reads as one continuous smooth expanse
+## (the Stardew/Graveyard-Keeper dirt-field read), no block grid. (The cobble gen looked
+## fine because its high-freq stones masked the variant-edge; the dirt-field variant needs
+## the toroidal-CONTINUOUS discipline, not the variant-SCATTER.)
+func _paint_dirt_field() -> void:
 	if _floor_tiles == null:
 		push_warning("S1YardChunk: FloorTiles TileMapLayer missing — cannot paint")
 		return
 	for ty in range(grid_h):
 		for tx in range(grid_w):
+			_floor_tiles.set_cell(Vector2i(tx, ty), SOURCE_DIRT, _dirt_atlas_coords(tx, ty))
+
+
+## Atlas coords for the continuous DIRT field. Always variant 0 (`DIRT_FIELD_VARIANT`),
+## addressed by the world coord wrapped into the variant's 4x4 cells → the single tile
+## tiles seamlessly onto itself with no block seam. Pure (GUT-pinnable).
+func _dirt_atlas_coords(tx: int, ty: int) -> Vector2i:
+	var local_x: int = ((tx % GROUND_BLOCK_TILES) + GROUND_BLOCK_TILES) % GROUND_BLOCK_TILES
+	var local_y: int = ((ty % GROUND_BLOCK_TILES) + GROUND_BLOCK_TILES) % GROUND_BLOCK_TILES
+	return Vector2i(DIRT_FIELD_VARIANT * GROUND_BLOCK_TILES + local_x, local_y)
+
+
+## v3 PASS 2 — overwrite dirt with GRASS in the authored edge/corner regions ONLY.
+## Grass reclaims the MARGINS (Stardew ref), NOT the mid-field (the v2 scatter was chaos).
+## Each region's interior is solid grass; its OUTER ring feathers back to dirt on a fine
+## dither (`_is_grass_cell`) so the dirt↔grass border is soft, never a hard rectangle.
+## Grass uses the SAME continuous toroidal addressing as dirt (variant 0) so a multi-tile
+## grass region reads as one continuous patch (no internal block seam either).
+func _paint_grass_regions() -> void:
+	if _floor_tiles == null:
+		return
+	for ty in range(grid_h):
+		for tx in range(grid_w):
 			var cell := Vector2i(tx, ty)
-			var source: int = _ground_class_for(cell)
-			var block_x: int = tx / GROUND_BLOCK_TILES
-			var block_y: int = ty / GROUND_BLOCK_TILES
-			var variant: int = _block_variant(block_x, block_y)
-			var local_x: int = tx % GROUND_BLOCK_TILES
-			var local_y: int = ty % GROUND_BLOCK_TILES
-			var atlas := Vector2i(variant * GROUND_BLOCK_TILES + local_x, local_y)
-			_floor_tiles.set_cell(cell, source, atlas)
+			if _is_grass_cell(cell):
+				var local_x: int = tx % GROUND_BLOCK_TILES
+				var local_y: int = ty % GROUND_BLOCK_TILES
+				var atlas := Vector2i(GRASS_FIELD_VARIANT * GROUND_BLOCK_TILES + local_x, local_y)
+				_floor_tiles.set_cell(cell, SOURCE_GRASS, atlas)
 
 
-## Decide the ONE ground class for a cell (v2 §3 composition priority): a surviving
-## COBBLE patch wins over GRASS reclamation, which wins over the DIRT majority default.
-## (The fine-cobble LANE overrides all of these in `_paint_path_lane`, erasing the cell.)
-## Pure function (GUT-pinnable, deterministic per seed).
-##
-## COBBLE-PATCH EDGE INVASION (spec §3.2 "bordered by dirt + grass invasion at their
-## edges"): a cell on a patch's outer RING is dropped back to the surrounding class on a
-## fine dither, so the patch reads as old paving INVADED by dirt/grass at its rim, not a
-## clean-cut rectangle. The interior stays solid cobble.
-func _ground_class_for(cell: Vector2i) -> int:
-	for patch: Rect2i in cobble_patches:
-		if patch.has_point(cell):
-			# Outer-ring cell? (one tile in from any patch edge). Invade it on a dither so
-			# the patch border feathers into the surrounding ground.
-			var on_ring: bool = (
-				cell.x == patch.position.x
-				or cell.x == patch.position.x + patch.size.x - 1
-				or cell.y == patch.position.y
-				or cell.y == patch.position.y + patch.size.y - 1
-			)
-			if on_ring and _fine_dither(cell) < 0.42:
-				# fall through to the surrounding class (grass if reclaimed here, else dirt)
-				return SOURCE_GRASS if _is_grass_cell(cell) else SOURCE_DIRT
-			return SOURCE_COBBLE
-	if _is_grass_cell(cell):
-		return SOURCE_GRASS
-	return SOURCE_DIRT
-
-
-## True if a cell is GRASS (reclamation patch). The ground is DIRT-MAJORITY (~55-65%);
-## grass is the MINORITY (~20-30%) reclaiming where feet DIDN'T fall — the corners, the
-## yard rim, building south-base shadows, the wet SW dip — in a FEW soft organic BLOBS,
-## NOT a perimeter ring and NOT a speckle. Two craft requirements from the refs (Stardew
-## 11h19_36 / Graveyard Keeper 11h18_12):
-##   1. Grass is the minority — the OPEN mid-yard stays trodden DIRT (the majority).
-##   2. The dirt↔grass border is SOFT + organic — a low-frequency BLOB field (grass forms
-##      a few rounded clusters, not a checkerboard) PLUS a boundary STIPPLE (cells right
-##      at a cluster edge flip class on a fine dither, breaking the hard 32px tile line
-##      into a feathered stipple — the in-engine stand-in for a Wang-blend tile, spec §3.3).
-## "Reclamation pull" concentrates grass at the rim/corners/bases WITHOUT grassing the
-## whole perimeter (the prior bug). Deterministic (grass_seed). Target ~20-30% (GUT-pinned).
+## True if a cell is GRASS. v3: grass is HAND-PLACED in the authored `grass_regions` at the
+## yard margins (NOT a noise field across the middle — that was the v2 chaos). A cell is
+## grass if it is inside any region AND either (a) in the region INTERIOR (solid grass) or
+## (b) on the region's OUTER ring but PASSES a fine dither (so the border feathers back to
+## dirt instead of a hard rectangle edge). Deterministic (grass_seed drives only the
+## border stipple). Pure function (GUT-pinnable).
 func _is_grass_cell(cell: Vector2i) -> bool:
-	# Low-frequency BLOB field in [0,1] — grass forms a few rounded clusters (smooth,
-	# value-noise-like), so cluster boundaries are long + curved, not single-cell noise.
-	var blob: float = _grass_blob(cell)
-	# Reclamation pull: a GENTLE bias up toward the rim/corners/bases (NOT a hard boost
-	# that grasses the whole edge). Peaks in the very corners + the wet SW dip.
-	var pull: float = _reclamation_pull(cell)
-	var field: float = blob + pull
-	# Hard cut: only the strongest clusters become grass (minority coverage). 0.72 lands
-	# grass ~22-26% with the blob+pull shaping (pinned by the coverage GUT test).
-	var thresh: float = 0.72
-	# BOUNDARY STIPPLE: within a thin band around the threshold, flip on a fine per-cell
-	# dither so the dirt↔grass edge breaks into an organic stipple instead of a clean line.
-	var band: float = 0.05
-	if absf(field - thresh) < band:
-		# fine high-freq dither in [0,1]; cell is grass if dither < normalized closeness.
-		var d: float = _fine_dither(cell)
-		var bias: float = (field - (thresh - band)) / (2.0 * band)  # 0..1 across the band
-		return d < bias
-	return field > thresh
+	for region: Rect2i in grass_regions:
+		if not region.has_point(cell):
+			continue
+		# Outer-ring cell? (one tile in from any region edge.) Feather it back to dirt on a
+		# fine dither so the dirt↔grass border is a soft stipple, never a clean rectangle.
+		var on_ring: bool = (
+			cell.x == region.position.x
+			or cell.x == region.position.x + region.size.x - 1
+			or cell.y == region.position.y
+			or cell.y == region.position.y + region.size.y - 1
+		)
+		if on_ring:
+			# ~55% of ring cells stay grass, ~45% feather to dirt → soft organic border.
+			return _fine_dither(cell) < 0.55
+		return true  # region interior = solid grass
+	return false
 
 
-## Low-frequency value-noise BLOB field in [0,1] for grass clustering. Bilinearly
-## interpolates a coarse lattice (period ~5 tiles) so grass forms rounded clusters with
-## smooth curved borders (not per-cell speckle). Deterministic (grass_seed).
-func _grass_blob(cell: Vector2i) -> float:
-	var period: float = 5.0
-	var gx: float = float(cell.x) / period
-	var gy: float = float(cell.y) / period
-	var x0: int = int(floor(gx))
-	var y0: int = int(floor(gy))
-	var fx: float = gx - float(x0)
-	var fy: float = gy - float(y0)
-	# smoothstep for rounded blobs
-	fx = fx * fx * (3.0 - 2.0 * fx)
-	fy = fy * fy * (3.0 - 2.0 * fy)
-	var c00: float = _lattice(x0, y0)
-	var c10: float = _lattice(x0 + 1, y0)
-	var c01: float = _lattice(x0, y0 + 1)
-	var c11: float = _lattice(x0 + 1, y0 + 1)
-	var top: float = c00 * (1.0 - fx) + c10 * fx
-	var bot: float = c01 * (1.0 - fx) + c11 * fx
-	return top * (1.0 - fy) + bot * fy
+## v3 PASS 3 — the surviving-COBBLE well APRON. Cobble appears in the FloorTiles field ONLY
+## here: a deliberate paved ring around the well (the most-walked-and-paved spot). NO mid-
+## field cobble scatter. Overwrites dirt/grass within `well_apron`; the well_footprint
+## interior is left (the well prop/collision occupies it) and the lane pass still wins.
+## Uses the cobble atlas with the per-block variant scatter (high-freq stones hide any
+## variant edge across this small region — the apron is tiny, no flat-field seam risk).
+func _paint_well_apron() -> void:
+	if _floor_tiles == null:
+		return
+	var region := well_apron
+	for ty in range(region.position.y, region.position.y + region.size.y):
+		for tx in range(region.position.x, region.position.x + region.size.x):
+			if tx < 0 or tx >= grid_w or ty < 0 or ty >= grid_h:
+				continue
+			# Leave the well's own footprint interior unpaved (the well prop sits there).
+			if well_footprint.has_point(Vector2i(tx, ty)):
+				continue
+			var block_x: int = tx / COBBLE_BLOCK_TILES
+			var block_y: int = ty / COBBLE_BLOCK_TILES
+			var variant: int = _block_variant(block_x, block_y)
+			var local_x: int = tx % COBBLE_BLOCK_TILES
+			var local_y: int = ty % COBBLE_BLOCK_TILES
+			var atlas := Vector2i(variant * COBBLE_BLOCK_TILES + local_x, local_y)
+			_floor_tiles.set_cell(Vector2i(tx, ty), SOURCE_COBBLE, atlas)
 
 
-## Coarse lattice value in [0,1] at integer lattice coords (the blob-field corners).
-func _lattice(lx: int, ly: int) -> float:
-	var h: int = ((lx * 374761393) ^ (ly * 668265263) ^ (grass_seed * 1442695041)) & 0x7fffffff
-	return float(h % 1000) / 1000.0
-
-
-## Reclamation pull in ~[0,0.30] — a GENTLE bias toward where nature reclaims (corners,
-## the yard rim, building south-bases, the wet SW dip). Peaks in the corners; near-zero
-## in the open mid-yard (which stays trodden DIRT). Shaped so grass concentrates at the
-## edges WITHOUT covering the whole perimeter.
-func _reclamation_pull(cell: Vector2i) -> float:
-	var pull: float = 0.0
-	# Corner pull: strongest in the four corners, fading inward (a smooth radial-ish term).
-	var ex: float = 1.0 - float(mini(cell.x, grid_w - 1 - cell.x)) / (float(grid_w) * 0.5)
-	var ey: float = 1.0 - float(mini(cell.y, grid_h - 1 - cell.y)) / (float(grid_h) * 0.5)
-	pull += 0.14 * (ex * ey)  # corner product → only the corners get the full pull
-	# Building south-base shadow (damp grassy foot) — a narrow strip just below a building.
-	for foot: Rect2i in building_footprints:
-		var base_y: int = foot.position.y + foot.size.y
-		if (
-			cell.y >= base_y
-			and cell.y <= base_y + 1
-			and cell.x >= foot.position.x
-			and cell.x < foot.position.x + foot.size.x
-		):
-			pull += 0.16
-	# The SW dip (dormitory ruin / SW spring) — the wettest, grassiest corner of the yard.
-	if cell.x <= 9 and cell.y >= grid_h - 6:
-		pull += 0.14
-	return pull
-
-
-## Fine high-frequency dither in [0,1] for the dirt↔grass boundary stipple (feathered
-## edge). Distinct hash family from the blob lattice so the stipple doesn't realign.
+## Fine high-frequency dither in [0,1] for the grass-region border feather. Deterministic
+## (grass_seed). Pure function.
 func _fine_dither(cell: Vector2i) -> float:
 	var h: int = ((cell.x * 2654435761) ^ (cell.y * 40503) ^ (grass_seed * 2246822519)) & 0x7fffffff
 	return float(h % 1000) / 1000.0
@@ -378,41 +376,28 @@ func _fine_dither(cell: Vector2i) -> float:
 func _compute_lane_cells() -> Dictionary:
 	var cells: Dictionary = {}
 
-	# --- Processional spine: a curving 2-wide ribbon west → east. The centre-row
-	# follows a gentle curve (south dip around the central building, back to centre).
+	# --- THE PROCESSIONAL SPINE: ONE clear, continuous, 3-wide fine-cobble ribbon running
+	# WEST (spawn gate, row 12) → curving → EAST (descent, row 12). This is the single most
+	# important structure element (Sponsor 2026-06-08: "the path must READ as a path").
+	# 3 tiles wide (centre row ± 1) so it is unmistakably legible as "the walkable lane",
+	# not a thin track. The centre-row follows a gentle south dip across the mid-yard
+	# (`_spine_center_row`) so the ribbon skirts the central building on open ground and
+	# curves organically (never a ruler-straight road). HAND-PLACED as a connected ribbon —
+	# every column from the west edge to the east edge gets the 3-wide band, so the lane is
+	# one continuous connected path (the GUT connectivity pin asserts this).
 	for tx in range(0, grid_w):
 		var center_row: int = _spine_center_row(tx)
-		# 2-wide ribbon: the centre row + one row south of it (keeps the band off the
-		# very top/bottom and reads as a worn double-track).
-		for dy in range(0, 2):
+		for dy in range(-1, 2):  # centre row ± 1 → a 3-wide legible lane
 			_add_lane_cell(cells, tx, center_row + dy)
 
-	# --- Building-link: short lane run from the spine up to the central building's
-	# south face (footprint 18-23 × 9-13 → south face at y=13). Connects spine (south
-	# of the building) to the colonnade the pillars front (s1_yard_slice_chunk.tscn).
-	for ty in range(14, 16):
-		for tx in range(20, 23):
-			_add_lane_cell(cells, tx, ty)
-
-	# --- Well approach + apron. The well_footprint is (20,16,2,2). Spur from the spine
-	# down to the well, plus a 1-tile-thick apron ring around the well base (§2.2 "worn
-	# fine-cobble apron"). The apron is the most-worn ground in the yard (everyone drew water).
-	var well := well_footprint
-	# Apron ring: the band one tile outside the well footprint on all sides.
-	for ty in range(well.position.y - 1, well.position.y + well.size.y + 1):
-		for tx in range(well.position.x - 1, well.position.x + well.size.x + 1):
-			# Only the RING (exclude the interior, which the well prop/collision occupies).
-			var on_ring: bool = (
-				tx == well.position.x - 1
-				or tx == well.position.x + well.size.x
-				or ty == well.position.y - 1
-				or ty == well.position.y + well.size.y
-			)
-			if on_ring:
-				_add_lane_cell(cells, tx, ty)
-	# Short spur connecting the spine to the apron (the well sits just south of the spine).
-	for ty in range(15, well.position.y):
-		_add_lane_cell(cells, well.position.x + 1, ty)
+	# --- WELL SPUR: a short 1-wide fine-cobble spur from the spine SOUTH down to the well
+	# apron, so the well reads as ON the path network (a deliberate approach). The spur
+	# joins the spine (south side) to the top of the well apron region. Connected to the
+	# spine so the whole lane stays one component.
+	var spur_x: int = well_footprint.position.x + 1
+	var spur_top: int = _spine_center_row(spur_x) + 1
+	for ty in range(spur_top, well_apron.position.y):
+		_add_lane_cell(cells, spur_x, ty)
 
 	return cells
 
@@ -422,22 +407,27 @@ func _compute_lane_cells() -> Dictionary:
 ## dipping ~2 rows SOUTH across the mid-yard so the ribbon skirts the central building on
 ## open cobble + reads organic. Pure function (GUT-pinnable, deterministic).
 func _spine_center_row(tx: int) -> int:
-	# Quadratic-ish dip: deepest near the centre column, flat at the ends. Keeps the
-	# band on the south side of the central building (footprint south face y=13) without
-	# crossing INTO it (the _add_lane_cell building-footprint guard also protects this).
+	# Gentle dip: deepest near the centre column, flat at the ends. v3 reduces the
+	# amplitude 3.0→2.0 so the 3-wide lane staggers in fewer, gentler steps (a smoother
+	# path edge, closer to the references' clean lanes — the prior ×3 stepped too sharply).
+	# Keeps the band south of the central building (footprint south face y=13) without
+	# crossing INTO it (the _add_lane_cell footprint guard also protects this).
 	var t: float = float(tx) / float(maxi(grid_w - 1, 1))  # 0..1 across the yard
-	var dip: float = sin(t * PI) * 3.0  # 0 at ends, ~3 at centre → south dip
+	var dip: float = sin(t * PI) * 2.0  # 0 at ends, ~2 at centre → gentle south dip
 	return 12 + int(round(dip))
 
 
 ## Add a lane cell at (tx, ty) to the set IF it is in-bounds and NOT inside a building
-## footprint (a path never runs through a solid wall). Idempotent.
+## footprint OR the well footprint (a path never runs through a solid structure). Idempotent.
 func _add_lane_cell(cells: Dictionary, tx: int, ty: int) -> void:
 	if tx < 0 or tx >= grid_w or ty < 0 or ty >= grid_h:
 		return
 	for foot: Rect2i in building_footprints:
 		if foot.has_point(Vector2i(tx, ty)):
 			return
+	# The well is a solid landmark too — the lane skirts it (apron rings it instead).
+	if well_footprint.has_point(Vector2i(tx, ty)):
+		return
 	cells[Vector2i(tx, ty)] = true
 
 

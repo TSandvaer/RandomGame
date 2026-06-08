@@ -266,56 +266,72 @@ func test_ground_composition_is_dirt_majority_cobble_is_parts() -> void:
 	assert_gt(counts[SOURCE_COBBLE], 0, "cobble present (surviving-paving patches)")
 
 
-## REPEAT-BREAK (PR #424 Sponsor fix; carried into v2). The ground must NOT stamp one
-## repeating block — the painter scatters 6 atlas variants per 4x4 block via a non-tiling
-## hash (all ground classes share the 6-variant layout). Assert that across the yard's
-## blocks MULTIPLE distinct variants are used (variant = atlas_col / 4), so the field
-## doesn't read a single repeating stamp. A regression to a single-period would use
-## exactly ONE variant → fails.
-func test_yard_cobble_uses_multiple_variants_no_single_stamp() -> void:
+## v3 SEAM-FIX PIN (Sponsor 2026-06-08 "hard square block seams forming a visible grid").
+## The v2 painter swapped a DIFFERENT atlas variant per 4x4 block; two different toroidal
+## tiles don't mate at their shared edge → the visible ~256px block grid on the smooth
+## dirt field. v3 paints the DIRT field from ONE variant CONTINUOUSLY (`_dirt_atlas_coords`:
+## variant 0, addressed by world coord wrapped into the variant's 4x4 cells), so a single
+## seamless tile wraps onto itself with NO block seam. Pin that EVERY dirt cell uses the
+## SAME variant (variant 0) AND that the atlas col within a 4x4 block period equals the
+## cell's tx%4 (the continuous-wrap contract) — a regression back to the per-block variant
+## SWAP (the seam bug) would use multiple variants on dirt cells and fail this loudly.
+func test_dirt_field_is_continuous_single_variant_no_block_seam() -> void:
 	var inst: Node = _instantiate_yard_chunk()
 	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
 	if floor_tiles == null:
 		return
-	var variants_seen := {}
-	# Sample one cell per 4x4 block across the whole yard; record its variant.
-	for by: int in range(0, YARD_H, 4):
-		for bx: int in range(0, YARD_W, 4):
-			var coords: Vector2i = floor_tiles.get_cell_atlas_coords(Vector2i(bx, by))
-			if coords.x < 0:
+	var dirt_cells := 0
+	for ty in range(YARD_H):
+		for tx in range(YARD_W):
+			var cell := Vector2i(tx, ty)
+			if floor_tiles.get_cell_source_id(cell) != SOURCE_DIRT:
 				continue
+			dirt_cells += 1
+			var coords: Vector2i = floor_tiles.get_cell_atlas_coords(cell)
 			var variant: int = coords.x / 4  # 6 variant-blocks of 4 cols each
-			variants_seen[variant] = true
-	# A single-stamp regression yields exactly 1 variant; the scatter must use several.
-	assert_gt(
-		variants_seen.size(),
-		2,
+			var local_col: int = coords.x % 4
+			# THE SEAM-FIX INVARIANT: every dirt cell is variant 0 (continuous, no swap)
+			# AND its atlas col within the block tracks tx%4 (the toroidal-wrap addressing).
+			assert_eq(variant, 0, "dirt cell %s uses the single continuous variant 0" % str(cell))
+			assert_eq(
+				local_col, tx % 4, "dirt cell %s atlas col tracks tx%%4 (continuous wrap)" % str(cell)
+			)
+			assert_eq(coords.y, ty % 4, "dirt cell %s atlas row tracks ty%%4" % str(cell))
+	assert_gt(dirt_cells, 400, "dirt is the majority continuous field (got %d cells)" % dirt_cells)
+
+
+## v3 STRUCTURE PIN (Sponsor 2026-06-08 "no structure ... just chaos"). Grass is HAND-
+## PLACED at the OUTER edges/corners ONLY — NOT scattered across the mid-field (the v2
+## noise scatter was the chaos). Pin that EVERY grass cell sits within a hand-authored
+## grass_region (all at the yard margins) AND that the OPEN MID-FIELD (a central band well
+## away from the rim) is entirely dirt/lane/cobble — ZERO grass. A regression back to the
+## noise-scatter (grass blobs in the middle) fails this loudly.
+func test_grass_only_at_edges_none_in_mid_field() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
+	if floor_tiles == null:
+		return
+	# Mid-field probe box: columns 12..28, rows 7..17 (the open centre, clear of the
+	# corner/rim grass regions). No grass may appear here — the middle is smooth dirt + lane.
+	var mid_grass := 0
+	for ty in range(7, 18):
+		for tx in range(12, 29):
+			if floor_tiles.get_cell_source_id(Vector2i(tx, ty)) == SOURCE_GRASS:
+				mid_grass += 1
+	assert_eq(
+		mid_grass,
+		0,
 		(
-			"yard must scatter MULTIPLE cobble variants (no single repeating stamp), got %d"
-			% variants_seen.size()
+			"NO grass in the open mid-field (cols 12-28, rows 7-17) — grass is hand-placed at"
+			+ " the EDGES only; mid-field scatter is the rejected v2 chaos (got %d)" % mid_grass
 		)
 	)
-
-
-## The variant scatter is NON-TILING — it must not realign on a small period (which
-## would re-introduce a visible variant grid). Assert two blocks a short period apart
-## differ for at least one offset (cheap non-tiling probe).
-func test_yard_cobble_variant_scatter_is_non_tiling() -> void:
-	var inst: Node = _instantiate_yard_chunk()
-	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
-	if floor_tiles == null:
-		return
-	# Compare the variant of block row 0 across consecutive blocks — they must not be
-	# all identical (a tiling period of 1) and not strictly alternating in a trivial
-	# way. Cheap check: collect the row-0 variant sequence; assert ≥3 distinct values.
-	var seq := {}
-	for bx: int in range(0, YARD_W, 4):
-		var coords: Vector2i = floor_tiles.get_cell_atlas_coords(Vector2i(bx, 0))
-		if coords.x >= 0:
-			seq[coords.x / 4] = true
-	assert_gt(
-		seq.size(), 2, "row-0 variant sequence must vary (non-tiling), got %d distinct" % seq.size()
-	)
+	# And grass IS present at the corners (the hand-placed reclamation regions exist).
+	var corner_grass := 0
+	for probe: Vector2i in [Vector2i(1, 1), Vector2i(38, 1), Vector2i(2, 21), Vector2i(37, 22)]:
+		if floor_tiles.get_cell_source_id(probe) == SOURCE_GRASS:
+			corner_grass += 1
+	assert_gt(corner_grass, 0, "grass reclaims the corners (hand-placed edge regions present)")
 
 
 func test_yard_chunk_builds_solid_building_structures() -> void:
@@ -721,6 +737,49 @@ func test_lane_spine_spans_west_to_east() -> void:
 			has_east = true
 	assert_true(has_west, "lane reaches the WEST spawn-gate edge")
 	assert_true(has_east, "lane reaches the EAST descent edge (journey span)")
+
+
+## v3 PATH-LEGIBILITY PIN (Sponsor 2026-06-08 "the path must READ as a path"). The lane
+## must be ONE CONNECTED component (a continuous ribbon you can walk west→east), not a
+## scatter of disconnected cobble cells. 4-connectivity flood-fill from any west-edge lane
+## cell must reach an east-edge lane cell AND cover (nearly) all lane cells. A regression
+## that fragments the lane into islands (the rejected scatter read) fails this loudly.
+func test_lane_is_one_connected_ribbon_west_to_east() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var lane: TileMapLayer = inst.get_node("PathLane")
+	if lane == null:
+		return
+	var lane_set := {}
+	var west_seed := Vector2i(-1, -1)
+	for cell: Vector2i in lane.get_used_cells():
+		lane_set[cell] = true
+		if west_seed == Vector2i(-1, -1) and cell.x <= 2:
+			west_seed = cell
+	assert_ne(west_seed, Vector2i(-1, -1), "lane has a west-edge seed cell")
+	if west_seed == Vector2i(-1, -1):
+		return
+	# 4-connectivity flood fill from the west seed over the lane cells.
+	var seen := {west_seed: true}
+	var queue: Array[Vector2i] = [west_seed]
+	var head := 0
+	var reached_east := false
+	while head < queue.size():
+		var cur: Vector2i = queue[head]
+		head += 1
+		if cur.x >= YARD_W - 3:
+			reached_east = true
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var n: Vector2i = cur + d
+			if lane_set.has(n) and not seen.has(n):
+				seen[n] = true
+				queue.append(n)
+	assert_true(reached_east, "lane is connected west→east (one walkable ribbon, not islands)")
+	# (Nearly) ALL lane cells are in the one component — no orphan lane islands. Allow a
+	# tiny slack for the well-spur tip if the gentle dip leaves it 1 cell detached.
+	var coverage: float = float(seen.size()) / float(maxi(lane_set.size(), 1))
+	assert_gt(
+		coverage, 0.95, "≥95%% of lane cells are in ONE connected ribbon (got %.1f%%)" % (coverage * 100.0)
+	)
 
 
 ## The lane never runs through a building footprint (a path doesn't cross a solid wall).

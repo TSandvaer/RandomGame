@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
 """
-IN-CONTEXT JUDGE RENDER for the v2 S1 GROUND COMPOSITION (86ca5hwmx, render-first gate).
+IN-CONTEXT JUDGE RENDER for the v3 HAND-PLACED STRUCTURED S1 GROUND (86ca5hwmx,
+render-first gate, Sponsor 2026-06-08 "no structure ... just chaos" 4th bounce).
 
-After the ashlar slab path was soak-rejected a THIRD time, the ground + path were
-re-specced (Uma s1-ground-composition-v2.md): the path is FINE-COBBLE pavers and the
-ground is VARIED (worn DIRT majority + GRASS reclamation patches + COBBLE patches + the
-fine-cobble lane). Per the dispatch brief's MANDATORY render-first gate, this composes
-the FULL varied ground at game zoom with a char_scale=0.48 player + a 0.552 mob
-reference, so the composition can be hard-judged against the 13 inspiration images
-BEFORE any soak. De-risks a 4th bounce.
+v3 DROPS the v2 procedural SCATTER (noise-grass across the whole grid + 5 mid-field
+cobble patches → read as chaos). It HAND-PLACES every material to match the references
+(Graveyard Keeper 11h18_12 + Stardew 11h19_36): a SMOOTH continuous dirt base field,
+ONE clear deliberate fine-cobble PATH lane, GRASS only at the outer edges/corners.
 
-This mirrors the S1YardChunk painter's geometry EXACTLY (same atlas layout, same
-block-variant scatter, same grass-noise placement, same lane geometry, same cobble-patch
-footprints) so the render is a faithful proxy of what the game paints — NOT a hand mock.
-Reads the SHIPPED atlases:
-  assets/tilesets/s1_cloister/floor_dirt.png   (dirt majority,  768x128 = 6 variants)
-  assets/tilesets/s1_cloister/floor_grass.png  (grass patches,  768x128 = 6 variants)
-  assets/tilesets/s1_cloister/floor_cobble.png (cobble patches, 768x128 = 6 variants)
+This mirrors the S1YardChunk painter's v3 geometry EXACTLY (same continuous dirt-field
+addressing, same hand-placed grass_regions + feathered border, same well apron, same
+3-wide lane geometry) so the render is a faithful proxy of what the game paints — NOT a
+hand mock. Reads the SHIPPED atlases:
+  assets/tilesets/s1_cloister/floor_dirt.png   (dirt field,     768x128 = 6 variants)
+  assets/tilesets/s1_cloister/floor_grass.png  (grass regions,  768x128 = 6 variants)
+  assets/tilesets/s1_cloister/floor_cobble.png (well apron,     768x128 = 6 variants)
   assets/tilesets/s1_cloister/floor_path.png   (fine-cobble lane,768x128 = 6 variants)
 
-Output: _yard_render/yard_ground_v2_judge.png
+Output: _yard_render/yard_ground_v3_judge.png
 """
 import math
 import os
@@ -29,23 +27,29 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 ATL = os.path.join(ROOT, "assets/tilesets/s1_cloister")
-OUT = os.path.join(ROOT, "_yard_render", "yard_ground_v2_judge.png")
+OUT = os.path.join(ROOT, "_yard_render", "yard_ground_v3_judge.png")
 
 TILE = 32
 VARIANTS = 6
 BLOCK = 4
 COBBLE_SEED = 1763   # matches S1YardChunk.cobble_seed
 GRASS_SEED = 2207    # matches S1YardChunk.grass_seed
+DIRT_FIELD_VARIANT = 0   # matches S1YardChunk.DIRT_FIELD_VARIANT
+GRASS_FIELD_VARIANT = 0  # matches S1YardChunk.GRASS_FIELD_VARIANT
 
 GW, GH = 40, 24
 ZOOM = 2
 
-# Mirror S1YardChunk.building_footprints (for grass south-base boost + lane guard).
+# Mirror S1YardChunk.building_footprints (lane guard + brick overlay).
 BUILDINGS = [(8, 0, 12, 3), (6, 21, 14, 3), (18, 9, 6, 5), (33, 6, 3, 3)]
-# Mirror S1YardChunk.cobble_patches.
-COBBLE_PATCHES = [(15, 14, 10, 5), (24, 8, 5, 6), (1, 8, 5, 8), (8, 3, 7, 4), (30, 9, 6, 6)]
-# Mirror S1YardChunk.well_footprint.
+# Mirror S1YardChunk.grass_regions (v3 hand-placed edge/corner grass).
+GRASS_REGIONS = [
+    (0, 0, 7, 6), (33, 0, 7, 5), (0, 18, 9, 6),
+    (34, 19, 6, 5), (20, 0, 10, 2), (22, 22, 11, 2),
+]
+# Mirror S1YardChunk.well_footprint + well_apron.
 WELL = (20, 16, 2, 2)
+WELL_APRON = (19, 15, 4, 4)
 
 
 def load_atlas(name):
@@ -64,7 +68,7 @@ def absi(x):
     return abs(int(x))
 
 
-def block_variant(bx, by):  # mirror _block_variant (ground)
+def block_variant(bx, by):  # mirror _block_variant (cobble apron)
     h = (bx * 73856093) ^ (by * 19349663) ^ (COBBLE_SEED * 83492791)
     return absi(h) % VARIANTS
 
@@ -79,71 +83,21 @@ def in_rect(tx, ty, rect):
     return x <= tx < x + w and y <= ty < y + h
 
 
-def _lattice(lx, ly):  # mirror _lattice
-    h = ((lx * 374761393) ^ (ly * 668265263) ^ (GRASS_SEED * 1442695041)) & 0x7fffffff
-    return (h % 1000) / 1000.0
-
-
-def grass_blob(tx, ty):  # mirror _grass_blob
-    period = 5.0
-    gx = tx / period
-    gy = ty / period
-    x0 = math.floor(gx)
-    y0 = math.floor(gy)
-    fx = gx - x0
-    fy = gy - y0
-    fx = fx * fx * (3.0 - 2.0 * fx)
-    fy = fy * fy * (3.0 - 2.0 * fy)
-    c00 = _lattice(x0, y0)
-    c10 = _lattice(x0 + 1, y0)
-    c01 = _lattice(x0, y0 + 1)
-    c11 = _lattice(x0 + 1, y0 + 1)
-    top = c00 * (1 - fx) + c10 * fx
-    bot = c01 * (1 - fx) + c11 * fx
-    return top * (1 - fy) + bot * fy
-
-
-def reclamation_pull(tx, ty):  # mirror _reclamation_pull
-    pull = 0.0
-    ex = 1.0 - min(tx, GW - 1 - tx) / (GW * 0.5)
-    ey = 1.0 - min(ty, GH - 1 - ty) / (GH * 0.5)
-    pull += 0.14 * (ex * ey)
-    for (bx, by, bw, bh) in BUILDINGS:
-        base_y = by + bh
-        if base_y <= ty <= base_y + 1 and bx <= tx < bx + bw:
-            pull += 0.16
-    if tx <= 9 and ty >= GH - 6:
-        pull += 0.14
-    return pull
-
-
 def fine_dither(tx, ty):  # mirror _fine_dither
     h = ((tx * 2654435761) ^ (ty * 40503) ^ (GRASS_SEED * 2246822519)) & 0x7fffffff
     return (h % 1000) / 1000.0
 
 
-def is_grass_cell(tx, ty):  # mirror _is_grass_cell
-    field = grass_blob(tx, ty) + reclamation_pull(tx, ty)
-    thresh = 0.72
-    band = 0.05
-    if abs(field - thresh) < band:
-        d = fine_dither(tx, ty)
-        bias = (field - (thresh - band)) / (2.0 * band)
-        return d < bias
-    return field > thresh
-
-
-def ground_class(tx, ty):  # mirror _ground_class_for: 0=cobble,4=grass,3=dirt
-    for p in COBBLE_PATCHES:
-        if in_rect(tx, ty, p):
-            px, py, pw, ph = p
-            on_ring = tx == px or tx == px + pw - 1 or ty == py or ty == py + ph - 1
-            if on_ring and fine_dither(tx, ty) < 0.42:
-                return 4 if is_grass_cell(tx, ty) else 3
-            return 0
-    if is_grass_cell(tx, ty):
-        return 4
-    return 3
+def is_grass_cell(tx, ty):  # mirror _is_grass_cell (v3 hand-placed regions)
+    for region in GRASS_REGIONS:
+        if not in_rect(tx, ty, region):
+            continue
+        rx, ry, rw, rh = region
+        on_ring = tx == rx or tx == rx + rw - 1 or ty == ry or ty == ry + rh - 1
+        if on_ring:
+            return fine_dither(tx, ty) < 0.55
+        return True
+    return False
 
 
 def spine_center_row(tx):  # mirror _spine_center_row
@@ -152,7 +106,7 @@ def spine_center_row(tx):  # mirror _spine_center_row
     return 12 + int(round(dip))
 
 
-def lane_cells():  # mirror _compute_lane_cells
+def lane_cells():  # mirror _compute_lane_cells (v3 3-wide spine + well spur)
     cells = set()
 
     def add(tx, ty):
@@ -161,24 +115,23 @@ def lane_cells():  # mirror _compute_lane_cells
         for b in BUILDINGS:
             if in_rect(tx, ty, b):
                 return
+        if in_rect(tx, ty, WELL):
+            return
         cells.add((tx, ty))
 
     for tx in range(GW):
         cr = spine_center_row(tx)
-        for dy in range(0, 2):
+        for dy in (-1, 0, 1):  # 3-wide legible lane
             add(tx, cr + dy)
-    for ty in range(14, 16):
-        for tx in range(20, 23):
-            add(tx, ty)
-    wx, wy, ww, wh = WELL
-    for ty in range(wy - 1, wy + wh + 1):
-        for tx in range(wx - 1, wx + ww + 1):
-            on_ring = tx == wx - 1 or tx == wx + ww or ty == wy - 1 or ty == wy + wh
-            if on_ring:
-                add(tx, ty)
-    for ty in range(15, wy):
-        add(wx + 1, ty)
+    spur_x = WELL[0] + 1
+    spur_top = spine_center_row(spur_x) + 1
+    for ty in range(spur_top, WELL_APRON[1]):
+        add(spur_x, ty)
     return cells
+
+
+def dirt_coords(tx, ty):  # mirror _dirt_atlas_coords (continuous wrap, no block seam)
+    return (DIRT_FIELD_VARIANT, ty % BLOCK, tx % BLOCK)
 
 
 def main():
@@ -186,7 +139,6 @@ def main():
     grass = load_atlas("floor_grass.png")
     cobble = load_atlas("floor_cobble.png")
     path = load_atlas("floor_path.png")
-    atlases = {0: cobble, 3: dirt, 4: grass}
 
     lanes = lane_cells()
     canvas = np.empty((GH * TILE, GW * TILE, 3), np.uint8)
@@ -195,10 +147,14 @@ def main():
             if (tx, ty) in lanes:
                 v = path_block_variant(tx // BLOCK, ty // BLOCK)
                 cell = path[v, ty % BLOCK, tx % BLOCK]
-            else:
-                src = ground_class(tx, ty)
+            elif in_rect(tx, ty, WELL_APRON) and not in_rect(tx, ty, WELL):
                 v = block_variant(tx // BLOCK, ty // BLOCK)
-                cell = atlases[src][v, ty % BLOCK, tx % BLOCK]
+                cell = cobble[v, ty % BLOCK, tx % BLOCK]
+            elif is_grass_cell(tx, ty):
+                cell = grass[GRASS_FIELD_VARIANT, ty % BLOCK, tx % BLOCK]
+            else:
+                gv, gy, gx = dirt_coords(tx, ty)
+                cell = dirt[gv, gy, gx]
             canvas[ty * TILE:(ty + 1) * TILE, tx * TILE:(tx + 1) * TILE] = cell
 
     img = Image.fromarray(canvas).resize(
@@ -218,12 +174,12 @@ def main():
     draw.rectangle([mx, my, mx + mw, my + mh], outline=(80, 160, 255), width=2)
     draw.text((mx, max(2, my - 14)), "mob ~0.552", fill=(120, 180, 255))
     draw.text((6, 6),
-              "v2 GROUND: dirt majority + grass edges + cobble patches + fine-cobble LANE @ game zoom (2x)",
+              "v3 STRUCTURED: smooth dirt field + ONE clear fine-cobble LANE + grass at EDGES @ game zoom (2x)",
               fill=(255, 235, 200))
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     img.save(OUT)
-    print(f"[judge] in-context yard-ground render -> {OUT} ({img.size[0]}x{img.size[1]})")
+    print(f"[judge] in-context v3 yard-ground render -> {OUT} ({img.size[0]}x{img.size[1]})")
 
 
 if __name__ == "__main__":
