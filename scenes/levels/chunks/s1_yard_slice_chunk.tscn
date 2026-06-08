@@ -96,35 +96,45 @@ tile_set = ExtResource("2_yardset")
 [node name="BuildingSprites" type="Node2D" parent="."]
 z_index = 1
 
-; Chapel + bell-tower — NW-corner-at-spawn (footprint x0-7,y0-2). Scale 1.0667 (240→256px
-; width), sprite 256x256, top-left (0,-160) so the bell-tower rises off-frame N, base at y96.
+; v3 RE-ANCHOR (orch landmark-framing re-judge 2026-06-08): the v2 anchors put square PixelLab
+; canvases (240px tall for a 96px footprint) base-at-footprint-bottom → the chapel rose to
+; y=-160, ENTIRELY above the world's y=0 top edge, where the camera (clamped to the floor bounds
+; [0,768]) can NEVER show it (b1 framed nothing). FIX: scale = min(width-fit, height-cap-fit)
+; where height-cap = (footprint_h + 2-tile rise), so a building never rises more than ~2 tiles
+; above its footprint top; base at footprint bottom, top CLAMPED >= 0 so the whole structure is
+; in-bounds. Buildings now read as substantial landmarks (chapel ~160px = 5 tiles wide) sitting
+; ON their footprints with a modest roof/tower rise, not runaway off-screen verticals.
+
+; Chapel + bell-tower — NW-corner-at-spawn (footprint x0-7,y0-2). Scale 0.6667 (height-capped),
+; sprite 160x160, top-left (48,0): top AT the world edge (the off-frame-N read) + base at y160.
 [node name="Chapel" type="Sprite2D" parent="BuildingSprites"]
 texture_filter = 1
 centered = false
-position = Vector2(0, -160)
-scale = Vector2(1.0667, 1.0667)
+position = Vector2(48, 0)
+scale = Vector2(0.6667, 0.6667)
 texture = ExtResource("10_chapel")
 
-; Dormitory ruin — LEFT (more-intact end), covers footprint x0-7. Scale 1.0407, top-left
-; (0,517) so the base sits at the S grid edge y768 (runs off-frame S).
+; Dormitory ruin — LEFT (more-intact end), covers footprint x0-7. Scale 0.6639 (height-capped),
+; sprite 163x160, top-left (46,608), base at the S grid edge y768 (runs off-frame S).
 [node name="DormitoryLeft" type="Sprite2D" parent="BuildingSprites"]
 texture_filter = 1
 centered = false
-position = Vector2(0, 517)
-scale = Vector2(1.0407, 1.0407)
+position = Vector2(46, 608)
+scale = Vector2(0.6639, 0.6639)
 texture = ExtResource("11_dormL")
 
-; Dormitory ruin — RIGHT (more-collapsed end + rubble spill), covers footprint x7-14 (abuts
-; the left half at x7). Scale 1.0492, top-left (224,512), base at y768.
+; Dormitory ruin — RIGHT (more-collapsed end + rubble spill), covers footprint x7-14. Scale
+; 0.6557 (height-capped), sprite 160x160, top-left (272,608), base at y768.
 [node name="DormitoryRight" type="Sprite2D" parent="BuildingSprites"]
 texture_filter = 1
 centered = false
-position = Vector2(224, 512)
-scale = Vector2(1.0492, 1.0492)
+position = Vector2(272, 608)
+scale = Vector2(0.6557, 0.6557)
 texture = ExtResource("12_dormR")
 
 ; Central cloister building — high, off-center (footprint x26-29,y0-3). Its LIT SOUTH WINDOW
-; (baked into the PNG) faces the player approach (canvas-S). Scale 1.0756, top-left (832,14).
+; (baked into the PNG) faces the player approach (canvas-S). Scale 1.0756 (width-fit; the 106px
+; PNG is already under the height cap), sprite 128x114, top-left (832,14).
 [node name="CentralBuilding" type="Sprite2D" parent="BuildingSprites"]
 texture_filter = 1
 centered = false
@@ -132,8 +142,9 @@ position = Vector2(832, 14)
 scale = Vector2(1.0756, 1.0756)
 texture = ExtResource("13_central")
 
-; Far outbuilding — tiny east-horizon depth anchor (footprint x38-39,y2-3). Scale 0.7901,
-; top-left (1216,70), sits ABOVE the exit line (y12) so it doesn't block the descent approach.
+; Far outbuilding — tiny east-horizon depth anchor (footprint x38-39,y2-3). Scale 0.7901
+; (width-fit), sprite 64x58, top-left (1216,70), sits ABOVE the exit line (y12) so it doesn't
+; block the descent approach.
 [node name="Outbuilding" type="Sprite2D" parent="BuildingSprites"]
 texture_filter = 1
 centered = false
