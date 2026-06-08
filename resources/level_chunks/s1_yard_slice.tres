@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="LevelChunkDef" load_steps=8 format=3]
+[gd_resource type="Resource" script_class="LevelChunkDef" load_steps=9 format=3]
 
 ; S1 open cloister-YARD first-slice chunk def (ticket 86ca5erzk, S1-YARD T4).
 ; The first WALKABLE yard chunk, consumed by the FloorAssembler path
@@ -15,12 +15,15 @@
 ; off this one toward "endless" (procgen-pipeline.md EAST/WEST mating); for THIS
 ; single-anchor slice the EAST seam is open (no right neighbour) — clean mating.
 ;
-; mob_spawns: a MODERATE cloister-penitent encounter (grunts) in the OPEN cobble
-; lanes (s1-cloister-yard.md §0.6 "combat density stays MODERATE" — the world is
-; alive with more than enemies). Tile coords chosen to sit in open ground, NOT on
-; a building footprint (north 8-19×0-2, south 6-19×21-23, central 18-23×9-13,
-; outbuilding 33-35×6-8) so every mob spawns on walkable cobble + can reach the
-; player (T6 navigability gate).
+; mob_spawns (v6 APPROVED-LAYOUT, s1-yard-layout-design.md §3.6): 4 lane-gating grunts
+; (MODERATE — combat punctuates the journey, never an arena fill; s1-cloister-yard.md §0.6).
+; Each gates a lane the spine routes through, OFF the §3.1 building footprints (chapel 0-7×0-2,
+; dormitory 0-14×21-23, central 26-29×0-3, outbuilding 38-39×2-3) + OFF the well/NPC footprints:
+;   (9,11)  first contact, open W lane just past the spawn approach
+;   (8,15)  W lane second, covers the south route toward the well
+;   (24,11) fork pressure, open south-of-central lane (makes the route-choice tense)
+;   (33,9)  east lane, the long approach to the exit ("deeper into the world")
+; All on walkable cobble + reachable from spawn (T6 navigability gate, GUT-pinned).
 
 [ext_resource type="Script" path="res://scripts/levels/LevelChunkDef.gd" id="1_chunk"]
 [ext_resource type="Script" path="res://scripts/levels/MobSpawnPoint.gd" id="2_spawn"]
@@ -38,19 +41,24 @@ position_tiles = Vector2i(39, 12)
 direction = 1
 tag = &"exit"
 
-[sub_resource type="Resource" id="Resource_spawn_grunt_w"]
+[sub_resource type="Resource" id="Resource_spawn_grunt_w1"]
 script = ExtResource("2_spawn")
-position_tiles = Vector2i(12, 14)
+position_tiles = Vector2i(9, 11)
 mob_id = &"grunt"
 
-[sub_resource type="Resource" id="Resource_spawn_grunt_c"]
+[sub_resource type="Resource" id="Resource_spawn_grunt_w2"]
 script = ExtResource("2_spawn")
-position_tiles = Vector2i(26, 6)
+position_tiles = Vector2i(8, 15)
+mob_id = &"grunt"
+
+[sub_resource type="Resource" id="Resource_spawn_grunt_fork"]
+script = ExtResource("2_spawn")
+position_tiles = Vector2i(24, 11)
 mob_id = &"grunt"
 
 [sub_resource type="Resource" id="Resource_spawn_grunt_e"]
 script = ExtResource("2_spawn")
-position_tiles = Vector2i(30, 16)
+position_tiles = Vector2i(33, 9)
 mob_id = &"grunt"
 
 [resource]
@@ -61,4 +69,4 @@ size_tiles = Vector2i(40, 24)
 tile_size_px = 32
 scene_path = "res://scenes/levels/chunks/s1_yard_slice_chunk.tscn"
 ports = [SubResource("Resource_entry_port"), SubResource("Resource_exit_port")]
-mob_spawns = [SubResource("Resource_spawn_grunt_w"), SubResource("Resource_spawn_grunt_c"), SubResource("Resource_spawn_grunt_e")]
+mob_spawns = [SubResource("Resource_spawn_grunt_w1"), SubResource("Resource_spawn_grunt_w2"), SubResource("Resource_spawn_grunt_fork"), SubResource("Resource_spawn_grunt_e")]

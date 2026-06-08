@@ -117,39 +117,49 @@ const BLEND_BAND_CELLS: int = 3
 ## cliff-scatter. LARGE solid blocks (≥6x6) give the autotile a clean solid-grass INTERIOR
 ## (the wang_15 center tile) with ONE soft blend ring at the perimeter — the Stardew/
 ## Graveyard-Keeper "grass reclaims the corner" read. Diff-reviewable data.
+## v6 APPROVED-LAYOUT (s1-yard-layout-design.md §3.7, PR #430). Grass reclaims the OUTER
+## corners as a FEW LARGE solid blocks (≥6x6 so the autotile gets a clean solid interior +
+## ONE soft blend ring — the v5 lesson). Re-anchored away from the §3.1 building footprints
+## (chapel NW 0-7×0-2, dormitory S 0-14×21-23, central 26-29×0-3, outbuilding 38-39×2-3) so
+## grass fills the open corners between landmarks, not under a building.
 @export var grass_regions: Array[Rect2i] = [
-	Rect2i(0, 0, 9, 8),  # NW corner — large solid block
-	Rect2i(31, 0, 9, 7),  # NE corner
-	Rect2i(0, 16, 11, 8),  # SW corner (wettest, grassiest) — largest
+	Rect2i(0, 4, 8, 8),  # W edge below the chapel — large solid block
+	Rect2i(31, 6, 9, 8),  # E edge below the outbuilding / NE-of-mid
+	Rect2i(0, 14, 9, 7),  # SW corner above the dormitory (wettest, grassiest)
 	Rect2i(32, 17, 8, 7),  # SE corner
 ]
 
-## Surviving-COBBLE apron region (v3) in LOGICAL tiles — a deliberate paved ring around the
-## well (the most-walked-and-paved spot). NO mid-field cobble scatter. Its outer ring
-## feathers into dirt on the same dither band so the apron edge is soft.
-@export var well_apron: Rect2i = Rect2i(19, 15, 4, 4)
+## Surviving-COBBLE apron region (v6) in LOGICAL tiles — the worn paved ring around the WELL
+## at (12,17). s1-yard-layout-design.md §3.3: a 4x4 worn apron x10-13, y16-18 (the most-worn
+## ground — everyone drew water). Its outer ring feathers into the ground on the dither band.
+@export var well_apron: Rect2i = Rect2i(10, 16, 4, 4)
 
-## Building footprints in LOGICAL tiles (x,y,w,h) — landmark STRUCTURES standing IN the
-## open expanse. The painter paints finer-brick over each AND builds a matching StaticBody2D.
+## Building footprints in LOGICAL tiles (x,y,w,h) — the APPROVED-LAYOUT landmark structures
+## (s1-yard-layout-design.md §3.1). The painter builds a matching StaticBody2D per footprint
+## (walk-AROUND solid); the VISUAL is the PixelLab iso/oblique building Sprite2D placed in the
+## .tscn (NOT painted brick — the v6 building-asset layer, s1-yard-building-assets.md §4). The
+## dormitory footprint Rect2i(0,21,15,3) is covered by TWO distinct ruin sprites (left x0-7 +
+## right x7-14) per the orch decision, but the collision is ONE solid over the full footprint.
 @export var building_footprints: Array[Rect2i] = [
-	Rect2i(8, 0, 12, 3),  # North range (chapel face / bell-tower)
-	Rect2i(6, 21, 14, 3),  # South range (dormitory ruin)
-	Rect2i(18, 9, 6, 5),  # Central cloister building
-	Rect2i(33, 6, 3, 3),  # Far, small east outbuilding (depth)
+	Rect2i(0, 0, 8, 3),  # Chapel + bell-tower — NW-corner-at-spawn anchor (§3.1)
+	Rect2i(0, 21, 15, 3),  # Dormitory ruin — S edge, wider+offset-east (§3.1; 2 ruin sprites)
+	Rect2i(26, 0, 4, 4),  # Central cloister building — high, off-center, lit S window (§3.1)
+	Rect2i(38, 2, 2, 2),  # Far outbuilding — tiny east-horizon depth anchor (§3.1)
 ]
 
 ## WELL-HEAD landmark in LOGICAL tiles (x,y,w,h) — solid base under the .tscn well sprite.
-## SOAK-REVISION (#426 prior): 2x2 to match the well scale drop (a real well ~1.5x player).
-@export var well_footprint: Rect2i = Rect2i(20, 16, 2, 2)
+## s1-yard-layout-design.md §3.3: center tile (12,17), collision footprint x11-13,y16-18 (3x3).
+@export var well_footprint: Rect2i = Rect2i(11, 16, 3, 3)
 
-## SPRING pools (T8) — damp low/shadow corners (still dark warm-neutral ColorRect pools).
+## SPRING / damp seep (§3.3) — a small water-accent patch x14-15,y16-17 (2x2) between the well
+## and the garden (the most-reclaimed corner). Still dark warm-neutral ColorRect pools.
 @export var spring_tiles: Array[Vector2i] = [
-	Vector2i(28, 2),  # north — damp shadow under the chapel range east section
-	Vector2i(9, 18),  # SW dip near the dormitory ruin
+	Vector2i(14, 16),  # the damp seep beside the well apron (§3.3)
 ]
 
-## GARDEN BED gone wild (T8) — ONE hero bed of tilled-soil-gone-to-weeds (south).
-@export var garden_bed: Rect2i = Rect2i(12, 17, 4, 3)
+## GARDEN BED gone wild (§3.3) — ONE hero bed of tilled-soil-gone-to-weeds near the dormitory
+## range, x19-20,y18-20 (2x3). Off-path discovery beat.
+@export var garden_bed: Rect2i = Rect2i(19, 18, 2, 3)
 
 ## S1_YARD_WATER_DOCTRINE (Uma §3.3) — still, dark, warm-neutral, sub-1.0, NEVER pure-black.
 const WATER_BASE := Color(0.180, 0.165, 0.149, 1.0)  # #2E2A26 dark warm-neutral still surface
@@ -303,49 +313,72 @@ func _fine_dither(cell: Vector2i) -> float:
 # ---- PASS 3: the fine-cobble LANE (LOVED cobble, finer-resolved dip + soft edges) ---
 
 
-## Compute the set of FINE cells the LANE occupies (v2 §2 desire-line map), resolved at the
-## FINE grid so the dip curve steps in small 16px increments (the #426 "chunky corners" fix).
-## The lane is a HUMBLE worn footpath threading the ground:
-##   - SPINE: west gate (player spawn, logical row 12) → gentle south dip → east descent.
-##     3 LOGICAL tiles wide (= 6 fine cells), centred on `_spine_center_fine_row`.
-##   - WELL SPUR: a short narrow spur from the spine S to the well apron.
-## Cells inside a building/well footprint are EXCLUDED (a path never crosses a solid wall).
-## Returns Dictionary{Vector2i(fine): true}.
+## v6 APPROVED-LAYOUT spine (s1-yard-layout-design.md §3.2): the worn cobble LANE follows the
+## ROUTED polyline — NOT a parametric sine dip. It enters low-west at the spawn, turns UP, runs
+## the upper-center rise, then the FORK splits: the MAIN line (S4) curves east-and-down to the
+## exit, and the SOUTH link (S3b) drops to the WELL. The lane is the v5 loved cobble (PathLane),
+## reconciled to route the approved spine + fork (orch decision #3 — no separate slab spine).
+## 2 LOGICAL tiles wide (= 4 fine cells) per the §3.2 "2 tiles wide" spec. Cells inside a
+## building/well footprint are EXCLUDED (a path never crosses a solid wall). Returns
+## Dictionary{Vector2i(fine): true}. All segment endpoints are in LOGICAL tiles → fine via x2.
 func _compute_lane_cells() -> Dictionary:
 	var cells: Dictionary = {}
-	# Lane half-width in FINE cells: a 3-logical-tile-wide lane = 6 fine cells → ±3.
-	var half_w: int = (3 * CELL_SUBDIV) / 2  # 3
-	for fx in range(0, _fw):
-		var center_fy: int = _spine_center_fine_row(fx)
-		for dy in range(-half_w, half_w + 1):
-			# #426 SOFT PATH EDGE: the OUTERMOST band (|dy| == half_w) feathers into dirt on
-			# the dither (keep ~65%, drop ~35%) so the path edge softens into the surrounding
-			# earth (Stardew/Graveyard-Keeper) WITHOUT reading ragged. The interior band
-			# (|dy| < half_w) always keeps (the solid walkable core).
-			if absi(dy) == half_w and _fine_dither(Vector2i(fx, center_fy + dy)) >= 0.65:
-				continue
-			_add_lane_cell(cells, fx, center_fy + dy)
-	# WELL SPUR: a short narrow (2-fine-cell-wide) spur from the spine S to the apron top.
-	# Start it INSIDE the always-kept lane core (center + half_w - 1) so the spur is
-	# guaranteed 4-connected to the spine (the soft-edge feather only drops the outermost
-	# band, so starting one cell inside the rim keeps the spur attached).
-	var spur_fx: int = (well_footprint.position.x) * CELL_SUBDIV + CELL_SUBDIV  # ~1 logical tile in
-	var spur_top: int = _spine_center_fine_row(spur_fx) + half_w - 1
-	var apron_top_fine: int = well_apron.position.y * CELL_SUBDIV
-	for fy in range(spur_top, apron_top_fine):
-		_add_lane_cell(cells, spur_fx, fy)
-		_add_lane_cell(cells, spur_fx + 1, fy)  # 2-fine-cell-wide spur (still narrow)
+	# §3.2 routed polyline in LOGICAL tiles (a 2-tile-wide ribbon stamped along each segment):
+	#   S1 spawn approach: (0,12)→(4,12) then turn UP (4,12)→(4,8)
+	#   S2 the rise:       (4,8)→(22,8)            (upper-center run, long east sightline)
+	#   S4 main→exit:      (22,8)→(28,8)→(28,11)→(36,11)→(36,12)→(39,12)  (curve E-and-down to port)
+	#   S3b south→well:    (22,8)→(22,13)→(14,13)→(14,16)                 (drops + curves to the well apron)
+	var spine_pts: Array[Vector2i] = [
+		Vector2i(0, 12), Vector2i(4, 12), Vector2i(4, 8), Vector2i(22, 8),
+		Vector2i(28, 8), Vector2i(28, 11), Vector2i(36, 11), Vector2i(36, 12), Vector2i(39, 12),
+	]
+	_stamp_polyline(cells, spine_pts, 2)  # 2 logical tiles wide
+	var well_link: Array[Vector2i] = [
+		Vector2i(22, 8), Vector2i(22, 13), Vector2i(14, 13), Vector2i(14, 16),
+	]
+	_stamp_polyline(cells, well_link, 2)
+	# Soft path edge (#426 / Stardew): feather the OUTERMOST rim of the stamped ribbon into the
+	# ground so the lane edge softens (keep ~65%, drop ~35% on the dither) WITHOUT reading
+	# ragged. Applied as a post-pass on rim cells (a cell with <4 lane neighbours is a rim cell).
+	_feather_lane_rim(cells)
 	return cells
 
 
-## Spine centre-row at FINE column fx — a gentle south dip, now resolved at the fine grid so
-## the curve steps in 16px increments (smooth) instead of the prior 32px stairs. Anchored at
-## logical row 12 (= fine row 24), dipping ~2 LOGICAL tiles (= 4 fine cells) south across the
-## mid-yard. Pure (GUT-pinnable, deterministic).
-func _spine_center_fine_row(fx: int) -> int:
-	var t: float = float(fx) / float(maxi(_fw - 1, 1))  # 0..1 across the yard
-	var dip_fine: float = sin(t * PI) * 2.0 * float(CELL_SUBDIV)  # 0 at ends, ~4 fine cells at centre
-	return 12 * CELL_SUBDIV + int(round(dip_fine))
+## Stamp a 2-tile-wide (= width_tiles*CELL_SUBDIV fine cells) ribbon along the polyline of
+## LOGICAL-tile waypoints into `cells`. Each consecutive pair is walked in fine-cell steps
+## (axis-aligned segments — the §3.2 polyline is rectilinear) and a square brush of the band
+## width is stamped at each step so corners stay connected. Pure-ish (writes into `cells`).
+func _stamp_polyline(cells: Dictionary, pts: Array[Vector2i], width_tiles: int) -> void:
+	var half: int = (width_tiles * CELL_SUBDIV) / 2  # 2 fine cells either side for width 2
+	for i in range(pts.size() - 1):
+		var a := Vector2i(pts[i].x * CELL_SUBDIV, pts[i].y * CELL_SUBDIV)
+		var b := Vector2i(pts[i + 1].x * CELL_SUBDIV, pts[i + 1].y * CELL_SUBDIV)
+		var steps: int = maxi(absi(b.x - a.x), absi(b.y - a.y))
+		for s in range(steps + 1):
+			var t: float = float(s) / float(maxi(steps, 1))
+			var cx: int = int(round(lerp(float(a.x), float(b.x), t)))
+			var cy: int = int(round(lerp(float(a.y), float(b.y), t)))
+			# Square brush so corners fill (a 90° turn keeps a solid elbow, not a 1px hinge).
+			for dy in range(-half, half + 1):
+				for dx in range(-half, half + 1):
+					_add_lane_cell(cells, cx + dx, cy + dy)
+
+
+## Feather the lane's outer rim into the surrounding ground (Stardew soft path edge). A fine
+## lane cell with fewer than 4 orthogonal lane neighbours is a RIM cell; drop ~35% of rim cells
+## on the dither so the edge softens without reading ragged. The solid interior is untouched
+## (≥4 lane neighbours always kept). Mutates `cells`.
+func _feather_lane_rim(cells: Dictionary) -> void:
+	var rim_drop: Array[Vector2i] = []
+	for cell: Vector2i in cells:
+		var neighbours: int = 0
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if cells.has(cell + d):
+				neighbours += 1
+		if neighbours < 4 and _fine_dither(cell) >= 0.65:
+			rim_drop.append(cell)
+	for cell: Vector2i in rim_drop:
+		cells.erase(cell)
 
 
 ## Add a lane FINE cell at (fx,fy) IF in-bounds and NOT inside a building/well footprint.
@@ -403,30 +436,15 @@ func _block_variant(block_x: int, block_y: int) -> int:
 # ---- Structures, collision, decoration (LOGICAL-tile world rects) -------------
 
 
-## Build the cloister BUILDINGS as solid landmark structures: paint finer-brick into the
-## `Buildings` TileMapLayer (fine cells over each LOGICAL footprint) AND add a StaticBody2D.
+## Build the cloister BUILDINGS as solid landmark structures: add a StaticBody2D per footprint
+## (walk-AROUND collision). v6: the VISUAL is the PixelLab iso/oblique building Sprite2D placed
+## in the .tscn (s1-yard-building-assets.md §4) — the painter NO LONGER paints finer-brick into
+## the `Buildings` TileMapLayer (the flat brick read flat + clashed with the iso sprite mass).
+## Collision only here; the `Buildings` TileMapLayer stays in the scene tree (empty) for back-
+## compat with the node skeleton, but is no longer painted.
 func _build_structures() -> void:
 	for foot: Rect2i in building_footprints:
-		_paint_building_bricks(foot)
 		_add_building_collision(foot)
-
-
-## Paint finer-brick over a building footprint into the `Buildings` TileMapLayer at the FINE
-## grid. The brick atlas window is phase-locked to the FINE world cell (wrapped into the
-## 8-cell wall period) so coursing flows continuously across a multi-tile building face.
-func _paint_building_bricks(foot: Rect2i) -> void:
-	if _buildings == null:
-		return
-	var fx0: int = foot.position.x * CELL_SUBDIV
-	var fy0: int = foot.position.y * CELL_SUBDIV
-	var fx1: int = (foot.position.x + foot.size.x) * CELL_SUBDIV - 1
-	var fy1: int = (foot.position.y + foot.size.y) * CELL_SUBDIV - 1
-	for fy in range(fy0, fy1 + 1):
-		for fx in range(fx0, fx1 + 1):
-			if fx < 0 or fx >= _fw or fy < 0 or fy >= _fh:
-				continue
-			var atlas := Vector2i(fx % WALL_FINE_PERIOD, fy % WALL_FINE_PERIOD)
-			_buildings.set_cell(Vector2i(fx, fy), SOURCE_WALL_FINE, atlas)
 
 
 ## Add a StaticBody2D + RectangleShape2D over a building footprint (LOGICAL-tile world rect)

@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://b0embergrave_s1yard_slice_chunk"]
+[gd_scene load_steps=16 format=3 uid="uid://b0embergrave_s1yard_slice_chunk"]
 
 ; S1 open cloister-YARD first-slice chunk (ticket 86ca5erzk, S1-YARD T4).
 ; The first WALKABLE yard: an open cobble expanse (1280x768 — wider+taller than
@@ -37,6 +37,15 @@
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/rubble_01.png" id="6_rubble"]
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/parchment_01.png" id="7_parchment"]
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/well_head.png" id="8_well"]
+; v6 APPROVED-LAYOUT building assets (s1-yard-building-assets.md) — PixelLab iso/oblique
+; top-down weathered-cloister-stone structures, placed as z=+1 Sprite2D landmarks at the
+; §3.1 footprints. The dormitory is TWO distinct ruin sprites (orch decision) over the
+; Rect2i(0,21,15,3) S-edge footprint.
+[ext_resource type="Texture2D" path="res://assets/props/s1_yard/chapel_belltower.png" id="10_chapel"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_yard/dormitory_ruin_left.png" id="11_dormL"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_yard/dormitory_ruin_right.png" id="12_dormR"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_yard/cloister_central.png" id="13_central"]
+[ext_resource type="Texture2D" path="res://assets/props/s1_yard/outbuilding_far.png" id="14_outb"]
 
 [node name="S1YardSliceChunk" type="Node2D"]
 script = ExtResource("1_yard")
@@ -71,10 +80,66 @@ tile_set = ExtResource("2_yardset")
 ; the garden soil bed, the apron shadow strips) — NO Sprite2D props.
 [node name="Springs" type="Node2D" parent="."]
 
+; v6: the Buildings TileMapLayer is NO LONGER painted (the painter dropped finer-brick — the
+; flat brick read flat + clashed with the iso building sprites). Kept (empty) for node-skeleton
+; back-compat; the building VISUAL is now the BuildingSprites group below.
 [node name="Buildings" type="TileMapLayer" parent="."]
 z_index = 1
 texture_filter = 1
 tile_set = ExtResource("2_yardset")
+
+; --- v6 APPROVED-LAYOUT building sprites (s1-yard-building-assets.md §4). Iso/oblique
+; top-down PixelLab structures placed at the §3.1 footprints; centered=false so position is
+; the sprite TOP-LEFT, scaled so sprite WIDTH ≈ footprint width, offset UP so the ground-
+; contact BASE sits at the footprint bottom edge and the mass (walls/roof/bell-tower) rises
+; toward screen-N (up). z=1 (above floor z=0, below the small face-props at z=2). ---
+[node name="BuildingSprites" type="Node2D" parent="."]
+z_index = 1
+
+; Chapel + bell-tower — NW-corner-at-spawn (footprint x0-7,y0-2). Scale 1.0667 (240→256px
+; width), sprite 256x256, top-left (0,-160) so the bell-tower rises off-frame N, base at y96.
+[node name="Chapel" type="Sprite2D" parent="BuildingSprites"]
+texture_filter = 1
+centered = false
+position = Vector2(0, -160)
+scale = Vector2(1.0667, 1.0667)
+texture = ExtResource("10_chapel")
+
+; Dormitory ruin — LEFT (more-intact end), covers footprint x0-7. Scale 1.0407, top-left
+; (0,517) so the base sits at the S grid edge y768 (runs off-frame S).
+[node name="DormitoryLeft" type="Sprite2D" parent="BuildingSprites"]
+texture_filter = 1
+centered = false
+position = Vector2(0, 517)
+scale = Vector2(1.0407, 1.0407)
+texture = ExtResource("11_dormL")
+
+; Dormitory ruin — RIGHT (more-collapsed end + rubble spill), covers footprint x7-14 (abuts
+; the left half at x7). Scale 1.0492, top-left (224,512), base at y768.
+[node name="DormitoryRight" type="Sprite2D" parent="BuildingSprites"]
+texture_filter = 1
+centered = false
+position = Vector2(224, 512)
+scale = Vector2(1.0492, 1.0492)
+texture = ExtResource("12_dormR")
+
+; Central cloister building — high, off-center (footprint x26-29,y0-3). Its LIT SOUTH WINDOW
+; (baked into the PNG) faces the player approach (canvas-S). Scale 1.0756, top-left (832,14).
+[node name="CentralBuilding" type="Sprite2D" parent="BuildingSprites"]
+texture_filter = 1
+centered = false
+position = Vector2(832, 14)
+scale = Vector2(1.0756, 1.0756)
+texture = ExtResource("13_central")
+
+; Far outbuilding — tiny east-horizon depth anchor (footprint x38-39,y2-3). Scale 0.7901,
+; top-left (1216,70), sits ABOVE the exit line (y12) so it doesn't block the descent approach.
+[node name="Outbuilding" type="Sprite2D" parent="BuildingSprites"]
+texture_filter = 1
+centered = false
+position = Vector2(1216, 70)
+scale = Vector2(0.7901, 0.7901)
+texture = ExtResource("14_outb")
 
 [node name="BuildingBodies" type="Node2D" parent="."]
 
@@ -88,106 +153,93 @@ z_index = 1
 [node name="Props" type="Node2D" parent="."]
 z_index = 2
 
-; --- Carried-forward props as landmarks (s1-cloister-yard.md §4.1 + ticket
-; scale calibration: pillars 0.85 / braziers 0.65 / banners+rubble 0.70). Placed
-; at building faces + yard corners; open cobble lanes left clear for traversal. ---
+; --- Carried-forward props as landmarks (s1-cloister-yard.md §4.1 + ticket scale calibration:
+; pillars 0.85 / braziers 0.65 / banners+rubble+parchment 0.70). v6 APPROVED-LAYOUT
+; repositioning: props now front the §3.1 landmark positions — the central building's lit-S-
+; window face (footprint x26-29,y0-3 → world ~832-960,0-128), the WELL (12,17 → world ~400,560),
+; the chapel base (x0-7 → world ~0-256,96), the §3.5 discovery seeds, and the east descent
+; approach (~x39,y12). The spine + open lanes left clear. z=2 (above z=1 building sprites). ---
 
-; Pillars fronting the central cloister building face (the colonnade edge).
+; Pillars fronting the central cloister building's south face (colonnade under the lit window).
 [node name="PillarCentralW" type="Sprite2D" parent="Props"]
-position = Vector2(568, 480)
+position = Vector2(848, 152)
 scale = Vector2(0.85, 0.85)
 texture = ExtResource("3_pillar")
 
 [node name="PillarCentralE" type="Sprite2D" parent="Props"]
-position = Vector2(776, 480)
+position = Vector2(936, 152)
 scale = Vector2(0.85, 0.85)
 texture = ExtResource("3_pillar")
 
-; Pillars fronting the north chapel range.
-[node name="PillarNorthW" type="Sprite2D" parent="Props"]
-position = Vector2(288, 104)
+; Pillars flanking the chapel base (NW spawn shoulder; chapel footprint x0-7, base ~y96).
+[node name="PillarChapelW" type="Sprite2D" parent="Props"]
+position = Vector2(72, 120)
 scale = Vector2(0.85, 0.85)
 texture = ExtResource("3_pillar")
 
-[node name="PillarNorthE" type="Sprite2D" parent="Props"]
-position = Vector2(576, 104)
+[node name="PillarChapelE" type="Sprite2D" parent="Props"]
+position = Vector2(200, 120)
 scale = Vector2(0.85, 0.85)
 texture = ExtResource("3_pillar")
 
-; Lit braziers — warm guttering light pooling on cobble (atmosphere, §0.6 C).
-; Flank the central building + light the eastern descent approach.
+; Lit braziers — warm guttering light (atmosphere). Flank the central lit window + the WELL
+; wonder-landmark + the eastern descent approach.
 [node name="BrazierCentralW" type="Sprite2D" parent="Props"]
-position = Vector2(536, 416)
+position = Vector2(824, 144)
 scale = Vector2(0.65, 0.65)
 texture = ExtResource("4_brazier")
 
 [node name="BrazierCentralE" type="Sprite2D" parent="Props"]
-position = Vector2(808, 416)
+position = Vector2(960, 144)
 scale = Vector2(0.65, 0.65)
 texture = ExtResource("4_brazier")
 
-[node name="BrazierDescentN" type="Sprite2D" parent="Props"]
-position = Vector2(1168, 336)
+[node name="BrazierWell" type="Sprite2D" parent="Props"]
+position = Vector2(336, 560)
 scale = Vector2(0.65, 0.65)
 texture = ExtResource("4_brazier")
 
-[node name="BrazierDescentS" type="Sprite2D" parent="Props"]
-position = Vector2(1168, 432)
+[node name="BrazierDescent" type="Sprite2D" parent="Props"]
+position = Vector2(1184, 336)
 scale = Vector2(0.65, 0.65)
 texture = ExtResource("4_brazier")
 
-; Worn banners on building faces (faded-symbol mystery hook, §0.6 C).
+; Worn banner on the central building face (faded-symbol mystery hook beside the lit window).
 [node name="BannerCentral" type="Sprite2D" parent="Props"]
-position = Vector2(672, 360)
+position = Vector2(896, 136)
 scale = Vector2(0.7, 0.7)
 texture = ExtResource("5_banner")
 
-[node name="BannerNorth" type="Sprite2D" parent="Props"]
-position = Vector2(432, 72)
-scale = Vector2(0.7, 0.7)
-texture = ExtResource("5_banner")
-
-; Rubble pooled at building bases + the dormitory ruin (settle-decoration §5.2).
-[node name="RubbleDormW" type="Sprite2D" parent="Props"]
-position = Vector2(248, 712)
-scale = Vector2(0.7, 0.7)
-texture = ExtResource("6_rubble")
-
-[node name="RubbleDormE" type="Sprite2D" parent="Props"]
-position = Vector2(520, 712)
+; Rubble — the §3.5 rubble-cache discovery beat N of the dormitory ruin (~x14,y20) + central base.
+[node name="RubbleDorm" type="Sprite2D" parent="Props"]
+position = Vector2(472, 648)
 scale = Vector2(0.7, 0.7)
 texture = ExtResource("6_rubble")
 
 [node name="RubbleCentral" type="Sprite2D" parent="Props"]
-position = Vector2(736, 472)
+position = Vector2(960, 128)
 scale = Vector2(0.7, 0.7)
 texture = ExtResource("6_rubble")
 
-; Parchment scraps in yard corners (settle-decoration).
-[node name="ParchmentNW" type="Sprite2D" parent="Props"]
-position = Vector2(120, 200)
+; Parchment — the §3.5 item-glint discovery seed (mossy corner ~13,7 → world ~416,224) + SE scrap.
+[node name="ParchmentGlint" type="Sprite2D" parent="Props"]
+position = Vector2(416, 224)
 scale = Vector2(0.7, 0.7)
 texture = ExtResource("7_parchment")
 
 [node name="ParchmentSE" type="Sprite2D" parent="Props"]
-position = Vector2(1080, 600)
+position = Vector2(1080, 640)
 scale = Vector2(0.7, 0.7)
 texture = ExtResource("7_parchment")
 
-; --- WELL-HEAD hero landmark (S1-YARD T8, Uma s1-yard-ground-composition.md §3.1).
-; South-central, OFF the processional spine at the south route-choice decision
-; point, ringed by a worn slab apron (painted by the script) — a wonder-landmark +
-; NPC-station seed the player is drawn toward. Collision-solid (WellBody, built by
-; the painter) so it's a walk-AROUND structure.
-; SOAK-REVISION (#426, Sponsor 2026-06-08): the well was "WAY out of proportion —
-; drastically too big (~5-6x the player)". Scale 0.85→0.35 so the rim DIAMETER reads
-; ~1.5x the char_scale=0.6 player HEIGHT (in-context measure: well rendered ~81px wide
-; vs player ~54px tall = 1.5x), a real well a person draws from — calibrated to the
-; HUMAN-SCALE fountain in inspiration/2026-06-08_07h53_24.png (art-direction.md §3),
-; NOT a building (spec §3.1 target). Footprint dropped 3x3→2x2 to match the smaller
-; solid base. z=2 (Props, above floor/buildings). Recentred to tile (21,17) ≈ the new
-; 2x2 footprint centre so the painted apron still rings it.
+; --- WELL-HEAD hero focal landmark (s1-yard-layout-design.md §3.3). South-center at tile
+; (12,17), OFF the critical spine at the south route-choice decision point, ringed by the worn
+; slab apron (painted by the script from well_apron) + the spring seep + garden bed — the
+; wonder/discovery corner. Collision-solid (WellBody, built by the painter from well_footprint
+; Rect2i(11,16,3,3)) so it's a walk-AROUND structure. Scale 0.35 (soak-revised #426: rim ~1.5x
+; player height, a real well not a building). z=2. Centered at tile (12,17) → world
+; (12.5*32, 17.5*32) = (400, 560).
 [node name="WellHead" type="Sprite2D" parent="Props"]
-position = Vector2(672, 544)
+position = Vector2(400, 560)
 scale = Vector2(0.35, 0.35)
 texture = ExtResource("8_well")

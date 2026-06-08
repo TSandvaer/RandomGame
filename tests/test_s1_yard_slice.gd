@@ -62,9 +62,10 @@ const AI_COBBLE_PATH: String = "res://assets/tilesets/s1_cloister/floor_cobble_a
 const DG_ALL_DIRT_ATLAS := Vector2i(2, 1)  # wang_0 (all 4 corners dirt)
 const DG_ALL_GRASS_ATLAS := Vector2i(0, 3)  # wang_15 (all 4 corners grass)
 
-# Well-head footprint mirror (matches S1YardChunk.well_footprint) — the nav grid
-# bakes this as a wall too (the well is a solid walk-AROUND landmark, like buildings).
-const WELL_FOOTPRINT := Rect2i(20, 16, 2, 2)  # SOAK-REVISION #426: 3x3→2x2 (well scale 0.85→0.35)
+# Well-head footprint mirror (matches S1YardChunk.well_footprint) — the nav grid bakes this as
+# a wall too (the well is a solid walk-AROUND landmark, like buildings). v6 APPROVED-LAYOUT
+# (s1-yard-layout-design.md §3.3): well at tile (12,17), collision footprint x11-13,y16-18 (3x3).
+const WELL_FOOTPRINT := Rect2i(11, 16, 3, 3)
 
 # S1_YARD_WATER_DOCTRINE / path doctrine eye-dropper hexes (Uma §2.4 / §3.3) — pinned
 # so a regression that recolours the doctrine surfaces fails loudly. Values are the
@@ -173,15 +174,16 @@ func _collect_nodes(root: Node, of_type: String) -> Array:
 	return out
 
 
-# Building footprints (in tiles) mirrored from S1YardChunk.building_footprints —
-# the nav grid bakes these as walls so the BFS reflects a grunt pathing AROUND the
-# solid buildings, not a point that walks through them.
+# Building footprints (in tiles) mirrored from S1YardChunk.building_footprints — the nav grid
+# bakes these as walls so the BFS reflects a grunt pathing AROUND the solid buildings. v6
+# APPROVED-LAYOUT (s1-yard-layout-design.md §3.1): chapel NW-corner / dormitory S-edge-wider /
+# central high-off-center / outbuilding tiny-east-horizon.
 func _building_footprints() -> Array[Rect2i]:
 	var out: Array[Rect2i] = []
-	out.append(Rect2i(8, 0, 12, 3))
-	out.append(Rect2i(6, 21, 14, 3))
-	out.append(Rect2i(18, 9, 6, 5))
-	out.append(Rect2i(33, 6, 3, 3))
+	out.append(Rect2i(0, 0, 8, 3))  # chapel + bell-tower
+	out.append(Rect2i(0, 21, 15, 3))  # dormitory ruin (2 sprites, 1 collision)
+	out.append(Rect2i(26, 0, 4, 4))  # central cloister building
+	out.append(Rect2i(38, 2, 2, 2))  # far outbuilding
 	return out
 
 
@@ -314,7 +316,7 @@ func test_ground_grass_only_at_corners_none_in_mid_field() -> void:
 	if gt == null:
 		return
 	# Mid-field probe box in LOGICAL cells: cols 14..26 / rows 9..15 (the open centre, clear of
-	# the corner grass regions NW(0,0,9,8) NE(31,0,9,7) SW(0,16,11,8) SE(32,17,8,7)). Every
+	# the v6 grass regions W-below-chapel(0,4,8,8) E(31,6,9,8) SW(0,14,9,7) SE(32,17,8,7)). Every
 	# cell here must be the all-dirt Wang tile (no grass corner).
 	var mid_grass := 0
 	for ty in range(9, 16):
@@ -329,9 +331,10 @@ func test_ground_grass_only_at_corners_none_in_mid_field() -> void:
 			+ " grass is hand-placed at the corners only (got %d)" % mid_grass
 		)
 	)
-	# Grass IS present in the DEEP INTERIOR of each corner region (the all-grass Wang tile).
+	# Grass IS present in the DEEP INTERIOR of each v6 grass region (the all-grass Wang tile).
+	# Probes are ≥1 cell inside each region edge so all 4 corners are grass.
 	var corner_grass := 0
-	for probe: Vector2i in [Vector2i(3, 3), Vector2i(35, 3), Vector2i(4, 20), Vector2i(35, 20)]:
+	for probe: Vector2i in [Vector2i(3, 7), Vector2i(35, 10), Vector2i(4, 17), Vector2i(35, 20)]:
 		if gt.get_cell_atlas_coords(probe) == DG_ALL_GRASS_ATLAS:
 			corner_grass += 1
 	assert_gt(
@@ -349,10 +352,11 @@ func test_ground_dirt_grass_boundary_uses_blend_tiles() -> void:
 	var gt: TileMapLayer = inst.get_node("GroundTerrain")
 	if gt == null:
 		return
-	# NW region is logical Rect2i(0,0,9,8) → east edge at col 8/9. Scan cols 7..11 rows 1..7.
+	# v6 W region is logical Rect2i(0,4,8,8) → east edge at col 7/8. Scan cols 6..10 rows 5..11
+	# (a band straddling the dirt↔grass boundary).
 	var blend_tiles := 0
-	for ty in range(1, 8):
-		for tx in range(7, 12):
+	for ty in range(5, 12):
+		for tx in range(6, 11):
 			var a: Vector2i = gt.get_cell_atlas_coords(Vector2i(tx, ty))
 			if a != DG_ALL_DIRT_ATLAS and a != DG_ALL_GRASS_ATLAS:
 				blend_tiles += 1
@@ -424,25 +428,47 @@ func test_yard_chunk_builds_solid_building_structures() -> void:
 		assert_gt(shapes.size(), 0, "building has a CollisionShape2D")
 
 
-func test_yard_chunk_paints_building_bricks() -> void:
+## v6 APPROVED-LAYOUT: the Buildings TileMapLayer is NO LONGER painted (the painter dropped
+## finer-brick — the flat brick read flat + clashed with the iso building sprites). The building
+## VISUAL is now the BuildingSprites group of PixelLab iso/oblique structure Sprite2Ds. Pin:
+## Buildings layer EMPTY + BuildingSprites has the 5 building sprites (chapel + 2 dormitory ruins
+## + central + outbuilding) using the s1_yard building textures.
+func test_buildings_are_iso_sprites_not_painted_brick() -> void:
 	var inst: Node = _instantiate_yard_chunk()
 	var buildings: TileMapLayer = inst.get_node("Buildings")
-	assert_not_null(buildings, "Buildings TileMapLayer present")
-	if buildings == null:
+	var sprites_root: Node = inst.get_node("BuildingSprites")
+	assert_not_null(buildings, "Buildings TileMapLayer present (empty, back-compat skeleton)")
+	assert_not_null(sprites_root, "BuildingSprites group present")
+	if buildings == null or sprites_root == null:
 		return
-	# A FINE cell inside the central building footprint (logical 18-23 × 9-13 = fine 36-47 ×
-	# 18-27) is painted with the finer-brick source; a fine cell in open ground is NOT.
-	# Logical (20,11) → fine (40,22); logical open-ground (3,12) → fine (6,24).
+	# Buildings layer paints NOTHING now (iso sprites carry the visual).
 	assert_eq(
-		buildings.get_cell_source_id(Vector2i(40, 22)),
-		SOURCE_WALL_FINE,
-		"central-building fine cell painted with finer brick"
+		buildings.get_used_cells().size(),
+		0,
+		"Buildings TileMapLayer is EMPTY — buildings are iso Sprite2D landmarks now (v6)"
 	)
-	assert_eq(
-		buildings.get_cell_source_id(Vector2i(6, 24)),
-		-1,
-		"open-ground fine cell has NO building brick (empty cell)"
-	)
+	# 5 building sprites, each using an s1_yard building texture.
+	var sprites: Array = _collect_nodes(sprites_root, "Sprite2D")
+	assert_eq(sprites.size(), 5, "5 building sprites (chapel + 2 dorm ruins + central + outbuilding)")
+	var expected_textures := {
+		"chapel_belltower.png": false,
+		"dormitory_ruin_left.png": false,
+		"dormitory_ruin_right.png": false,
+		"cloister_central.png": false,
+		"outbuilding_far.png": false,
+	}
+	for spr: Sprite2D in sprites:
+		if spr.texture == null:
+			continue
+		var path: String = spr.texture.resource_path
+		for key: String in expected_textures.keys():
+			if path.ends_with(key):
+				expected_textures[key] = true
+				# Buildings are z=+1 group (BuildingSprites z_index=1); centered=false (footprint
+				# top-left anchoring per s1-yard-building-assets.md §4).
+				assert_false(spr.centered, "%s anchored top-left (centered=false)" % key)
+	for key: String in expected_textures.keys():
+		assert_true(expected_textures[key], "building sprite present: %s" % key)
 
 
 func test_carried_forward_props_present_at_calibrated_scales() -> void:
