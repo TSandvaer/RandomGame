@@ -1,4 +1,18 @@
-# S1 Slab-Path Texture — "Cut Processional Stone, Worn Smooth by Centuries of Feet"
+# S1 Slab-Path Texture — RETIRED (DEAD — third path rejection)
+
+> **⛔ RETIRED 2026-06-08 — DO NOT IMPLEMENT.** This ashlar/cut-stone slab-path approach
+> was **rejected a third time** in soak. Sponsor verbatim: *"the path is too big and not at
+> all like a real path… Fine small-cobble pavers is preferred. The cobblestone should only be
+> parts of the walking background."* Big flat cut pavers — irregular or not, at any scale — are
+> the wrong shape for a real path. **The path is now FINE SMALL-COBBLE PAVERS (a finer/warmer
+> variant of the LOVED `gen_s1_cobble_floor.py`), and the ground is varied (cobble as PARTS,
+> not a carpet).** See the live spec: **`team/uma-ux/s1-ground-composition-v2.md`.**
+> Do NOT generate `gen_s1_slab_path.py` / any broken-course ashlar slab. The content below is
+> kept for history only.
+
+---
+
+# (HISTORICAL) S1 Slab-Path Texture — "Cut Processional Stone, Worn Smooth by Centuries of Feet"
 
 **Owner:** Uma (Stage A — vision/direction) → orch (PixelLab/procedural gen, orch-only) → Drew (Stage C — paint into the held PR #426 or a follow-up) · **Phase:** M3 S1 spatial pivot, ground LAYER, slab-path MATERIAL.
 **Extends / replaces:** `s1-yard-ground-composition.md` §2 assumed the SET-ASIDE `floor_sandstone.png` could be reused verbatim as the slab-path material. **That reuse is now DEAD.** Sponsor rejected the reused asset TWICE in soak — first "too big," then "awful." Drew read the asset and confirmed the root cause: it has **bright green moss-sprout DOTS baked into the joints** + **grid-regular identical square pavers**. This doc specs a NEW slab texture to replace it. Everything else in §2 (where the slabs run, the worn-center/mossy-edge composition, the warm-path-through-cool-cobble contrast) carries forward unchanged — only the MATERIAL changes from "reuse the old asset" to "gen a new one per this spec."
