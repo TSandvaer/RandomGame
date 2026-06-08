@@ -3,6 +3,13 @@
 *.import
 *.translation
 export.cfg
+# Godot 4.4+ generates a .uid sidecar for every script/resource (script-side
+# equivalent of the *.import asset metadata above). This project regenerates
+# import metadata in CI (`godot --headless --import` runs before tests/export
+# in ci.yml + release-github.yml) rather than tracking it, so .uid sidecars
+# are ignored for consistency with the *.import policy — they regenerate
+# deterministically on import. Added during the 4.3 -> 4.6 migration (86ca65gyv).
+*.uid
 # NOTE: export_presets.cfg is intentionally NOT ignored — it's the contract
 # the CI release workflows (release-itch.yml, release-github.yml) consume to
 # produce HTML5 / Windows / macOS / Linux builds. Keep it under VCS.

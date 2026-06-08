@@ -10,7 +10,7 @@ Pick one of:
 
 ### Option A — Asset Library (recommended for local dev)
 
-1. Open the project in Godot 4.3.
+1. Open the project in Godot 4.6.
 2. AssetLib tab -> search "Gut" -> author **bitwes** -> install.
 3. Project -> Project Settings -> Plugins -> enable **Gut**.
 4. Restart the editor.
@@ -19,11 +19,11 @@ Pick one of:
 
 ```sh
 git submodule add https://github.com/bitwes/Gut.git addons/gut
-git -C addons/gut checkout v9.3.0
+git -C addons/gut checkout v9.6.0
 ```
 
 We chose **Option A** for now: smaller repo, less merge-pain. Tests still run in CI
-because the workflow does `git clone bitwes/Gut --depth 1 --branch v9.3.0` before
+because the workflow does `git clone bitwes/Gut --depth 1 --branch v9.6.0` before
 running tests.
 
 ## Running tests locally
@@ -36,5 +36,7 @@ godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit
 
 ## Pinned version
 
-GUT **v9.3.0** (Godot 4.3 compatible). Bump in lockstep across this README,
-the CI workflow, and any local dev installs.
+GUT **v9.6.0** (Godot 4.6 compatible — v9.3.0 fails to load under 4.6 because its
+`class_name Logger` in `addons/gut/utils.gd` shadows Godot 4.6's new native `Logger`
+class; the fix landed in GUT 9.4.0 and full 4.6 compat in 9.6.0). Bump in lockstep
+across this README, the CI workflow, and any local dev installs.

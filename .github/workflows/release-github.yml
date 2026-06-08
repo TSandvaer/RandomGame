@@ -42,7 +42,7 @@ on:
       - main
 
 env:
-  GODOT_VERSION: "4.3"
+  GODOT_VERSION: "4.6.3"
   EXPORT_NAME: "embergrave"
 
 permissions:
@@ -50,10 +50,10 @@ permissions:
 
 jobs:
   export-html5:
-    name: Export HTML5 (Godot 4.3 headless)
+    name: Export HTML5 (Godot 4.6 headless)
     runs-on: ubuntu-22.04
     container:
-      image: barichello/godot-ci:4.3
+      image: barichello/godot-ci:4.6.3
     # Match ci.yml — barichello/godot-ci's default `sh -e` shell breaks on
     # `set -o pipefail`. Force bash for every step.
     defaults:
@@ -92,7 +92,9 @@ jobs:
             echo "Copied pre-installed templates from ${PREINSTALLED} -> ${TARGET_DIR}"
           else
             mkdir -p "${TARGET_DIR}"
-            curl -L -o /tmp/templates.tpz "https://downloads.tuxfamily.org/godotengine/${GODOT_VERSION}/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+            # tuxfamily mirror was retired; canonical export-template mirror is
+            # the godotengine/godot-builds GitHub release for the same version.
+            curl -L -o /tmp/templates.tpz "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
             unzip -o /tmp/templates.tpz -d /tmp/
             mv /tmp/templates/* "${TARGET_DIR}/"
             echo "Downloaded templates to ${TARGET_DIR}"
@@ -160,7 +162,7 @@ jobs:
         run: |
           set -euo pipefail
           # Smoke-check that the four pieces of an HTML5 export landed.
-          # Godot 4.3 produces: index.html, index.js, index.wasm, index.pck
+          # Godot 4.6 produces: index.html, index.js, index.wasm, index.pck
           # (or index.audio.position.worklet.js + index.audio.worklet.js for some configs).
           test -f build/web/index.html
           test -f build/web/index.js

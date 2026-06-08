@@ -10,9 +10,13 @@ on:
 # Pin once. Bump in lockstep across this workflow, addons/gut/README.md,
 # and .github/workflows/release-itch.yml.
 env:
-  GODOT_VERSION: "4.3"
+  GODOT_VERSION: "4.6.3"
   GODOT_STATUS: "stable"
-  GUT_VERSION: "v9.3.0"
+  # GUT v9.3.0 does NOT load under Godot 4.6 — its `class_name Logger`
+  # (addons/gut/utils.gd) shadows Godot 4.6's new native `Logger` class,
+  # a hard parse error that cascades through the whole addon. Fix landed
+  # in GUT 9.4.0; full 4.6 compat in 9.6.0 (86ca65gyv migration).
+  GUT_VERSION: "v9.6.0"
 
 permissions:
   contents: read
@@ -44,7 +48,7 @@ jobs:
     # plus the export templates we need for the release workflow. We only use
     # the runtime here.
     container:
-      image: barichello/godot-ci:4.3
+      image: barichello/godot-ci:4.6.3
     # The barichello/godot-ci container's default shell is `sh -e`, which
     # does not understand `set -o pipefail` and exits 2 immediately on any
     # `run:` step that uses it. Force bash for every step so pipefail and
@@ -160,7 +164,7 @@ jobs:
       #   Stage 3: drop the `set +e` / `true` guard and promote to errors
       #            once the warning count is at zero / sustainably bounded.
       #
-      # gdtoolkit is a Python package (pip). The barichello/godot-ci:4.3
+      # gdtoolkit is a Python package (pip). The barichello/godot-ci
       # container's Dockerfile (verified upstream at
       # https://github.com/abarichello/godot-ci/blob/master/Dockerfile)
       # installs ONLY: ca-certificates git git-lfs unzip wget zip adb

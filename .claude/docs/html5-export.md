@@ -4,7 +4,9 @@ What this doc covers: the constraints that shaped Embergrave's HTML5 / WebGL2 ex
 
 ## Renderer
 
-HTML5 export uses the **`gl_compatibility`** renderer (Godot 4.3 default for web). Desktop development uses `forward_plus` or `mobile`. They diverge in several load-bearing ways:
+> **Engine version note (86ca65gyv migration, 2026-06-08):** the project migrated 4.3 → **4.6.3.stable**. HTML5 still uses the **`gl_compatibility`** renderer (it remains the Godot 4.6 web default; `config/features` keeps `"GL Compatibility"`). The renderer-divergence rules below were authored against 4.3-gl_compatibility; they are PRESUMED to still hold under 4.6-gl_compatibility (same renderer family) but the full re-verification (HDR clamp, Polygon2D, z-index, service-worker, head_include injection) is the migration PR's HTML5 render-parity gate — see that PR's Self-Test Report for the as-verified status. The `index.html` head_include (contextmenu suppressor + `?debug=1` overlay) was confirmed to inject correctly under the 4.6 export.
+
+HTML5 export uses the **`gl_compatibility`** renderer (Godot 4.6 default for web; was the 4.3 default pre-migration). Desktop development uses `forward_plus` or `mobile`. They diverge in several load-bearing ways:
 
 - **HDR modulate clamp.** WebGL2's sRGB pipeline clamps `Color` channels to `[0, 1]`. A modulate value like `Color(1.4, 1.0, 0.7)` becomes `(1.0, 1.0, 0.7)` in HTML5 — against a near-white default modulate, the perceptible delta vanishes. **Rule: keep tween target colors strictly sub-1.0 on every channel.** Codified in test `test_player_swing_flash_tint_is_html5_safe` (asserts all channels in `[0, 1]` AND tint delta vs default `>= 0.20`). The original `SWING_FLASH_TINT = Color(1.4, 1.0, 0.7, 1)` was the load-bearing visibility bug fixed in PR #137. Use sub-1.0 like `Color(1.0, 0.85, 0.6, 1.0)`.
 - **Polygon2D rendering quirks.** Polygon2D shapes that render correctly on `forward_plus`/`mobile` may not render in `gl_compatibility` — empirically demonstrated by the swing wedge invisibility bug. **Rule: prefer ColorRect / NinePatchRect for simple shapes** until Godot upstream resolves the Polygon2D divergence. PR #137 swapped the wedge from a 3-vertex Polygon2D to a rotated ColorRect with the bounding rectangle (`size = reach × radius*2`).
@@ -257,7 +259,7 @@ When **both the PR author and the reviewing agent** cannot launch a browser inte
 gh workflow run release-github.yml --ref <branch-or-main>
 ```
 
-The workflow exports HTML5 via Godot 4.3 headless. Run produces an artifact named `embergrave-html5-<short-sha>.zip` (typically ~8.5 MB) attached to the run page. Direct artifact download URL pattern (use this in Sponsor handoff):
+The workflow exports HTML5 via Godot 4.6 headless (4.6.3.stable; was 4.3 pre-86ca65gyv migration). Run produces an artifact named `embergrave-html5-<short-sha>.zip` (typically ~8.5 MB) attached to the run page. Direct artifact download URL pattern (use this in Sponsor handoff):
 
 ```
 https://github.com/<owner>/<repo>/actions/runs/<run_id>/artifacts/<artifact_id>
