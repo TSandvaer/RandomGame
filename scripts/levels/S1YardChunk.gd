@@ -39,13 +39,18 @@ class_name S1YardChunk
 # Atlas-source ids inside s1_cloister_yard.tres.
 const SOURCE_COBBLE: int = 0
 const SOURCE_WALL_FINE: int = 1
-## Source 2 = warm-sandstone FLAGSTONE, reused as the worn processional SLAB-PATH
-## material (S1-YARD T8; Uma s1-yard-ground-composition.md §2.1). 64x64 = 2x2 atlas.
+## Source 2 = NEW procedural ASHLAR slab-path (`floor_slab.png`, #426 soak-rev; Uma
+## s1-slab-path-texture.md). REPLACES the twice-rejected `floor_sandstone.png` reuse
+## ("too big", then "awful" = baked green moss dots + grid-regular squares). Irregular
+## worn warm-sandstone cut-stone pavers, foot-polished bright centers + sunk dirt-shadow
+## edges, ZERO baked vegetation. A 512x128 MULTI-VARIANT atlas (4 variant-blocks of 4x4
+## 32px cells, variant v = cols [v*4 .. v*4+3]) — the SAME packed layout as the cobble,
+## so the slab painter scatters variants per block to break the repeating-stamp grid
+## (spec §3.2) down the processional spine, exactly like the cobble repeat-break.
 const SOURCE_SLAB: int = 2
-## SOAK-REVISION (#426, Sponsor 2026-06-08): slab region 32x32→16x16 in the .tres
-## (4x4 atlas) so the slab stones read FINER (a step up from cobble, not "too big /
-## chunky blocky rectangles"). Period 2→4 to match the new atlas dimension.
-const SLAB_ATLAS_PERIOD: int = 4  # 4x4 flagstone atlas (16px region over the 64px source)
+## Slab atlas: 4 variant-blocks, each a 4x4 grid of 32px cells (period 4 within a block).
+const SLAB_BLOCK_TILES: int = 4  # one slab variant-block spans 4x4 game tiles
+const SLAB_VARIANTS: int = 4  # number of slab variant-blocks packed in the atlas
 
 ## The cobble PNG is a MULTI-VARIANT atlas: SIX 4x4 variant-blocks side by side
 ## (768x128 = 24x4 cells; variant v occupies atlas columns [v*4 .. v*4+3]). Each
@@ -270,24 +275,40 @@ func _add_slab_cell(cells: Dictionary, tx: int, ty: int) -> void:
 	cells[Vector2i(tx, ty)] = true
 
 
-## Paint the worn processional slab paths (S1-YARD T8). For each slab cell: paint the
-## warm-sandstone flagstone into the SlabPaths layer AND ERASE the cobble cell beneath
+## Paint the worn processional slab paths (S1-YARD T8 + #426 soak-rev). For each slab
+## cell: paint the ASHLAR slab into the SlabPaths layer AND ERASE the cobble cell beneath
 ## in FloorTiles, so exactly ONE tile-class renders per cell (no stacked-z, no z-fight —
-## T8 AC9 / html5-export.md §Z-index, both layers at z=0). The flagstone atlas is the
-## 2x2 set; a non-tiling hash picks the atlas cell per world-coord so the slab run reads
-## varied (worn cut stones), not a single repeated stamp.
+## T8 AC9 / html5-export.md §Z-index, both layers at z=0).
+##
+## REPEAT-BREAK (#426): the new slab atlas is multi-variant (4 variant-blocks). Each slab
+## cell is assigned a variant via a non-tiling hash of its 4x4 BLOCK coords (so adjacent
+## blocks differ and the processional spine never reads a repeating stamp — spec §3.2),
+## then the cell's local (bx,by) maps to that variant's atlas columns [v*4 + bx, by].
+## The slab world-coord (NOT cell index within the ribbon) drives the block so the
+## variation is spatially coherent with the cobble field beneath/around it.
 func _paint_slab_paths() -> void:
 	if _slab_paths == null or _floor_tiles == null:
 		push_warning("S1YardChunk: SlabPaths/FloorTiles missing — cannot paint slab paths")
 		return
 	var cells: Dictionary = _compute_slab_cells()
 	for cell: Vector2i in cells:
-		var h: int = (cell.x * 73856093) ^ (cell.y * 19349663) ^ (cobble_seed * 6151)
-		var ax: int = absi(h) % SLAB_ATLAS_PERIOD
-		var ay: int = absi(h / SLAB_ATLAS_PERIOD) % SLAB_ATLAS_PERIOD
-		_slab_paths.set_cell(cell, SOURCE_SLAB, Vector2i(ax, ay))
+		var block_x: int = cell.x / SLAB_BLOCK_TILES
+		var block_y: int = cell.y / SLAB_BLOCK_TILES
+		var variant: int = _slab_block_variant(block_x, block_y)
+		var local_x: int = cell.x % SLAB_BLOCK_TILES
+		var local_y: int = cell.y % SLAB_BLOCK_TILES
+		var atlas := Vector2i(variant * SLAB_BLOCK_TILES + local_x, local_y)
+		_slab_paths.set_cell(cell, SOURCE_SLAB, atlas)
 		# Erase cobble beneath → one tile-class per cell (the AC9 anti-z-fight rule).
 		_floor_tiles.set_cell(cell, -1)
+
+
+## Pick a slab variant [0, SLAB_VARIANTS) for a 4x4 block via a non-tiling hash of the
+## block coords + cobble_seed (distinct prime mix from _block_variant so the slab + cobble
+## variant fields don't realign). Deterministic per seed (GUT + visual repro).
+func _slab_block_variant(block_x: int, block_y: int) -> int:
+	var h: int = (block_x * 49979693) ^ (block_y * 86028157) ^ (cobble_seed * 6151)
+	return absi(h) % SLAB_VARIANTS
 
 
 ## Pick a cobble variant [0, COBBLE_VARIANTS) for a 4x4 block via a non-tiling
@@ -370,9 +391,10 @@ func _build_well_collision() -> void:
 ## Paint the SPRING pools (S1-YARD T8, Uma §3.2 + orch handoff). Each spring is a still
 ## dark warm-neutral ColorRect pool (S1_YARD_WATER_DOCTRINE — sub-1.0, NEVER pure-black,
 ## PL-WATER-01/02) over the cobble. The moss_patch sprite ring is REMOVED (#426 — Sponsor
-## flagged the green-flecked spiky moss sprites as ugly trash). NO bespoke asset, NO animation (still water =
-## zero HTML5 gate per §3.3); a single fixed sparse highlight ColorRect reads "quiet catch
-## of light on the surface" without any tween. NO Polygon2D (PR #137).
+## flagged the green-flecked spiky moss sprites as ugly trash). NO bespoke asset, NO
+## animation (still water = zero HTML5 gate per §3.3); a single fixed sparse highlight
+## ColorRect reads "quiet catch of light on the surface" without any tween. NO
+## Polygon2D (PR #137).
 func _paint_springs() -> void:
 	if _springs == null:
 		return

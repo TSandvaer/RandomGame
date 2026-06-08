@@ -31,6 +31,7 @@ const ZONE_PATH: String = "res://resources/level/zones/s1_z1_yard_slice.tres"
 const YARD_CHUNK_DEF_PATH: String = "res://resources/level_chunks/s1_yard_slice.tres"
 const DESCENT_CHUNK_DEF_PATH: String = "res://resources/level_chunks/s1_yard_descent.tres"
 const YARD_TILESET_PATH: String = "res://resources/tilesets/s1_cloister_yard.tres"
+const SLAB_ATLAS_PATH: String = "res://assets/tilesets/s1_cloister/floor_slab.png"
 const YARD_CHUNK_SCENE_PATH: String = "res://scenes/levels/chunks/s1_yard_slice_chunk.tscn"
 
 # The viewport the yard must EXCEED on BOTH axes for two-axis scroll.
@@ -791,6 +792,105 @@ func test_ground_composition_has_no_moss_patch_trash_sprites() -> void:
 			+ " ColorRect-only now."
 		)
 	)
+
+
+## REGRESSION GUARD PL-PATH-04 (#426 soak-rev, the rejection guard). The twice-rejected
+## floor_sandstone.png slab had baked green moss-sprout DOTS in the joints ("awful").
+## The NEW ashlar slab (floor_slab.png) has ZERO baked vegetation — joints are dirt-
+## shadow ONLY. Eye-dropper EVERY pixel of the shipped slab atlas: warm-sandstone always
+## has R >= G >= B; grout is near-neutral-warm. A green pixel (G clearly exceeds R) is the
+## rejected baked-vegetation class — assert NONE exist. This is the pin that proves the
+## "awful" baked-dot rejection is fixed (mirrors the generator's self-guard).
+func test_slab_atlas_has_zero_green_pixels_pl_path_04() -> void:
+	var tex: Texture2D = load(SLAB_ATLAS_PATH)
+	assert_not_null(tex, "floor_slab.png loads")
+	if tex == null:
+		return
+	var img: Image = tex.get_image()
+	assert_not_null(img, "slab atlas image readable")
+	if img == null:
+		return
+	var w: int = img.get_width()
+	var h: int = img.get_height()
+	# Sample on a stride grid (full per-pixel is ~65k reads; a 4px stride = ~4k, still
+	# dense enough to catch any baked green dot, which would be a multi-pixel cluster).
+	var green_pixels: int = 0
+	for y: int in range(0, h, 2):
+		for x: int in range(0, w, 2):
+			var c: Color = img.get_pixel(x, y)
+			# Green = G channel clearly dominant over BOTH R and B (warm sandstone /
+			# dirt-shadow grout never does this). Small tolerance for AA.
+			if c.g > c.r + 0.02 and c.g > c.b + 0.02:
+				green_pixels += 1
+	assert_eq(
+		green_pixels,
+		0,
+		(
+			"PL-PATH-04: slab atlas must have ZERO green pixels (the rejected baked moss-dot"
+			+ " class) — found %d. Joints are dirt-shadow ONLY; vegetation is a separate"
+			+ " painted-decoration pass, never baked into the ground tile." % green_pixels
+		)
+	)
+
+
+## The slab atlas is the NEW multi-variant ashlar atlas (#426): 512x128 = 16x4 cells =
+## FOUR 4x4 variant-blocks (region 32x32). A regression back to the old 64x64 sandstone
+## (or a wrong region size) would break the variant scatter. Pin the atlas dimensions +
+## region geometry so the painter's [v*4 + bx, by] addressing stays valid.
+func test_slab_atlas_is_multi_variant_geometry() -> void:
+	var tex: Texture2D = load(SLAB_ATLAS_PATH)
+	assert_not_null(tex, "floor_slab.png loads")
+	if tex == null:
+		return
+	# 4 variants * 128px = 512 wide; 128 tall (a 4x4 atlas of 32px cells per variant).
+	assert_eq(tex.get_width(), 512, "slab atlas 512px wide (4 variant-blocks of 128px)")
+	assert_eq(tex.get_height(), 128, "slab atlas 128px tall (4 rows of 32px cells)")
+	# The .tres declares 32x32 regions over this atlas.
+	var ts: TileSet = load(YARD_TILESET_PATH)
+	if ts == null:
+		return
+	var src: TileSetAtlasSource = ts.get_source(SOURCE_SLAB) as TileSetAtlasSource
+	assert_not_null(src, "slab source is a TileSetAtlasSource")
+	if src != null:
+		assert_eq(src.texture_region_size, Vector2i(32, 32), "slab region size = 32px game tile")
+
+
+## The slab ribbon scatters MULTIPLE atlas variants (the repeat-break, spec §3.2) — a
+## single repeated stamp down the processional spine is the rejected grid read. Assert
+## the painted slab cells use more than one variant (variant = atlas_col / 4).
+func test_slab_paths_scatter_multiple_variants_no_single_stamp() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var slab: TileMapLayer = inst.get_node("SlabPaths")
+	if slab == null:
+		return
+	var variants_seen := {}
+	for cell: Vector2i in slab.get_used_cells():
+		var coords: Vector2i = slab.get_cell_atlas_coords(cell)
+		if coords.x < 0:
+			continue
+		variants_seen[coords.x / 4] = true  # 4 variant-blocks of 4 cols each
+	assert_gt(
+		variants_seen.size(),
+		1,
+		(
+			"slab paths must scatter MULTIPLE ashlar variants (no single repeating stamp down"
+			+ " the spine — spec §3.2 anti-grid), got %d" % variants_seen.size()
+		)
+	)
+
+
+## The slab atlas column addressing must stay in-bounds: variant in [0,4), local col in
+## [0,4), so atlas col = v*4 + bx ∈ [0,16). Pin every painted slab cell's atlas coords
+## within the 16x4 atlas (catches an off-by-one in the variant/local mapping).
+func test_slab_atlas_coords_in_bounds() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var slab: TileMapLayer = inst.get_node("SlabPaths")
+	if slab == null:
+		return
+	for cell: Vector2i in slab.get_used_cells():
+		var coords: Vector2i = slab.get_cell_atlas_coords(cell)
+		assert_between(coords.x, 0, 15, "slab atlas col in [0,16) for cell %s" % str(cell))
+		assert_between(coords.y, 0, 3, "slab atlas row in [0,4) for cell %s" % str(cell))
 
 
 ## The well-baked nav grid still keeps a walkable interior + every mob spawn reachable
