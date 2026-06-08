@@ -203,15 +203,15 @@ func test_effective_attack_range_tracks_root_scale() -> void:
 		"0.48 scale → 13.44 px trigger (well inside the 0.48 hitbox contact)"
 	)
 	# SOAK-REV #426 — non-boss mobs now render at char_scale × MOB_SCALE_FACTOR
-	# (0.48 × 1.15 = 0.552). The melee trigger reads the mob's OWN root scale, so
+	# (0.48 × 1.265 = 0.607). The melee trigger reads the mob's OWN root scale, so
 	# the dead-gap stays closed AT THE BIGGER SCALE: reach grows WITH the body
-	# (13.44 → 15.46 px). This pins "combat still connects at the new mob scale".
-	g.scale = Vector2(0.552, 0.552)
+	# (13.44 → 16.99 px). This pins "combat still connects at the new mob scale".
+	g.scale = Vector2(0.607, 0.607)
 	assert_almost_eq(
 		g._effective_attack_range(),
-		Grunt.ATTACK_RANGE * 0.552,
+		Grunt.ATTACK_RANGE * 0.607,
 		0.0001,
-		"0.552 (0.48 × MOB_SCALE_FACTOR) scale → 15.46 px trigger (reach scales WITH the bigger body)"
+		"0.607 (0.48 × MOB_SCALE_FACTOR) scale → 16.99 px trigger (reach scales WITH the bigger body)"
 	)
 
 

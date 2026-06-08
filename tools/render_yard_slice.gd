@@ -52,6 +52,14 @@ func _init() -> void:
 	await _shot(vp, cam, Rect2(0, 250, 480, 270), "yard_spawn_vista.png")
 	await _shot(vp, cam, Rect2(440, 250, 480, 270), "yard_central_building.png")
 
+	# v5 AUTOTILE-TERRAIN gate (the IN-GAME verification of record, Sponsor 2026-06-08).
+	# Full-yard view of the dirt+grass autotile blend + the cobble lane, saved as
+	# ingame_terrain.png. Plus an NW-corner game-zoom crop showing a dirt↔grass blend edge
+	# up close + a spawn-area crop showing the lane through the ground.
+	await _shot(vp, cam, Rect2(0, 0, 1280, 768), "ingame_terrain.png")
+	await _shot(vp, cam, Rect2(0, 0, 480, 270), "ingame_terrain_nw_blend.png")
+	await _shot(vp, cam, Rect2(700, 250, 480, 270), "ingame_terrain_lane_east.png")
+
 	print("[render] DONE — yard renders in ", OUT_DIR)
 	quit()
 

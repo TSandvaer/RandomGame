@@ -9,9 +9,10 @@ extends GutTest
 ##      bounding_box_px is WIDER AND TALLER than the 480x270 viewport (the two-axis
 ##      "big + endless" scroll lever) + well-mated (yard EAST exit ↔ descent WEST
 ##      entry).
-##   2. The yard chunk scene paints the v2 VARIED open ground (dirt majority + grass
-##      patches + cobble patches + the fine-cobble lane, no perimeter wall ring), builds
-##      the authored building structures (visual brick + StaticBody2D collision).
+##   2. The yard chunk scene paints the v5 AUTOTILE ground (dirt+grass base via
+##      set_cells_terrain_connect over a doctrine-locked corner-Wang terrain TileSet —
+##      Godot auto-selects the soft blended edge tile; the loved cobble lane + well apron
+##      on top), builds the authored building structures (visual brick + StaticBody2D).
 ##   3. The carried-forward props are present at the calibrated scales
 ##      (pillars 0.85 / braziers 0.65 / banners+rubble+parchment 0.70).
 ##   4. NAVIGABILITY (folds in T6 for the yard): grunt-radius BFS over a walk grid
@@ -43,11 +44,23 @@ const YARD_CHUNK_SCENE_PATH: String = "res://scenes/levels/chunks/s1_yard_slice_
 const VIEWPORT_W: float = 480.0
 const VIEWPORT_H: float = 270.0
 
-const SOURCE_COBBLE: int = 0  # surviving-paving cobble patches (v2)
+const SOURCE_COBBLE: int = 0  # surviving-paving cobble patches (v2; well apron on FloorTiles)
 const SOURCE_WALL_FINE: int = 1
 const SOURCE_PATH: int = 2  # fine-cobble LANE source (v2, replaces the dead slab)
-const SOURCE_DIRT: int = 3  # worn-dirt majority ground (v2)
-const SOURCE_GRASS: int = 4  # grass reclamation patches (v2)
+const SOURCE_DIRT: int = 3  # worn-dirt atlas (DECLARED for asset pins; not painted in v5)
+const SOURCE_GRASS: int = 4  # grass atlas (DECLARED for asset pins; not painted in v5)
+
+# v5 AUTOTILE TERRAIN (s1_dirtgrass_terrain.tres). The dirt+grass BASE moved off FloorTiles
+# onto the GroundTerrain layer, painted via set_cells_terrain_connect over a corner-Wang
+# terrain set. terrain 0 = dirt, 1 = grass. The all-dirt Wang tile is atlas (2,1) (bbox
+# 64,32 / 32 = col2,row1 = wang_0 all-lower); the all-grass tile is (0,3) (wang_15 all-upper).
+const DG_TERRAIN_TILESET_PATH: String = "res://resources/tilesets/s1_dirtgrass_terrain.tres"
+const DG_ATLAS_PATH: String = "res://assets/tilesets/s1_cloister/wang_dirtgrass.png"
+# v5 Sponsor-approved AI weathered-cobble lane source (seamless via tools/seamless_cobble.py;
+# packed into floor_path.png 6-variant atlas via tools/build_path_cobble_atlas.py).
+const AI_COBBLE_PATH: String = "res://assets/tilesets/s1_cloister/floor_cobble_ai.png"
+const DG_ALL_DIRT_ATLAS := Vector2i(2, 1)  # wang_0 (all 4 corners dirt)
+const DG_ALL_GRASS_ATLAS := Vector2i(0, 3)  # wang_15 (all 4 corners grass)
 
 # Well-head footprint mirror (matches S1YardChunk.well_footprint) — the nav grid
 # bakes this as a wall too (the well is a solid walk-AROUND landmark, like buildings).
@@ -124,6 +137,31 @@ func _instantiate_yard_chunk() -> Node:
 	var inst: Node = packed.instantiate()
 	add_child_autofree(inst)
 	return inst
+
+
+## Instantiate the chunk AND await a frame so the GroundTerrain set_cells_terrain_connect
+## autotile result commits (the terrain buffer commits on the frame after the paint —
+## verified empirically; reading get_used_cells() in the same synchronous block returns 0).
+## Tests that inspect GroundTerrain MUST use this async variant.
+func _instantiate_yard_chunk_committed() -> Node:
+	var inst: Node = _instantiate_yard_chunk()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	return inst
+
+
+## Count the GroundTerrain cells whose atlas coords resolve to dirt-corner vs grass-corner.
+## A cell is "grassy" if its selected Wang tile has ANY grass corner (i.e. it is NOT the
+## all-dirt tile); "dirt" if it is the all-dirt tile. Returns {dirt, grass, total}.
+func _ground_terrain_counts(gt: TileMapLayer) -> Dictionary:
+	var dirt := 0
+	var grass := 0
+	for c: Vector2i in gt.get_used_cells():
+		if gt.get_cell_atlas_coords(c) == DG_ALL_DIRT_ATLAS:
+			dirt += 1
+		else:
+			grass += 1  # any non-all-dirt Wang tile carries grass (center or blend)
+	return {"dirt": dirt, "grass": grass, "total": gt.get_used_cells().size()}
 
 
 func _collect_nodes(root: Node, of_type: String) -> Array:
@@ -209,186 +247,164 @@ func test_assembled_floor_is_well_mated() -> void:
 # ---- Surface 2 + 3: chunk scene paint + props -----------------------
 
 
-## v2 GROUND COMPOSITION (86ca5hwmx): the ground is NO LONGER wall-to-wall cobble — it
-## is a VARIED open expanse of dirt (majority) + grass (edges) + cobble (patches), with
-## NO perimeter wall ring (still the open-yard model). Every FloorTiles cell that is NOT
-## under the fine-cobble lane must be exactly one valid GROUND class (dirt/grass/cobble),
-## and EVERY cell must be painted (no holes in the open expanse).
-func test_yard_chunk_paints_varied_open_ground_no_wall_ring() -> void:
-	var inst: Node = _instantiate_yard_chunk()
+## v5 AUTOTILE GROUND (86ca5hwmx, Sponsor-approved AI-gen Wang + Godot autotile). The dirt+
+## grass BASE is painted on the GroundTerrain layer via set_cells_terrain_connect — EVERY
+## logical cell (40x24) is painted (no holes), and every painted cell resolves to a valid
+## Wang atlas tile (source 0 of the terrain TileSet). FloorTiles now holds ONLY the cobble
+## apron + lane-erasures (no dirt/grass). Pin: GroundTerrain covers the whole grid; FloorTiles
+## holds only valid cobble (or empty).
+func test_yard_chunk_paints_full_autotile_ground_base() -> void:
+	var inst: Node = await _instantiate_yard_chunk_committed()
+	var gt: TileMapLayer = inst.get_node("GroundTerrain")
 	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
-	var lane: TileMapLayer = inst.get_node("PathLane")
-	assert_not_null(floor_tiles, "FloorTiles TileMapLayer present")
-	if floor_tiles == null or lane == null:
+	assert_not_null(gt, "GroundTerrain TileMapLayer present")
+	if gt == null or floor_tiles == null:
 		return
-	var valid_ground := [SOURCE_COBBLE, SOURCE_DIRT, SOURCE_GRASS]
-	for ty in range(FINE_H):
-		for tx in range(FINE_W):
-			var cell := Vector2i(tx, ty)
-			# A cell is EITHER a lane cell (painted in PathLane, erased in FloorTiles) OR a
-			# ground cell (painted in FloorTiles with a valid ground class). Exactly one.
-			var lane_src: int = lane.get_cell_source_id(cell)
-			var floor_src: int = floor_tiles.get_cell_source_id(cell)
-			if lane_src == SOURCE_PATH:
-				assert_eq(floor_src, -1, "lane cell %s has ground ERASED beneath (AC9)" % str(cell))
-			else:
-				assert_true(
-					floor_src in valid_ground,
-					(
-						"ground cell %s is a valid class (dirt/grass/cobble), got %d"
-						% [str(cell), floor_src]
-					)
-				)
-
-
-## v2 §3: the ground is DIRT-MAJORITY (~55-65%), with grass (~20-30%) + cobble (~10-20%)
-## as PARTS, NOT a cobble carpet (Sponsor: "cobblestone should only be parts of the
-## walking background"). Pin the composition ratios so a regression back to a cobble (or
-## any single-class) carpet fails loudly. Counts are over ground (non-lane) cells.
-func test_ground_composition_is_dirt_majority_cobble_is_parts() -> void:
-	var inst: Node = _instantiate_yard_chunk()
-	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
-	if floor_tiles == null:
-		return
-	var counts := {SOURCE_DIRT: 0, SOURCE_GRASS: 0, SOURCE_COBBLE: 0}
-	var total := 0
-	for ty in range(FINE_H):
-		for tx in range(FINE_W):
-			var src: int = floor_tiles.get_cell_source_id(Vector2i(tx, ty))
-			if counts.has(src):
-				counts[src] += 1
-				total += 1
-	assert_gt(total, 0, "ground has painted cells")
-	var dirt_frac: float = float(counts[SOURCE_DIRT]) / float(total)
-	var grass_frac: float = float(counts[SOURCE_GRASS]) / float(total)
-	var cobble_frac: float = float(counts[SOURCE_COBBLE]) / float(total)
-	# DIRT is the clear majority (the new default ground).
-	assert_gt(dirt_frac, 0.50, "dirt is the MAJORITY ground (got %.1f%%)" % (dirt_frac * 100.0))
-	# GRASS + COBBLE are PARTS, not the dominant surface (each well under half).
-	assert_lt(
-		grass_frac, 0.40, "grass is a PART, not the majority (got %.1f%%)" % (grass_frac * 100.0)
+	# Every logical cell painted on GroundTerrain (no holes in the open expanse).
+	assert_eq(
+		gt.get_used_cells().size(),
+		YARD_W * YARD_H,
+		"GroundTerrain paints EVERY logical cell (40x24=960, no holes)"
 	)
+	# Every painted terrain cell resolves to a real Wang atlas tile (source 0, coords valid).
+	for c: Vector2i in gt.get_used_cells():
+		assert_eq(gt.get_cell_source_id(c), 0, "terrain cell %s uses the Wang source (0)" % str(c))
+		var a: Vector2i = gt.get_cell_atlas_coords(c)
+		assert_between(a.x, 0, 3, "terrain atlas col in [0,4) for %s" % str(c))
+		assert_between(a.y, 0, 3, "terrain atlas row in [0,4) for %s" % str(c))
+	# FloorTiles holds ONLY cobble (the apron) where painted — never dirt/grass anymore.
+	for c: Vector2i in floor_tiles.get_used_cells():
+		assert_eq(
+			floor_tiles.get_cell_source_id(c),
+			SOURCE_COBBLE,
+			"FloorTiles holds ONLY the cobble apron (v5 moved dirt/grass to the terrain layer)"
+		)
+
+
+## v5 §3 + Sponsor "cobblestone should only be parts": the autotiled ground is DIRT-MAJORITY
+## with GRASS as PARTS (reclaimed corners). Pin the composition over GroundTerrain cells: the
+## all-dirt Wang tile dominates (>55%), grass-bearing tiles (center + blend) are a minority
+## (<40%), and BOTH are genuinely present. A regression to a grass-carpet (or all-dirt with no
+## reclamation) fails loudly.
+func test_ground_composition_is_dirt_majority_grass_is_parts() -> void:
+	var inst: Node = await _instantiate_yard_chunk_committed()
+	var gt: TileMapLayer = inst.get_node("GroundTerrain")
+	if gt == null:
+		return
+	var counts: Dictionary = _ground_terrain_counts(gt)
+	var total: int = counts["total"]
+	assert_gt(total, 0, "terrain has painted cells")
+	var dirt_frac: float = float(counts["dirt"]) / float(total)
+	var grass_frac: float = float(counts["grass"]) / float(total)
+	assert_gt(dirt_frac, 0.55, "dirt is the MAJORITY ground (got %.1f%%)" % (dirt_frac * 100.0))
 	assert_lt(
-		cobble_frac, 0.40, "cobble is a PART, not a carpet (got %.1f%%)" % (cobble_frac * 100.0)
+		grass_frac, 0.40, "grass+blend is a PART, not the majority (got %.1f%%)" % (grass_frac * 100.0)
 	)
-	# All three materials are actually PRESENT (the composition is genuinely varied).
-	assert_gt(counts[SOURCE_DIRT], 0, "dirt present")
-	assert_gt(counts[SOURCE_GRASS], 0, "grass present (reclamation patches)")
-	assert_gt(counts[SOURCE_COBBLE], 0, "cobble present (surviving-paving patches)")
+	assert_gt(counts["dirt"], 0, "all-dirt tiles present (the open field)")
+	assert_gt(counts["grass"], 0, "grass-bearing tiles present (reclamation corners + blend)")
 
 
-## v3 SEAM-FIX PIN (Sponsor 2026-06-08 "hard square block seams forming a visible grid").
-## The v2 painter swapped a DIFFERENT atlas variant per 4x4 block; two different toroidal
-## tiles don't mate at their shared edge → the visible ~256px block grid on the smooth
-## dirt field. v3 paints the DIRT field from ONE variant CONTINUOUSLY (`_field_atlas_coords`:
-## variant 0, addressed by world coord wrapped into the variant's cells), so a single
-## seamless tile wraps onto itself with NO block seam. #426 keeps this at the FINER grid:
-## the period is now 8 fine cells per variant (128px / 16px). Pin that EVERY dirt cell uses
-## the SAME variant (variant 0) AND that the atlas col within the 8-fine-cell period equals
-## fx%8 (the continuous-wrap contract) — a regression back to the per-block variant SWAP
-## (the seam bug) would use multiple variants on dirt cells and fail this loudly.
-func test_dirt_field_is_continuous_single_variant_no_block_seam() -> void:
-	var inst: Node = _instantiate_yard_chunk()
-	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
-	if floor_tiles == null:
+## v5 STRUCTURE PIN (Sponsor "no structure ... just chaos"; carried). Grass is HAND-PLACED at
+## the OUTER corners ONLY — the OPEN MID-FIELD (a central band away from the rim) is entirely
+## the all-dirt Wang tile (zero grass-bearing tiles). A regression to mid-field grass scatter
+## (the rejected chaos, or an autotile mis-wire that grasses the centre) fails loudly.
+func test_ground_grass_only_at_corners_none_in_mid_field() -> void:
+	var inst: Node = await _instantiate_yard_chunk_committed()
+	var gt: TileMapLayer = inst.get_node("GroundTerrain")
+	if gt == null:
 		return
-	var dirt_cells := 0
-	# Iterate the FINE grid (#426 finer-cell revision). The atlas period is now 8 fine cells
-	# per variant (128px / 16px); the continuous-wrap invariant tracks fx/fy % 8.
-	for fy in range(FINE_H):
-		for fx in range(FINE_W):
-			var cell := Vector2i(fx, fy)
-			if floor_tiles.get_cell_source_id(cell) != SOURCE_DIRT:
-				continue
-			dirt_cells += 1
-			var coords: Vector2i = floor_tiles.get_cell_atlas_coords(cell)
-			var variant: int = coords.x / ATLAS_FINE_PERIOD  # 6 variant-blocks of 8 fine cols
-			var local_col: int = coords.x % ATLAS_FINE_PERIOD
-			# THE SEAM-FIX INVARIANT (still holds at the finer grid): every dirt cell is the
-			# single continuous variant 0 (no per-block swap), AND its atlas col within the
-			# variant tracks fx%8 (the toroidal-wrap continuous addressing — constant stone size).
-			assert_eq(variant, 0, "dirt cell %s uses the single continuous variant 0" % str(cell))
-			assert_eq(
-				local_col,
-				fx % ATLAS_FINE_PERIOD,
-				"dirt cell %s atlas col tracks fx%%8 (continuous wrap)" % str(cell)
-			)
-			assert_eq(
-				coords.y, fy % ATLAS_FINE_PERIOD, "dirt cell %s atlas row tracks fy%%8" % str(cell)
-			)
-	# ~4x the prior cell count at 2x-finer in both axes (was >400 at 40x24).
-	assert_gt(dirt_cells, 1600, "dirt is the majority continuous field (got %d cells)" % dirt_cells)
-
-
-## v3 STRUCTURE PIN (Sponsor 2026-06-08 "no structure ... just chaos"). Grass is HAND-
-## PLACED at the OUTER edges/corners ONLY — NOT scattered across the mid-field (the v2
-## noise scatter was the chaos). Pin that EVERY grass cell sits within a hand-authored
-## grass_region (all at the yard margins) AND that the OPEN MID-FIELD (a central band well
-## away from the rim) is entirely dirt/lane/cobble — ZERO grass. A regression back to the
-## noise-scatter (grass blobs in the middle) fails this loudly.
-func test_grass_only_at_edges_none_in_mid_field() -> void:
-	var inst: Node = _instantiate_yard_chunk()
-	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
-	if floor_tiles == null:
-		return
-	# Mid-field probe box in FINE cells (#426): logical cols 12..28 / rows 7..17 = fine cols
-	# 24..56 / rows 14..34 (the open centre, clear of the corner/rim grass regions). No grass
-	# may appear here — the middle is smooth dirt + lane.
+	# Mid-field probe box in LOGICAL cells: cols 14..26 / rows 9..15 (the open centre, clear of
+	# the corner grass regions NW(0,0,9,8) NE(31,0,9,7) SW(0,16,11,8) SE(32,17,8,7)). Every
+	# cell here must be the all-dirt Wang tile (no grass corner).
 	var mid_grass := 0
-	for fy in range(14, 35):
-		for fx in range(24, 57):
-			if floor_tiles.get_cell_source_id(Vector2i(fx, fy)) == SOURCE_GRASS:
+	for ty in range(9, 16):
+		for tx in range(14, 27):
+			if gt.get_cell_atlas_coords(Vector2i(tx, ty)) != DG_ALL_DIRT_ATLAS:
 				mid_grass += 1
 	assert_eq(
 		mid_grass,
 		0,
 		(
-			"NO grass in the open mid-field (fine cols 24-56, rows 14-34) — grass is hand-placed"
-			+ " at the EDGES only; mid-field scatter is the rejected v2 chaos (got %d)" % mid_grass
+			"NO grass-bearing tiles in the open mid-field (logical cols 14-26, rows 9-15) —"
+			+ " grass is hand-placed at the corners only (got %d)" % mid_grass
 		)
 	)
-	# And grass IS present at the corners (the hand-placed reclamation regions exist). Probe
-	# the DEEP INTERIOR of each corner region (in fine cells) — clear of the feathered border.
+	# Grass IS present in the DEEP INTERIOR of each corner region (the all-grass Wang tile).
 	var corner_grass := 0
-	for probe: Vector2i in [Vector2i(3, 3), Vector2i(72, 3), Vector2i(4, 40), Vector2i(72, 42)]:
-		if floor_tiles.get_cell_source_id(probe) == SOURCE_GRASS:
+	for probe: Vector2i in [Vector2i(3, 3), Vector2i(35, 3), Vector2i(4, 20), Vector2i(35, 20)]:
+		if gt.get_cell_atlas_coords(probe) == DG_ALL_GRASS_ATLAS:
 			corner_grass += 1
-	assert_gt(corner_grass, 0, "grass reclaims the corners (hand-placed edge regions present)")
-
-
-## #426 SEAMLESS-BLEND PIN (Sponsor 2026-06-08 "make the materials BLEND — no more sharp
-## tile seams"). The dirt↔grass boundary must be a FEATHERED dither band, NOT a hard
-## rectangular cut. Probe the blend band along a grass region's edge: within the band there
-## must be BOTH grass AND dirt fine cells INTERLEAVED (the soft stipple), proving the border
-## is feathered. A regression back to a clean rectangle (every band cell the same class)
-## fails this loudly. Uses the NW grass region (logical Rect2i(0,0,7,6) = fine 0..13 x 0..11).
-func test_grass_dirt_boundary_is_feathered_not_hard_edge() -> void:
-	var inst: Node = _instantiate_yard_chunk()
-	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
-	if floor_tiles == null:
-		return
-	# The NW region's east edge sits around fine col 13 (logical x 0..6 → fine 0..13). Scan a
-	# vertical blend band straddling that edge (fine cols 11..16, rows 1..10 — clear of the
-	# lane which is centred near fine row 24) and tally grass vs dirt fine cells.
-	var grass_in_band := 0
-	var dirt_in_band := 0
-	for fy in range(1, 11):
-		for fx in range(11, 17):
-			var src: int = floor_tiles.get_cell_source_id(Vector2i(fx, fy))
-			if src == SOURCE_GRASS:
-				grass_in_band += 1
-			elif src == SOURCE_DIRT:
-				dirt_in_band += 1
-	# A FEATHERED border has BOTH classes interleaved across the band (the soft stipple). A
-	# hard rectangular cut would have one class on each side with no interleave in the band.
-	assert_gt(grass_in_band, 0, "blend band has grass cells (region interior side)")
 	assert_gt(
-		dirt_in_band,
+		corner_grass, 0, "grass reclaims the corners (solid all-grass Wang interior present)"
+	)
+
+
+## v5 AUTOTILE BLEND PIN (Sponsor-approved soft dirt↔grass blend). At a grass region's edge
+## the autotile must select BLEND tiles (Wang tiles with MIXED corners — neither all-dirt nor
+## all-grass), proving the dirt↔grass boundary is the soft Godot-autotiled corner blend
+## (Stardew/Graveyard-Keeper), not a hard cut. Scan a band straddling the NW region's east
+## edge (logical col ~8-9) and require ≥1 mixed-corner Wang tile.
+func test_ground_dirt_grass_boundary_uses_blend_tiles() -> void:
+	var inst: Node = await _instantiate_yard_chunk_committed()
+	var gt: TileMapLayer = inst.get_node("GroundTerrain")
+	if gt == null:
+		return
+	# NW region is logical Rect2i(0,0,9,8) → east edge at col 8/9. Scan cols 7..11 rows 1..7.
+	var blend_tiles := 0
+	for ty in range(1, 8):
+		for tx in range(7, 12):
+			var a: Vector2i = gt.get_cell_atlas_coords(Vector2i(tx, ty))
+			if a != DG_ALL_DIRT_ATLAS and a != DG_ALL_GRASS_ATLAS:
+				blend_tiles += 1
+	assert_gt(
+		blend_tiles,
 		0,
 		(
-			"blend band has dirt cells INTERLEAVED with grass — the dirt↔grass border is FEATHERED"
-			+ " (soft dither stipple), not a hard rectangular tile seam (#426 seamless blend)"
+			"the dirt↔grass boundary selects BLEND Wang tiles (mixed corners) — the soft Godot"
+			+ " autotile transition, not a hard cut (v5 Stardew/Graveyard-Keeper blend)"
 		)
+	)
+
+
+## v5 GRASS-MUTE PIN (the doctrine-lock — Sponsor: grass muted/mossy, NOT neon). The shipped
+## Wang atlas's grass must read MUTED OLIVE-green (the moss family ~88° hue, sat <0.70), NOT
+## the raw PixelLab NEON green (~123° hue, sat ~0.97). Sample the green-dominant pixels and
+## assert their mean saturation is muted + their mean hue is olive-shifted off pure green.
+func test_wang_grass_is_muted_not_neon() -> void:
+	var tex: Texture2D = load(DG_ATLAS_PATH)
+	assert_not_null(tex, "wang_dirtgrass.png loads")
+	if tex == null:
+		return
+	var img: Image = tex.get_image()
+	if img == null:
+		return
+	var w: int = img.get_width()
+	var h: int = img.get_height()
+	var sat_acc := 0.0
+	var hue_acc := 0.0
+	var n := 0
+	for y in range(0, h, 2):
+		for x in range(0, w, 2):
+			var c: Color = img.get_pixel(x, y)
+			# green-dominant pixel (the grass).
+			if c.g > c.r + 0.008 and c.g > c.b + 0.008:
+				sat_acc += c.s
+				hue_acc += c.h * 360.0
+				n += 1
+	assert_gt(n, 0, "atlas has grass pixels to sample")
+	var mean_sat: float = sat_acc / float(maxi(n, 1))
+	var mean_hue: float = hue_acc / float(maxi(n, 1))
+	# Muted: mean saturation well below the raw neon ~0.97 (doctrine-lock crushed it).
+	assert_lt(
+		mean_sat,
+		0.70,
+		"grass is MUTED (mean sat %.2f < 0.70 — not the raw neon ~0.97)" % mean_sat
+	)
+	# Olive-shifted: mean hue pulled OFF pure green (123°) toward the moss family (~88-100°).
+	assert_lt(
+		mean_hue,
+		115.0,
+		"grass hue olive-shifted toward moss (mean %.1f deg < 115 — off neon-green 123)" % mean_hue
 	)
 
 
@@ -741,15 +757,28 @@ func test_tileset_has_path_source() -> void:
 	if ts == null:
 		return
 	assert_true(ts.has_source(SOURCE_PATH), "yard TileSet has the fine-cobble lane source (id 2)")
-	# v2 also wires the dirt + grass ground sources (3 + 4).
+	# Sources 3+4 (dirt/grass atlases) stay DECLARED for back-compat asset pins.
 	assert_true(ts.has_source(SOURCE_DIRT), "yard TileSet has the worn-dirt source (id 3)")
 	assert_true(ts.has_source(SOURCE_GRASS), "yard TileSet has the grass source (id 4)")
+	# v5: the dirt+grass BASE is now the autotile TERRAIN TileSet (a separate resource). It
+	# must load + carry one corner-match terrain set with 2 terrains (dirt + grass).
+	var dg: TileSet = load(DG_TERRAIN_TILESET_PATH)
+	assert_not_null(dg, "dirt/grass terrain TileSet loads")
+	if dg != null:
+		assert_eq(dg.get_terrain_sets_count(), 1, "terrain TileSet has one terrain set")
+		assert_eq(
+			dg.get_terrain_set_mode(0),
+			TileSet.TERRAIN_MODE_MATCH_CORNERS,
+			"terrain set is corner-match (Wang)"
+		)
+		assert_eq(dg.get_terrains_count(0), 2, "terrain set has dirt + grass terrains")
 
 
-## The fine-cobble LANE is painted as a RIBBON into the PathLane layer, AND the ground
-## cell beneath each lane cell is ERASED in FloorTiles — exactly ONE tile-class per cell,
-## no stacked-z, no z-fight (AC9 / html5-export.md §Z-index). This is the load-bearing
-## anti-z-fight invariant: assert that EVERY painted lane cell has empty ground beneath.
+## The fine-cobble LANE is painted as a RIBBON into the PathLane layer, AND any cobble-apron
+## cell beneath each lane cell is ERASED in FloorTiles — exactly ONE VISIBLE COBBLE-class per
+## cell, no z-fight (AC9 / html5-export.md §Z-index). The dirt/grass TERRAIN base (z=-1) is
+## intentionally left intact beneath the lane — the opaque lane renders OVER it (z-ordered),
+## the path-through-ground read. This pins that no apron-cobble fights the lane-cobble.
 func test_lane_painted_with_ground_erased_beneath_no_zfight() -> void:
 	var inst: Node = _instantiate_yard_chunk()
 	var lane: TileMapLayer = inst.get_node("PathLane")
@@ -979,44 +1008,37 @@ func test_ground_composition_has_no_moss_patch_trash_sprites() -> void:
 	)
 
 
-## REGRESSION GUARD PL-PATH-04 (v2, the rejection guard). The twice-rejected
-## floor_sandstone.png + the thrice-rejected ashlar slab are dead. The v2 fine-cobble
-## LANE (floor_path.png) + the worn-DIRT field (floor_dirt.png) are walking surfaces
-## that ship with ZERO baked vegetation — joints/gaps are dirt-shadow ONLY. Eye-dropper
-## EVERY pixel of the shipped path + dirt atlases: warm-grey/earth always has R >= G >= B.
-## A green pixel (G clearly exceeds R) is the rejected baked-vegetation class — assert NONE
-## exist on the WALKING surfaces (grass is the SEPARATE green layer, tested elsewhere).
-func test_walking_atlases_have_zero_green_pixels_pl_path_04() -> void:
-	for atlas_path: String in [PATH_ATLAS_PATH, DIRT_ATLAS_PATH]:
-		var tex: Texture2D = load(atlas_path)
-		assert_not_null(tex, "%s loads" % atlas_path)
-		if tex == null:
-			continue
-		var img: Image = tex.get_image()
-		assert_not_null(img, "atlas image readable: %s" % atlas_path)
-		if img == null:
-			continue
-		var w: int = img.get_width()
-		var h: int = img.get_height()
-		var green_pixels: int = 0
-		for y: int in range(0, h, 2):
-			for x: int in range(0, w, 2):
-				var c: Color = img.get_pixel(x, y)
-				# Green = G clearly dominant over BOTH R and B. Small tolerance for AA.
-				if c.g > c.r + 0.02 and c.g > c.b + 0.02:
-					green_pixels += 1
-		assert_eq(
-			green_pixels,
-			0,
-			(
-				(
-					"PL-PATH-04: walking atlas %s must have ZERO green pixels (the rejected baked"
-					+ " moss-dot class) — found %d. Vegetation is the SEPARATE grass ground layer,"
-					+ " never baked into a walking tile."
-				)
-				% [atlas_path, green_pixels]
-			)
+## REGRESSION GUARD (v5). The DIRT walking field must stay ZERO-green (no baked moss-dot
+## scatter — the twice-rejected class). The DIRT atlas joints/gaps are dirt-shadow ONLY.
+## NOTE (v5 Sponsor-approved cobble swap): the LANE atlas (floor_path.png) is now the AI
+## weathered cobble whose grout IS mossy green — Sponsor explicitly approved that look, so the
+## lane is INTENTIONALLY excluded from the zero-green guard (the green there is real grout in a
+## crafted tile, not a baked-vegetation scatter). The grass GROUND is a separate layer.
+func test_dirt_field_has_zero_green_pixels() -> void:
+	var tex: Texture2D = load(DIRT_ATLAS_PATH)
+	assert_not_null(tex, "%s loads" % DIRT_ATLAS_PATH)
+	if tex == null:
+		return
+	var img: Image = tex.get_image()
+	if img == null:
+		return
+	var w: int = img.get_width()
+	var h: int = img.get_height()
+	var green_pixels: int = 0
+	for y: int in range(0, h, 2):
+		for x: int in range(0, w, 2):
+			var c: Color = img.get_pixel(x, y)
+			if c.g > c.r + 0.02 and c.g > c.b + 0.02:
+				green_pixels += 1
+	assert_eq(
+		green_pixels,
+		0,
+		(
+			"the DIRT walking field %s must have ZERO green pixels (no baked moss-dot scatter)"
+			% DIRT_ATLAS_PATH
+			+ " — found %d. The grass GROUND is a separate autotile layer." % green_pixels
 		)
+	)
 
 
 ## The path/dirt/grass atlases are the v2 multi-variant atlases: 768x128 = 24x4 cells =
@@ -1087,11 +1109,11 @@ func test_lane_atlas_coords_in_bounds() -> void:
 		assert_between(coords.y, 0, 7, "lane atlas row in [0,8) for cell %s" % str(cell))
 
 
-## The fine-cobble LANE reads PERCEPTIBLY WARMER + LIGHTER than the surrounding ground
-## (the PL-PATH-02 "walk here" wayfinding contrast, spec §2.3). The path doctrine base
-## #7E7460 is warmer+lighter than the ground cobble #6E665A AND the dirt #6B5A41. Pin
-## that the path atlas mean luminance EXCEEDS the dirt atlas mean (so the lane stands out
-## against the dirt-majority ground it threads), proving the contrast didn't collapse.
+## The cobble LANE reads PERCEPTIBLY LIGHTER than the surrounding dirt ground (the PL-PATH-02
+## "walk here" wayfinding contrast). v5: the lane is now the Sponsor-approved AI weathered
+## cobble (floor_path.png rebuilt from floor_cobble_ai.png) — grey-tan stone, mean luminance
+## ~107 vs the dark dirt ~84, so the lane still stands out against the dirt-majority ground.
+## Pin that the path atlas mean luminance EXCEEDS the dirt mean (contrast didn't collapse).
 func test_lane_reads_lighter_than_dirt_ground_pl_path_02() -> void:
 	var path_tex: Texture2D = load(PATH_ATLAS_PATH)
 	var dirt_tex: Texture2D = load(DIRT_ATLAS_PATH)
@@ -1107,6 +1129,29 @@ func test_lane_reads_lighter_than_dirt_ground_pl_path_02() -> void:
 			+ " contrast) — path lum %.3f vs dirt lum %.3f" % [path_lum, dirt_lum]
 		)
 	)
+
+
+## v5 AI-COBBLE LANE SOURCE PIN (Sponsor-approved this round). The seamless AI weathered
+## cobble (floor_cobble_ai.png) ships + is the lane source. Pin: it loads, is 256x256, AND
+## carries mossy grout (some green-dominant pixels — the approved look, distinct from the
+## zero-green DIRT field). A regression that loses the AI cobble or strips its grout fails here.
+func test_ai_cobble_lane_source_present_with_grout() -> void:
+	var tex: Texture2D = load(AI_COBBLE_PATH)
+	assert_not_null(tex, "AI weathered-cobble lane source loads: %s" % AI_COBBLE_PATH)
+	if tex == null:
+		return
+	assert_eq(tex.get_width(), 256, "AI cobble is 256px wide")
+	assert_eq(tex.get_height(), 256, "AI cobble is 256px tall")
+	var img: Image = tex.get_image()
+	if img == null:
+		return
+	var green := 0
+	for y: int in range(0, 256, 4):
+		for x: int in range(0, 256, 4):
+			var c: Color = img.get_pixel(x, y)
+			if c.g > c.r + 0.02 and c.g > c.b + 0.02:
+				green += 1
+	assert_gt(green, 0, "AI cobble carries mossy grout (Sponsor-approved green grout in the lane)")
 
 
 ## Mean perceptual luminance of an atlas image (stride-sampled). Helper for PL-PATH-02.
