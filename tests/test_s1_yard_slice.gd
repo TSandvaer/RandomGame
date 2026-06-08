@@ -43,7 +43,7 @@ const SOURCE_SLAB: int = 2  # warm-sandstone flagstone slab-path source (T8)
 
 # Well-head footprint mirror (matches S1YardChunk.well_footprint) — the nav grid
 # bakes this as a wall too (the well is a solid walk-AROUND landmark, like buildings).
-const WELL_FOOTPRINT := Rect2i(20, 16, 3, 3)
+const WELL_FOOTPRINT := Rect2i(20, 16, 2, 2)  # SOAK-REVISION #426: 3x3→2x2 (well scale 0.85→0.42)
 
 # S1_YARD_WATER_DOCTRINE / path doctrine eye-dropper hexes (Uma §2.4 / §3.3) — pinned
 # so a regression that recolours the doctrine surfaces fails loudly. Values are the
@@ -691,7 +691,10 @@ func test_well_head_prop_and_collision_present() -> void:
 	for spr: Sprite2D in sprites:
 		if spr.texture != null and spr.texture.resource_path.ends_with("well_head.png"):
 			found_well = true
-			assert_almost_eq(spr.scale.x, 0.85, 0.001, "well at landmark scale 0.85")
+			# SOAK-REVISION #426: well scale 0.85→0.35 (rim ~1.5x player height, a real
+			# well not a building — Sponsor "drastically too big" 2026-06-08; calibrated to
+			# the human-scale fountain in inspiration/2026-06-08_07h53_24.png).
+			assert_almost_eq(spr.scale.x, 0.35, 0.001, "well at soak-revised scale 0.35")
 	assert_true(found_well, "well-head prop present (well_head.png landmark)")
 	# Collision: one StaticBody2D with a CollisionShape2D (solid walk-around landmark).
 	var bodies: Array = _collect_nodes(well_body, "StaticBody2D")
@@ -745,9 +748,10 @@ func test_springs_count_in_range() -> void:
 	assert_between(pools, 1, 2, "1-2 spring pools in the yard (§3.2)")
 
 
-## ONE garden bed gone wild (§4 "one hero bed, not multiple") — a soil ColorRect bed +
-## clustered moss overgrowth, near the dormitory range (south half).
-func test_one_garden_bed_with_overgrowth() -> void:
+## ONE garden bed gone wild (§4 "one hero bed, not multiple") — a soil ColorRect bed
+## near the dormitory range (south half). SOAK-REVISION #426: the moss_patch overgrowth
+## sprites were cut (spiky-prop "trash" class); the bed is the clean soil ColorRect alone.
+func test_one_garden_bed_soil_in_south_half() -> void:
 	var inst: Node = _instantiate_yard_chunk()
 	var springs: Node = inst.get_node("Springs")
 	if springs == null:
@@ -762,6 +766,31 @@ func test_one_garden_bed_with_overgrowth() -> void:
 			# Sits in the south half (near dormitory range).
 			assert_gt(rect.position.y, float(YARD_H) * TILE_PX * 0.5, "garden bed in south half")
 	assert_eq(beds, 1, "exactly ONE garden bed (§4 one hero bed)")
+
+
+## REGRESSION GUARD (SOAK-REVISION #426). The Sponsor flagged the scattered moss_patch
+## sprites (spring rings + garden overgrowth + building-base aprons) as ugly spiky "trash"
+## leaking across the yard + onto the wall band, and asked for the whole class removed.
+## Pin that the ground-composition containers hold NO Sprite2D props (the moss_patch
+## class) — only ColorRects (water pools/glints, garden soil, apron shadow strips). A
+## future re-introduction of the moss-tuft scatter fails this gate loudly. (The well-head
+## + carried-forward landmark props live in Props, which is intentionally unaffected.)
+func test_ground_composition_has_no_moss_patch_trash_sprites() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var springs: Node = inst.get_node("Springs")
+	assert_not_null(springs, "Springs container present")
+	if springs == null:
+		return
+	var sprites: Array = _collect_nodes(springs, "Sprite2D")
+	assert_eq(
+		sprites.size(),
+		0,
+		(
+			"ground-composition (Springs container) places NO Sprite2D props — the moss_patch"
+			+ " tufts read as ugly spiky 'trash' (Sponsor #426); springs/garden/aprons are"
+			+ " ColorRect-only now."
+		)
+	)
 
 
 ## The well-baked nav grid still keeps a walkable interior + every mob spawn reachable

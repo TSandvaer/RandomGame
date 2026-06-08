@@ -25,7 +25,10 @@
 ;                composition.md §2.1: the SET-ASIDE base material becomes the path
 ;                material — large flat cut stones, warmer + larger-stone than the cool
 ;                cobble = the "warm path through cool field" wayfinding read, PL-PATH-01/02).
-;                64x64 = 2x2 atlas, period 2. The S1YardChunk painter lays these as
+;                64x64 source; SOAK-REVISION (#426) region 16x16 = 4x4 atlas, period 4
+;                (was 2x2/period 2) so the slab stones read FINER — a step up from cobble
+;                without the "too big / chunky blocky rectangles" Sponsor flagged 2026-06-08.
+;                The S1YardChunk painter lays these as
 ;                RIBBONS (spine + building-links + well-apron) into the SlabPaths layer
 ;                AND erases the cobble cell beneath (one tile-class per cell at z=0 — no
 ;                stacked-z, no z-fight per html5-export.md §Z-index + the T8 AC9 rule).
@@ -159,13 +162,33 @@ texture_region_size = Vector2i(32, 32)
 2:3/0 = 0
 3:3/0 = 0
 
+; Slab region size 16x16 → a 4x4 atlas over the 64x64 flagstone (was 32x32 / 2x2).
+; SOAK-REVISION (Sponsor 2026-06-08, #426): the slab stones read "too big / chunky
+; blocky rectangles". The spec-sanctioned mechanism ("smaller painted tile region",
+; s1-yard-ground-composition.md §1 / ticket AC1) HALVES the painted region so each
+; 32px game tile renders a 16px source region (2x more, SMALLER cut stones) — a clear
+; step UP from the cobble but no longer big blocky rectangles. NO regen, NO retile-grid
+; stamp (a 2x2 downsample-retile re-introduces a visible grid + amplifies the baked
+; flecks; the smaller-region path avoids both). Painter SLAB_ATLAS_PERIOD 2→4 to match.
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_slab"]
 texture = ExtResource("3_slab")
-texture_region_size = Vector2i(32, 32)
+texture_region_size = Vector2i(16, 16)
 0:0/0 = 0
 1:0/0 = 0
+2:0/0 = 0
+3:0/0 = 0
 0:1/0 = 0
 1:1/0 = 0
+2:1/0 = 0
+3:1/0 = 0
+0:2/0 = 0
+1:2/0 = 0
+2:2/0 = 0
+3:2/0 = 0
+0:3/0 = 0
+1:3/0 = 0
+2:3/0 = 0
+3:3/0 = 0
 
 [resource]
 tile_size = Vector2i(32, 32)

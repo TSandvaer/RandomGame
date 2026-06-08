@@ -42,7 +42,10 @@ const SOURCE_WALL_FINE: int = 1
 ## Source 2 = warm-sandstone FLAGSTONE, reused as the worn processional SLAB-PATH
 ## material (S1-YARD T8; Uma s1-yard-ground-composition.md §2.1). 64x64 = 2x2 atlas.
 const SOURCE_SLAB: int = 2
-const SLAB_ATLAS_PERIOD: int = 2  # 2x2 flagstone atlas
+## SOAK-REVISION (#426, Sponsor 2026-06-08): slab region 32x32→16x16 in the .tres
+## (4x4 atlas) so the slab stones read FINER (a step up from cobble, not "too big /
+## chunky blocky rectangles"). Period 2→4 to match the new atlas dimension.
+const SLAB_ATLAS_PERIOD: int = 4  # 4x4 flagstone atlas (16px region over the 64px source)
 
 ## The cobble PNG is a MULTI-VARIANT atlas: SIX 4x4 variant-blocks side by side
 ## (768x128 = 24x4 cells; variant v occupies atlas columns [v*4 .. v*4+3]). Each
@@ -110,9 +113,12 @@ const WALL_ATLAS_PERIOD: int = 4
 ## buildings) AND a worn slab apron rings it (§2.2 well-approach). The sprite itself
 ## is placed in the .tscn at the apron centre (688, 560 ≈ tile (21.5, 17.5)). Kept as
 ## data here so the nav GUT test can mirror it as a wall (parity with building_footprints).
-## Footprint is the SOLID base of the well (~3x3 tiles) centred under the sprite, NOT the
-## full sprite extent (the upper rim overhangs visually but the player collides with the base).
-@export var well_footprint: Rect2i = Rect2i(20, 16, 3, 3)
+## Footprint is the SOLID base of the well centred under the sprite, NOT the full sprite
+## extent (the upper rim overhangs visually but the player collides with the base).
+## SOAK-REVISION (#426): 3x3→2x2 to match the well scale drop 0.85→0.35 (the well is now
+## a ~81px-wide real well a person draws from ≈1.5x player height, not a building);
+## centred at tile (21,17).
+@export var well_footprint: Rect2i = Rect2i(20, 16, 2, 2)
 
 ## SPRING pools (S1-YARD T8, Uma §3.2; orch handoff: ColorRect-pool, NO bespoke asset).
 ## Each is a damp low/shadow corner where ground water surfaces. Authored in TILES as
@@ -138,9 +144,6 @@ const WATER_HIGHLIGHT := Color(0.522, 0.486, 0.424, 1.0)  # #857C6C sparse still
 ## Damp earth tint for the garden bed (warm soil, sub-1.0). Doctrine dirt-through family.
 const GARDEN_SOIL := Color(0.329, 0.271, 0.184, 0.78)  # #54452F soil, semi-transparent
 
-## Carried-forward moss prop reused for spring rings + garden overgrowth + base aprons.
-const MOSS_PATCH_PATH: String = "res://assets/props/s1_cloister/moss_patch.png"
-
 const TILE_PX: float = 32.0
 
 @onready var _floor_tiles: TileMapLayer = $FloorTiles
@@ -150,13 +153,6 @@ const TILE_PX: float = 32.0
 @onready var _building_bodies: Node2D = $BuildingBodies
 @onready var _well_body: Node2D = $WellBody
 @onready var _decoration: Node2D = $Decoration
-
-
-## Single load site for the reused moss prop (dedupes the duplicated-load lint across
-## the spring-ring / garden-overgrowth / building-apron call sites; resource cache hands
-## back the same Texture2D instance so this is allocation-free after the first call).
-func _load_moss() -> Texture2D:
-	return load(MOSS_PATCH_PATH)
 
 
 func _ready() -> void:
@@ -393,22 +389,22 @@ func _paint_springs() -> void:
 		glint.size = Vector2(TILE_PX * 0.5, TILE_PX * 0.28)
 		glint.position = Vector2(cx - glint.size.x * 0.5, cy - TILE_PX * 0.35)
 		_springs.add_child(glint)
-		# Wettest-moss ring: small moss_patch sprites clustered at the pool edge (reuse).
-		# Kept SMALL (scale 0.5) so they read as damp moss flecks, NOT the player-sized
-		# blobs the Sponsor rejected in PR #424's decoration scatter.
-		for ring_offset: Vector2 in [Vector2(-22, 4), Vector2(22, 6), Vector2(2, 22)]:
-			var moss := Sprite2D.new()
-			moss.texture = _load_moss()
-			moss.scale = Vector2(0.5, 0.5)
-			moss.position = Vector2(cx + ring_offset.x, cy + ring_offset.y)
-			_springs.add_child(moss)
+		# SOAK-REVISION (#426, Sponsor 2026-06-08): the moss_patch sprite RING is REMOVED.
+		# The Sponsor flagged the scattered spiky/burr moss_patch sprites (green-flecked
+		# brown blobs across the yard + leaking onto the wall band) as ugly "trash" — the
+		# SAME ugly-spiky-object class removed once before (the _scatter_decoration no-op).
+		# The spring is now JUST the still dark ColorRect pool + the fixed highlight (the
+		# water feature is load-bearing; the moss props were the trash).
 
 
 ## Paint the GARDEN BED gone wild (S1-YARD T8, Uma §4). ONE hero bed of tilled soil
 ## reclaimed by weeds near the dormitory range. A semi-transparent damp-earth ColorRect
-## bed (cobble reads through, so it's "soil OVER the ground", not a hard tile swap) +
-## clustered moss_patch overgrowth (reuse, small scale). LOW-cost, one bed (§4 "one hero
-## bed, not multiple"). Floor-level (parented to Springs/floor container, z=0).
+## bed (cobble reads through, so it's "soil OVER the ground", not a hard tile swap).
+## SOAK-REVISION (#426, Sponsor 2026-06-08): the clustered moss_patch OVERGROWTH is
+## REMOVED — those green-flecked moss sprites were part of the "ugly trash" spiky-prop
+## class the Sponsor cut. Per the spec rule "the garden bed can stay ONLY if it doesn't
+## use these spiky props", the bed is kept as the clean damp-soil ColorRect alone (no
+## moss_patch sprites). LOW-cost, one bed (§4 "one hero bed, not multiple"). Floor-level.
 func _paint_garden_bed() -> void:
 	if _springs == null:
 		return
@@ -418,24 +414,18 @@ func _paint_garden_bed() -> void:
 	soil.size = Vector2(bed.size.x * TILE_PX, bed.size.y * TILE_PX)
 	soil.position = Vector2(bed.position.x * TILE_PX, bed.position.y * TILE_PX)
 	_springs.add_child(soil)
-	# Overgrowth: a few small moss tufts scattered in the bed (reclaimed-by-weeds read).
-	for tuft: Vector2i in [Vector2i(0, 0), Vector2i(2, 1), Vector2i(3, 2), Vector2i(1, 2)]:
-		var weed := Sprite2D.new()
-		weed.texture = _load_moss()
-		weed.scale = Vector2(0.55, 0.55)
-		weed.position = Vector2(
-			(float(bed.position.x + tuft.x) + 0.5) * TILE_PX,
-			(float(bed.position.y + tuft.y) + 0.5) * TILE_PX
-		)
-		_springs.add_child(weed)
 
 
 ## Damp mossy aprons at building bases (S1-YARD T8, Uma §4 — FREE via existing doctrine).
 ## The ground at a building's SOUTH base (where sun never reaches the wall foot) reads
 ## damp + moss-thickened vs the open sun-ground — grounds the buildings INTO the yard. A
-## subtle semi-transparent dark ColorRect strip along each building's south edge + a few
-## small moss tufts. Floor-level (z=0 via Springs container). Subtle (low alpha) so it
-## darkens the cobble shadow WITHOUT a hard border (no hard clean edge, §2.3 discipline).
+## subtle semi-transparent dark ColorRect strip along each building's south edge. Floor-
+## level (z=0 via Springs container). Subtle (low alpha) so it darkens the cobble shadow
+## WITHOUT a hard border (no hard clean edge, §2.3 discipline).
+## SOAK-REVISION (#426, Sponsor 2026-06-08): the moss_patch TUFTS at building bases are
+## REMOVED — these were the moss sprites "leaking onto the wall band" the Sponsor flagged
+## (red arrows on the bottom wall band). The apron is now JUST the subtle dark shadow
+## strip (a ColorRect, not a spiky prop) — it still grounds the buildings without the trash.
 func _paint_building_aprons() -> void:
 	if _springs == null:
 		return
@@ -450,16 +440,6 @@ func _paint_building_aprons() -> void:
 		apron.size = Vector2(foot.size.x * TILE_PX, TILE_PX * 0.6)
 		apron.position = Vector2(foot.position.x * TILE_PX, apron_y * TILE_PX)
 		_springs.add_child(apron)
-		# A couple of small moss tufts at the damp base (reclaimed-corner read).
-		for i in range(2):
-			var moss := Sprite2D.new()
-			moss.texture = _load_moss()
-			moss.scale = Vector2(0.45, 0.45)
-			moss.position = Vector2(
-				(float(foot.position.x) + (float(i) + 0.5) * float(foot.size.x) * 0.5) * TILE_PX,
-				(float(apron_y) + 0.2) * TILE_PX
-			)
-			_springs.add_child(moss)
 
 
 ## Yard decoration. INTENTIONALLY a NO-OP as of the Sponsor scale soak (2026-06-07,

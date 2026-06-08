@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://b0embergrave_s1yard_slice_chunk"]
+[gd_scene load_steps=10 format=3 uid="uid://b0embergrave_s1yard_slice_chunk"]
 
 ; S1 open cloister-YARD first-slice chunk (ticket 86ca5erzk, S1-YARD T4).
 ; The first WALKABLE yard: an open cobble expanse (1280x768 — wider+taller than
@@ -25,7 +25,6 @@
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/rubble_01.png" id="6_rubble"]
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/parchment_01.png" id="7_parchment"]
 [ext_resource type="Texture2D" path="res://assets/props/s1_cloister/well_head.png" id="8_well"]
-[ext_resource type="Texture2D" path="res://assets/props/s1_cloister/moss_patch.png" id="9_moss"]
 
 [node name="S1YardSliceChunk" type="Node2D"]
 script = ExtResource("1_yard")
@@ -43,8 +42,11 @@ texture_filter = 1
 tile_set = ExtResource("2_yardset")
 
 ; Springs — still dark warm-neutral ColorRect pools (S1_YARD_WATER_DOCTRINE) at
-; floor level, with a moss_patch ring + damp-cobble feel. NO bespoke asset (orch
-; handoff: spring is a ColorRect-pool decoration over the cobble). z=0 floor-level.
+; floor level. NO bespoke asset (orch handoff: spring is a ColorRect-pool decoration
+; over the cobble). z=0 floor-level. SOAK-REVISION (#426): the moss_patch sprite rings
+; (+ garden overgrowth + apron tufts) were REMOVED — the Sponsor flagged those spiky
+; moss sprites as ugly "trash". This container now holds only ColorRects (pools, glints,
+; the garden soil bed, the apron shadow strips) — NO Sprite2D props.
 [node name="Springs" type="Node2D" parent="."]
 
 [node name="Buildings" type="TileMapLayer" parent="."]
@@ -154,9 +156,16 @@ texture = ExtResource("7_parchment")
 ; South-central, OFF the processional spine at the south route-choice decision
 ; point, ringed by a worn slab apron (painted by the script) — a wonder-landmark +
 ; NPC-station seed the player is drawn toward. Collision-solid (WellBody, built by
-; the painter) so it's a walk-AROUND structure. Scale 0.85 (orch handoff: landmark,
-; sibling to pillar 0.85; reads ~2.6x player height). z=2 (Props, above floor/buildings).
+; the painter) so it's a walk-AROUND structure.
+; SOAK-REVISION (#426, Sponsor 2026-06-08): the well was "WAY out of proportion —
+; drastically too big (~5-6x the player)". Scale 0.85→0.35 so the rim DIAMETER reads
+; ~1.5x the char_scale=0.6 player HEIGHT (in-context measure: well rendered ~81px wide
+; vs player ~54px tall = 1.5x), a real well a person draws from — calibrated to the
+; HUMAN-SCALE fountain in inspiration/2026-06-08_07h53_24.png (art-direction.md §3),
+; NOT a building (spec §3.1 target). Footprint dropped 3x3→2x2 to match the smaller
+; solid base. z=2 (Props, above floor/buildings). Recentred to tile (21,17) ≈ the new
+; 2x2 footprint centre so the painted apron still rings it.
 [node name="WellHead" type="Sprite2D" parent="Props"]
-position = Vector2(688, 560)
-scale = Vector2(0.85, 0.85)
+position = Vector2(672, 544)
+scale = Vector2(0.35, 0.35)
 texture = ExtResource("8_well")

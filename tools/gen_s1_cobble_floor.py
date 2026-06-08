@@ -153,7 +153,7 @@ def toroidal_value_noise(S, rng, cells, octaves=3):
 # The cobble tile
 # ---------------------------------------------------------------------------
 def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
-                     moss_amount=1.0, dirt_amount=1.0):
+                     moss_amount=1.0, dirt_amount=1.0, fine_scale=1.0):
     """
     Generate ONE seamless varied-size cobble tile (S x S, RGB uint8).
 
@@ -183,12 +183,19 @@ def make_cobble_tile(seed, S=256, warm_bias=0.05, lighten=1.20,
     # Authored against a 384px source (gives the ~3.6px pebbles real pixels) tiled
     # at period 4: a large cobble now renders ~18 screen px ≈ 1/3 the 0.6 player,
     # so the player walks on a FINE cobble ground (`tile-scale-small-player-large-world`).
+    # fine_scale (#426 SOAK-REVISION, Sponsor 2026-06-08): "cobble base ~20% SMALLER
+    # (finer stones)". Multiplies every tier's min_radius + weight by fine_scale and
+    # bumps counts by ~1/fine_scale^2 so coverage holds at the finer stone size. The
+    # Voronoi cell area scales ~radius^2, so count ∝ 1/scale^2 keeps the field packed.
+    # fine_scale=1.0 = the locked T8 (#424) read; 0.8 = the 20%-finer soak-revision.
+    fs = fine_scale
+    cinv = 1.0 / max(fs * fs, 1e-3)
     radii_plan = [
         # (count, min_radius_px, weight)  weight feeds additively-weighted Voronoi
-        (70,  15 * k, 8.0 * k),   # LARGER cobbles  (still the dominant set-stones, but small)
-        (150,  9 * k, 4.5 * k),   # MEDIUM cobbles
-        (320,  6 * k, 2.2 * k),   # SMALL cobbles
-        (650, 3.6 * k, 1.0 * k),  # PEBBLES packed into the gaps
+        (int(70 * cinv),  15 * k * fs, 8.0 * k * fs),   # LARGER cobbles (dominant set-stones)
+        (int(150 * cinv),  9 * k * fs, 4.5 * k * fs),   # MEDIUM cobbles
+        (int(320 * cinv),  6 * k * fs, 2.2 * k * fs),   # SMALL cobbles
+        (int(650 * cinv), 3.6 * k * fs, 1.0 * k * fs),  # PEBBLES packed into the gaps
     ]
     pts, weights = toroidal_poisson_varied(S, rng, radii_plan)
     n = len(pts)
@@ -341,6 +348,13 @@ def main():
                     help="overall brighten multiplier on cobble stone colors (1.0=v1)")
     ap.add_argument("--suffix", default="",
                     help="filename suffix for output set (e.g. v2) to keep prior renders")
+    ap.add_argument("--fine-scale", type=float, default=1.0, dest="fine_scale",
+                    help="stone-size multiplier (#426 soak-rev: 0.8 = 20%% finer/smaller "
+                         "cobbles; 1.0 = locked T8 read)")
+    ap.add_argument("--atlas-out", default=None, dest="atlas_out",
+                    help="if set, also assemble the shipped 768x128 6-variant atlas PNG at "
+                         "this path (each 384px source variant downsampled to 128px, packed "
+                         "side by side) — the file the painter consumes")
     args = ap.parse_args()
     sfx = ("_" + args.suffix) if args.suffix else ""
 
@@ -360,7 +374,8 @@ def main():
     for i in range(args.variants):
         moss_a = moss_spread[i % len(moss_spread)]
         t = make_cobble_tile(args.seed + i * 17, S=S, warm_bias=args.warm,
-                             lighten=args.lighten, moss_amount=moss_a, dirt_amount=0.0)
+                             lighten=args.lighten, moss_amount=moss_a, dirt_amount=0.0,
+                             fine_scale=args.fine_scale)
         variants.append(t)
         Image.fromarray(t).save(os.path.join(out, f"cobble{sfx}_v{i}_{S}.png"))
         print(f"  - cobble{sfx}_v{i}_{S}.png")
@@ -407,6 +422,24 @@ def main():
     draw.text((pxp, max(2, pyp - 16)), "player ~0.6", fill=(255, 130, 70))
     gz.save(os.path.join(out, f"cobble_proc_field_zoom{sfx}.png"))
     print(f"[gen] cobble_proc_field_zoom{sfx}.png (1:1 yard crop at game zoom + player-scale ref)")
+
+    # SHIPPED ATLAS (#426): assemble the 768x128 6-variant atlas the painter consumes.
+    # Each variant source (authored at --res, typically 384px) is downsampled to 128px
+    # (a 4x4 atlas of 32px cells) and packed side by side: variant v = cols [v*4..v*4+3].
+    # This makes the regen fully reproducible end-to-end (was a manual pack step in #424).
+    if args.atlas_out:
+        atlas_variants = args.variants
+        block = 128
+        atlas = Image.new("RGB", (atlas_variants * block, block), (20, 18, 16))
+        for i in range(atlas_variants):
+            v = variants[i] if i < len(variants) else variants[-1]
+            v_img = Image.fromarray(v).resize((block, block), Image.LANCZOS)
+            atlas.paste(v_img, (i * block, 0))
+        atlas_path = os.path.abspath(args.atlas_out)
+        os.makedirs(os.path.dirname(atlas_path), exist_ok=True)
+        atlas.save(atlas_path)
+        print(f"[gen] shipped atlas -> {atlas_path} ({atlas.size[0]}x{atlas.size[1]}, "
+              f"{atlas_variants} variants, fine_scale={args.fine_scale})")
 
     print(f"\n[gen] DONE. Outputs in: {out}")
 
