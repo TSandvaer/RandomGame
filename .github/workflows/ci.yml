@@ -373,18 +373,34 @@ jobs:
 
           # --- Guard 2: loaded-script-count regression ---------------------
           # GUT summary line shape: "Scripts           76"
+          # NOTE(86ca65gyv): GUT's "Scripts N" summary EXCLUDES scripts that
+          # opt out via `should_skip_script()` (it reports them separately as
+          # "[Risky] Script was skipped"). An intentional skip therefore looks
+          # identical to a silently-dropped (parse-failed) file from the bare
+          # count's perspective. To keep this gate's silent-drop protection
+          # intact while tolerating intentional skips, add the skipped-script
+          # count back: a parse-dropped file emits NO skip line, so it still
+          # trips the mismatch; an intentional skip is accounted for.
+          # (Currently: tests/test_cainos_tileset.gd — Cainos 4.6 corner-terrain
+          # rebuild deferred, see TODO(86ca65gyv-D) in that file.)
           disk_count=$(find tests -name 'test_*.gd' -type f | wc -l | tr -d ' ')
           gut_count=$(grep -E '^Scripts[[:space:]]+[0-9]+' "$log" | grep -oE '[0-9]+' | tail -n1 || true)
+          # Count only the run-summary skip shape ("[Risky] Script was
+          # skipped:") — it fires exactly once per intentionally-skipped script.
+          # (The inline "[Script skipped]:" line also fires but counting both
+          # would double-count.)
+          skipped_count=$(grep -cE '\[Risky\] Script was skipped:' "$log" || true)
           if [ -z "$gut_count" ]; then
             echo "::error::Could not find the 'Scripts <N>' summary line in GUT output — GUT may not have run to completion."
             exit 1
           fi
-          echo "Test files on disk (test_*.gd): $disk_count    Scripts loaded by GUT: $gut_count"
-          if [ "$disk_count" -ne "$gut_count" ]; then
-            echo "::error::Test-script count mismatch: $disk_count test_*.gd files on disk but GUT loaded $gut_count. A test file was silently dropped (parse error / discovery gap). See #86c9u2w6y."
+          accounted=$((gut_count + skipped_count))
+          echo "Test files on disk (test_*.gd): $disk_count    Scripts loaded by GUT: $gut_count    Skipped: $skipped_count    Accounted: $accounted"
+          if [ "$disk_count" -ne "$accounted" ]; then
+            echo "::error::Test-script count mismatch: $disk_count test_*.gd files on disk but GUT accounted for $accounted (loaded $gut_count + skipped $skipped_count). A test file was silently dropped (parse error / discovery gap). See #86c9u2w6y."
             exit 1
           fi
-          echo "OK: GUT loaded all $disk_count test files."
+          echo "OK: GUT accounted for all $disk_count test files ($gut_count loaded + $skipped_count intentionally skipped)."
 
       # Devon ci-hardening 2026-05-02 — on a failed run, upload the GUT
       # JUnit XML plus build_info.txt so the next agent (Tess / Devon) can
