@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Embergrave"
 config/description="Top-down 2D action-RPG dungeon crawler. Eight strata, ember-knight, persistent character + gear across runs."
-run/main_scene="res://scenes/Main.tscn"
+run/main_scene="res://scenes/levels/s1_yard_authored.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
 config/icon="res://icon.svg"
 boot_splash/show_image=false
