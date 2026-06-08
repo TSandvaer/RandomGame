@@ -280,7 +280,9 @@ func test_main_apply_char_scale_scales_player_and_nonboss_mobs() -> void:
 	var mob_factor: float = main.get("MOB_SCALE_FACTOR")
 	var player: Node = main.get("_player")
 	assert_not_null(player, "Main has a player after boot")
-	assert_almost_eq((player as Node2D).scale.x, 0.6, 0.0001, "player root scaled to 0.6 (no factor)")
+	assert_almost_eq(
+		(player as Node2D).scale.x, 0.6, 0.0001, "player root scaled to 0.6 (no factor)"
+	)
 	assert_almost_eq((player as Node2D).scale.y, 0.6, 0.0001, "player root scaled uniformly")
 	var room: Node = main.get("_current_room")
 	assert_not_null(room, "Room02 loaded")
@@ -335,8 +337,10 @@ func test_apply_char_scale_scales_assembler_floor_mobs() -> void:
 			(m as Node2D).scale.x,
 			0.48 * mob_factor,
 			0.0001,
-			"assembler-floor non-boss mob %s scaled to 0.48 × MOB_SCALE_FACTOR (app-gap fix + bigger-mob tune)"
-			% str(m.name)
+			(
+				"assembler-floor non-boss mob %s scaled to 0.48 × MOB_SCALE_FACTOR (app-gap fix + bigger-mob tune)"
+				% str(m.name)
+			)
 		)
 	main.queue_free()
 
@@ -385,7 +389,10 @@ func test_main_room_load_applies_production_default_with_no_param() -> void:
 			(m as Node2D).scale.x,
 			_flags.CHAR_SCALE_PRODUCTION_DEFAULT * mob_factor,
 			0.0001,
-			"non-boss mob %s scaled to production_default × MOB_SCALE_FACTOR (no param)" % str(m.name),
+			(
+				"non-boss mob %s scaled to production_default × MOB_SCALE_FACTOR (no param)"
+				% str(m.name)
+			),
 		)
 
 
@@ -426,7 +433,7 @@ func test_main_apply_char_scale_one_leaves_player_ship_size_mobs_bigger() -> voi
 	# The PLAYER production-safety contract: applying 1.0 leaves the PLAYER at ship
 	# scale (1,1). Post soak-rev #426, NON-BOSS mobs ALWAYS render MOB_SCALE_FACTOR
 	# bigger than the applied scale — even at the 1.0 "full size" apply a mob is
-	# 1.15×. The bigger-mob silhouette is intentional at every scale, not just the
+	# 1.265×. The bigger-mob silhouette is intentional at every scale, not just the
 	# 0.48 default; the player is the size reference, mobs read bigger than it.
 	var main: Node = MAIN_SCENE.instantiate()
 	add_child_autofree(main)
@@ -458,10 +465,10 @@ func test_main_apply_char_scale_one_leaves_player_ship_size_mobs_bigger() -> voi
 func test_nonboss_mob_renders_mob_scale_factor_bigger_than_player() -> void:
 	# THE soak-rev #426 contract (Sponsor 2026-06-08): a NON-BOSS mob renders
 	# clearly BIGGER than the player. The ratio of mob.scale ÷ player.scale must
-	# be EXACTLY MOB_SCALE_FACTOR (1.15) — asserted as the ratio itself so the
-	# test tracks the constant, not a hardcoded 0.552. This is the load-bearing
-	# pin: at the 0.48 production default the player reads 0.48 and every grunt
-	# reads 0.552, i.e. 15% bigger.
+	# be EXACTLY MOB_SCALE_FACTOR (1.265 after the #426 +10% bump from 1.15) —
+	# asserted as the ratio itself so the test tracks the constant, not a hardcoded
+	# 0.61. At the 0.48 production default the player reads 0.48 and every grunt
+	# reads ≈0.61, i.e. ~27% bigger.
 	var main: Node = MAIN_SCENE.instantiate()
 	add_child_autofree(main)
 	await get_tree().process_frame
@@ -472,7 +479,9 @@ func test_nonboss_mob_renders_mob_scale_factor_bigger_than_player() -> void:
 	await get_tree().process_frame
 	main.call("_apply_char_scale", _flags.CHAR_SCALE_PRODUCTION_DEFAULT)
 	var mob_factor: float = main.get("MOB_SCALE_FACTOR")
-	assert_almost_eq(mob_factor, 1.15, 0.0001, "MOB_SCALE_FACTOR is the 15%-bigger tune")
+	assert_almost_eq(
+		mob_factor, 1.265, 0.0001, "MOB_SCALE_FACTOR is the #426 +10%-bigger tune (1.265)"
+	)
 	var player: Node = main.get("_player")
 	var player_scale: float = (player as Node2D).scale.x
 	assert_gt(player_scale, 0.0, "player has a positive scale to ratio against")
@@ -486,7 +495,7 @@ func test_nonboss_mob_renders_mob_scale_factor_bigger_than_player() -> void:
 			mob_scale / player_scale,
 			mob_factor,
 			0.0001,
-			"non-boss mob %s renders MOB_SCALE_FACTOR (1.15×) bigger than the player" % str(m.name)
+			"non-boss mob %s renders MOB_SCALE_FACTOR (1.265×) bigger than the player" % str(m.name)
 		)
 		assert_gt(mob_scale, player_scale, "mob is strictly bigger than the player")
 
@@ -538,7 +547,7 @@ func test_apply_char_scale_leaves_boss_full_size_among_mobs() -> void:
 	)
 	# Boss-unaffected pin (soak-rev #426): the boss must NOT receive the bigger-mob
 	# multiply either — it is excluded before the multiply, so it stays a clean 1.0,
-	# explicitly NOT 0.6 (scaled) and NOT 0.6 × 1.15 (scaled + factored).
+	# explicitly NOT 0.6 (scaled) and NOT 0.6 × 1.265 (scaled + factored).
 	assert_ne(
 		(boss as Node2D).scale.x, 0.6 * mob_factor, "boss is NOT multiplied by MOB_SCALE_FACTOR"
 	)

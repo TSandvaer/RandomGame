@@ -58,10 +58,21 @@ const WELL_FOOTPRINT := Rect2i(20, 16, 2, 2)  # SOAK-REVISION #426: 3x3→2x2 (w
 # painter-side constants (water ColorRect) + the spec's named hexes for documentation.
 const WATER_BASE_HEX := "2e2a26"  # PL-WATER-01 dark warm-neutral (NOT pure-black PL-WATER-02)
 
-# Yard grid (must match S1YardChunk.grid_w/grid_h + s1_yard_slice.tres size_tiles).
+# Yard grid in LOGICAL tiles (must match S1YardChunk.grid_w/grid_h + s1_yard_slice.tres
+# size_tiles + the ChunkDef contract). The WORLD is unchanged at 40x24 logical 32px tiles.
 const YARD_W: int = 40
 const YARD_H: int = 24
 const TILE_PX: float = 32.0
+
+# #426 FINER-CELL revision: the painter renders at a CELL_SUBDIV-finer grid (2x → 16px fine
+# cells) so path/region geometry resolves in small smooth steps. The painted TileMapLayer
+# cell coords are now in FINE cells (0..79 x 0..47); the cell-inspection tests iterate the
+# fine grid. The ATLAS period is 8 fine cells (128px variant / 16px cell). The atlas PNGs
+# are UNCHANGED (same 768x128 stones); only the .tres cell geometry got finer.
+const CELL_SUBDIV: int = 2
+const FINE_W: int = YARD_W * CELL_SUBDIV  # 80
+const FINE_H: int = YARD_H * CELL_SUBDIV  # 48
+const ATLAS_FINE_PERIOD: int = 8  # 128px variant / 16px fine cell
 
 # Grunt body radius mirror (matches test_s1_assembled_floor_navigability.gd).
 const GRUNT_BODY_RADIUS_PX: float = 12.0
@@ -211,8 +222,8 @@ func test_yard_chunk_paints_varied_open_ground_no_wall_ring() -> void:
 	if floor_tiles == null or lane == null:
 		return
 	var valid_ground := [SOURCE_COBBLE, SOURCE_DIRT, SOURCE_GRASS]
-	for ty in range(YARD_H):
-		for tx in range(YARD_W):
+	for ty in range(FINE_H):
+		for tx in range(FINE_W):
 			var cell := Vector2i(tx, ty)
 			# A cell is EITHER a lane cell (painted in PathLane, erased in FloorTiles) OR a
 			# ground cell (painted in FloorTiles with a valid ground class). Exactly one.
@@ -241,8 +252,8 @@ func test_ground_composition_is_dirt_majority_cobble_is_parts() -> void:
 		return
 	var counts := {SOURCE_DIRT: 0, SOURCE_GRASS: 0, SOURCE_COBBLE: 0}
 	var total := 0
-	for ty in range(YARD_H):
-		for tx in range(YARD_W):
+	for ty in range(FINE_H):
+		for tx in range(FINE_W):
 			var src: int = floor_tiles.get_cell_source_id(Vector2i(tx, ty))
 			if counts.has(src):
 				counts[src] += 1
@@ -269,35 +280,44 @@ func test_ground_composition_is_dirt_majority_cobble_is_parts() -> void:
 ## v3 SEAM-FIX PIN (Sponsor 2026-06-08 "hard square block seams forming a visible grid").
 ## The v2 painter swapped a DIFFERENT atlas variant per 4x4 block; two different toroidal
 ## tiles don't mate at their shared edge → the visible ~256px block grid on the smooth
-## dirt field. v3 paints the DIRT field from ONE variant CONTINUOUSLY (`_dirt_atlas_coords`:
-## variant 0, addressed by world coord wrapped into the variant's 4x4 cells), so a single
-## seamless tile wraps onto itself with NO block seam. Pin that EVERY dirt cell uses the
-## SAME variant (variant 0) AND that the atlas col within a 4x4 block period equals the
-## cell's tx%4 (the continuous-wrap contract) — a regression back to the per-block variant
-## SWAP (the seam bug) would use multiple variants on dirt cells and fail this loudly.
+## dirt field. v3 paints the DIRT field from ONE variant CONTINUOUSLY (`_field_atlas_coords`:
+## variant 0, addressed by world coord wrapped into the variant's cells), so a single
+## seamless tile wraps onto itself with NO block seam. #426 keeps this at the FINER grid:
+## the period is now 8 fine cells per variant (128px / 16px). Pin that EVERY dirt cell uses
+## the SAME variant (variant 0) AND that the atlas col within the 8-fine-cell period equals
+## fx%8 (the continuous-wrap contract) — a regression back to the per-block variant SWAP
+## (the seam bug) would use multiple variants on dirt cells and fail this loudly.
 func test_dirt_field_is_continuous_single_variant_no_block_seam() -> void:
 	var inst: Node = _instantiate_yard_chunk()
 	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
 	if floor_tiles == null:
 		return
 	var dirt_cells := 0
-	for ty in range(YARD_H):
-		for tx in range(YARD_W):
-			var cell := Vector2i(tx, ty)
+	# Iterate the FINE grid (#426 finer-cell revision). The atlas period is now 8 fine cells
+	# per variant (128px / 16px); the continuous-wrap invariant tracks fx/fy % 8.
+	for fy in range(FINE_H):
+		for fx in range(FINE_W):
+			var cell := Vector2i(fx, fy)
 			if floor_tiles.get_cell_source_id(cell) != SOURCE_DIRT:
 				continue
 			dirt_cells += 1
 			var coords: Vector2i = floor_tiles.get_cell_atlas_coords(cell)
-			var variant: int = coords.x / 4  # 6 variant-blocks of 4 cols each
-			var local_col: int = coords.x % 4
-			# THE SEAM-FIX INVARIANT: every dirt cell is variant 0 (continuous, no swap)
-			# AND its atlas col within the block tracks tx%4 (the toroidal-wrap addressing).
+			var variant: int = coords.x / ATLAS_FINE_PERIOD  # 6 variant-blocks of 8 fine cols
+			var local_col: int = coords.x % ATLAS_FINE_PERIOD
+			# THE SEAM-FIX INVARIANT (still holds at the finer grid): every dirt cell is the
+			# single continuous variant 0 (no per-block swap), AND its atlas col within the
+			# variant tracks fx%8 (the toroidal-wrap continuous addressing — constant stone size).
 			assert_eq(variant, 0, "dirt cell %s uses the single continuous variant 0" % str(cell))
 			assert_eq(
-				local_col, tx % 4, "dirt cell %s atlas col tracks tx%%4 (continuous wrap)" % str(cell)
+				local_col,
+				fx % ATLAS_FINE_PERIOD,
+				"dirt cell %s atlas col tracks fx%%8 (continuous wrap)" % str(cell)
 			)
-			assert_eq(coords.y, ty % 4, "dirt cell %s atlas row tracks ty%%4" % str(cell))
-	assert_gt(dirt_cells, 400, "dirt is the majority continuous field (got %d cells)" % dirt_cells)
+			assert_eq(
+				coords.y, fy % ATLAS_FINE_PERIOD, "dirt cell %s atlas row tracks fy%%8" % str(cell)
+			)
+	# ~4x the prior cell count at 2x-finer in both axes (was >400 at 40x24).
+	assert_gt(dirt_cells, 1600, "dirt is the majority continuous field (got %d cells)" % dirt_cells)
 
 
 ## v3 STRUCTURE PIN (Sponsor 2026-06-08 "no structure ... just chaos"). Grass is HAND-
@@ -311,27 +331,65 @@ func test_grass_only_at_edges_none_in_mid_field() -> void:
 	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
 	if floor_tiles == null:
 		return
-	# Mid-field probe box: columns 12..28, rows 7..17 (the open centre, clear of the
-	# corner/rim grass regions). No grass may appear here — the middle is smooth dirt + lane.
+	# Mid-field probe box in FINE cells (#426): logical cols 12..28 / rows 7..17 = fine cols
+	# 24..56 / rows 14..34 (the open centre, clear of the corner/rim grass regions). No grass
+	# may appear here — the middle is smooth dirt + lane.
 	var mid_grass := 0
-	for ty in range(7, 18):
-		for tx in range(12, 29):
-			if floor_tiles.get_cell_source_id(Vector2i(tx, ty)) == SOURCE_GRASS:
+	for fy in range(14, 35):
+		for fx in range(24, 57):
+			if floor_tiles.get_cell_source_id(Vector2i(fx, fy)) == SOURCE_GRASS:
 				mid_grass += 1
 	assert_eq(
 		mid_grass,
 		0,
 		(
-			"NO grass in the open mid-field (cols 12-28, rows 7-17) — grass is hand-placed at"
-			+ " the EDGES only; mid-field scatter is the rejected v2 chaos (got %d)" % mid_grass
+			"NO grass in the open mid-field (fine cols 24-56, rows 14-34) — grass is hand-placed"
+			+ " at the EDGES only; mid-field scatter is the rejected v2 chaos (got %d)" % mid_grass
 		)
 	)
-	# And grass IS present at the corners (the hand-placed reclamation regions exist).
+	# And grass IS present at the corners (the hand-placed reclamation regions exist). Probe
+	# the DEEP INTERIOR of each corner region (in fine cells) — clear of the feathered border.
 	var corner_grass := 0
-	for probe: Vector2i in [Vector2i(1, 1), Vector2i(38, 1), Vector2i(2, 21), Vector2i(37, 22)]:
+	for probe: Vector2i in [Vector2i(3, 3), Vector2i(72, 3), Vector2i(4, 40), Vector2i(72, 42)]:
 		if floor_tiles.get_cell_source_id(probe) == SOURCE_GRASS:
 			corner_grass += 1
 	assert_gt(corner_grass, 0, "grass reclaims the corners (hand-placed edge regions present)")
+
+
+## #426 SEAMLESS-BLEND PIN (Sponsor 2026-06-08 "make the materials BLEND — no more sharp
+## tile seams"). The dirt↔grass boundary must be a FEATHERED dither band, NOT a hard
+## rectangular cut. Probe the blend band along a grass region's edge: within the band there
+## must be BOTH grass AND dirt fine cells INTERLEAVED (the soft stipple), proving the border
+## is feathered. A regression back to a clean rectangle (every band cell the same class)
+## fails this loudly. Uses the NW grass region (logical Rect2i(0,0,7,6) = fine 0..13 x 0..11).
+func test_grass_dirt_boundary_is_feathered_not_hard_edge() -> void:
+	var inst: Node = _instantiate_yard_chunk()
+	var floor_tiles: TileMapLayer = inst.get_node("FloorTiles")
+	if floor_tiles == null:
+		return
+	# The NW region's east edge sits around fine col 13 (logical x 0..6 → fine 0..13). Scan a
+	# vertical blend band straddling that edge (fine cols 11..16, rows 1..10 — clear of the
+	# lane which is centred near fine row 24) and tally grass vs dirt fine cells.
+	var grass_in_band := 0
+	var dirt_in_band := 0
+	for fy in range(1, 11):
+		for fx in range(11, 17):
+			var src: int = floor_tiles.get_cell_source_id(Vector2i(fx, fy))
+			if src == SOURCE_GRASS:
+				grass_in_band += 1
+			elif src == SOURCE_DIRT:
+				dirt_in_band += 1
+	# A FEATHERED border has BOTH classes interleaved across the band (the soft stipple). A
+	# hard rectangular cut would have one class on each side with no interleave in the band.
+	assert_gt(grass_in_band, 0, "blend band has grass cells (region interior side)")
+	assert_gt(
+		dirt_in_band,
+		0,
+		(
+			"blend band has dirt cells INTERLEAVED with grass — the dirt↔grass border is FEATHERED"
+			+ " (soft dither stipple), not a hard rectangular tile seam (#426 seamless blend)"
+		)
+	)
 
 
 func test_yard_chunk_builds_solid_building_structures() -> void:
@@ -356,17 +414,18 @@ func test_yard_chunk_paints_building_bricks() -> void:
 	assert_not_null(buildings, "Buildings TileMapLayer present")
 	if buildings == null:
 		return
-	# A cell inside the central building footprint (18-23 × 9-13) is painted with
-	# the finer-brick source; a cell in open ground is NOT.
+	# A FINE cell inside the central building footprint (logical 18-23 × 9-13 = fine 36-47 ×
+	# 18-27) is painted with the finer-brick source; a fine cell in open ground is NOT.
+	# Logical (20,11) → fine (40,22); logical open-ground (3,12) → fine (6,24).
 	assert_eq(
-		buildings.get_cell_source_id(Vector2i(20, 11)),
+		buildings.get_cell_source_id(Vector2i(40, 22)),
 		SOURCE_WALL_FINE,
-		"central-building cell painted with finer brick"
+		"central-building fine cell painted with finer brick"
 	)
 	assert_eq(
-		buildings.get_cell_source_id(Vector2i(3, 12)),
+		buildings.get_cell_source_id(Vector2i(6, 24)),
 		-1,
-		"open-ground cell has NO building brick (empty cell)"
+		"open-ground fine cell has NO building brick (empty cell)"
 	)
 
 
@@ -716,8 +775,9 @@ func test_lane_painted_with_ground_erased_beneath_no_zfight() -> void:
 			)
 		)
 		lane_cells += 1
-	# The spine + links + apron paint a meaningful ribbon, not zero cells.
-	assert_gt(lane_cells, 30, "the lane paints a real wayfinding ribbon (got %d)" % lane_cells)
+	# The spine + spur paint a meaningful ribbon. At the FINE grid the lane is ~6 fine cells
+	# wide x ~160 fine cols (minus building skips + soft-edge feather), so hundreds of cells.
+	assert_gt(lane_cells, 200, "the lane paints a real wayfinding ribbon (got %d)" % lane_cells)
 
 
 ## The lane spine runs west→east — assert lane cells exist near the WEST edge (spawn gate)
@@ -728,12 +788,13 @@ func test_lane_spine_spans_west_to_east() -> void:
 	var lane: TileMapLayer = inst.get_node("PathLane")
 	if lane == null:
 		return
+	# West/east edges in FINE cells (#426): west fx ≤ 2, east fx ≥ FINE_W - 3.
 	var has_west: bool = false
 	var has_east: bool = false
 	for cell: Vector2i in lane.get_used_cells():
 		if cell.x <= 2:
 			has_west = true
-		if cell.x >= YARD_W - 3:
+		if cell.x >= FINE_W - 3:
 			has_east = true
 	assert_true(has_west, "lane reaches the WEST spawn-gate edge")
 	assert_true(has_east, "lane reaches the EAST descent edge (journey span)")
@@ -766,7 +827,7 @@ func test_lane_is_one_connected_ribbon_west_to_east() -> void:
 	while head < queue.size():
 		var cur: Vector2i = queue[head]
 		head += 1
-		if cur.x >= YARD_W - 3:
+		if cur.x >= FINE_W - 3:
 			reached_east = true
 		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			var n: Vector2i = cur + d
@@ -778,7 +839,9 @@ func test_lane_is_one_connected_ribbon_west_to_east() -> void:
 	# tiny slack for the well-spur tip if the gentle dip leaves it 1 cell detached.
 	var coverage: float = float(seen.size()) / float(maxi(lane_set.size(), 1))
 	assert_gt(
-		coverage, 0.95, "≥95%% of lane cells are in ONE connected ribbon (got %.1f%%)" % (coverage * 100.0)
+		coverage,
+		0.95,
+		"≥95%% of lane cells are in ONE connected ribbon (got %.1f%%)" % (coverage * 100.0)
 	)
 
 
@@ -788,10 +851,14 @@ func test_lane_cells_never_inside_a_building() -> void:
 	var lane: TileMapLayer = inst.get_node("PathLane")
 	if lane == null:
 		return
+	# Lane cells are FINE cells (#426); footprints are LOGICAL tiles. Convert each footprint
+	# to its fine-cell rect and assert no lane fine cell falls inside.
 	for cell: Vector2i in lane.get_used_cells():
 		for foot: Rect2i in _building_footprints():
+			var fine_foot := Rect2i(foot.position * CELL_SUBDIV, foot.size * CELL_SUBDIV)
 			assert_false(
-				foot.has_point(cell), "lane cell %s must NOT be inside building %s" % [cell, foot]
+				fine_foot.has_point(cell),
+				"lane fine cell %s must NOT be inside building (fine %s)" % [cell, fine_foot]
 			)
 
 
@@ -965,7 +1032,8 @@ func test_ground_atlases_are_multi_variant_geometry() -> void:
 		# 6 variants * 128px = 768 wide; 128 tall (a 4x4 atlas of 32px cells per variant).
 		assert_eq(tex.get_width(), 768, "%s 768px wide (6 variant-blocks of 128px)" % atlas_path)
 		assert_eq(tex.get_height(), 128, "%s 128px tall (4 rows of 32px cells)" % atlas_path)
-	# The .tres declares 32x32 regions over the path/dirt/grass sources.
+	# #426 FINER CELL: the .tres now declares 16px regions (was 32px) over the path/dirt/grass
+	# sources — the atlas PNGs are UNCHANGED (768x128 stones); only the cell geometry got finer.
 	var ts: TileSet = load(YARD_TILESET_PATH)
 	if ts == null:
 		return
@@ -975,8 +1043,8 @@ func test_ground_atlases_are_multi_variant_geometry() -> void:
 		if src != null:
 			assert_eq(
 				src.texture_region_size,
-				Vector2i(32, 32),
-				"source %d region size = 32px tile" % src_id
+				Vector2i(16, 16),
+				"source %d region size = 16px fine cell (#426)" % src_id
 			)
 
 
@@ -993,7 +1061,7 @@ func test_lane_scatters_multiple_variants_no_single_stamp() -> void:
 		var coords: Vector2i = lane.get_cell_atlas_coords(cell)
 		if coords.x < 0:
 			continue
-		variants_seen[coords.x / 4] = true  # 6 variant-blocks of 4 cols each
+		variants_seen[coords.x / ATLAS_FINE_PERIOD] = true  # 6 variant-blocks of 8 fine cols
 	assert_gt(
 		variants_seen.size(),
 		1,
@@ -1012,10 +1080,11 @@ func test_lane_atlas_coords_in_bounds() -> void:
 	var lane: TileMapLayer = inst.get_node("PathLane")
 	if lane == null:
 		return
+	# At the finer grid the atlas is 6 variants x 8 fine cols = [0,48) cols, 8 rows = [0,8).
 	for cell: Vector2i in lane.get_used_cells():
 		var coords: Vector2i = lane.get_cell_atlas_coords(cell)
-		assert_between(coords.x, 0, 23, "lane atlas col in [0,24) for cell %s" % str(cell))
-		assert_between(coords.y, 0, 3, "lane atlas row in [0,4) for cell %s" % str(cell))
+		assert_between(coords.x, 0, 47, "lane atlas col in [0,48) for cell %s" % str(cell))
+		assert_between(coords.y, 0, 7, "lane atlas row in [0,8) for cell %s" % str(cell))
 
 
 ## The fine-cobble LANE reads PERCEPTIBLY WARMER + LIGHTER than the surrounding ground

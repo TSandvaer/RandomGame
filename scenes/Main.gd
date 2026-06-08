@@ -271,9 +271,10 @@ const CAMERA_FOLLOW_DEADZONE: Vector2 = Vector2(40, 24)
 ## 86ca5hwmx soak-rev #426, Sponsor 2026-06-08). The char-scale Sponsor dialed
 ## (CHAR_SCALE_PRODUCTION_DEFAULT = 0.48) is applied to the PLAYER directly, but
 ## every NON-BOSS mob renders at `char_scale × MOB_SCALE_FACTOR` so mobs read
-## clearly BIGGER than the player again (≈0.552 at the 0.48 default). The 0.48
-## tune had made mobs read the same size as — or smaller than — the player;
-## Sponsor wants the 15%-bigger silhouette back. Bosses are UNCHANGED (already
+## clearly BIGGER than the player again (≈0.61 at the 0.48 default — #426 soak-rev
+## 2026-06-08 bumped the factor 1.15→1.265 for a +10% bigger mob silhouette: mob
+## ≈0.61 vs player 0.48). The 0.48 tune had made mobs read the same size as — or
+## smaller than — the player; Sponsor wants the bigger silhouette. Bosses UNCHANGED (already
 ## char-scale-exempt via `_char_scale_is_boss`), so this factor never touches
 ## them. The factor is applied ONLY inside `_scale_mob_list` (the single
 ## non-boss-mob scaling point shared by BOTH mob-spawn surfaces — static-room
@@ -282,8 +283,8 @@ const CAMERA_FOLLOW_DEADZONE: Vector2 = Vector2(40, 24)
 ## multiplied. Scale-aware mob attack-reach (`Grunt`/`Charger`
 ## `_effective_attack_range = ATTACK_RANGE * scale.x`) reads the mob's own root
 ## scale, so the dead-gap stays closed — the reach scales WITH the now-bigger
-## body (0.48→13.44 px reach becomes 0.552→15.46 px).
-const MOB_SCALE_FACTOR: float = 1.15
+## body (0.48→13.44 px reach becomes 0.61→17.06 px at the #426 1.265 factor).
+const MOB_SCALE_FACTOR: float = 1.265
 
 # ---- Runtime ---------------------------------------------------------
 
