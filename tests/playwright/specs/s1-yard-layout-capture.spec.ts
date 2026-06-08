@@ -56,6 +56,41 @@ async function drive(
   await page.waitForTimeout(300); // settle a frame for the camera + render
 }
 
+/** Latest player world position from the throttled `[combat-trace] Player.pos` line. */
+function latestPlayerPos(capture: ConsoleCapture): { x: number; y: number } | null {
+  const lines = capture.getLines();
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].text.match(/Player\.pos \| pos=\(([-\d.]+),([-\d.]+)\)/);
+    if (m) return { x: parseFloat(m[1]), y: parseFloat(m[2]) };
+  }
+  return null;
+}
+
+/**
+ * Drive `key` in bursts until the player's `axis` ("x"|"y") reaches `target`
+ * (`dir` = +1 toward larger, -1 toward smaller), reading the Player.pos trace
+ * between bursts. Position-VERIFIED (not dead-reckoned) — walk speed is 120 px/s
+ * so dead-reckoning over the 1280px yard accumulates error + stalls on collision.
+ */
+async function driveUntil(
+  page: import("@playwright/test").Page,
+  capture: ConsoleCapture,
+  key: string,
+  axis: "x" | "y",
+  target: number,
+  dir: 1 | -1,
+  maxBursts = 12,
+): Promise<void> {
+  for (let i = 0; i < maxBursts; i++) {
+    const p = latestPlayerPos(capture);
+    if (p) {
+      const v = axis === "x" ? p.x : p.y;
+      if (dir === 1 ? v >= target : v <= target) return;
+    }
+    await drive(page, key, 600); // 600ms ≈ 72px/burst; the Player.pos trace throttles at 0.25s
+  }
+}
+
 test.describe("S1 yard APPROVED-LAYOUT in-game GPU capture", () => {
   test("frames each building landmark on the assembler path", async ({ page, context }) => {
     await context.route("**/*", (route) => route.continue());
@@ -76,33 +111,40 @@ test.describe("S1 yard APPROVED-LAYOUT in-game GPU capture", () => {
     await canvas.focus().catch(() => {});
     await page.waitForTimeout(600);
 
-    // Spawn is left-edge, vertical-center (~world 24, 384). Drive N toward the chapel
-    // (footprint x0-7,y0-2 → base ~y96): the camera clamps to the top floor bound, framing
-    // the chapel + bell-tower at the NW spawn shoulder.
-    await drive(page, "KeyW", 1600);
+    // Walk speed is 120 px/s; the camera follows the player + clamps to the floor bounds
+    // [0,1280]x[0,768]. Framing uses position-VERIFIED drives (driveUntil reads Player.pos)
+    // for mid-field targets, and hard edge-clamp drives for corner buildings (the camera
+    // pins to the corner so the corner building is deterministically framed).
+
+    // 1. CHAPEL — NW corner. Drive N to the top edge (camera clamps top) → chapel framed.
+    await driveUntil(page, capture, "KeyW", "y", 130, -1);
     await shot(page, "b1_chapel_belltower");
 
-    // Back to center then S toward the dormitory ruins (footprint x0-14,y21-23, S edge).
-    await drive(page, "KeyS", 2400);
+    // 2. DORMITORY RUINS — SW (footprint x0-14, y21-23). Drive S to the bottom edge + stay W.
+    await driveUntil(page, capture, "KeyS", "y", 650, 1);
+    await driveUntil(page, capture, "KeyD", "x", 160, 1);
     await shot(page, "b2_dormitory_ruins");
 
-    // E a little + stay low → the WELL (tile 12,17 → world ~400,560) + spring + garden.
-    await drive(page, "KeyD", 1300);
+    // 3. WELL focal — tile (12,17) → world ~(400,560). Position-verify x then y.
+    await driveUntil(page, capture, "KeyD", "x", 360, 1);
+    await driveUntil(page, capture, "KeyW", "y", 520, -1);
     await shot(page, "b3_well_focal");
 
-    // Up to the central building (footprint x26-29,y0-3 → world ~896,64) via E then N. The
-    // lit ember SOUTH window faces the approach (canvas-S of the structure).
-    await drive(page, "KeyD", 2600);
-    await drive(page, "KeyW", 1500);
+    // 4. CENTRAL building — footprint x26-29,y0-3 → world ~(896,64), lit ember S window faces
+    //    the approach. Position-verify x to ~880, then drive N to the top edge.
+    await driveUntil(page, capture, "KeyD", "x", 880, 1);
+    await driveUntil(page, capture, "KeyW", "y", 150, -1);
     await shot(page, "b4_central_lit_window");
 
-    // Far E + N to the outbuilding (footprint x38-39,y2-3 → world ~1248,80) on the east horizon.
-    await drive(page, "KeyD", 2600);
+    // 5. FAR OUTBUILDING — NE (footprint x38-39,y2-3). Drive E to the right edge (camera clamps
+    //    east) + stay N → the outbuilding on the east horizon.
+    await driveUntil(page, capture, "KeyD", "x", 1240, 1);
     await shot(page, "b5_far_outbuilding");
 
-    // Wide overview: drop to mid-yard (the fork/spine + well + central silhouette together).
-    await drive(page, "KeyA", 1400);
-    await drive(page, "KeyS", 700);
+    // 6. OVERVIEW — mid-yard vantage (~tile 20,12 → world ~640,384): the spine/fork + central
+    //    silhouette + the open lanes share one frame.
+    await driveUntil(page, capture, "KeyA", "x", 660, -1);
+    await driveUntil(page, capture, "KeyS", "y", 360, 1);
     await shot(page, "b6_overview_spine_fork");
 
     // Universal warning gate.
