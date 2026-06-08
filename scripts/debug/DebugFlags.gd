@@ -218,13 +218,18 @@ const CHAR_SCALE_MAX: float = 2.0
 const CHAR_SCALE_STEP: float = 0.05  # per-keypress increment
 const CHAR_SCALE_RESET: float = 1.0  # full / ship size (the `\` dial reset + explicit-disable value)
 ## SHIPPED production default (ticket 86ca3rgxq). Sponsor dialed 0.6 on the
-## Stage-1 soak (build 6a59f9e, run 26872372173) as the right size for player +
-## non-boss mobs in the widened S1 rooms. With NO `?char_scale` param this is the
+## Stage-1 soak (build 6a59f9e, run 26872372173); SOAK-REVISION (#426, 2026-06-08)
+## drops it a further 20% to 0.48 (0.6 × 0.8) — Sponsor wants the player + all NORMAL
+## (non-boss) mobs 20% smaller (the "small player, large world" north-star, calibrated
+## to the inspiration board art-direction.md). With NO `?char_scale` param this is the
 ## scale Main applies in normal play. A param (`?char_scale=N`) OVERRIDES it; the
 ## `[`/`]`/`\` dial still works for live re-tuning; `?char_scale=1.0` (or the `\`
-## reset key) returns to full size. The boss exclusion is unaffected — bosses are
-## always 1.0× regardless of this default (see `Main._char_scale_is_boss`).
-const CHAR_SCALE_PRODUCTION_DEFAULT: float = 0.6
+## reset key) returns to full size. Stays above CHAR_SCALE_MIN (0.3). The boss exclusion
+## is unaffected — bosses are always 1.0× regardless of this default (see
+## `Main._char_scale_is_boss`). NOTE: this is an INTENTIONAL GLOBAL tune — it changes
+## the default boot too (not just the yard), so the prior "default boot byte-identical"
+## invariant is relaxed to "byte-identical EXCEPT this intended 0.6→0.48 char_scale tune".
+const CHAR_SCALE_PRODUCTION_DEFAULT: float = 0.48
 
 # Public state — read by gameplay code, written only via toggle/parse functions.
 var fast_xp_enabled: bool = false

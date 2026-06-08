@@ -6,12 +6,14 @@ extends GutTest
 ##
 ## Sibling of the `?cam_zoom` dial (ticket 86ca3kjyg): cam_zoom dials the CAMERA
 ## perspective; char_scale dials how BIG the player + non-boss mobs render inside
-## that perspective. The Sponsor dialed 0.6 on the Stage-1 soak as the right size
-## in the widened S1 rooms; this lock makes 0.6 the production default while
+## that perspective. The Sponsor dialed 0.6 on the Stage-1 soak; SOAK-REVISION #426
+## (2026-06-08) drops it a further 20% to 0.48 (CHAR_SCALE_PRODUCTION_DEFAULT) as the
+## "small player, large world" tune; this lock keeps the production default applied while
 ## keeping the `?char_scale` param + `[`/`]`/`\` dial fully working for re-tuning.
 ##
 ## RESOLUTION (default vs param vs explicit-disable) — pinned by tests below:
-##   - param ABSENT → effective_char_scale() == 0.6 (shipped default; tests 1/3/8a)
+##   - param ABSENT → effective_char_scale() == CHAR_SCALE_PRODUCTION_DEFAULT (0.48;
+##     shipped default; tests 1/3/8a)
 ##   - param/dial PRESENT → effective_char_scale() == the override (tests 2/3/8b)
 ##   - explicit-disable → 1.0 / `\` reset returns to full size (tests 5/8c)
 ##
@@ -95,19 +97,21 @@ func test_has_char_scale_override_false_at_default() -> void:
 
 func test_effective_char_scale_is_production_default_at_no_override() -> void:
 	# THE LOCK (ticket 86ca3rgxq): with no param override, the effective scale Main
-	# applies is the SHIPPED 0.6 production default — NOT 1.0 ship size. This is the
-	# load-bearing change; a default boot now renders player + non-boss mobs at 0.6.
+	# applies is the SHIPPED production default — NOT 1.0 ship size. This is the
+	# load-bearing change; a default boot renders player + non-boss mobs at the default.
 	assert_almost_eq(
 		_flags.effective_char_scale(),
 		_flags.CHAR_SCALE_PRODUCTION_DEFAULT,
 		0.0001,
-		"effective scale is the 0.6 production default when no override is set"
+		"effective scale is the production default when no override is set"
 	)
+	# SOAK-REVISION #426: production default dropped 0.6→0.48 (Sponsor "player + normal
+	# mobs 20% smaller", 2026-06-08; 0.6 × 0.8, stays above CHAR_SCALE_MIN 0.3).
 	assert_almost_eq(
 		_flags.CHAR_SCALE_PRODUCTION_DEFAULT,
-		0.6,
+		0.48,
 		0.0001,
-		"the locked production default is 0.6 (Sponsor's dialed value)",
+		"the production default is the soak-revised 0.48 (Sponsor's 20%-smaller tune)",
 	)
 
 
@@ -296,8 +300,13 @@ func test_main_room_load_applies_production_default_with_no_param() -> void:
 	# where the boot/room-load path stops applying the default (the silent-killer
 	# class: a weak "scale != 1.0" assertion would pass; we assert the actual 0.6).
 	assert_false(_flags.has_char_scale_override(), "no param override active (default state)")
+	# SOAK-REVISION #426: assert the CONSTANT (now 0.48), not a hardcoded 0.6, so the test
+	# tracks the production-default tune intentionally rather than pinning the old value.
 	assert_almost_eq(
-		_flags.effective_char_scale(), 0.6, 0.0001, "effective default is 0.6 going in"
+		_flags.effective_char_scale(),
+		_flags.CHAR_SCALE_PRODUCTION_DEFAULT,
+		0.0001,
+		"effective default is the production default going in"
 	)
 	var main: Node = MAIN_SCENE.instantiate()
 	add_child_autofree(main)
@@ -311,9 +320,9 @@ func test_main_room_load_applies_production_default_with_no_param() -> void:
 	assert_not_null(player, "Main has a player after boot")
 	assert_almost_eq(
 		(player as Node2D).scale.x,
-		0.6,
+		_flags.CHAR_SCALE_PRODUCTION_DEFAULT,
 		0.0001,
-		"player scaled to the 0.6 production default by the room-load path (no param)",
+		"player scaled to the production default by the room-load path (no param)",
 	)
 	var room: Node = main.get("_current_room")
 	var mobs: Array = room.call("get_spawned_mobs")
@@ -321,9 +330,9 @@ func test_main_room_load_applies_production_default_with_no_param() -> void:
 	for m in mobs:
 		assert_almost_eq(
 			(m as Node2D).scale.x,
-			0.6,
+			_flags.CHAR_SCALE_PRODUCTION_DEFAULT,
 			0.0001,
-			"non-boss mob %s scaled to the 0.6 production default (no param)" % str(m.name),
+			"non-boss mob %s scaled to the production default (no param)" % str(m.name),
 		)
 
 
