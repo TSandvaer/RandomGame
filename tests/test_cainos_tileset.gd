@@ -33,6 +33,35 @@ const EDGE_CELL := Vector2i(2, 4)
 var _warn_guard: NoWarningGuard
 
 
+# TODO(86ca65gyv-D / Godot 4.6): cainos corner-terrain rebuild.
+# This whole script is SKIPPED under the 4.3->4.6 migration. The Cainos
+# corner-Wang TileSet (resources/tilesets/cainos_s1.tres, terrain_set_0/mode=1
+# = TERRAIN_MODE_MATCH_CORNERS) was AUTHORED UNDER 4.3. When the
+# 4.3-serialized authoring scene (s1_yard_authored.tscn) is instantiated under
+# 4.6, its painted terrain cells get re-validated against 4.6's stricter
+# `is_valid_terrain_peering_bit` check, which (a) spams engine errors that GUT
+# 9.6 fails on, and (b) SIGSEGVs (signal 11) the headless runner when this file
+# runs inside the full 166-file suite.
+#
+# ROOT CAUSE (empirically determined, NOT a 4.6 engine bug): a freshly-built
+# corner-mode TerrainSet + corner peering bits + painted cell built via the 4.6
+# API produces ZERO peering-bit errors (verified with a standalone 4.6 probe).
+# So the defect is the 4.3-authored .tres/.tscn peering-bit layout being
+# malformed for 4.6 — a Drew .tres/.tscn REBUILD (re-paint the terrain in the
+# 4.6 editor / regenerate peering bits), NOT an autotile-workflow rethink.
+#
+# Deferred per the orchestrator+Sponsor scope decision. Un-skip when the
+# rebuilt 4.6-native cainos_s1.tres + s1_yard_authored.tscn land. The scene is
+# NON-PRODUCTION (Sponsor's hand-authoring "paint your yard, press F5" scene;
+# not referenced from Main.tscn or any production script), so the game ships
+# unaffected in the interim.
+func should_skip_script():
+	return (
+		"86ca65gyv-D: Cainos corner-terrain rebuild deferred — 4.3-authored "
+		+ "peering bits trip 4.6 is_valid_terrain_peering_bit (+ headless SIGSEGV)"
+	)
+
+
 func before_each() -> void:
 	_warn_guard = NoWarningGuard.new()
 	_warn_guard.attach()

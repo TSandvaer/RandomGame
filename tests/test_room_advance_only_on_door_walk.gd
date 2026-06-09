@@ -313,6 +313,7 @@ func test_boss_room_door_trigger_is_not_monitorable() -> void:
 			+ "so Area2D neighbors cannot receive area_entered from it"
 		)
 	)
+	_assert_bare_boss_room_load_errors()
 
 
 func test_boss_room_door_trigger_area_entered_ignored_does_not_start_entry_sequence() -> void:
@@ -342,6 +343,7 @@ func test_boss_room_door_trigger_area_entered_ignored_does_not_start_entry_seque
 		boss_room.is_entry_sequence_active(),
 		"entry sequence must remain inactive after area_entered no-op"
 	)
+	_assert_bare_boss_room_load_errors()
 
 
 func test_boss_room_door_trigger_non_characterbody_ignored() -> void:
@@ -364,3 +366,14 @@ func test_boss_room_door_trigger_non_characterbody_ignored() -> void:
 	assert_signal_not_emitted(
 		boss_room, "entry_sequence_started", "bare Node2D body must NOT trigger boss entry sequence"
 	)
+	_assert_bare_boss_room_load_errors()
+
+
+# GUT 9.6 (Godot 4.6) error-capture opt-in. The bare-test escape
+# (`boss_scene_path = ""`) makes `_spawn_boss`'s `load("")` emit an engine
+# error AND `Stratum1BossRoom` push_error during the deferred fixture pass.
+# These are EXPECTED in every bare-instantiation test here — assert them so
+# GUT does not fail the test on the deliberate negative path.
+func _assert_bare_boss_room_load_errors() -> void:
+	assert_engine_error("failed")
+	assert_push_error("failed to load boss scene")

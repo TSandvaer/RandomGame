@@ -144,12 +144,16 @@ func test_assemble_single_returns_null_for_invalid_chunk() -> void:
 	var bad: LevelChunkDef = _make_chunk(&"")
 	var result: LevelAssembler.AssemblyResult = asm.assemble_single(bad, Callable())
 	assert_null(result, "invalid chunk yields null result")
+	# GUT 9.6 (Godot 4.6) error-capture opt-in for the deliberate validate-fail.
+	assert_push_error("chunk_def invalid")
 
 
 func test_assemble_single_returns_null_for_null_chunk() -> void:
 	var asm: LevelAssembler = LevelAssemblerScript.new()
 	var result: LevelAssembler.AssemblyResult = asm.assemble_single(null, Callable())
 	assert_null(result)
+	# GUT 9.6 (Godot 4.6) error-capture opt-in for the deliberate null-input path.
+	assert_push_error("chunk_def is null")
 
 
 func test_assemble_single_produces_root_node_and_bounds() -> void:

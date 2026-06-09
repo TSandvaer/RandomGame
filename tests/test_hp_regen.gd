@@ -184,12 +184,12 @@ func test_regen_active_changed_signal_fires_on_activation() -> void:
 
 	_pre_satisfy_regen_timers(p)
 	assert_true(p.is_regenerating, "regen activated")
-	assert_signal_emitted_with_parameters(
-		p,
-		"regen_active_changed",
-		[true],
-		"AC-5: regen_active_changed(true) must fire on activation"
-	)
+	# GUT 9.6 (Godot 4.6 migration) dropped the trailing message param from
+	# assert_signal_emitted_with_parameters — its signature is now
+	# (object, signal, params, index=-1). A 4th string arg lands in `index`
+	# and trips a String==int compare in signal_watcher. AC intent kept in a
+	# preceding comment instead. AC-5: regen_active_changed(true) on activation.
+	assert_signal_emitted_with_parameters(p, "regen_active_changed", [true])
 
 
 func test_regen_active_changed_signal_fires_on_damage_interrupt() -> void:
@@ -202,12 +202,10 @@ func test_regen_active_changed_signal_fires_on_damage_interrupt() -> void:
 	var src: Node = Node.new()
 	add_child_autofree(src)
 	p.take_damage(5, Vector2.ZERO, src)
-	assert_signal_emitted_with_parameters(
-		p,
-		"regen_active_changed",
-		[false],
-		"AC-5: regen_active_changed(false) must fire when damage interrupts regen"
-	)
+	# GUT 9.6 (Godot 4.6) signature change — see note on the activation test
+	# above; drop the trailing message arg. AC-5: regen_active_changed(false)
+	# must fire when damage interrupts regen.
+	assert_signal_emitted_with_parameters(p, "regen_active_changed", [false])
 
 
 func test_regen_not_active_at_full_hp() -> void:

@@ -61,6 +61,18 @@ on:
         required: false
         default: "embergrave-html5"
 
+# The "Resolve artifact run ID + expected SHA" step calls `gh api
+# repos/.../actions/runs/<id>` + `.../artifacts` to locate the
+# release-github.yml artifact. That requires `actions: read`. Without an
+# explicit permissions block the job inherits the restricted default token
+# and the resolve step fails with "gh: Resource not accessible by integration
+# (HTTP 403)" — which surfaced as a Playwright "failure" on every
+# pull_request-triggered run (pre-existing, NOT a Godot 4.6 issue; observed on
+# pre-migration SHAs too). Grant least-privilege read scopes. (86ca65gyv)
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   playwright-e2e:
     name: Playwright E2E — HTML5 artifact smoke

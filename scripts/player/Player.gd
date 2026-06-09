@@ -1705,7 +1705,16 @@ func _spawn_swing_wedge(
 	# the alpha-decay clock.
 	var tween: Tween = create_tween()
 	tween.tween_property(wedge, "modulate:a", 0.0, lifetime)
-	tween.tween_callback(Callable(self, "_on_wedge_finished").bind(wedge))
+	# NOTE(86ca65gyv / Godot 4.6): bind the wedge's INSTANCE ID (an int), never
+	# the node reference itself. The previous wedge is `queue_free`d the moment a
+	# chained attack spawns a replacement (see `_spawn_swing_wedge` above), so by
+	# the time this fade-tween's callback step runs the captured node may already
+	# be freed. On 4.3 binding the freed Object marshalled fine; Godot 4.6
+	# tightened both paths — a bound freed Object raises "Cannot convert argument
+	# 1 from Object to Object", and a lambda-captured freed node raises "Lambda
+	# capture ... was freed". An int instance-id has neither failure mode;
+	# `_on_wedge_finished` resolves it via `instance_from_id` and no-ops if gone.
+	tween.tween_callback(Callable(self, "_on_wedge_finished").bind(wedge.get_instance_id()))
 	_combat_trace(
 		"Player.swing_wedge",
 		(
@@ -1750,12 +1759,17 @@ func _play_swing_flash() -> void:
 ## Internal: tween-finished callback for the swing wedge. Frees the node and
 ## clears the active reference (only if this exact wedge is still the
 ## active one — a newer attack may have already replaced it).
-func _on_wedge_finished(wedge: ColorRect) -> void:
-	if not is_instance_valid(wedge):
+# Takes the wedge's INSTANCE ID (see `_spawn_swing_wedge` for the Godot 4.6
+# marshalling rationale). Resolves via `instance_from_id` and no-ops if the
+# wedge was already freed (the common chained-attack case).
+func _on_wedge_finished(wedge_id: int) -> void:
+	var obj: Object = instance_from_id(wedge_id)
+	var rect := obj as ColorRect
+	if not is_instance_valid(rect):
 		return
-	if _active_swing_wedge == wedge:
+	if _active_swing_wedge == rect:
 		_active_swing_wedge = null
-	wedge.queue_free()
+	rect.queue_free()
 
 
 # ---- Hitbox spawn -------------------------------------------------------

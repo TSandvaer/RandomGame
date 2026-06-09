@@ -134,3 +134,7 @@ func test_relaunch_with_corrupt_save_does_not_crash() -> void:
 	# expect the error and don't want it to noise up the run report.
 	var loaded: Dictionary = _save().load_game(TEST_SLOT)
 	assert_true(loaded.is_empty(), "corrupt save -> {} not crash; UI shows New Game")
+	# GUT 9.6 (Godot 4.6) error-capture opt-in: malformed JSON makes
+	# JSON.parse_string emit an engine error AND Save.load_game push_error.
+	assert_engine_error("error != Error::OK")
+	assert_push_error("JSON parse failed or root not Dictionary")

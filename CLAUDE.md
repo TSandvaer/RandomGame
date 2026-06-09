@@ -1,11 +1,11 @@
 # Embergrave / RandomGame
 
-A 2D action-RPG built in **Godot 4.3** with HTML5 export as the primary distribution surface. Working title surfaced in build artifacts is `embergrave`; the repo and ClickUp board still carry the legacy name `RandomGame`.
+A 2D action-RPG built in **Godot 4.6** with HTML5 export as the primary distribution surface. Working title surfaced in build artifacts is `embergrave`; the repo and ClickUp board still carry the legacy name `RandomGame`.
 
 ## Context
 
 - **Director / sole stakeholder ("Sponsor"):** Thomas. Single delegated decision-maker; orchestrator handles team coordination.
-- **Engine:** Godot 4.3 stable. HTML5 export uses `gl_compatibility` renderer (WebGL2). Desktop dev uses `forward_plus` / `mobile`.
+- **Engine:** Godot 4.6 stable (4.6.3.stable.official; migrated from 4.3 via 86ca65gyv 2026-06-08). HTML5 export uses `gl_compatibility` renderer (WebGL2). Desktop dev uses `forward_plus` / `mobile`.
 - **Distribution:** GitHub Actions release-build → HTML5 artifact (`embergrave-html5-<sha>.zip`) downloaded by Sponsor for soak. itch.io deploy planned post-M1.
 - **Codebase shape:** GDScript only; `scripts/`, `scenes/`, `resources/`, `assets/`, `tests/` (GUT). M1 RC is the current milestone target.
 
@@ -19,7 +19,7 @@ HTML5 / WebGL2 has several load-bearing divergences from desktop (HDR clamp, Pol
 
 ## Tech stack
 
-- **Godot 4.3** — game engine; `project.godot` configures both desktop and HTML5 renderers
+- **Godot 4.6** — game engine; `project.godot` configures both desktop and HTML5 renderers
 - **GUT** (Godot Unit Test) — unit + integration tests under `tests/`; CI runs via headless Godot in GitHub Actions
 - **GitHub Actions** — `ci.yml` (CI on every push/PR) + `release-github.yml` (HTML5 export on demand)
 - **ClickUp** — single source of truth for tickets; integrated via `mcp__clickup__*` tools

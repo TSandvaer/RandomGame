@@ -8,6 +8,8 @@ The Sponsor M2 RC soak meta-finding (2026-05-15) was that **3 of 4 user-visible 
 
 ### GUT side — `NoWarningGuard` + `WarningBus`
 
+> **86ca65gyv migration note (4.3 → 4.6, 2026-06-08):** the limitation below was true on 4.3 and motivated the WarningBus call-site-shim design, which stays in use. Separately, GUT 9.6.0 (the 4.6-compatible GUT pin) ADDED its own engine-error capture (`addons/gut/error_tracker.gd` + `gut_tracked_error.gd`) that auto-fails a test on any unexpected engine `push_error` / `ERROR:` during its body. This is INDEPENDENT of WarningBus and bit the migration: every deliberate-negative-path test (bad-JSON save load, invalid ZoneDef, null chunk) that correctly `push_error`s now trips GUT's capture and must opt-in via GUT's `assert_push_error` / error-expectation API (the GUT-side analog of `WarningBus.expect_warning`). Tracked in the migration breakage inventory.
+
 **The Godot 4.3 limitation that shapes this design.** Godot 4.3's GDScript API does NOT expose any way to install a custom logger or intercept `push_warning` / `push_error` calls from within the GDScript process. Verified surfaces:
 
 - `OS.add_logger()` — C++ only, no GDScript binding.
