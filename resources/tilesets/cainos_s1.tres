@@ -1,14 +1,14 @@
-[gd_resource type="TileSet" load_steps=13 format=3]
+[gd_resource type="TileSet" format=3]
 
-[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_tileset_grass.png" id="1_1ddef"]
-[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_tileset_stone_ground.png" id="2_6ayjy"]
-[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_tileset_wall.png" id="3_7gwdq"]
-[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_props.png" id="4_j2fc8"]
-[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_plant.png" id="5_47q8g"]
-[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_struct.png" id="6_gs5xq"]
+[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_tileset_grass.png" id="1_8i5vc"]
+[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_tileset_stone_ground.png" id="2_2tbir"]
+[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_tileset_wall.png" id="3_vgh27"]
+[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_props.png" id="4_k8so8"]
+[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_plant.png" id="5_duty3"]
+[ext_resource type="Texture2D" path="res://assets/tilesets/cainos/tx_struct.png" id="6_ebo0s"]
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_obq7x"]
-texture = ExtResource("1_1ddef")
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_6n814"]
+texture = ExtResource("1_8i5vc")
 texture_region_size = Vector2i(32, 32)
 0:0/0 = 0
 0:0/0/terrain_set = 0
@@ -447,8 +447,8 @@ texture_region_size = Vector2i(32, 32)
 6:7/0 = 0
 7:7/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_p8hkn"]
-texture = ExtResource("2_6ayjy")
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_krice"]
+texture = ExtResource("2_2tbir")
 texture_region_size = Vector2i(32, 32)
 0:0/0 = 0
 1:0/0 = 0
@@ -501,8 +501,8 @@ texture_region_size = Vector2i(32, 32)
 6:7/0 = 0
 7:7/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_qo7j4"]
-texture = ExtResource("3_7gwdq")
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_nmk26"]
+texture = ExtResource("3_vgh27")
 texture_region_size = Vector2i(32, 32)
 1:1/0 = 0
 2:1/0 = 0
@@ -566,8 +566,8 @@ texture_region_size = Vector2i(32, 32)
 4:10/0 = 0
 5:10/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_qf5a6"]
-texture = ExtResource("4_j2fc8")
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ukwxm"]
+texture = ExtResource("4_k8so8")
 texture_region_size = Vector2i(32, 32)
 1:0/0 = 0
 5:0/0 = 0
@@ -667,8 +667,8 @@ texture_region_size = Vector2i(32, 32)
 8:15/0 = 0
 9:15/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_ny1hs"]
-texture = ExtResource("5_47q8g")
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_mduxl"]
+texture = ExtResource("5_duty3")
 texture_region_size = Vector2i(32, 32)
 1:0/0 = 0
 2:0/0 = 0
@@ -740,8 +740,8 @@ texture_region_size = Vector2i(32, 32)
 2:15/0 = 0
 3:15/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_o7n0c"]
-texture = ExtResource("6_gs5xq")
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_lcxsw"]
+texture = ExtResource("6_ebo0s")
 texture_region_size = Vector2i(32, 32)
 12:0/0 = 0
 13:0/0 = 0
@@ -855,9 +855,9 @@ terrain_set_0/terrain_0/name = "grass"
 terrain_set_0/terrain_0/color = Color(0.45, 0.46, 0.11, 1)
 terrain_set_0/terrain_1/name = "stone_path"
 terrain_set_0/terrain_1/color = Color(0.5, 0.49, 0.45, 1)
-sources/0 = SubResource("TileSetAtlasSource_obq7x")
-sources/1 = SubResource("TileSetAtlasSource_p8hkn")
-sources/2 = SubResource("TileSetAtlasSource_qo7j4")
-sources/3 = SubResource("TileSetAtlasSource_qf5a6")
-sources/4 = SubResource("TileSetAtlasSource_ny1hs")
-sources/5 = SubResource("TileSetAtlasSource_o7n0c")
+sources/0 = SubResource("TileSetAtlasSource_6n814")
+sources/1 = SubResource("TileSetAtlasSource_krice")
+sources/2 = SubResource("TileSetAtlasSource_nmk26")
+sources/3 = SubResource("TileSetAtlasSource_ukwxm")
+sources/4 = SubResource("TileSetAtlasSource_mduxl")
+sources/5 = SubResource("TileSetAtlasSource_lcxsw")

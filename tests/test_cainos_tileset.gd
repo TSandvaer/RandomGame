@@ -33,33 +33,17 @@ const EDGE_CELL := Vector2i(2, 4)
 var _warn_guard: NoWarningGuard
 
 
-# TODO(86ca65gyv-D / Godot 4.6): cainos corner-terrain rebuild.
-# This whole script is SKIPPED under the 4.3->4.6 migration. The Cainos
-# corner-Wang TileSet (resources/tilesets/cainos_s1.tres, terrain_set_0/mode=1
-# = TERRAIN_MODE_MATCH_CORNERS) was AUTHORED UNDER 4.3. When the
-# 4.3-serialized authoring scene (s1_yard_authored.tscn) is instantiated under
-# 4.6, its painted terrain cells get re-validated against 4.6's stricter
-# `is_valid_terrain_peering_bit` check, which (a) spams engine errors that GUT
-# 9.6 fails on, and (b) SIGSEGVs (signal 11) the headless runner when this file
-# runs inside the full 166-file suite.
-#
-# ROOT CAUSE (empirically determined, NOT a 4.6 engine bug): a freshly-built
-# corner-mode TerrainSet + corner peering bits + painted cell built via the 4.6
-# API produces ZERO peering-bit errors (verified with a standalone 4.6 probe).
-# So the defect is the 4.3-authored .tres/.tscn peering-bit layout being
-# malformed for 4.6 — a Drew .tres/.tscn REBUILD (re-paint the terrain in the
-# 4.6 editor / regenerate peering bits), NOT an autotile-workflow rethink.
-#
-# Deferred per the orchestrator+Sponsor scope decision. Un-skip when the
-# rebuilt 4.6-native cainos_s1.tres + s1_yard_authored.tscn land. The scene is
-# NON-PRODUCTION (Sponsor's hand-authoring "paint your yard, press F5" scene;
-# not referenced from Main.tscn or any production script), so the game ships
-# unaffected in the interim.
-func should_skip_script():
-	return (
-		"86ca65gyv-D: Cainos corner-terrain rebuild deferred — 4.3-authored "
-		+ "peering bits trip 4.6 is_valid_terrain_peering_bit (+ headless SIGSEGV)"
-	)
+# 4.6 rebuild (ticket 86ca67aj0): the prior `should_skip_script()` defer
+# (TODO 86ca65gyv-D) is REMOVED — cainos_s1.tres was regenerated via the 4.6
+# TileSet/TileData API + ResourceSaver on Godot 4.6.3, so the corner peering
+# bits now serialize 4.6-correctly. Empirically (standalone 4.6.3 probe):
+# loading the rebuilt .tres AND instantiating s1_yard_authored.tscn (280
+# painted cells) emit ZERO `is_valid_terrain_peering_bit` errors and no
+# SIGSEGV. The ONE caveat that shaped the tests below: reading a corner
+# peering bit on a tile whose `terrain_set == -1` (the excluded notch cells
+# (6,7)/(7,7)) DOES raise `is_valid_terrain_peering_bit` on 4.6 — so any loop
+# over ALL tiles must guard `terrain_set >= 0` before reading corners (see
+# `test_some_transition_tiles_exist`).
 
 
 func before_each() -> void:
@@ -175,10 +159,11 @@ func test_some_transition_tiles_exist() -> void:
 		var data := src.get_tile_data(coord, 0)
 		if data == null:
 			continue
-		var c := {
-			TileSet.CELL_NEIGHBOR_TOP_LEFT_CORNER: 0,
-			TileSet.CELL_NEIGHBOR_TOP_RIGHT_CORNER: 0,
-		}
+		# Guard: on 4.6, reading a corner peering bit on a tile NOT in a
+		# terrain set (terrain_set == -1, e.g. the excluded notch cells
+		# (6,7)/(7,7)) raises `is_valid_terrain_peering_bit`. Skip those.
+		if data.terrain_set < 0:
+			continue
 		var tl := data.get_terrain_peering_bit(TileSet.CELL_NEIGHBOR_TOP_LEFT_CORNER)
 		var tr := data.get_terrain_peering_bit(TileSet.CELL_NEIGHBOR_TOP_RIGHT_CORNER)
 		var bl := data.get_terrain_peering_bit(TileSet.CELL_NEIGHBOR_BOTTOM_LEFT_CORNER)
