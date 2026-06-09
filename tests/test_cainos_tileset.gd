@@ -185,43 +185,67 @@ func test_authoring_scene_loads() -> void:
 	assert_not_null(ps, "s1_yard_authored.tscn loads as a PackedScene")
 
 
+# --- Scene-instantiating tests: IMMEDIATE controlled free, NOT GUT batch-autofree.
+#
+# Full-suite SIGSEGV avoidance (ticket 86ca67aj0): the cainos test runs LAST-ish
+# in the 166-file suite. Under accumulated RenderingServer/physics state, leaving
+# 5 live S1YardAuthored instances (each: Player + AnimatedSprite2D +
+# CollisionShape2D + 4 cainos-TileSet TileMapLayers) alive until GUT's end-of-
+# script `add_child_autofree` batch-sweep crashes the headless runner (signal 11
+# on free; the original SIGSEGV this ticket fixes). Empirically, the tileset +
+# scene are clean in isolation (standalone 4.6.3 probe: 0 peering-bit errors), so
+# the crash is the simultaneous-batch-free surface, not the resource itself.
+# Bounding to ONE live instance at a time + an explicit `free()` + frame-drain
+# inside each test removes that surface. `await get_tree().process_frame` after
+# free lets the node detach from the physics/render servers cleanly before the
+# next test instantiates.
+
+func _free_drain(root: Node) -> void:
+	root.free()
+	await get_tree().process_frame
+
+
 func test_authoring_scene_instantiates_with_layers() -> void:
 	var ps := load(SCENE_PATH) as PackedScene
 	var root := ps.instantiate()
-	add_child_autofree(root)
+	add_child(root)
 	assert_not_null(root.get_node_or_null("Ground"), "Ground TileMapLayer present")
 	assert_not_null(root.get_node_or_null("StoneGround"), "StoneGround layer present")
 	assert_not_null(root.get_node_or_null("Walls"), "Walls layer present")
 	assert_not_null(root.get_node_or_null("Props"), "Props container present")
 	assert_not_null(root.get_node_or_null("Player"), "Player instance present")
+	await _free_drain(root)
 
 
 func test_ground_layer_has_cainos_tileset() -> void:
 	var ps := load(SCENE_PATH) as PackedScene
 	var root := ps.instantiate()
-	add_child_autofree(root)
+	add_child(root)
 	var ground := root.get_node("Ground") as TileMapLayer
 	assert_not_null(ground.tile_set, "Ground has a TileSet assigned")
 	assert_eq(ground.tile_set.get_source_count(), 6, "Ground uses the 6-source Cainos set")
+	await _free_drain(root)
 
 
 func test_starter_ground_patch_is_painted() -> void:
 	# Proves the scene renders Cainos tiles the moment it opens (not a blank grid).
 	var ps := load(SCENE_PATH) as PackedScene
 	var root := ps.instantiate()
-	add_child_autofree(root)
+	add_child(root)
 	var ground := root.get_node("Ground") as TileMapLayer
 	assert_gt(ground.get_used_cells().size(), 100, "starter ground patch is painted")
+	await _free_drain(root)
 
 
 func test_prop_palette_scene_loads() -> void:
 	var ps := load(PALETTE_PATH) as PackedScene
 	assert_not_null(ps, "s1_prop_palette.tscn loads")
 	var root := ps.instantiate()
-	add_child_autofree(root)
+	add_child(root)
 	# Carried-forward decoration props present as copyable Sprite2D nodes.
 	assert_not_null(root.get_node_or_null("Pillar"), "Pillar prop sprite present")
 	assert_not_null(root.get_node_or_null("BrazierLit"), "BrazierLit prop sprite present")
+	await _free_drain(root)
 
 
 func test_palette_has_all_five_building_landmarks() -> void:
@@ -229,7 +253,7 @@ func test_palette_has_all_five_building_landmarks() -> void:
 	# smaller s1_cloister decoration props.
 	var ps := load(PALETTE_PATH) as PackedScene
 	var root := ps.instantiate()
-	add_child_autofree(root)
+	add_child(root)
 	for node_name in [
 		"ChapelBelltower", "CloisterCentral", "DormitoryRuinLeft",
 		"DormitoryRuinRight", "OutbuildingFar",
@@ -238,6 +262,7 @@ func test_palette_has_all_five_building_landmarks() -> void:
 		assert_not_null(spr, "%s building sprite present in palette" % node_name)
 		if spr != null:
 			assert_not_null(spr.texture, "%s has a texture assigned" % node_name)
+	await _free_drain(root)
 
 
 func test_notched_grass_cells_excluded_from_terrain() -> void:
