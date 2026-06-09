@@ -122,3 +122,28 @@ Two ways:
 If you want more terrains (e.g. a dirt↔grass blend, water edges), or more props
 pre-sliced into the palette, just ask — the team adds them to the tileset/palette
 and you keep painting.
+
+---
+
+## Maintenance note — Godot version + the corner terrain (team)
+
+`cainos_s1.tres` is a **generated** resource — do NOT hand-edit it. The corner
+peering bits (the grass↔stone-path auto-blend) silently drop or go malformed if
+the `.tres` is hand-authored, and the serialization is **engine-version-sensitive**:
+a tileset built under one Godot version can trip the next version's stricter
+`is_valid_terrain_peering_bit` validation.
+
+It was regenerated for **Godot 4.6.3** (ticket 86ca67aj0; the original 4.3 build,
+#432, was malformed for 4.6's terrain system and SIGSEGV'd the headless suite).
+If a future engine bump breaks the autotile again, the fix is to **re-run the
+builder on the new engine**, not to edit the `.tres`:
+
+```
+<godot-4.x-binary> --headless --path . --script res://tools/build_cainos_tileset.gd
+```
+
+The corner-quadrant classification lives in `tools/build_cainos_tileset.gd`
+(`PATH_CORNERS`) + `tools/_cainos_corner_map.md`; `tests/test_cainos_tileset.gd`
+pins the peering-bit count + the scene-opens gate. Note: the excluded notch cells
+(6,7)/(7,7) carry `terrain_set == -1` — any code that loops all tiles reading
+corner bits must guard `terrain_set >= 0` first or 4.6 raises a peering-bit error.
