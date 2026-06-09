@@ -185,75 +185,72 @@ func test_authoring_scene_loads() -> void:
 	assert_not_null(ps, "s1_yard_authored.tscn loads as a PackedScene")
 
 
-# --- Scene-instantiating tests: IMMEDIATE controlled free, NOT GUT batch-autofree.
+# --- Scene-structure tests: inspect WITHOUT adding to the SceneTree.
 #
-# Full-suite SIGSEGV avoidance (ticket 86ca67aj0): the cainos test runs LAST-ish
-# in the 166-file suite. Under accumulated RenderingServer/physics state, leaving
-# 5 live S1YardAuthored instances (each: Player + AnimatedSprite2D +
-# CollisionShape2D + 4 cainos-TileSet TileMapLayers) alive until GUT's end-of-
-# script `add_child_autofree` batch-sweep crashes the headless runner (signal 11
-# on free; the original SIGSEGV this ticket fixes). Empirically, the tileset +
-# scene are clean in isolation (standalone 4.6.3 probe: 0 peering-bit errors), so
-# the crash is the simultaneous-batch-free surface, not the resource itself.
-# Bounding to ONE live instance at a time + an explicit `free()` + frame-drain
-# inside each test removes that surface. `await get_tree().process_frame` after
-# free lets the node detach from the physics/render servers cleanly before the
-# next test instantiates.
-
-func _free_drain(root: Node) -> void:
-	root.free()
-	await get_tree().process_frame
-
+# Full-suite SIGSEGV root cause (ticket 86ca67aj0, empirically pinned over TWO CI
+# runs): adding S1YardAuthored to the LIVE SceneTree and then freeing it crashes
+# the headless runner (signal 11) — but ONLY under the full 166-file suite's
+# accumulated RenderingServer/physics state. In isolation it is clean (standalone
+# 4.6.3 probe: instantiate-into-tree + free survives, 0 peering-bit errors). CI
+# run aa096b3 hung 7.5min after the cainos test's GUT batch-autofree teardown of 5
+# in-tree instances; run 9848717 (immediate-free, one at a time) STILL hung at the
+# FIRST in-tree free (`test_authoring_scene_instantiates_with_layers` printed
+# `[S1YardAuthored] ready` then never returned). So the crash surface is
+# "free a live-in-tree S1YardAuthored under full-suite state", NOT the count of
+# instances and NOT the tileset resource.
+#
+# Fix: verify scene STRUCTURE on a `PackedScene.instantiate()` that is NEVER added
+# to the tree. No `_ready` runs (no Camera2D add, no physics/render registration),
+# so `free()` of a never-in-tree node has no server-detach surface to crash on
+# (standalone 4.6.3 probe: 0 errors, clean free). This is sufficient for the
+# regression pin (node topology + TileSet wiring + painted-cell count). The
+# "scene actually RUNS with _ready + renders the autotile" gate is covered
+# independently by the real-GPU (opengl3) in-game capture in the PR's Self-Test
+# Report (team/drew-dev/_captures/cainos_46_autotile.png) — F6 launch verified
+# there, not via an in-suite live instantiation that destabilizes the runner.
 
 func test_authoring_scene_instantiates_with_layers() -> void:
-	var ps := load(SCENE_PATH) as PackedScene
-	var root := ps.instantiate()
-	add_child(root)
+	var root := (load(SCENE_PATH) as PackedScene).instantiate()
 	assert_not_null(root.get_node_or_null("Ground"), "Ground TileMapLayer present")
 	assert_not_null(root.get_node_or_null("StoneGround"), "StoneGround layer present")
 	assert_not_null(root.get_node_or_null("Walls"), "Walls layer present")
 	assert_not_null(root.get_node_or_null("Props"), "Props container present")
 	assert_not_null(root.get_node_or_null("Player"), "Player instance present")
-	await _free_drain(root)
+	root.free()
 
 
 func test_ground_layer_has_cainos_tileset() -> void:
-	var ps := load(SCENE_PATH) as PackedScene
-	var root := ps.instantiate()
-	add_child(root)
+	var root := (load(SCENE_PATH) as PackedScene).instantiate()
 	var ground := root.get_node("Ground") as TileMapLayer
 	assert_not_null(ground.tile_set, "Ground has a TileSet assigned")
 	assert_eq(ground.tile_set.get_source_count(), 6, "Ground uses the 6-source Cainos set")
-	await _free_drain(root)
+	root.free()
 
 
 func test_starter_ground_patch_is_painted() -> void:
-	# Proves the scene renders Cainos tiles the moment it opens (not a blank grid).
-	var ps := load(SCENE_PATH) as PackedScene
-	var root := ps.instantiate()
-	add_child(root)
+	# Proves the scene carries painted Cainos cells from the moment it loads
+	# (not a blank grid). Read from the never-in-tree instance — get_used_cells
+	# reads the TileMapLayer's cell data, which is populated at instantiate time.
+	var root := (load(SCENE_PATH) as PackedScene).instantiate()
 	var ground := root.get_node("Ground") as TileMapLayer
 	assert_gt(ground.get_used_cells().size(), 100, "starter ground patch is painted")
-	await _free_drain(root)
+	root.free()
 
 
 func test_prop_palette_scene_loads() -> void:
 	var ps := load(PALETTE_PATH) as PackedScene
 	assert_not_null(ps, "s1_prop_palette.tscn loads")
 	var root := ps.instantiate()
-	add_child(root)
 	# Carried-forward decoration props present as copyable Sprite2D nodes.
 	assert_not_null(root.get_node_or_null("Pillar"), "Pillar prop sprite present")
 	assert_not_null(root.get_node_or_null("BrazierLit"), "BrazierLit prop sprite present")
-	await _free_drain(root)
+	root.free()
 
 
 func test_palette_has_all_five_building_landmarks() -> void:
 	# The 5 REAL S1 building landmarks (assets/props/s1_yard) — distinct from the
 	# smaller s1_cloister decoration props.
-	var ps := load(PALETTE_PATH) as PackedScene
-	var root := ps.instantiate()
-	add_child(root)
+	var root := (load(PALETTE_PATH) as PackedScene).instantiate()
 	for node_name in [
 		"ChapelBelltower", "CloisterCentral", "DormitoryRuinLeft",
 		"DormitoryRuinRight", "OutbuildingFar",
@@ -262,7 +259,7 @@ func test_palette_has_all_five_building_landmarks() -> void:
 		assert_not_null(spr, "%s building sprite present in palette" % node_name)
 		if spr != null:
 			assert_not_null(spr.texture, "%s has a texture assigned" % node_name)
-	await _free_drain(root)
+	root.free()
 
 
 func test_notched_grass_cells_excluded_from_terrain() -> void:
