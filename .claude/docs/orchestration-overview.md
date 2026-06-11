@@ -18,7 +18,7 @@ What this doc covers: how Claude Code sessions on Embergrave / RandomGame are st
 
 - **Sponsor talks to the orchestrator only.** The orchestrator routes work to the named-role agents.
 - **Sponsor delegates all team decisions** — only signs off big deliveries (M1 RC, etc.). Orchestrator makes recommended calls; Sponsor redirects when they disagree. See memory: `sponsor-decision-delegation.md`.
-- **The orchestrator never codes** — does not read source, grep, trace bugs, or edit code. Dispatches agents from symptoms instead. See memory: `orchestrator-never-codes.md`.
+- **The orchestrator never codes** — does not read source, grep, trace bugs, or edit code. Dispatches agents from symptoms instead. See memory: `orchestrator-never-codes.md`. **Exception: R&D lane** — see the "R&D lane" section below for the narrow class of orchestrator-direct work that is legitimate and its mandatory harvest gate.
 - **Always parallel dispatch** — every tick has 3-5 agents in flight; tickets aren't progress, dispatches are. See memory: `always-parallel-dispatch.md`.
 
 ## Named-agent roster
@@ -209,6 +209,50 @@ Get the artifact ID via `gh api repos/.../actions/runs/<id>/artifacts`. See memo
 ## Sub-agent doc-reading
 
 **If you are a sub-agent spawned via the Agent tool, you do NOT inherit the SessionStart auto-load.** Before starting any work, Read every `.claude/docs/*.md` file (in parallel). These are the canonical project-context briefs the main session sees automatically; without them you are working blind on combat architecture, HTML5 export quirks, and orchestration conventions. Sub-agents should also include a "Non-obvious findings" section in their final report so the main session can route insights into the docs via the maintain-docs Stop hook.
+
+## R&D lane
+
+This section codifies conventions that have been practiced but never documented. Source: R&D investigation 2026-06-11 (3-agent investigation of R&D capability gaps).
+
+### What the R&D lane is
+
+R&D bursts — rapid art generation, procedural math experiments, headless engine wiring, proof-of-concept scenes — have historically run orchestrator-direct. The "orchestrator never codes" rule was never formally adjusted for this, creating ambiguity and, more importantly, a recurring absorption gap: R&D generation ran fine; R&D *absorption* (peer review, harvest PRs, productionization tickets) did not. The iso sprint of 2026-06-08..11 is the clearest example: PRs #421/#423 + ~405 untracked entries (scripts, atlases, scenes, docs) with zero peer review of orchestrator-authored code and zero productionization tickets filed.
+
+### Legitimate orchestrator-direct R&D
+
+Two classes are legitimately orchestrator-direct. Everything else dispatches to Devon or Drew.
+
+**Class A — MCP-bound generation.** PixelLab (`create_character`, `animate_character`, `create_isometric_tile`, etc.) and pixel-mcp tools are user-scope MCP servers that do not inherit to sub-agents (memory: `sub-agent-mcp-tool-surface-scope`). Generation against these tools runs in the main orchestrator session. Integration of generated assets into the codebase (wiring `.tres` files, writing GDScript) dispatches to Devon or Drew.
+
+**Class B — Sponsor-interactive style/feel iteration.** When Sponsor is live and iterating on visual style or feel in real time — reviewing a generated sprite, asking for a palette tweak, comparing two tile variants — the latency of a sub-agent dispatch cycle (5-15 min per round) makes the loop unworkable. Orchestrator handles the live interactive slice; the resulting implementation dispatches to the team. The 2026-06-08 Sponsor review session (8 style-bounce rounds in one day) is the canonical example of this class.
+
+### MCP-free R&D dispatches to Devon or Drew
+
+Procedural math (numpy/PIL tile pipelines), headless Godot engine wiring, `.tscn` scene authoring, GDScript tool scripts, atlas generation logic — none of these require MCP tools and all are dispatchable. The ~60-70% of the 2026-06-08..11 iso sprint work that fell into this class should have dispatched to Devon (engine/headless surface) or Drew (game-side/content surface) per normal routing. Orchestrator running it directly was a process error, not a deliberate policy.
+
+**Default routing:**
+- Engine wiring, headless tooling, `_check_*.gd` scripts → Devon
+- Scene authoring, level content, game-side scripts → Drew
+
+### Harvest gate (mandatory after every R&D burst)
+
+Every R&D burst — however small — closes with all three of the following. Skipping any one is a process error.
+
+1. **Harvest PR.** An orchestrator-authored PR committing all generated artifacts and docs: scripts, atlases, `.tres` files, `.tscn` scenes, `.md` docs, and any `.claude/docs/` updates. The PR body states what each artifact is and where it came from (generation tool + parameters for art; authoring notes for code). No artifacts remain untracked after the burst.
+
+2. **Peer review of orchestrator-authored code.** Any GDScript, `.tscn`, or tool script authored by the orchestrator during the burst requires a Devon or Drew peer review before it enters `main`. Surface routing follows the `tess-cant-self-qa-peer-review` convention: engine/harness surface → Devon; game-side surface → Drew. Art assets (sprites, atlases, tilesets) do not require code peer review but must still land via the harvest PR.
+
+3. **Productionization tickets.** Priya files tickets for anything the R&D output enables but does not complete: wiring into the production play loop, integration tests, UX polish, Sponsor soak gates. These tickets are dispatch-ready at filing — not placeholders. The iso sprint productionization tickets (H1–H4 below, ENTRY 2026-06-11-001 through 2026-06-11-004) are the first instance of this rule being applied retroactively.
+
+### Precedent trail
+
+This rule is codification, not invention. All three precedents ran orchestrator-direct under the "R&D is different" implicit understanding; this section makes the understanding explicit and adds the harvest gate that was missing.
+
+| Precedent | Date | What ran orch-direct | Absorption gap |
+|---|---|---|---|
+| Camera-scroll spike (PR #314) | 2026-05-22 | CameraDirector API + spike scene | Spike doc written; W2 retrofit ticket filed. Harvest gate close-to-met (spike was scoped for absorption from the start) |
+| Procgen FloorAssembler spike (PR #328) | 2026-05-23 | FloorAssembler math + AssembledFloor shape | Spike doc written; W2 impl tickets filed. Same pattern — intentionally spike-shaped |
+| Iso sprint (PRs #421, #423 + untracked) | 2026-06-08..11 | numpy/PIL tile pipelines, headless engine wiring, 11 building scenes, iso proof atlases, godot-headless-tooling.md, art-direction.md, pixellab-pipeline.md delta | ~405 untracked entries; zero peer review of orch-authored code; zero productionization tickets; RESUME.md stale. The gap this rule closes. |
 
 ## Cross-references
 

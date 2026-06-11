@@ -643,3 +643,11 @@ Source: PR #339 (`pm(si8-lock): W2 unblock — procgen shape locked to (b) + 3 t
 - **Target:** W2-T4 — feat(save): world_seed save-write + v5 additive field
 - **Source:** PR #339 ENTRY queue (Priya-authored, Sponsor SI-8 (b) lock fidelity)
 - **Flushed:** 2026-05-23T~10:55Z (orchestrator main session — `mcp__clickup__update_task` × 3 in parallel)
+
+---
+
+## Flushed 2026-06-11 (orchestrator, R&D-lane harvest tickets)
+- ENTRY 2026-06-11-001 → 86ca7ugce (H1 iso ground pipeline harvest; scope paths corrected at flush per Drew PR #435 review: atlases live in `assets/iso_proof/` directly, tres at `resources/tilesets/iso_proof_tiles.tres`)
+- ENTRY 2026-06-11-002 → 86ca7ugfr (H2 iso building kit harvest)
+- ENTRY 2026-06-11-003 → 86ca7ugkj (H3 iso sprint docs harvest)
+- ENTRY 2026-06-11-004 → 86ca7ugrq (H4 RESUME.md refresh)
