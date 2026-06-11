@@ -8,7 +8,24 @@
       "Edit(.claude/agents/*.md)",
       "mcp__clickup__update_task",
       "mcp__clickup__create_task",
-      "mcp__clickup__create_task_comment"
+      "mcp__clickup__create_task_comment",
+      "Bash(git status)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git worktree:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr review:*)",
+      "Bash(gh pr comment:*)",
+      "mcp__clickup__*"
     ]
   },
   "hooks": {
@@ -55,6 +72,14 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/agent-liveness-stop.sh\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch-sentinel-stop.sh\""
           }
         ]
       }
