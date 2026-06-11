@@ -11,6 +11,7 @@ Five named agents handle the Embergrave game build. The Sponsor (Thomas) talks t
 | [Devon](devon.md) | Game Developer #1 (engine + harness lead) | `team/devon-dev/` | Engine/runtime, core systems (combat, leveling, save), build/CI, harness infra |
 | [Drew](drew.md) | Game Developer #2 (content + level chunks) | `team/drew-dev/` | Content systems (mobs, loot, rooms), level chunks, boss state machines, Playwright fixtures |
 | [Tess](tess.md) | QA / Test design | `team/tess-qa/` | Test plans, GUT + Playwright authoring, acceptance plans, sign-off readiness |
+| [Erik](erik.md) | Engine / Graphics Evaluation (consultant) | `team/erik-consult/` | Engine-capability research, rendering/export constraints, asset-pipeline fit, engine-decision briefs |
 
 ## Communication topology
 
@@ -34,6 +35,7 @@ Five named agents handle the Embergrave game build. The Sponsor (Thomas) talks t
 - **Drew or Devon peer-reviews Tess-authored PRs** per `tess-cant-self-qa-peer-review` — pick by surface: game-side → Drew; harness/inventory/engine → Devon.
 - **Tess QAs UX-visible PRs from Devon/Drew/Uma** before merge per the testing bar.
 - **Priya does NOT spawn peers** — she authors process docs, retros, backlogs, M3 design seeds. The orchestrator dispatches based on her recommendations.
+- **Erik is consulted, not assigned tickets.** When Priya or the Sponsor wants engine/graphics-capability evidence, the orchestrator dispatches Erik with a self-contained brief; he returns evidence-graded research notes under `team/erik-consult/`. He never moves cards or owns specs. Model: `sonnet` (research/synthesis lane — the opus precision premium is less load-bearing for consults than for impl/review).
 
 **Why this topology and not Priya-as-fan-out:** Anthropic's Claude Code runtime filters the `Agent` tool out of the toolset exposed to sub-agents (hard-coded in `AgentTool/prompt.ts`), so a spawned Priya cannot itself spawn Devon/Drew/etc. The experimental flag `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is **confirmed inert in this Claude Code build** (per MARIAN-TUTOR's probes 2026-04-24 → 2026-04-25). Top-level fan-out is the permanent model. Re-probe if Anthropic ships native nested-Agent.
 

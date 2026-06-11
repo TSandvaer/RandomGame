@@ -16,6 +16,22 @@ Every dispatch to a named persona (Priya / Uma / Devon / Drew / Tess) via the `A
 
 ---
 
+## Wave decomposition — track-based parallel-author routing (Priya-owned)
+
+When Priya decomposes a wave (or any multi-PR batch) into tickets, every ticket carries an `assignee_recommendation` driven by the track-based routing rule below. Mitigates author-concentration (MarianLearning Pattern H: one dev authored 6/11 PRs across two waves because routing was implicit).
+
+**Routing rule (defaults — Priya adjusts on persona-load):**
+
+| Track | Default assignee | Examples |
+|---|---|---|
+| engine / save / build / CI / harness infra | **Devon** | autoloads, save schema, `.github/workflows/`, Playwright harness, GUT infra |
+| content / mobs / loot / level chunks / visual impl | **Drew** | mob state machines, level chunks, tweens/modulate, room gates, prop integration |
+| test design / e2e specs / acceptance plans | **Tess** | GUT suites, Playwright specs, acceptance plans, soak bug-bashes |
+
+**Decomposition output shape** — every ticket row in the wave plan carries: Ticket ID / Title / Work-type tag / assignee_recommendation / Files-in-play.
+
+**Parallel-fire discipline (mandatory):** Priya files ALL tickets for the wave in ONE response (parallel `mcp__clickup__create_task` calls), then surfaces the list. The orchestrator dispatches the workers **in the same orchestrator round** — multiple `Agent` spawns per response, not serial rounds. (Consistent with memory `parallel-dispatch-ticket-race`: Priya files first, workers dispatch with pre-filed IDs inline.)
+
 ## Scoped contract (mandatory in every dispatch)
 
 Pin the agent's allowed file scope + role boundary so they don't blind-resolve into another agent's lane on conflict. Block goes near the top of the brief, after the task-specific summary and before the worktree state.
@@ -44,6 +60,7 @@ Replace placeholders with the task-specific scope. Skip the block only for trivi
 - Push by refspec: `git push origin <your-role>/<task-name>:<your-role>/<task-name>`.
 - The `git checkout -B` always force-creates from `origin/main`. Don't try to recover prior in-flight work — every dispatch starts fresh.
 - Other agents may be in flight in parallel; their worktrees + file scopes are documented in your task-specific brief above. No file overlap is expected; if you find one, surface it (don't blind-resolve).
+- **Reviewer-side checkout pattern** (when reviewing a PR whose branch is still claimed by the author's worktree): use `git fetch origin pull/<n>/head:pr-<n>-review && git checkout pr-<n>-review` OR `git checkout --detach origin/<author-branch>`. Do NOT use `gh pr checkout` if the author's worktree is still bound to the head ref — it yanks the branch out from under the author (worktree-concurrency race).
 ```
 
 Replace `<your-role>` with the literal role name (priya / uma / devon / drew / tess) and `<task-name>` with a kebab-case task slug.
@@ -279,6 +296,8 @@ Detailed content goes in artifacts the orchestrator can read on-demand, NOT in t
 **Return timing — exit after report, do NOT wait for merge.** Submit your final report at `ready for qa test` (PR open + Self-Test Report posted + ClickUp flipped) and EXIT. Do NOT wait for Tess QA or orchestrator merge before reporting. The merge + ClickUp `→ complete` flip is the orchestrator's lane (per `clickup-flip-paired-with-merge`). Waiting around for merge wastes agent cycles AND delays the orchestrator's visibility into your readiness. If Tess REQUEST CHANGES, the orchestrator re-dispatches you fresh with the rework brief — that's the contract. **Concrete tell:** if your final report describes events that happened AFTER your work was done (merge, Tess approval, ClickUp `→ complete` flip), you waited too long. Submit at PR-open + ClickUp `ready for qa test` and exit.
 
 **Orchestrator-side enforcement of claim-fidelity.** If your final report makes a state claim ("CI passes", "GUT clean", "Soak fine") without the cite-able evidence shape above, the orchestrator will SendMessage-bounce-back asking for the cite BEFORE processing the report or dispatching the next agent. Don't re-do the work — just paste the evidence. Catching the optimism at report time is cheaper than catching it downstream.
+
+**Use `gh pr create --body-file <path>` for PR bodies longer than ~5 lines** (avoids the 600s-stream-watchdog kill observed on long heredoc/inline `--body` patterns in sibling projects). Long review comments already use `gh pr comment --body-file` — same rationale.
 ```
 
 **Backstory:** the M2 W3 mid-retro investigation (2026-05-15) found that verbose sub-agent final reports flooding the orchestrator's main conversation window was the dominant context-bloat surface. The M3 retrospective (2026-05-22, PR #315) added the claim-fidelity + return-timing amendments after empirical findings — PR #314's "CI in flight" claim when CI had failed 2 min earlier (P2 pattern), Drew's PR #312 agent waiting 42 min for merge before reporting. Tight orchestrator-bound reports + cite-able evidence + return-at-ready-for-qa is the discipline that closes that gap. See orchestrator memory `tightened-final-report-contract.md` (with 2026-05-22 amendments) + `agent-lifecycle-vs-sendmessage.md`. Pair with the persona-file references in `.claude/agents/{role}.md`.
@@ -326,6 +345,10 @@ The harness denies self-merge of one's own PR via `gh pr review --approve` (retu
 - For test PRs Tess approves: deliver approval via `gh pr comment <PR#> --body "LGTM, signing off"` then merge via `gh api PUT repos/.../pulls/<PR#>/merge -f merge_method=squash`. Tess has authority for this on test PRs.
 - For other roles: don't try to self-merge. Open the PR and stop.
 
+## Work-type tag (ticket-level, Priya applies at creation)
+
+Every ticket carries a free-text tag from `impl` / `spec` / `investigation` / `test` / `chore` / `cleanup`. The tag drives which acceptance gates apply: **impl** needs a green paired test; **spec** needs PR-opens-to-template; **investigation** needs question-answered-in-PR-body; **test** needs a failing-first contract; **chore** needs no behavior change; **cleanup** needs comment-only or follow-up reframe. Without the tag, the testing-bar rubric mis-scores spec/investigation tickets as low quality. Priya applies the tag at ticket creation; the orchestrator checks it pre-dispatch. (Imported from MarianLearning's 2026-05-22 retro.)
+
 ## Pre-dispatch checklist (orchestrator-side)
 
 Run this checklist BEFORE firing the `Agent` call. Catches missing blocks at dispatch time when fixing them is a one-line brief edit — not after the agent's burned cycles on an under-specified task.
@@ -333,6 +356,8 @@ Run this checklist BEFORE firing the `Agent` call. Catches missing blocks at dis
 - [ ] **Worktree-concurrency check.** Scan in-flight `Agent` tasks for any whose worktree maps to the target persona. If one exists, do NOT dispatch — queue the new task to fire after the first's `<task-notification>`, or reassign by surface (per user-global `Sub-agent worktree-concurrency discipline`).
 - [ ] **Fresh `main` pull.** The role worktree's branch will be force-created from `origin/main` by Step 0 — confirm `git fetch origin` ran in this orchestrator tick (or include it in the brief's Step 0 as the existing template does).
 - [ ] **Ticket ID + body included verbatim** in the brief (sub-agents lack `mcp__clickup__*` tools per `sub-agent-mcp-tool-surface-scope`; they read the ticket body from the brief, not from the board).
+- [ ] **Ticket-body hard gates.** Ticket body carries an explicit OOS list + a named success-test. Missing either → bounce to Priya for flesh-out BEFORE dispatch (or the orchestrator fills them per the ticket-flesh-out auto-decide class when it has the context).
+- [ ] **Work-type tag present** on the ticket (`impl`/`spec`/`investigation`/`test`/`chore`/`cleanup`) — drives which acceptance gates apply.
 - [ ] **Branch name** follows `<role>/<id>-<slug>` format.
 - [ ] **Scoped contract block present** — owned files, read-only references, OOS, conflict rule. OOS named explicitly; if the agent should not touch a tempting adjacent file, NAME IT.
 - [ ] **Reviewer named** per Done clause reviewer-track (game-side → Drew, harness/inventory → Devon, Tess PRs → peer by surface, Priya docs → Devon or Drew by surface).
