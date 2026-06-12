@@ -116,6 +116,74 @@ always-square — plan the crop step into every pipeline.
 
 ---
 
+## Transparent-padding trap — canvas bottom is NOT the character's feet
+
+PixelLab canvases carry roughly **24 px of fully-transparent alpha below the character's
+lowest opaque pixel** (validated on 92×92 `v3` canvases; likely present on other sizes but
+not independently measured). Ground-anchored renderers that treat the canvas bottom-center as
+the feet will float the character ~24 px above its true ground position. The offset is
+camera-angle-dependent (grows more visible at steeper pitch) and is easy to miss in
+single-view tests.
+
+**Why BottomCenter is insufficient.** The naive fix — pivot `(0.5, 0.0)` in bottom-normalized
+convention, i.e. canvas BottomCenter — leaves the full transparent footer intact. Empirically
+confirmed on the Player Monk v3 strict rig (92×92, 88 frames): BottomCenter still produced a
+visible residual offset at multiple camera pitches; Sponsor photographed the drift. The
+correct pivot is pinned to the **actual lowest opaque pixel row** in the frame, not the
+canvas edge. (ClickUp 86ca7y46c, iteration-3 evidence comment.)
+
+**Measured values (Player Monk v3 strict, 2026-06-12):**
+- Canvas: 92×92 px
+- Lowest opaque row: ≈ row 67 of 92 (0-indexed from top)
+- Transparent footer: ≈ 24–25 px
+- Pivot bottom-normalized: `spritePivot.y ≈ 0.266`
+- Validated via 12-capture 360°-orbit + zoom boundary sweep across all 88 frames
+
+**Convention used throughout:** `0 = canvas bottom, 1 = canvas top` (bottom-normalized). The
+measured `0.266` means the pivot sits 26.6% of canvas height above the canvas bottom.
+
+**Alpha-scan code (PIL + NumPy):**
+
+```python
+import numpy as np
+from PIL import Image
+
+def find_sprite_pivot(png_path: str) -> float:
+    """Return bottom-normalized pivot_y (0=canvas bottom, 1=top).
+    Pin the pivot to the lowest opaque pixel row in the frame."""
+    arr = np.array(Image.open(png_path).convert("RGBA"))
+    alpha = arr[:, :, 3]           # shape (H, W)
+    h = alpha.shape[0]
+    opaque_rows = np.where(alpha.max(axis=1) > 0)[0]
+    if opaque_rows.size == 0:
+        return 0.0                 # fully transparent — fallback
+    lowest_opaque = int(opaque_rows.max())   # 0-indexed from top
+    # bottom-normalise: canvas bottom = row (h-1)
+    return 1.0 - lowest_opaque / (h - 1)
+```
+
+**Practical rule:** scan 2–4 representative frames (idle south + a walk extreme). If the
+pivot variance across frames is small (< 0.01), use the mean as a single shared pivot;
+otherwise use per-frame pivots. The monk frames had low variance across all 88 frames — a
+single mean pivot was sufficient.
+
+**Engine application:**
+
+- **Godot:** shift `sprite.offset.y` so the lowest opaque row sits on the node origin
+  (ground contact point) instead of the canvas bottom/center.
+- **Unity:** `sprite.pivot = new Vector2(0.5f, pivot_y)` with the bottom-normalized value
+  (Unity's pivot `y=0` = canvas bottom — matches this convention directly).
+
+**Verification ritual:** place a visible marker at the character's world ground point and
+run a 360°-orbit sweep at both minimum and maximum camera pitch. The marker must sit at the
+character's visible feet in every capture; camera-angle-dependent drift is the tell that the
+padding is still unaccounted for.
+
+**Cite:** ClickUp ticket 86ca7y46c (engine-spike iteration 3, evidence comment).
+Engine-agnostic finding — applies to Godot and Unity alike.
+
+---
+
 ## Quantize duplicate-slot trap — over-request target_colors
 
 PixelLab generations that are color-clustered (brown bears, grey wolves, etc.) cause k-means
@@ -349,6 +417,67 @@ neighbor with no red in S2 doctrine) and routed the iron buckle into warm-bronze
 
 **Reference impl:** `tools/bake_stoker_palette.py` (PR #276). Nit: hardcoded
 `REPO_ROOT` deferred to M4 — see ClickUp `86c9uze5j`.
+
+### Strategy 5 — Single-region hue-mask recolor with luminance preservation ✓ (validated 2026-06-07, S1 well-head water)
+
+Strategies 1–4 all operate **palette-wide** — they remap every pixel. Use Strategy 5 when
+only ONE color region needs a hue shift (e.g. water came back cool/teal but the surrounding
+moss, stone rim, and bucket detail are already doctrine-correct). Remapping the whole palette
+would disturb the correct neighbors; a targeted region mask shifts the off-material alone, and
+re-rolling would risk losing the good detail elsewhere.
+
+**Hue-mask discrimination (S1 water vs moss example):** hue families have discriminating
+color-channel relationships that survive PixelLab's palette variance. Pick the mask whose
+false-positive rate on neighboring materials is verifiable by inspection.
+
+| Material to target | Mask condition | Why |
+|---|---|---|
+| Cool / teal water | `b > r + 12` | blue clearly dominates red in teal |
+| Yellow-green moss | `g > b + 20` | green dominates blue — the `b > r+12` water mask naturally EXCLUDES it |
+| Warm stone / dirt | `r > b AND r > g` | already doctrine-warm; untouched |
+| Red accent / glow | `r > g + 30 AND r > b + 30` | red dominates both |
+
+**Luminance-preserving recolor (keep light/dark structure, shift hue only):**
+
+```python
+import numpy as np
+from PIL import Image
+
+# Target warm-neutral ratio from the doctrine (e.g. S1_YARD_WATER_DOCTRINE R:G:B ≈ 1.0:0.92:0.82)
+RATIO_R, RATIO_G, RATIO_B = 1.0, 0.92, 0.82
+DENOM = 0.299*RATIO_R + 0.587*RATIO_G + 0.114*RATIO_B  # ≈ 0.9325 — normalises k to preserve luminance
+
+arr = np.array(Image.open("source.png").convert("RGBA"), dtype=float)
+r, g, b, a = arr[...,0], arr[...,1], arr[...,2], arr[...,3]
+
+mask = (b > r + 12) & (a > 0)              # cool water pixels only
+L = 0.299*r + 0.587*g + 0.114*b            # BT.601 source luminance
+k = L / DENOM                              # scale so recolored pixel matches source luminance
+arr[mask, 0] = np.clip(k[mask]*RATIO_R, 0, 255)
+arr[mask, 1] = np.clip(k[mask]*RATIO_G, 0, 255)
+arr[mask, 2] = np.clip(k[mask]*RATIO_B, 0, 255)
+
+Image.fromarray(arr.astype(np.uint8), "RGBA").save("recolored.png")
+```
+
+**Why luminance-preservation matters:** a flat hue-swap (`r,g,b = target` for all masked
+pixels) collapses the structure — the glint becomes the same color as the deep shadow. Scaling
+by `L/DENOM` keeps the bright glint bright and the deep water dark, just in the new hue family.
+
+**When to use 5 vs 3/4 vs re-roll:**
+
+| Scenario | Strategy |
+|---|---|
+| Wrong hue on ONE region; rest of sprite is correct | **5** (raster PIL mask on raw PNG) |
+| Whole sprite needs doctrine compliance (fresh gen) | **3** (per-slot NN on indexed canvas) |
+| Doctrine-locked sprite retinted to sibling stratum | **4** (luminance-band role routing) |
+| Wrong silhouette / proportions / missing character beat | re-roll |
+
+**Distinct from 3/4:** Strategy 5 runs a PIL/numpy pixel loop on the **raw (non-indexed) PNG**,
+targeting pixels by hue condition rather than palette slot — no quantize step. Cost: zero
+PixelLab gens, <1 s. **Caveat:** if the off-hue region shares a channel ratio with a correct
+neighbor (e.g. cool stone AND cool water both fire `b > r+12`), tighten the threshold or add a
+spatial (bounding-rect) mask, and always verify the mask visually as an alpha overlay first.
 
 ---
 
@@ -657,6 +786,31 @@ extracted cleanly via ZIP. Idle rotation PNGs are also bundled in the ZIP at
   downloading.
 - Always use `curl --fail` (per the docs warning) — without it, curl saves the error JSON
   as if it were the ZIP.
+
+---
+
+## PixelLab MCP PNG download URLs require `curl -L` (redirect not followed by default)
+
+Tileset and map-object tools return PNG download URLs of the form
+`https://api.pixellab.ai/mcp/tilesets/<id>/image` and
+`https://api.pixellab.ai/mcp/map-objects/<id>/download`. These issue an HTTP redirect to the
+actual file location. Plain `curl -s -o out.png <url>` does NOT follow it and **silently writes
+a 0-byte file** — curl exits 0, the file exists, and the failure only surfaces downstream
+(PIL: `UnidentifiedImageError: cannot identify image file`).
+
+```bash
+# WRONG — silent 0-byte file:
+curl -s -o tiles.png "https://api.pixellab.ai/mcp/tilesets/<id>/image"
+
+# CORRECT — -L (follow redirect) is the load-bearing flag; -f fails loud on HTTP errors:
+curl -sS -L -f -o tiles.png "https://api.pixellab.ai/mcp/tilesets/<id>/image"
+```
+
+The character-ZIP examples elsewhere in this doc already use `-fsSL` (which includes `-L`) and
+are unaffected. The trap fires when composing a fresh curl for the tileset/map-object PNG
+endpoints. Validated 2026-06-12 (ClickUp `86ca7yt5u`): first tileset download wrote 0 bytes;
+adding `-L` fixed it on the immediate retry. Default to `curl -sS -L -f` for every
+`mcp__pixellab__*` image URL.
 
 ---
 
@@ -1074,6 +1228,64 @@ import_image(sprite_path="...", image_path="C:/path/source.png",
 
 **CHECK THE TARGET MOB'S ANIM CONTRACT *BEFORE* GENERATING THE ANIM SET — and mind that quadruped templates lack `die`/`hit`.** When re-arting an EXISTING mob (frames-swap into its `.tres`), read the contract FIRST: the keys the game expects are pinned by `tests/test_<mob>_animation_wire.gd` and mirrored by the current `_pixellab_anims/<OldRig>/animations/` folder names. Generate the FULL required set, not a plausible-looking subset. Concrete miss (S1 charger bone-hound, 2026-06-06): the charger is an existing mob with contract `{walk, telegraph, atk, die}`, but the quadruped template list is only `{bark, fast-walk, idle, running-Nf, sneaking, walk-Nf}` — there is **no death or hit or telegraph template for quadrupeds**. Animating idle/walk/running/bark produced a rig MISSING `die` (had to be added afterward as a **v3 custom animation**, `action_description="collapsing and falling over dead..."`, which DOES support arbitrary actions for quadrupeds — pass explicit `directions:[all 8]` since v3 defaults to south-only). Map the rest at install (`running→telegraph`, `bark→atk`). Failing to check the contract up front cost a wasted animation cycle. (Tooling trap that hid this: the Bash tool persists cwd, and `git ls-tree origin/main` applies the cwd prefix — running it from a subdirectory silently scopes the listing to that dir and can look like "the file doesn't exist." Run repo-wide `git ls-tree -r` from the repo root or with `git -C <root>`.)
 
+**v3 creation HOLDS 3 job slots while running — queue the walk only after status = completed
+(validated 2026-06-10, iso-proof monk).** A v3 humanoid creation (`size=48`, 2 gens, 8 dirs)
+holds **3 of 10** Tier-2 job slots while in progress. Queuing `animate_character` template
+`"walking"` (8 directions = 8 slots) during that window fails atomically:
+`need 8 job slots but only 7 available (3/10 used)`. This happens **even while `get_character`
+shows the hint "animate_character can be queued now (runs after creation completes)"** — that
+hint is unreliable; queue the walk only AFTER `get_character` returns `status: completed` with
+rotation URLs populated. Observed wall-clock: v3 creation ~10–15 min (vs the "~3–5 min" hint);
+the walk itself ~5 min (within its stated class).
+
+**Per-direction frame URLs (alternative to the rig ZIP).** Each direction of a walk set gets
+its **own animation UUID**; frames live at
+`animations/<anim-uuid>/<direction>/<frame-index>.png` with frames named `0.png`–`5.png`
+(6-frame walk). Build a `direction → uuid` map from the `get_character` output before
+harvesting — do NOT assume one shared UUID across directions. Per-direction URL fetching is
+validated; the rig ZIP (above) remains the bulk alternative.
+
+---
+
+## PixelLab is pixel-art-native — non-pixel-art aesthetics are not achievable (validated 2026-06-12)
+
+PixelLab produces pixel art. Always. Style params are soft guidance; they **cannot escape the pixel-art grain** — stair-stepped edges, pixel-cluster shading, selective outlining are structural, not an artefact of a bad prompt.
+
+**Empirical validation (2× probes, ClickUp `86ca7zkyr`):**
+
+| Probe | char-id | Key params | Description strategy | Result |
+|---|---|---|---|---|
+| 1 | `dd85e045-8d32-48ce-8528-08d7f373188f` | v3, `outline="lineless"`, `detail="low detail"` | Low-poly render description ("smooth-shaded LOW-POLY 3D model, flat color facets, no outlines, no pixel dithering") | Classic pixel art — stair edges, cluster shading, selective outlines despite "lineless" |
+| 2 | `68bf9445-3996-4e5f-97f0-e7f1b4b538e5` | v3, maximally aggressive prompt | "ABSOLUTELY NOT pixel art … a clean 3D render like Ico/Journey/Quaternius/Synty" | Unmistakably pixel art — identical failure mode |
+
+**Why style params don't help:**
+- `outline` / `detail` are soft guidance — they nudge pixel-art style, not the rendering model.
+- `shading` and `proportions` are **ignored entirely** by v3 (already documented in the mode-ladder section above).
+- Out-of-distribution prompting ("not pixel art", "smooth shading") does not suppress the mode; PixelLab's literal-interpretation behavior (see § "Prompt engineering" above) may actually reinforce the concept being negated — the same class as the absolutist-negation trap documented there.
+- PixelLab's training distribution is pixel art; no prompt combination escapes it.
+
+**Hard rule — do NOT spend generations chasing non-pixel-art aesthetics.** Stop after the FIRST probe confirms pixel-art output. Aesthetics that cannot be produced:
+- Smooth low-poly render (Synty / Quaternius style)
+- Vector / painterly-smooth illustration
+- Gouraud / Phong shading look
+- "Screenshot of a 3D game"
+
+**Routing — when the target aesthetic is non-pixel-art:**
+
+| Need | Route |
+|---|---|
+| Low-poly 3D characters (Quaternius/Kenney style) | CC0 asset packs — quaternius.com, kenney.nl, OpenGameArt.org (Synty POLYGON packs match the look but are PAID, need Sponsor auth) |
+| Custom 3D model | Blender modeling via Devon/Drew |
+| Text-to-3D from description | `mcp__blender__generate_hyper3d_model_via_text` (Blender MCP) |
+| Text-to-3D from concept art | `mcp__blender__generate_hyper3d_model_via_images` |
+
+**PixelLab's value in a 3D-style project:** even when the game world is 3D or low-poly, PixelLab is the right tool for:
+- Pixel-art HUD / UI elements
+- 2D billboard sprites used as decals, particles, or FX overlays
+- **Identity design sheets** — the castaway exploration probes (`_castaway_judge/castaway_v3_south_2x.png`, `castaway_v4_south_2x.png`) were rejected as shipped sprites but kept as design reference for silhouette / proportion / palette decisions.
+
+**Evidence trail:** ClickUp `86ca7zkyr`; judged outputs at `_castaway_judge/castaway_v3_south_2x.png` and `_castaway_judge/castaway_v4_south_2x.png`.
+
 ---
 
 ## `create_topdown_tileset` is a terrain-TRANSITION tool — NOT for a uniform crafted floor
@@ -1085,7 +1297,55 @@ Validated 2026-06-06 (S1 tile upgrade `86ca44p4j`, 2 passes). `create_topdown_ti
 
 So the Wang tool gives you **path/field OR flat-repeat** — never "continuous floor, richly varied, seam-free." It is the right tool for an actual terrain edge (floor→pit, grass→stone), not for re-arting one surface.
 
+**Addendum — the 32px resolution cap (re-confirmed 2026-06-07, S1 cobble-yard `86ca5erva`).** Even used *correctly* — a deliberate `lower="dirt"` / `upper="cobblestone"` setup so the base (all-corners-upper) tile IS a seamless single-surface cobble, with dirt only as occasional sunk-stone patches — `create_topdown_tileset` DOES tile seam-free (the Wang corner-matching works). BUT its `tile_size` is **hard-capped at 16 or 32px** (see the tool schema), and at 32px even with `detail="highly detailed"` + `shading="highly detailed shading"` the stones come out **small and uniform** (and skew green/mossy). So the Wang tool's ceiling for a floor is *seamless-but-low-res-uniform*. This is the load-bearing reason a high-detail, genuinely-varied-stone floor must be **procedural** (any resolution, seamless-by-construction via toroidal wrap, varied-radius stones) rather than any PixelLab tool — Sponsor chose procedural for the cobble-yard on exactly this quality tradeoff. (Also re-confirmed this session: `create_tiles_pro` with `outline_mode=segmentation` gives full-bleed tiles but the numbered variants *diverge in palette* — grey vs green vs dirt — and being independent square tiles they still show a grid; and `create_map_object` at ≥256px stops making a floor patch and renders a whole walled scene.)
+
 **For a uniform crafted floor/wall surface, use a VARIANT-SET approach instead:** generate several individual seamless tile variants (`create_map_object` / `create_1_direction_object`, or pixel-mcp hand-craft for full control) — each a self-contained worn-stone tile with different crack/wear — then the game-side painter scatters them so no tile repeats in a run (matches the multi-variant-set intent in `team/uma-ux/s1-tile-rework.md` §2.2A). Mind seamlessness: object-gen does not guarantee edge-matching tiles; for a stone floor, mild edge mismatch reads as irregular grooves (acceptable), but verify tiled at game zoom. This corrects the spec's assumption that `create_topdown_tileset` would produce crafted floor/wall sets.
+
+**Addendum — terrain QUALITY is material-dependent, even in the CORRECT (transition) role (2026-06-08, S1 ground pivot).** When finally used the right way — Wang transition sets for `?s1_assembler=1` ground blends — the tool's output quality split sharply by material:
+- **Natural / organic terrains (dirt↔grass): EXCELLENT.** The dirt↔grass set produced a soft, ragged, hand-painted-looking blend (sunk-dirt path with a mossy/rooty grass bank) — **Sponsor-approved on sight.** The Wang tool is genuinely good for organic terrain edges (dirt, grass, sand, earth).
+- **Man-made fine STONE (cobble): FAILS.** A dirt↔cobble set with an explicit `upper="fine small warm grey-tan cobblestones, warm tan not grey, NO moss, NO green"` + `detail/shading=highly detailed` STILL came back **green/mossy with no real stone structure** at 32px. A Strategy-5 hue-mask recolor (green→warm) only yielded a muddy **gravel mush**, not crisp cobble — the recolor fixes hue, not the missing stone geometry.
+- **Practical rule:** use `create_topdown_tileset` for **organic/natural terrain blends** (the soft dirt/grass/sand edges it excels at); do NOT use it for **man-made stone surfaces** (cobble, pavers, flagstone). For a stone GROUND, the AI route that WORKS is a **high-res (256px) full-bleed `create_map_object`** ("Top-down weathered cobblestone ground, …" at 256×256 came back full-bleed-opaque + good — Sponsor-approved 2026-06-08, far better than the 32px Wang cobble); tile it seam-free via the np.roll wrap (the INSET-CROP technique above). Procedural (`gen_s1_cobble_floor.py`) is the other viable stone route. Let the Wang tool handle only the *natural* terrain transitions around the stone. (S1 yard ground: dirt+grass = Wang autotile; cobble lane = 256px `create_map_object` cobble.) The Wang grass also skews neon → mute via Strategy-5 toward the doctrine green (`#5C7044`).
+- **Map-object expiry gotcha:** `create_map_object` outputs **auto-delete after 8h**. `list_objects` keeps showing the expired entry, but `get_map_object` and the `/download` URL both return "not found" / JSON-error once expired — so a good ground/prop you want to keep must be **downloaded + committed promptly, or regenerated from its prompt** (the list row's name is the only surviving record). Don't assume a listed object is still retrievable.
+
+---
+
+## `create_topdown_tileset` — flat-terrain calibration traps (Zone-A beach/field, 2026-06-12, ClickUp `86ca7yt5u`)
+
+First production use in its CORRECT role (organic terrain blends — sand↔grass, dry↔wet sand)
+surfaced four calibration findings beyond the material-quality rules above:
+
+**1. `transition_size` bakes a HEIGHT LEDGE into flat blends.** At `0.5` the boundary renders
+as a cliff lip with cast shadow (reads as raised grass platform over sand); at `0.25` still
+slightly ledge-y. The param's own doc hints it "often affects the height difference" — treat it
+as a height-step control, not a blend-width control. For flat ground↔ground blends, keep it low
+(≤0.15 — *inference, untested below 0.25*) and/or add "completely flat ground, no cliff, no
+ledge, no height difference" to the transition description. If you only need the interior fill
+tiles (below), the transition render is irrelevant.
+
+**2. Featureless terrain + `detail="highly detailed"` induces mechanical weave/grid
+micro-structure.** Sand at "highly detailed" came back as basket-weave — the model fills the
+detail budget on a featureless material with periodic structure. Validated fix (both changes
+applied together, not isolated): `detail="medium detail"` + explicit description language
+`"NO pattern, NO grid, NO weave, no repeating structure, organic randomness"`.
+
+**3. Name the palette tones; adjectives under-deliver.** `"lush meadow grass, layered
+multi-tone greens"` → flat saturated cartoon green (FAIL). `"dense short grass in many layered
+muted green tones (olive, moss, forest green)"` → real tonal layering (PASS). Same pattern for
+sand: `"muted warm palette ... tan and beige"` under-delivered vs naming `"tan, beige and
+khaki"`. Rule: enumerate 2-3 specific tone names per terrain in `lower_description` /
+`upper_description`; this is the terrain analogue of the character prompt-engineering rules.
+
+**4. Purity-scan fill extraction — and the dry↔wet pair trick.** Every Wang-16 sheet contains
+pure single-terrain interior tiles (all corners the same terrain). Extract them
+programmatically: split the sheet into `tile_size` cells, classify each pixel into the two
+terrain color-classes (a simple channel comparison suffices — e.g. green-dominant vs
+tan-dominant), and take cells with purity 1.0. These are seamless per-terrain fills usable
+independently of the transition. **Bonus:** a `lower="dry sand"` / `upper="wet sand"` variant
+pair yields TWO usable fills of the same material from ONE generation. **Caveat:** a single
+extracted 32px cell carries less tonal variation than the sheet read suggests — the Zone-A sand
+fill read pale/uniform in-engine. If the fill needs more richness, prefer the 256px
+`create_map_object` + inset-crop route (section above) or composite mild luminance variation
+over the fill.
 
 ---
 
@@ -1101,7 +1361,520 @@ Validated 2026-06-06 (S1 tile upgrade `86ca44p4j`, same session as the `create_t
 
 **Validated authoring recipe (the one that worked — "broken-ashlar" flagstone):** lay irregular rectangular stones in jittered offset courses (course height ~11-13 px for slabs / ~7-9 px for cobbles at a 32 px tile), 1 px mortar gap (`#5C4F38` bed + `#1A1210` shadow side), per-stone flat doctrine tone with a few worn-lighter (`#A89677`) stones, a 1 px lit lip on the top+left of each stone and a 1 px `#1A1210`/`#5C4F38` shadow on bottom+right (carved relief). **Make it seamless by wrapping stone x-positions and course heights toroidally (modulo the tile size)** — every paint op writes at `(px % S, py % S)`. Generate a small variant SET (3 base + worn-path + moss + cracked) by varying the RNG seed; the game-side painter scatters them. A toroidal-**Voronoi** stone model also tiles seamlessly but reads as angular shards/scales — the **rectangular broken-course (ashlar) model is the correct shape for cut flagstone**, Voronoi is not. Judge tiled across a 15×8 (one-screen) span at 3× zoom, not in isolation. This is the path that finally broke the `#407` wallpaper failure.
 
+**Premium-pass refinements on top of the base recipe (two non-obvious traps, validated 2026-06-06 slab2 pass):**
+- **Large-scale tonal variation must be a TOROIDAL low-freq drift, not per-stone randomness** — add `0.06*sin(2π·x/S+φx) + 0.05*cos(2π·y/S+φy)` as a brightness multiplier across the whole tile. Built from full-period sines on the tile dimension it stays seamless, and it kills the "every stone independently random → flat noise" look by giving the surface gentle light/dark regions (reads as unevenly worn stone). Per-stone random tone alone reads flat; the drift is what makes it read crafted.
+- **Moss must be soft FACE-BLOBS, never groove-following** — the intuitive "paint moss along the dark mortar pixels" produces a bright-green DASHED WIREFRAME outlining every stone (a glitch read, not moss). Instead scatter 2-3 circular olive clusters (`#5C7044`, ~55% fill, with a `×0.78` darker sibling) **only over lit stone faces** (skip pixels whose RGB sum is in shadow range) — reads as organic damp creep. Same principle for any in-groove accent: grooves are structure, not a place to paint color.
+
 ---
+
+## AI-generated tiles CAN make a continuous floor — the fix is INSET-CROP (validated 2026-06-06, Sponsor-preferred over procedural)
+
+The procedural recipe above works, but a Sponsor may prefer the more organic/painterly look of an **AI-generated** `create_map_object` floor tile (e.g. a 128×128 "seamless top-down aged sandstone flagstones"). Earlier in this same session both PixelLab tile tools were ruled out for continuous floors — but that conclusion was **too strong**. AI tile-objects ARE usable as a continuous floor; the blocker is a specific, fixable artifact:
+
+- **The real culprit is a heavy dark PERIMETER FRAME, not the transparency or "seamlessness."** Every `create_map_object` tile renders the stone motif with a thick dark mortar/shadow border around all four sides, sitting on a transparent margin (~28% alpha-0). Tiling it raw → the transparent margin reads as black gaps; cropping only to the opaque bbox still leaves the dark frame → every tile boundary becomes a heavy grid line (the wallpaper read). Scattering N different AI tiles makes it WORSE (mismatched frames meet → coarse grid of distinct bordered squares).
+- **Fix: crop ~10-12px INSIDE the opaque bbox**, cutting the frame, so the stone field reaches the new edge. Then tiles abut **stone-to-stone** with only a thin natural joint, and the tile boundary becomes indistinguishable from the internal mortar joints. A single inset-cropped tile tiled at its native period reads as a continuous crafted flagstone floor at game zoom. (One tile + sparse hand-placed accent tiles to break the period beats a multi-variant scatter.)
+- **Engine integration is free:** the existing `s1_cloister.tres` already treats the 128px floor PNG as a **4×4 atlas of 32px tiles** painted to reconstruct the image — so dropping in a full-bleed inset-cropped 128px AI floor tiles at a gentle 4-tile (128px) period with stones flowing inside each block. Just match the existing 128px source dimension.
+- **Palette coherence — recolor cold AI tiles to the doctrine ramp via a luminance→ramp gradient map.** The AI floor came back warm (fine), but the AI *wall* came back cold grey and clashed. A luminance→warm-ramp map (`#1A1210`→`#2C261C`→`#4A3F2E`→`#5C4F38`→`#9A7A4E`) recolors it to the warm cloister palette while keeping the AI stone structure — though a fresh AI gen with an explicit "WARM tan, NOT grey" prompt reads crisper than recoloring a grey source.
+
+**When to use which:** procedural broken-ashlar = full doctrine control, no gen cost, but reads slightly mechanical. AI-tile + inset-crop = more organic/painterly (Sponsor preferred), costs gens + needs the frame-crop + possible palette recolor. The Sponsor is the taste authority; his feel-approval of the AI look overrides the doctrine-lock mandate where they conflict (do a gentle nudge, not a hard lock, to preserve the approved look).
+
+---
+
+## `create_map_object` cannot render flat ground-texture variations — it builds a structure
+
+**Validated 2026-06-07 (S1 yard ground-composition, spring/seep attempts).** `create_map_object`
+interprets pool / spring / seep / wet-patch prompts as **discrete built objects** (a thing with
+a rim, walls, or basin), not flat ground-texture variations. Two attempts:
+
+- `"still pool welling up between cobblestones, top-down"` → a **stone-rim basin** (a built
+  structure — correct shape for a well, wrong for ground water).
+- a simpler flat-seep prompt → a **flat dark blob with an over-bright moss ring**, reading as a
+  circular decal prop stamped on the floor, not organic ground texture.
+
+**Root cause:** `create_map_object` is designed for discrete objects that sit ON a surface
+(barrels, wells, crates, braziers). The transparent-background constraint means every output has
+a hard object silhouette — architecturally outside "a patch that blends seamlessly into the
+surrounding floor." Top-down framing does not override this.
+
+**Same class as the floor-tool ceiling above:** just as `create_topdown_tileset` and
+`create_tiles_pro` cannot produce a continuous crafted floor, `create_map_object` cannot produce
+a flat ground patch. PixelLab tools are for discrete objects + terrain edges; flat continuous
+ground variations (wet patches, mud, puddles, worn paths that are part of the floor) are
+**in-engine territory**.
+
+**Fallback for ground-seep / wet-cobble / damp-patch:** author in-engine as a `ColorRect` or
+`Sprite2D` with a semi-transparent warm-neutral tint (e.g. `Color(0.18, 0.16, 0.15, 0.35)`)
+over the existing floor tiles, plus reused moss/damp tile variants for organic edge blending.
+Free (no gen cost), full control over the spread shape. (Used for S1 yard springs per the
+ground-composition spec §3.2.)
+
+## `create_map_object` building-asset gotchas (S1 yard buildings, 2026-06-08)
+
+Validated generating the 5 S1-yard building props (chapel, dormitory ×2, central, outbuilding) via `create_map_object`.
+
+**1. Larger gens silently bake an OPAQUE matte background — despite the API reporting "background: transparent".** The 256px gens (chapel, both dormitory halves) came back with a flat warm-grey matte filling the canvas (corner pixels `(214,206,194,255)` / `(204,198,173,255)`, **0 transparent pixels**), while the 128px + 96px gens (central, outbuilding) were correctly transparent (corner alpha 0). The `get_map_object` output line still said `background: transparent` for all of them — **do not trust it; check `px[0,0][3]` after download.** Hypothesis (unconfirmed): the matte appears on the larger canvases; size threshold not pinned. Always inspect corner alpha before placing.
+
+**2. Strip the matte by EDGE-FLOOD, never global color-replace.** The matte color (warm tan-grey) is Euclidean-close to the sandstone walls, so a global "make all pixels matching bg transparent" punches holes in the building (the same class as pixel-mcp's `fill_area` global-replace trap). Safe fix: BFS flood from the border pixels with a small tolerance (`TOL≈18` RGB), removing only the **contiguous** border matte; the selective-outline silhouette stops the flood at the building edge. Then `getbbox()` + crop to tighten bounds so the footprint maps to the placement `Rect2i`. Reusable script: `tools/crop_s1_buildings.py`.
+
+**3. Static sprites need NO HDR-clamp — clamping is only for modulate/tween.** The `html5-export.md` sub-1.0-channel rule bites when a color is *multiplied* (modulate/tween push >1.0 → WebGL2 clip). A static PNG sprite with full-255 channels displays correctly; clamping it is unnecessary motion. Clamp only if/when the sprite gets a runtime modulate cue (e.g. a flickering lit window → that's a ColorRect-modulate, then clamp).
+
+**4. The building/wall palette doctrine has NO roof color — do NOT hard-snap buildings to it.** `S1_BUILDING_DOCTRINE` (8 hexes: sandstone body/trim/deep + moss + parchment + soot + mortar) is a *wall/stone* palette. Buildings-with-roofs (terracotta chapel roof, grey-slate dormitory roof) have legitimate roof materials the doctrine never anticipated; Strategy-3 nearest-neighbor would route a terracotta roof to `#9A7A4E` bronzed-trim and a slate roof to wall-stone, turning roofs into walls. For first-of-class building gens that already read warm + weathered, prefer **mechanical-only processing** (matte-strip + bbox-crop) and preserve the natural roofs; the Stardew/Graveyard-Keeper references favor warm colored roofs anyway. Treat "how muted should the buildings be" as a Sponsor subjective-feel call surfaced at the in-game serve, not an auto-applied doctrine-lock.
+
+**5. Baked ground-plate under iso buildings: RECOLOR, do not remove (validated 2026-06-10, `building_ruin.png`).** D2-style iso building gens come with a baked maroon/oxblood ground-plate diamond under the footprint (plus pebbles + a path stub drawn ON it). Surgical removal destroys the asset — two attempts failed: (a) color-cluster masking in the lower region also ate the door-arch interior and wall shadows (same color family); (b) flood-fill from plate seeds spread up through connected shadow tones and ate most of the building. The safe fix is a **luminance-preserving recolor** of the plate family only: select red-dominant pixels (`(r>45)&(r<150)&(g<60)&(b<45)&(r>g*2.2)`, restricted to the lower canvas region), compute per-pixel luminance relative to the plate's anchor color (here `(112,25,4)`), and remap onto a target earth-brown ramp (`lum × (146,106,72)`). Walls/roof untouched; pebbles and path stub stay coherent; the plate reads as an intentional dirt foundation bed that harmonizes with ground tiles. Keep the original as a `_*_orig.png` backup before swapping.
+
+**5b. Building APRONS: do NOT strip — keep and BLEND with a matching tile material (settled 2026-06-11 after two failed strip attempts).** Apron removal joins gotcha #5's removal graveyard: (a) a geometric wall-base-diamond cut (`outside diamond AND below band`, per-building `(halfw, halfh, drop)`) sliced into the walls — fixed params don't generalize across buildings, and the damage SHIPPED because it was judged from a THUMBNAIL; full-size before/after renders are mandatory for any destructive sprite op; (b) a per-column bottom-up color strip stalled immediately — apron grout lines are dark pixels that satisfy any sane "stop at outline" condition (332/0/689 px removed of ~15k targets). The SHIPPED solution inverts the problem: keep aprons, sample their palette (family H/S/V stats + V-mean scaling), recolor an existing seamless tile material into it → new paintable terrain ("plaza") with full transitions; painting plaza around a building makes the baked apron read as an intentional terrace. Classify bases regardless: flat slab aprons (blend with plaza) vs architectural bases (walled forecourts, gallery floors, plinths — always keep).
+
+
+## Building-wall kit generation — oblique view, width, and seam strategy (S1 yard, 2026-06-10)
+
+> **SUPERSEDED AS ACTIVE DIRECTION — 2026-06-10.** The same day this workflow was validated,
+> the project pivoted to a **full isometric world** (Diablo-2 style); see
+> `team/DECISIONS.md` (2026-06-10 full-isometric-world entry). The oblique wall-kit approach
+> is abandoned as the current direction. The techniques below (pier-on-seam, frame-normalize,
+> tone-match, single-bay width rule) remain valid reference; for the **active path** see the
+> isometric building recipe section below.
+
+Validated generating oblique cloister building-WALL blocks (new asset class distinct from the
+building-prop assets above) via `create_map_object`.
+
+### View param — which value gives which building read
+
+| `view` value | Result |
+|---|---|
+| `"low top-down"` | Oblique angled roof + facade — **correct for S1 monastery wall bays** ✓ |
+| `"top-down"` | Flat pure-top view; no visible façade |
+| `"side"` | Crenellated castle battlements — reads militaristic, NOT monastery |
+
+**Use `"low top-down"` for any oblique monastery wall or facade asset.** `"side"` is
+recorded here because it is tempting (orthographic wall face) but produces castle battlements
+regardless of how explicitly "NOT castle" the prompt is.
+
+### Width: single bay (~128px) keeps on-style; wide (384px, 3-bay) castle-ifies
+
+Generating a wide multi-bay span in a single prompt causes PixelLab to shift toward
+heavy castle architecture even with strong "monastery NOT castle" wording. **Prompt single
+bays (~128px each) and composite them in post.** A 3-bay wall is a post-process assembly of
+3 individual bay gens.
+
+### Plain bays — generate with minimal openings, then patch
+
+PixelLab resists blank walls and typically inserts small windows or slits even when the prompt
+forbids them. The recommended strategy for a truly plain bay is to **generate a plain-as-possible
+bay (accepting the small windows as a starting point) and then patch stone texture over the
+openings in post** using the Python+Pillow pipeline (see the System.Drawing section in
+`pixel-mcp-pipeline.md`).
+
+### Kit seam strategy — pier-on-seam + frame-normalize + tone-match
+
+The kit (`assets/props/s1_cloister/buildings/`) contains individual bay PNGs and a 48px-wide
+pier sprite. The assembly pipeline (`assets/props/s1_cloister/buildings/_pixellab_raw/build_kit.py`):
+
+**Pier-on-seam** — stamp the 48px buttress-pier sprite at every bay boundary (seam). This
+hides roofline steps, edge mismatch, and tone breaks between adjacent bays. Because the pier
+fully covers each bay edge, the shared roof band does NOT need to tile horizontally — each bay
+can have its own roofline variation (validated: per-bay rooflines vary 45–64px).
+
+**Frame-normalize + tone-match** — for each assembled bay, stamp the shared roof band
+(rows 0–66 from the reference bay) to create a consistent skyline, then apply a per-channel
+multiplicative gain to match the bay's mean tone to the group wall-mean (so bays generated
+at different sessions don't read as patchwork). Both passes run in the same Python step before
+pier assembly.
+
+```python
+# Skeleton — tone-match (per-channel multiplicative gain)
+import numpy as np
+from PIL import Image
+
+def tone_match(src: np.ndarray, target_mean: np.ndarray) -> np.ndarray:
+    """Scale each RGB channel so src wall-region mean matches target_mean."""
+    mask = src[..., 3] > 0                          # opaque pixels only
+    result = src.copy().astype(float)
+    for c in range(3):
+        src_mean = result[mask, c].mean()
+        if src_mean > 1e-3:
+            result[..., c] = np.clip(result[..., c] * (target_mean[c] / src_mean), 0, 255)
+    return result.astype(np.uint8)
+```
+
+### Asset locations
+
+| File | Contents |
+|---|---|
+| `assets/props/s1_cloister/buildings/_pixellab_raw/` | Raw PixelLab downloads for wall bays + `build_kit.py` |
+| `assets/props/s1_cloister/buildings/cloister_bay_plain.png` | Plain bay (generated; for a fully-blank variant, patch openings in post) |
+| `assets/props/s1_cloister/buildings/cloister_bay_window.png` | Bay with arched window |
+| `assets/props/s1_cloister/buildings/cloister_bay_door.png` | Bay with door opening |
+| `assets/props/s1_cloister/buildings/cloister_bay_arch.png` | Bay with arcade arch |
+| `assets/props/s1_cloister/buildings/cloister_bay_decorated.png` | Bay with niche/banner stonework |
+| `assets/props/s1_cloister/buildings/pier.png` | 48px-wide buttress pier (boundary stamp) |
+| `scenes/levels/demo/cloister_wall_demo.tscn` | Demo scene showing a composed wall run |
+
+## `create_map_object` — isometric building recipe (D2-style, validated 2026-06-10)
+
+Validated generating isometric buildings in Diablo-2 style via `create_map_object`
+(object ID `29721b7a`, size 320). This is the **active building path** after the 2026-06-10
+full-isometric-world pivot (`team/DECISIONS.md`).
+
+**Validated prompt pattern:**
+
+```
+Isometric view of <subject>. Diablo 2 style. True isometric projection showing two visible
+walls meeting at a front corner, with depth. <material/condition descriptors, e.g.
+"worn tan sandstone, caved-in terracotta roof, rubble at the base">
+```
+
+- `view`: `"low top-down"` — confirmed correct for the iso-corner framing.
+- `size`: 320 validated (object `29721b7a`); 256–384 is the working range.
+- **The framing phrase is load-bearing.** "True isometric projection showing two visible
+  walls meeting at a front corner, with depth" empirically avoided the castle-ification /
+  battlements trap FIRST TRY — the same subject phrased as a "wall" prompt castle-ifies
+  (see the wall-kit section above). Drop the phrase and you risk a fortress read.
+
+**Matte trap RE-VALIDATED at 320px.** Corner pixel `(127,124,125,255)` — fully opaque despite
+`get_map_object` reporting `background: transparent`. Apply the same BFS edge-flood fix as
+building-asset gotcha #2 above (`TOL≈18`, `getbbox()` crop). Always check `px[0,0][3]` after
+download; do not trust the API field.
+
+**8-hour auto-expiry applies.** Download promptly after generation.
+
+**Do NOT hard-snap iso buildings to `S1_BUILDING_DOCTRINE`.** Gotcha #4 above applies
+identically: legitimate roof materials (terracotta, slate) fall outside the wall/stone doctrine
+palette; prefer mechanical-only processing (matte-strip + bbox-crop) and preserve natural roof
+colors. Treat muting as a Sponsor subjective-feel call at in-game serve.
+
+## `create_map_object` — scatter prop generation traps (Zone-A, 2026-06-12, ClickUp `86ca7yt5u`)
+
+Validated across an 11-prop scatter set for the Zone-A beach/field ground layer (grass tuft,
+dry tuft, pebble, pebble cluster, seashell, driftwood, red/yellow/purple wildflower clumps,
+straw stalks, bush). Building-asset gotchas above (matte trap, 8h expiry) still apply; these
+are additional, scatter-specific:
+
+**1. Shape override — "bush" generates a CONIFER without explicit NOT-tree language.**
+`"small dense wild bush, layered muted green foliage"` returned an unmistakable small conifer
+(triangular silhouette; its berries read as ornaments). Validated fix (re-roll passed first
+try): `"low rounded wild shrub, irregular dome shape wider than tall, ... NOT a tree, no
+trunk, no conifer shape"`. General rule: when the desired shape is not the dominant archetype
+of the prompted object class, add explicit `NOT <taller/dominant form>` language.
+
+**2. Non-square canvas may come back square with transparent padding.** A 64×32 driftwood
+request returned a 64×64 canvas (observed once). Harmless if the consumer feet-anchors and
+crops, but never assume the returned canvas matches the request — check `Image.open(p).size`
+and crop to `getbbox()` when the footprint matters.
+
+**3. Concurrency rate-limit observed below the nominal cap.** Firing 10 `create_map_object`
+calls at once (with a tileset job also in flight) rejected 4 with `rate limit exceeded` at ~7
+accepted jobs — Tier-2 nominal is 10 concurrent. Observed once; treat ~6 simultaneous calls as
+the safe batch size. The error's own "wait 15-30s" hint works: retried calls all succeeded
+after the first batch drained.
+
+**4. Style-param lock that held across all 12 props (probe + batch):** `detail="medium
+detail"`, `shading="medium shading"`, `outline="lineless"`, `view="high top-down"`. Lock these
+across a scatter batch and vary only the description — prevents style drift between props that
+will share one ground. Probe ONE prop first (the grass tuft was the validation probe), judge
+it, then batch the rest with identical params.
+
+**5. 8-hour auto-delete applies to scatter props** (same rule as the map-object expiry gotcha
+above) — harvest the whole batch promptly; the generation prompt is the only surviving record
+after expiry.
+
+## Multi-gen building SETS — palette drift, harmonization, and complex-vs-segment granularity (validated 2026-06-10)
+
+**Every independent gen rolls its own palette.** A 7-building batch with IDENTICAL
+material/palette prompt tails came back with visibly different roof reds and stone tints
+(Sponsor: "its 3 different shades of red"). Prompt wording cannot fix this — harmonize in post.
+
+**Family-recolor harmonization (validated 2×, red-roof set + ember set):**
+1. Pick ONE Sponsor-approved piece as the palette anchor.
+2. Family selectors by channel ratio on each piece, e.g. roof-red `(r>g*1.25)&(r>b*1.25)&(r>55)`,
+   moss `(g>r*1.3)&(g>b*1.1)` (exclude — keep moss green), ember-glow `(r>120)&(r>g*1.25)&(g>b)`
+   (exclude — keep warm window light), stone = everything else opaque above near-black.
+3. Per family: HSV remap — hue := anchor family's circular-mean hue; sat := `0.3·own + 0.7·anchor_mean`;
+   **keep V** (preserves all shading/detail). Optional gentle darkness pull for outlier pieces:
+   if a piece's family V-mean exceeds anchor's by >12%, scale V toward `anchor_mean×1.06`.
+4. PIL `convert('HSV')` round-trip works; carry alpha separately.
+
+This is cheap, deterministic, and uniform across any number of pieces — re-anchoring a whole
+set to a new Sponsor style pick is a re-run, not a regeneration.
+
+**Granularity rule — prompt whole CONNECTED COMPLEXES, never "segments".** Modular-kit
+prompts misfire: "short section of a monastery wing" → a complete tall gable house; "tall
+narrow stone buttress pier" → a crenellated castle turret (the castle-ification trap recurs
+on any wall-like fragment subject). But complex subjects excel: "U-shaped range around a
+court", "L-shaped wing meeting a square corner bell tower", "quadrangle with enclosed inner
+courtyard" all produce coherent connected-wing buildings first try. Compose large complexes
+(monasteries, castles) from complex-buildings placed close together + standalone TOWERS at
+junctions (towers hide all joints — sibling of the wall-kit pier-on-seam trick); do NOT chase
+edge-mating segment kits.
+
+**Long-range subjects drift to enclosures.** "Long two-storey range" prompts repeatedly grew
+courtyards/battlemented forecourts (3 occurrences). Strongest counter-wording found: "one
+single straight long narrow ... much longer than tall ... NO battlements" — still only
+partially effective; budget a re-roll.
+
+## `create_isometric_tile` — size cap, shape param, and real ETA (validated 2026-06-10)
+
+**Hard size cap: 64px** (`size` param maximum).
+
+**`tile_shape` — use `"thin tile"` for D2-flat ground.** The `"thin tile"` variant is ~10%
+canvas height (flat diamond), matching how walkable ground reads in Diablo-2-style iso.
+Thicker shapes (`"thick tile"` ~25%, `"block"` ~50%) read as raised slabs or blocks — right
+for elevated terrain, wrong for flat ground.
+
+**Real ETA: ~463–465 s (≈8 min) observed** at `size=64`, `detail="highly detailed"`, despite
+the tool description claiming "~10–20s".
+
+**General rule: NEVER schedule from tool-description ETAs.** Same hint-vs-reality class as
+`create_map_object`'s "30–90s" claim (observed ~7–8 min at 320–384px high detail) and
+`create_character` v3's "~3–5 min" hint (observed ~10–15 min). PixelLab description ETAs are
+aspirational across all async tools — trust the `eta` field in the `get_*` poll response.
+
+**NEVER use `create_isometric_tile` for continuous ground — it seams by design (validated
+2026-06-10, Sponsor-observed).** Each generated diamond is a self-contained slab: its own
+stone-border composition + a baked side lip from the `tile_shape` thickness. Adjacent painted
+cells read as separate slabs with visible seams everywhere; this is structural, not a quality
+issue — unfixable by prompting or re-rolling. Suitable for **standalone props or raised
+platforms** where the slab border is intentional; wrong for walkable ground fields.
+
+**Validated replacement for seamless iso ground: project a seamless top-down texture into
+diamonds.** Source: any seamless cross-mating top-down tile set (validated on
+`assets/tilesets/s1_cloister/floor_cobble.png`, 768×128 = six cross-mating 128px variants).
+For a 128×64 diamond canvas, per output pixel (X, Y):
+
+```
+U = (2Y + X − 64) mod 128
+V = (2Y − X + 64) mod 128
+color = source[V, U + 128·n]          # n = variant index 0–5
+alpha = diamond mask: |X−64|/64 + |Y−32|/32 ≤ 1
+```
+
+Integer-exact nearest sampling — no resample blur. **Load-bearing property:** one map-cell
+advance equals exactly one source period (128px), so every diamond's edges land on the source
+tiles' own (mating) borders — self-mating AND cross-variant-mating by construction. Verified:
+a 10×10 random-variant field renders as one continuous plane, zero seams. Output is flat (no
+lip) and inherits the production palette. Implementation:
+`assets/iso_proof/make_iso_cobble.py`; resulting TileSet = single 768×64 atlas,
+`texture_region_size` 128×64, 6 tiles, `tile_shape=1`, `tile_size` 128×64, no texture_origin.
+
+| Need | Use |
+|---|---|
+| Standalone elevated platform / iso prop tile | `create_isometric_tile` |
+| Continuous walkable iso ground field | Projection-slice from a seamless top-down source (recipe above) |
+
+Same root-cause family as the top-down cross-variant constraint in the next section
+(period/edge mismatch between independently generated tiles).
+
+## `create_tiles_pro` — validated route for seamless flat iso GROUND when no top-down source exists (validated 2026-06-10)
+
+**Amendment to the earlier "`create_tiles_pro` is ALSO wrong for a continuous floor" conclusion:**
+that conclusion was for `tile_type="square_topdown"`, which produces transparent rounded-token
+tiles. The `tile_type="isometric"` variant is a structurally different path and IS validated for
+seamless flat iso ground tiles (this is the same feature as the web GUI's Maps → Tiles →
+Isometric group generator).
+
+**Validated recipe (exact call used for the iso-proof grass/flagstone/dirt sets):**
+
+```python
+mcp__pixellab__create_tiles_pro(
+    description="1). <material one> 2). <material two> ...",  # numbered materials, ONE string
+    tile_type="isometric",
+    tile_size=128,           # canvas comes back 128×128; flat diamond occupies rows 32–95
+    tile_height=64,
+    tile_view_angle=30,
+    tile_depth_ratio=0,      # flat ground — no slab lip
+    outline_mode="segmentation",
+    seed=7,
+)
+```
+
+Crop the **128×64 band at rows 32–95** of each 128×128 canvas for the Godot `tile_shape=1`
+TileSet (`texture_region_size = Vector2i(128, 64)`). Grass-tuft overhang may poke a few px
+above row 32; clipped on crop, negligible at game zoom.
+
+**Geometry trap — `tile_view="top-down"` gives a 1:1 square diamond, not D2 2:1.** The
+default-looking choice for "flat ground" yields 64×64 1:1 diamonds. For the D2 2:1 dimetric
+grid you need `tile_view_angle=30` + `tile_depth_ratio=0` (+ `tile_size=128, tile_height=64`).
+
+**Variant counts are auto-computed (totals, not per-material):** 4 materials @ 64px → 16 tiles
+(≈4/material); 4 materials @ 128px → 10 tiles (≈2-3/material); 1 material @ 128px → 10 tiles.
+Cost ~20–40 gens per call.
+
+**Per-material seam verdicts (6×6 lattice field mocks, same-tile worst case + mixed-variant):**
+
+| Material | Verdict | Notes |
+|---|---|---|
+| Grass | PASS | No seam lines even same-tile-repeated; mixed variants read organic |
+| Flagstone | PASS | Tile borders read as intentional grout — D2-dungeon look |
+| Cobble (multi-material group) | FAIL | Moss/dark bands baked along diamond edges → visible lattice; variant tone-spread → patchwork |
+| Dirt (multi-material group) | FAIL | Streaky directional texture repeats hard; variant tone-spread → patchwork |
+
+**Patchwork mitigation (validated on dirt):**
+
+1. Re-call `create_tiles_pro` with ONLY the failing material and a defect-tuned prompt
+   (dirt fix: "smooth trodden earth, even warm brown tone, no streaks, no cracks").
+2. Download all variants; compose lattice field mocks (same-tile worst case first).
+3. Keep only the tone-coherent subset — judge BEFORE installing into the TileSet.
+   Dirt: kept 4 of 10 (most-uniform first).
+
+Cobble mitigation via single-material regen is **unvalidated** (never attempted — the
+projection route already covers cobble; see routing below).
+
+**Post-processing mitigations after the cull (validated 2026-06-10 on grass v2):**
+
+- **Alpha pin-holes inside the diamond** (blade-fringe notches; ~120-220 px/tile observed on
+  grass) read as black gap slivers when painted back-to-back. Fix: iterative 4-neighbor
+  nearest-fill restricted to the diamond mask (np.roll the opaque mask in 4 directions,
+  copy RGBA where a transparent-in-diamond pixel gains an opaque neighbor; ~8 iterations),
+  then force `alpha=255` everywhere inside the diamond.
+- **Cross-variant tone spread** (soft patchwork even within one gen's culled subset): shift
+  each variant's RGB by `(pool_mean − tile_mean) × 0.7` (means over in-diamond pixels).
+  70% correction removes the value-step between diamonds while keeping per-tile character.
+  Observed shifts are small (1-4 RGB points) — the residual lattice readability comes from
+  per-tile grain direction, which equalization cannot fix; diminishing returns past this.
+- **Cross-GENERATION pooling FAILS — negative result.** Pooling variants from two different
+  `create_tiles_pro` calls (different prompts/seeds, same material) checkerboards hard:
+  generations differ systematically in tone AND texture character, and mean-equalization
+  cannot fix texture. Variant pools must come from a single generation call. (Observed:
+  dirt v1 smooth-tan subset + dirt v2 grainy-dark tiles → hard checkerboard.)
+
+**Routing rule — which iso-ground path:**
+
+| Scenario | Route |
+|---|---|
+| Seamless top-down source already exists (e.g. `floor_cobble.png`) | Projection-slice (`make_iso_cobble.py`, section above) — seamless by construction, zero gen cost |
+| No source; material passes the lattice-mock gate | `create_tiles_pro` isometric (single-material + culled subset if the multi-material group seams) |
+| No source; material fails even single-material mitigation | Generate a seamless top-down source first (inset-crop doctrine, pixel-mcp-pipeline.md), then projection-slice |
+
+Field-mock judge artifacts: `assets/iso_proof/_tiles_pro*/`. Do NOT confuse this path with
+`create_isometric_tile` (seams-by-design slabs, section above) or `create_tiles_pro`
+`square_topdown` (transparent tokens, section above).
+
+## Scripted iso TRANSITION tiles — mate-by-construction, zero gen cost (validated 2026-06-10)
+
+Cross-material border tiles (grass↔dirt etc.) for the Godot terrain auto-tiler are
+constructed procedurally from the shipped material textures — no PixelLab generation.
+For each unordered material pair: the 14 side-combination tiles (2⁴ bitmasks minus the
+2 pures) at 128×64. Implementation: `assets/iso_proof/make_iso_transitions.py` (builds
+all 6 pair atlases AND regenerates the entire terrain-wired `.tres` in one pass — never
+hand-edit the .tres; re-run the script).
+
+**Diamond-local coordinate frame.** The 128×64 diamond is the image of the unit square
+under `X = 64 + (u − v)·64`, `Y = (u + v)·32`. Edges: NE = `v=0`, SE = `u=1`, SW = `v=1`,
+NW = `u=0`. (Godot peering-bit names: NE=`top_right_side`, SE=`bottom_right_side`,
+SW=`bottom_left_side`, NW=`top_left_side` — see godot-headless-tooling.md Pattern 5.)
+
+**Mask field = inverse-distance (Shepard p=2) interpolation of the 4 SIDE bits** (bit=1 →
+that edge mates material B):
+
+```python
+d = [v, 1-u, 1-v, u]                  # distances to NE, SE, SW, NW edges
+w = [1.0 / (di + 1e-3)**2 for di in d]
+f = sum(wi*bi for wi, bi in zip(w, bits)) / sum(w)   # → B where f > 0.5
+```
+
+The field is PURE at every edge (distance→0 → that side's weight dominates → f → its bit),
+so edges are canonical: any two tiles agreeing on a shared edge's terrain mate exactly,
+including against the pure material tiles. Boundaries pin to corner points on mixed corners.
+
+**Negative result — Coons-patch / bilinear-corner construction FAILS.** Along the NE edge
+(v=0) the bilinear form evaluates to `b_ne/2 + (1−u)·b_nw/2 + u·b_se/2` — NOT pure, →
+seams against pure neighbors. Same for corner-anchored Shepard (edge midpoints blend the
+two adjacent corners → 0.5). Side-distance Shepard is the construction that works.
+
+**Organic boundaries without breaking the mating guarantee:** multi-octave noise (octaves
+4/8/16, bilinear-upscaled randn) added to the field with **edge-vanishing amplitude**
+`clip(min_edge_dist × 4, 0, 1) × 0.55` — zero at edges keeps them canonical; full noise in
+the interior. A ±0.05 band around the 0.5 threshold gets random per-pixel dither for
+pixel-art feel. Texture sampling: A-pixels from material A's variant-0 tile, B-pixels from
+B's variant 0 (all variants of a material mate, so transitions mate every painted variant).
+
+**Atlas convention:** column index = bits − 1 where bits = NE | SE&lt;&lt;1 | SW&lt;&lt;2 | NW&lt;&lt;3,
+bits ∈ [1..14]. Tile `terrain` (center) = B when ≥3 bits set, else A.
+
+## Projection limits + iso-lattice TORUS synthesis (validated 2026-06-10)
+
+**The projection-slice route destroys directional texture.** `U=(2Y+X-64)%128, V=(2Y-X+64)%128`
+maps source-space verticals onto diagonals and compresses everything 2:1 vertically — fine
+upright structure (grass blades) becomes diagonal smear/speckle. Projection works for
+ISOTROPIC textures only (cobble, packed dirt, flagstone slabs). Empirical: projected grass
+read as "static noise" two attempts in a row; PixelLab's native iso tiles read well because
+their blades are drawn in iso view.
+
+**Fix — synthesize directly in SCREEN space on the iso-lattice torus.** The diamond lattice
+(translations `(±64,+32)`) has a 128×32 fundamental domain with a TWISTED wrap: stepping past
+`y=31` shifts `x` by 64. Paint upright strokes with lattice folding and the result tiles
+perfectly while keeping screen-space orientation:
+
+```python
+FW, FH = 128, 32
+def fold(x, y):                      # screen coords -> fundamental domain
+    t = (y // FH) % 2
+    return (x + 64 * t) % FW, y % FH
+# smoothing must twist too: vertical np.roll wraps get an extra 64px x-shift
+# diamond build: SX = (X + 64*((Y // FH) % 2)) % FW;  SY = Y % FH;  tile = buf[SY, SX]
+```
+
+Validated for grass (5200 micro-strokes + 1500 upright 2-4px blades + sparse muted dry
+blades over a 2-tone lattice-smoothed base): zero seams, blades upright. Implementation
+inline in the session; the projection machinery lives in `make_iso_projected_grounds.py`.
+
+**Keep the AI look without the AI seams — palette sampling.** Histogram-quantize the
+approved PixelLab tiles (`(px // 12 * 12)`, count clusters, take top-N sorted by brightness)
+and drive the procedural synthesis with those dominant colors. Bridges the Sponsor's
+AI-quality preference (memory `sponsor-prefers-ai-gen-tile-quality`) with construction-level
+seamlessness; tuft DECALS cropped from the AI tiles add back organic life per-variant.
+
+**Object-route ground sources are unreliable.** `create_1_direction_object` with
+"edge-to-edge ground texture, tileable" prompts usually returns sparse blobs-on-transparent
+(2 of 3 packs failed entirely, 2026-06-10; the one earlier success was luck). Slab/stone
+subjects fare better than organic scatter (the flagstone pack yielded 1 good full-bleed
+candidate of 4 — check `(a[...,3]<200).sum()` and np.roll(64,64) wrap-test before trusting).
+Sources may carry in-texture transparent holes — pin-hole fill with TOROIDAL neighbors
+(np.roll wraps) before projecting.
+
+**Updated routing for iso ground materials:**
+
+| Material class | Route |
+|---|---|
+| Isotropic, seamless top-down source exists (cobble) | Projection-slice |
+| Isotropic, no source (dirt, flagstone) | Procedural toroidal synth or one AI source attempt → projection-slice |
+| Directional/organic (grass, fur, reeds) | Iso-lattice torus synthesis in screen space (this section) |
+| Any material, per-tile AI look preferred over seamlessness | `create_tiles_pro` iso + post-processing mitigations (sections above) |
+
+## Multi-variant seamless FIELD — toroidal ≠ cross-variant edge-mating (S1 yard, PR #426)
+
+Validated 2026-06-08. A toroidally-seamless tile (the `np.roll` half-offset wrap, or any
+generator that guarantees a tile wraps with **itself**) is seamless **only when the SAME tile
+repeats**. It does NOT guarantee that two **different variants** mate at their shared edge.
+
+**The trap:** painting a large ground field by swapping among N seamless variants *per block*
+(e.g. a different 256px cobble/dirt variant per chunk-block for visual variety) exposes a
+**visible grid of seams** at every block boundary — adjacent variants' edge pixels don't line
+up, so the eye reads a ~256px lattice across what should be a continuous field. This was the
+"no structure / block-grid" artifact in the S1 yard v2 dirt field.
+
+**Fixes:**
+- **Single-variant continuous addressing (used for the S1 dirt fix):** paint the field from ONE
+  variant addressed continuously across the whole region (sample one large virtual texture by
+  world-coordinate modulo), so every cell mates with its neighbor by construction. Variety then
+  comes from composition (paths, patches, edges), NOT per-block texture swaps.
+- If you DO need multiple variants in one field, they must be generated to share identical edge
+  pixels (a common seam ring) — otherwise they cannot tile against each other.
+
+**Corollary (the broader S1-path lesson):** procedural *scatter* of material patches reads as
+chaos, not as authored ground. A varied ground that reads "designed" (smooth field + one
+legible path + grass at the margins) needs **hand-placed composition**, not per-block random
+variant/patch selection. See `.claude/docs/art-direction.md` § Execution lessons.
+
+**Finer geometry WITHOUT shrinking the texture — decouple the painter cell from the atlas (PR #426 v4).**
+To make path/region GEOMETRY finer (smaller corners/steps, soft edges) without shrinking the
+loved stone size: **decouple the painter/TileMap cell from the texture sampling.** Use a finer
+cell grid for authoring/painting (smaller cells → finer step resolution + room for feathered
+dither bands at material edges), but sample the atlas by **continuous world-coordinate** (`fx %
+period`) so the stone scale stays pinned to the atlas period regardless of cell size. The cobble
+"stones" stay the size Sponsor approved while the path corners get finer. **Constraint:** the
+cell size must divide BOTH the world dimension AND the atlas period for clean seamless tiling —
+this capped the S1 yard at a 16px cell (only 2× finer than the 32px logical tile) in the fixed
+1280×768 world. Finer-than-that needs a different world dimension or a boundary blend-shader.
 
 ## Checklist — before every PixelLab + pixel-mcp session
 
@@ -1116,6 +1889,37 @@ Validated 2026-06-06 (S1 tile upgrade `86ca44p4j`, same session as the `create_t
 8. Verify visually after every `set_palette` or `export_sprite` call.
 9. All pixel-mcp trap rules from `pixel-mcp-pipeline.md` still apply (Windows path escape,
    draw_pixels broken, fill_area global-replace, scale_sprite destructive).
+10. For characters destined for ground-anchored rendering (isometric / 3D billboard): alpha-scan
+    the idle-south frame for the lowest opaque pixel row and pivot there, NOT the canvas bottom
+    (see "Transparent-padding trap" section). If pivot drifts > 2 px across sample frames,
+    switch to per-frame pivots.
+
+## Env-art pre-delivery judge ritual (validated 2026-06-12, ClickUp `86ca7yt5u`)
+
+14 environment-art generations (tilesets + scatter props) for Zone-A; 3 failed the art bar and
+all 3 were caught BEFORE delivery by this ritual. Failures are invisible at the thumbnail scale
+the MCP tool response renders — judge at inspection scale, against the board, before any
+delivery to engine/consumer.
+
+1. **Download with `curl -sS -L -f`** (see the redirect-trap section) and fail-fast-verify the
+   file opens (`PIL.Image.open`).
+2. **Upscale NEAREST for inspection** — 4× for tile sheets, 8× for small props. Nearest-neighbor
+   (never bilinear) preserves pixel structure so weave/grid artifacts and silhouettes read.
+3. **Tiles: 4×4 self-tiled preview** — paste the candidate fill tile in a 4×4 grid and upscale.
+   Seams, repeat rhythm, and mechanical structure only become visible in a tiled field; a tile
+   judged in isolation always looks better than it tiles.
+4. **Props: contact-sheet the batch** — composite all props (8×, on a neutral grey background)
+   into ONE image and Read once. Style drift and scale mismatch read immediately in a grid;
+   N individual reads waste rounds and hide relative problems.
+5. **Judge against `art-direction.md`'s inspiration board**, not against "is this a good
+   sprite": the question is whether it reads as part of THIS world (fine multi-tone texture,
+   muted natural palette, no cartoon brightness). Record verdict + lesson per generation in a
+   session judge-trail file so prompt fixes accumulate instead of being rediscovered.
+
+**Zone-A worked examples (symptom → fix):** flat cartoon-green grass → name the tones
+(olive/moss/forest green); basket-weave sand → medium detail + "NO pattern/grid/weave, organic
+randomness"; conifer-shaped "bush" → explicit "NOT a tree, no trunk, no conifer shape";
+0-byte download → `curl -L`.
 
 ---
 

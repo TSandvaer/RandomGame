@@ -194,6 +194,29 @@ Camera tweens are created via `create_tween()` with no `ignore_time_scale` overr
 
 **If a future cue needs camera motion that ignores time-scale** (e.g. a panic-shake during a freeze for emphasis), it would need to construct its tween with explicit `set_ignore_time_scale(true)`. T9 ships no such surface.
 
+## Puppet steals the camera from standalone/demo scenes (F6) — scene must `make_current()` back
+
+The puppet is created and made current at AUTOLOAD ready (`CameraDirector.gd` `_ready` →
+`Camera2D.new()` + `add_child` + `make_current()`, ~lines 268-275) — i.e. **before any scene
+loads**, including F6-run standalone scenes. Consequence: a demo/proof/test scene that ships
+its own `Camera2D` (child of its player) never becomes the active camera — Godot's
+"enabled camera becomes current on enter-tree" rule only applies when NO camera is current
+yet, and the puppet always wins that race.
+
+**Symptom signature:** scene runs clean (zero errors), character moves, but the view stays
+fixed at world origin and the character walks out of frame. No warning anywhere.
+
+**Fix pattern (validated 2026-06-10, `IsoProofPlayer.gd`):** the scene-side script reclaims
+the view at spawn:
+
+```gdscript
+func _ready() -> void:
+    ($Camera as Camera2D).make_current()
+```
+
+Production scenes route camera ownership through `CameraDirector.follow_target` instead —
+this reclaim pattern is for standalone scenes that intentionally bypass the Director.
+
 ## Cross-references
 
 - [Audio Architecture](audio-architecture.md) — `AudioDirector` autoload + child-puppet pattern (parallel structure)

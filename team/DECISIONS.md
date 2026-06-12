@@ -498,3 +498,50 @@ Format:
 - Foundation: memory `[[s1-cloister-yard-open-world-direction]]` + `[[tile-scale-small-player-large-world]]`; aligns S1 with `[[m3-diablo-shape-directive]]`; `.claude/docs/camera-scroll.md` + `.claude/docs/procgen-pipeline.md`.
 - Open (deferred to Sponsor/Devon, NOT settled here): how far "endless" goes — finite-large-that-reads-endless vs truly-unbounded streaming (Open Q5, bounds T7); per-character S1 randomization depth; whether the open-yard feel is cleanly expressible in the port-mating chunk model (R-YARD-1, Devon's call). The new living-world pillars (ambient animals / discoverable treasures / landscapes-vistas-parallax, proposal §3.5) are flagged as later mini-tracks, NOT ticketed now.
 - Detail: this PR (`priya/s1-cloister-yard-tickets`) appends this entry; scope source `team/priya-pl/s1-cloister-yard-scope.md` (PR #418).
+
+## 2026-06-10 — FULL ISOMETRIC WORLD pivot, Diablo-2 style (Sponsor-directed)
+
+- Decided by: Sponsor (direct chat directive 2026-06-10, two steps: "abandon the whole flat building look, I only want buildings/constructions/ruins to be Isometric. keep it diablo 2 style" → asked scope via popup → Sponsor clicked **"Full isometric world"** over iso-buildings-on-topdown-ground and proof-first options). Orchestrator logs.
+- Decision: the ENTIRE game pivots to isometric presentation (Diablo-2 style): diamond/iso ground tiles, isometric camera read, isometric building/construction/ruin assets, isometric character + mob renders. Top-down and flat-oblique looks are abandoned.
+- Immediate consequences executed same-day: (a) the 2026-06-09/10 oblique cloister wall-block kit (cloister_bay_* + pier + cloister_wall_demo.tscn) abandoned as a look (files remain on disk); (b) PixelLab account purged of 20 non-isometric building generations (14 wall-kit gens + 6 June-8 top-down building props: chapel, 2 dormitory halves, central, 2 outbuilding variants) at Sponsor direction; well-head + non-building assets kept; local repo PNGs untouched.
+- Supersedes / re-scopes: top-down framing of the 2026-06-08 level-design pivot (Sponsor-paints-in-editor STILL HOLDS; the sourced ground tileset must now be an ISOMETRIC tileset); top-down character sprite direction (player monk + S1 mob roster need isometric re-renders); S1-YARD T-tickets' visual layer (open-yard spatial concept + assembler/endless path CARRY FORWARD; rendering becomes isometric).
+- Still in force: world-feel big-and-endless north-star, journey arc, warm worn-stone art direction, small-player/big-world scale doctrine, bestiary doctrine, assembler/continuous-scroll engine path.
+- Reversibility: strategic one-way once asset regeneration begins at scale; cheap to pause before the first batch of iso assets is generated/purchased.
+- Affects: EVERYONE — Uma (iso art-direction brief + which inspiration refs survive), Priya (workstream re-scope: iso ground tileset sourcing, iso character regen, camera/collision spike tickets), Devon (Godot isometric TileMapLayer + camera/collision spike), Drew (scene/painter retrofits), Tess (new visual-gate surface), Orchestrator (PixelLab iso generation — `create_isometric_tile` tooling exists).
+- Open (NOT settled here): iso projection ratio (2:1 dimetric classic vs other); whether existing GUT/Playwright spec surfaces survive the camera change; what happens to the in-flight sourced-tileset purchase if it was top-down; migration sequencing (proof-slice vs big-bang) — orchestrator recommends proof-slice first; Sponsor to confirm engagement shape.
+- Detail: memory `buildings-isometric-diablo2-style` (user-scope auto-memory) records the directive verbatim; this entry is the team-visible record.
+
+## 2026-06-11 — DEVELOPMENT HOLD: Godot engine choice under Sponsor review (Sponsor-directed)
+
+- Decided by: Sponsor (direct chat directive 2026-06-11, verbatim: "I have serious doubts about the choice of godot. I want you to hold of any development before we have settled the wether the graphics engine supports my requirements"). Orchestrator logs.
+- Decision: ALL development is held until the graphics-engine question is settled. No dispatches, no PR authoring, no merges — including the R&D harvest wave (H1 `86ca7ugce` / H2 `86ca7ugfr` / H3 `86ca7ugkj` / H4 `86ca7ugrq`) and the Playwright-red fix (`86ca7xgud`) — until Sponsor declares the engine question settled.
+- Next step: requirements elicitation with Sponsor → engine-capability evaluation against those requirements (Godot 4.6 as-is; alternatives compared where a requirement genuinely fails) → Sponsor verdict (stay / migrate / re-scope).
+- Context: lands one day after the FULL ISOMETRIC WORLD pivot (2026-06-10 entry). Hypothesis — verify with Sponsor, requirements not yet enumerated: the doubt concerns graphics capability for the Diablo-2-style isometric target look.
+- Reversibility: the hold itself is fully reversible (Sponsor lifts it). A downstream engine-migration decision would be strategic one-way territory and gets its own DECISIONS entry.
+- Affects: everyone — all role dispatches paused. PR #422 (journey-arc roadmap) remains open awaiting Sponsor's strategic read (a docs proposal, not development; still not auto-merged).
+
+## 2026-06-11 — Engine evaluation: Unity proof-slice GO + desktop-first distribution + survival-genre reveal (Sponsor-directed)
+
+- Decided by: Sponsor (popup answers + chat, 2026-06-11). Orchestrator logs.
+- Decision 1 — **Desktop-first distribution**: downloadable desktop builds become the primary play surface (itch.io-style); browser becomes optional/later. Supersedes HTML5-as-primary.
+- Decision 2 — **Unity proof-slice as the engine-evaluation vehicle** (~1–2 team-weeks, $0 new spend): PixelLab monk as billboarded 8-direction sprite in a big 3D terrain, PoE-style click-to-move (NavMesh), mouse-orbit camera, plus a survival micro-loop (click tree → pathfind → chop → collect wood → place campfire) reflecting the revealed genre. Sponsor judges by playing a Windows build. The development hold on Godot-side work (2026-06-11 entry above) continues until the verdict.
+- Genre revealed (shapes the evaluation): Sponsor aspiration = survival — "wake up and have to survive: chop wood, make a fire, collect food and build a shelter." Budget guardrail restated: hobby project, 100–200 USD/mo acceptable.
+- Facts verified same-day (web): Unity Personal free under $200K revenue/funding, runtime fee cancelled 2024; PixelLab output is engine-agnostic spritesheets (Unity import standard).
+- Building-depth fork RESOLVED same-day (Sponsor popup): **prefab placement, Don't Starve-style** — locks 3D-world + billboard-pixel-art + prefab architecture; PixelLab stays central; no free-form/Valheim construction, no 3D-mesh art needed. Unity Editor prerequisite also resolved: Unity 6 (6000.4.10f1) + Hub already installed on the dev machine; spike ticket `86ca7y46c` dispatched to Devon (license fail-fast = step 1).
+- Reversibility: proof-slice is throwaway-by-design; no migration commitment until Sponsor judges it.
+
+## 2026-06-12 — Player character goes LOW-POLY 3D (matches world style)
+
+- Decided by: Sponsor (popup decision, mid-engine-eval soak)
+- Decision: The player character will be a low-poly smooth-shaded 3D mesh matching the Zone C/D world style — replacing the pixel-art billboard route. Design: YOUNG (late-twenties) cheerful/hopeful castaway (torn shorts, bare chest/feet, long unkempt hair, light stubble) at 3x the monk's former on-screen scale. Spike placeholder = CC0 rigged low-poly humanoid (Quaternius/Mixamo routes per team/erik-consult/low-poly-style-sourcing-2026-06-12.md); custom castaway model is a later step; pixel castaway v1/v2 renders are archived as the design reference.
+- Why: Sponsor on the pixel castaway: "the character is not really in the Soft Low-Poly (or Smooth-Shaded Low-Poly) style" + picked style-coherence over the mixed HD-2D aesthetic (rejected options: judge-in-world-first, keep-pixel-deliberately). Also amends design: "he should also look younger and more happy".
+- Reversibility: reversible while in spike (pixel sets archived; PixelLab pipeline intact — narrows to UI/icons/portraits for now)
+- Affects: character-art pipeline (PixelLab → CC0/custom 3D for characters), Devon (spike integration), engine-eval verdict surface, ticket 86ca7zkyr
+
+## 2026-06-12 — ENGINE DECISION: migrate to Unity (Sponsor-directed)
+
+- Decided by: Sponsor (popup decision after all style gates passed)
+- Decision: Embergrave migrates from Godot 4.6 to Unity (Unity 6 / URP) as the production engine. The 2026-06-11 development hold resolves as retire-Godot: Godot-side development does not resume; the Unity eval spike's learnings + Sponsor-approved zones/character seed the production setup. Priya re-scopes the roadmap (incl. PR #422) under the survival genre + low-poly smooth-shaded direction.
+- Why: Engine-eval spike found NO Unity blockers (Devon verdict YES: PoE click-move, orbit camera, NavMesh, billboard + 3D characters, PixelLab import all work — ticket 86ca7y46c), and all style gates passed 2026-06-12 (Sponsor verbatims: character "appealing (if it can be a bit more detailed/polished)"; "i love zone D + quality"; "zone c approved"). Sponsor's gut was Unity from the 2026-06-11 requirements elicitation; the spike turned gut into evidence.
+- Reversibility: one-way in practice (roadmap, assets, and codebase re-anchor on Unity; the Godot repo is archived, not deleted)
+- Affects: all roles + repo strategy (Godot repo → archive; Unity production project bootstrap), held harvest wave H1 86ca7ugce / H2 86ca7ugfr / H3 86ca7ugkj / H4 86ca7ugrq + Playwright fix 86ca7xgud (disposition via Priya re-scope), CI/release pipeline, desktop-first distribution, ticket 86ca7y46c (engine eval → complete), PR #422

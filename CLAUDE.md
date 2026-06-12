@@ -81,6 +81,8 @@ For deep-dive reference, see the topic files in `.claude/docs/`:
 - [Save Architecture](.claude/docs/save-architecture.md) — version-gate `_upgrade_payload` for breaking changes, additive `has()`-guard reads for forward-compat fields, unconditional backfill outside the version-gate for same-version feature additions (PR #352 `_backfill_v5_tier3_quest_fields` pattern)
 - [Quest System](.claude/docs/quest-system.md) — QuestDef / QuestState / QuestStateResolver schema, QuestActionRouter autoload (listener stub + bounty-state persistence via `accept_bounty` / `complete_bounty` verbs), Player.active_bounty save round-trip seam, existence ≠ invocation Main.gd wiring gotcha (PR #347 → #352 → #362), sub-track 5b TBD bounty-content surface
 - [Sponsor Soak Routing](.claude/docs/sponsor-soak-routing.md) — when Playwright + Tess is sufficient (mechanical correctness) vs when Sponsor soak is the binding gate (subjective feel, first-of-class visual, tier-completion); right-sizing the Sponsor ask
+- [Art Direction](.claude/docs/art-direction.md) — Sponsor's inspiration board (`inspiration/*.png`): the visual north-star — fine multi-tone worn stone, human-scale landmarks, lush PURPOSEFUL decoration, warm cohesive palette, small-player/big-alive-world; **look at the actual images before any visual/level/tile/prop work**
+- [Godot Headless Tooling](.claude/docs/godot-headless-tooling.md) — headless `--script` TileMap paint/re-save pattern, `--import` precondition, type-inference parse trap, cold-start noise guide
 
 ## Key references outside `.claude/docs/`
 
