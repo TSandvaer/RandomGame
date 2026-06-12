@@ -262,6 +262,40 @@ This applies to any pixel-mcp tool that takes a file path parameter.
 
 ---
 
+## Windows / .NET 10 — use Python + Pillow for pixel compositing; PowerShell System.Drawing is BROKEN on this host
+
+Validated 2026-06-10 during S1 building-wall kit assembly.
+
+**Observed symptom:** PowerShell `System.Drawing` / GDI+ bitmap operations crash the CLR host
+with a fatal error (`0x80131506`) under per-pixel or `LockBits` loops. After the crash, a
+subsequent `Bitmap` load on a valid PNG returns `"Parameter is not valid"` — the GDI+ subsystem
+is **poisoned for the rest of the PowerShell session**. Root cause not diagnosed; no workaround
+within PowerShell was found — recover by using a fresh shell and a different toolchain.
+
+**Remedy — use Python + Pillow + numpy for ALL pixel compositing on this host:**
+
+```python
+# Minimal verified skeleton
+import numpy as np
+from PIL import Image
+
+arr = np.array(Image.open("C:/path/to/source.png").convert("RGBA"))
+
+# … compositing ops here …
+
+Image.fromarray(arr, "RGBA").save("C:/path/to/output.png")
+```
+
+This applies to: tone-matching, hue-mask recolors (Strategy 5 in `pixellab-pipeline.md`),
+matte-stripping, frame-compositing, and any other per-pixel pipeline step. PowerShell is safe
+for file I/O (move, copy, mkdir) but MUST NOT be used for `System.Drawing` / GDI+ pixel
+work on this machine.
+
+**Cross-reference:** `pixellab-pipeline.md` § "Building-wall kit generation" uses this toolchain
+for the bay tone-match + pier-on-seam assembly.
+
+---
+
 ## Doctrine palette lock — worked example (S1 Grunt)
 
 When `quantize_palette` is used to lock a downscaled sprite to the doctrine palette, the palette

@@ -39,6 +39,43 @@ The orchestrator itself uses two locations:
 
 Per-role worktrees are **single-tenant** — never spawn two agents for the same role concurrently on the same worktree (their writes interleave and stomp each other; see memory: `multi-dispatch-worktree-conflict.md`).
 
+### Sponsor's design worktree — `RandomGame-design`
+
+Sponsor's Godot editor opens `C:/Trunk/PRIVATE/RandomGame-design` (branch `sponsor/s1-design`),
+**not** the main repo. It appears in `git worktree list` like the role worktrees — but it is
+Sponsor-only territory: agents never commit to `sponsor/s1-design`.
+
+**Delivery rule (verified 2026-06-10):** any scene, script, resource, or asset Sponsor must
+open or paint in his editor must exist in the design worktree at the **same relative path** as
+in the main repo. The main repo is canonical; design-worktree copies are untracked soak/design
+artifacts. A main-repo-only write silently fails the handoff — the file simply never appears in
+Sponsor's FileSystem dock (no error anywhere), costing a screenshot round-trip to diagnose.
+
+**Delivering-agent convention:** as the final step of a dispatch — before submitting the
+Self-Test Report — mirror-copy all Sponsor-facing files (including every script/resource the
+scene depends on) into the design worktree:
+
+```bash
+cp "C:/Trunk/PRIVATE/RandomGame/scenes/levels/demo/iso_proof.tscn" \
+   "C:/Trunk/PRIVATE/RandomGame-design/scenes/levels/demo/iso_proof.tscn"
+```
+
+**Detection fingerprint:** Sponsor's FileSystem dock shows design-worktree-only files
+(`s1_yard_authored.tscn`, `s1_prop_palette.tscn`) but lacks a path you know exists in main →
+his editor root is the design worktree and your file wasn't mirrored.
+
+**Import-order wrinkle:** after copying new resources, Sponsor's editor must rescan + import
+them BEFORE a scene referencing them reloads — a scene loaded before its new dependencies are
+imported silently drops the reference (observed: TileMapLayer with empty `tile_set`). Fix:
+**Project → Reload Current Project** in Sponsor's editor.
+
+**Headless-script import prerequisite (agent-side sibling):** when an agent runs a `--script`
+pass against a project copy that contains never-imported assets, Godot errors with "No loader
+found for resource" and cascading ext_resource failures — the same root cause as the
+editor-side wrinkle above, surfaced differently. Fix: run `--headless --path <project>
+--import` once before any `--script` pass. Full pattern + cold-start noise guide in
+[`.claude/docs/godot-headless-tooling.md`](.claude/docs/godot-headless-tooling.md).
+
 ## Dispatch conventions
 
 A dispatch brief should include:
@@ -83,6 +120,7 @@ Several gates are non-negotiable per memory rules:
 - **Playwright browser-E2E harness** (`tests/playwright/`, design at `team/tess-qa/playwright-harness-design.md`, landed PR #154): the canonical browser-driven AC verification gate. Complement to GUT — covers what headless engine tests miss (HTML5 renderer behavior, real input events, service-worker cache, canvas-to-DOM coordination). CI auto-runs against every release-build via `.github/workflows/playwright-e2e.yml`. **Sponsor-soak is no longer the only AC gate** — Sponsor's role shifted to subjective feel-check after the harness reports green. As of M2 W1 the suite covers AC1–AC4 + equip-flow + negative-assertion sweep; AC4 final flip tracked by `86c9qckrd`.
 - **Roster-swap audit gate** (`team/tess-qa/playwright-harness-design.md` § "Roster-swap regression discipline"): any PR that mutates a `resources/level_chunks/*.tres` file's `mob_spawns` (count, type, or position) MUST run the full Playwright harness against the new artifact AND audit every spec whose trace assertions match on the affected mob class. PR #169's silent breakage of 6 specs is the cautionary tale — the harness went red-on-main for ~24h before being noticed. Self-Test Report must include the all-specs harness run output.
 - **Playwright artifact SHA-pin contract** (`.github/workflows/playwright-e2e.yml`, W3-T11 ticket `86c9ue1xu`): manual `gh workflow run playwright-e2e.yml` invocations MUST pass either `-f artifact_run_id=<id>` (exact run) or `-f artifact_sha=<sha>` (matches a release-github.yml run by head_sha). Passing neither is a HARD FAIL — the legacy "latest successful release on main" silent-fallback bit Tess's W2 soak by pulling the W2 RC artifact for a PR-branch Playwright run. The resolve step verifies the downloaded artifact's name contains the resolved SHA before Playwright runs. `workflow_run` chain trigger (post-release-build on main) is unchanged — uses the upstream run's `id` + `head_sha` automatically.
+- **Outcome over motion — surface structural gaps, don't polish surfaces** (memory `orchestration-outcome-over-motion.md`; S1-yard 8-bounce incident 2026-06-08). Non-negotiable orchestration disciplines: (1) **≥2 Sponsor rejections of the same surface = wrong layer/tool → escalate the APPROACH, not another tweak** (the S1 yard got 8 tile-tweak rounds while the real gap — no map was ever DESIGNED — went unnamed). (2) **Every deliverable needs a QUALITY-owner + internal gate**; a green CI / Tess-mechanical-APPROVE means "it runs," NOT "it's good" — if no role owns "is this actually good," that judgment wrongly falls to the Sponsor. (3) **Direction ≠ design ≠ done**: vision-prose built literally comes out mechanical; validate the substance of a deliverable, not that a PR/asset exists. (4) **Never present work to the Sponsor as "ready / bless it" unless the orchestrator genuinely believes it's good** — overstating completion is the trust-killer. (5) **A problem the SPONSOR catches = a broken internal gate** → fix the gate, don't just fix the one bug and keep forwarding (Sponsor-as-QA-loop violates `testing-bar`). (6) **Verify against the running game, not a proxy** that can diverge (the render-tool false-approval, `art-direction.md` Execution lessons).
 
 ## Git workflow
 
@@ -139,6 +177,82 @@ end with "and merge" should include this step explicitly.
 Validated 2026-05-18 (PR #276 Stoker merge) — supersedes the older "harmless;
 auto-rotates on next dispatch" framing, which undersold the ClickUp-flip short-circuit
 risk.
+
+### False-failure: `gh pr merge` from a detached-HEAD cwd
+
+Running `gh pr merge <N> --admin --squash --delete-branch` with the **cwd inside a
+detached-HEAD worktree** (e.g. after `git switch --detach HEAD`) prints:
+
+```
+could not determine current branch: failed to run git: not on any branch
+```
+
+This looks like a total failure, but it is **not**. The server-side squash-merge (step 1)
+and remote-branch deletion (step 2) both succeeded on the first call. Only the local
+post-merge context lookup failed. The board may appear to lie — ClickUp still shows
+"ready for qa test" if the paired flip was queued after the merge call — but the PR
+itself is already closed.
+
+**Ground-truth check:**
+
+```bash
+gh pr view <N> --json state,mergedAt -q '"\(.state) | mergedAt: \(.mergedAt)"'
+# → MERGED | mergedAt: 2026-06-11T22:15:00Z  → already done, take no further merge action
+# → OPEN   | mergedAt: null                  → genuinely failed; retry from repo root
+```
+
+**Recovery:** If the state is `MERGED`, the ClickUp flip that was short-circuited is the
+only remaining action — fire it immediately. If you retry the merge it will return
+"Pull request was already merged" (harmless), completing local cleanup; then run the
+paired ClickUp flip.
+
+**Prevention:** Run `gh pr merge` from the **repo root** (`C:/Trunk/PRIVATE/RandomGame`),
+not from a role worktree. The detach step (`git -C <worktree> switch --detach HEAD`)
+still happens in the agent worktree before the orchestrator fires the merge — that
+detach prevents the branch-hold failure described in the section above. Only the *cwd*
+of the merge call itself matters; use the repo root.
+
+**Contrast with the branch-hold failure above:** the branch-hold failure emits
+`error: Cannot delete branch '<name>' checked out at '<path>'`; this false-failure emits
+`could not determine current branch: not on any branch`. Both are verified by
+`gh pr view <N> --json state,mergedAt`; if `state=MERGED` the merge succeeded and only
+cleanup/ClickUp remains.
+
+Validated 2026-06-12 (PR #436 merge, timestamp 2026-06-11T22:15Z).
+
+### Orchestrator survey root silently drifts behind `origin/main` after server-side merges
+
+The orchestrator merges PRs via `gh pr merge --admin --squash --delete-branch` — a **server-side**
+operation that advances `origin/main` on GitHub but does **NOT** advance the local `main` checkout
+in the survey root (`C:/Trunk/PRIVATE/RandomGame`). After several merge rounds the local working
+tree can sit multiple commits behind `origin/main` while every `git fetch` correctly updates the
+`origin/main` ref (confirmed in practice at **7 commits behind**, 2026-06-07).
+
+**Symptom:** files committed by merged PRs are **invisible** to local `Read` / `Grep` / `Glob` /
+`find` — `git status` shows a clean tree, but the files simply aren't in the checkout.
+`git show <sha>:<path>` proves they're in history. Sub-agents who `cd` into the survey root see the
+same stale state.
+
+**Detection:** `git rev-list --left-right --count HEAD...origin/main` — a right-side count > 0
+means origin is ahead and local needs updating.
+
+**Fix:**
+
+```bash
+git -C C:/Trunk/PRIVATE/RandomGame stash            # preserve any doc-WIP (maintain-docs edits)
+git -C C:/Trunk/PRIVATE/RandomGame merge --ff-only origin/main
+git -C C:/Trunk/PRIVATE/RandomGame stash pop        # restore WIP
+```
+
+**Watch for untracked collisions:** if a merged PR now *tracks* a file that existed locally as
+*untracked* (e.g. a scope doc authored locally then committed via a PR from a role worktree), the
+`--ff-only` errors with "untracked working tree files would be overwritten." Back up + remove the
+local copy, run the ff, then diff the backup against the now-merged version to confirm no loss.
+
+**When it matters most:** whenever the orchestrator needs to read merged-PR content locally — e.g.
+judging a newly-merged asset against a just-merged base, or reading a script a sub-agent landed.
+A `git fetch` alone is NOT sufficient; the checkout must also advance. Role worktrees are unaffected
+(they `git fetch && git checkout main && git pull` explicitly in Step 0) — only the survey root drifts.
 
 ### Multi-line PR bodies / comments — always use `--body-file`, never heredoc or `--body "..."`
 
